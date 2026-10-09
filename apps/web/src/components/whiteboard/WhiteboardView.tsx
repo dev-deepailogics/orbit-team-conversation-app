@@ -484,13 +484,14 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           return Math.hypot(coords.x - cx, coords.y - cy) <= r;
         }
         if (el.type === 'text') {
-          const w = el.width || 200;
-          const h = el.height || 40;
+          const lineCount = (el.text || '').split('\n').length || 1;
+          const estimatedHeight = Math.max(el.height || 48, lineCount * (el.fontSize || 18) * 1.35 + 10);
+          const w = el.width || 240;
           return (
             coords.x >= el.x &&
             coords.x <= el.x + w &&
             coords.y >= el.y &&
-            coords.y <= el.y + h
+            coords.y <= el.y + estimatedHeight
           );
         }
         if (el.type === 'pen' && el.points) {
@@ -737,37 +738,162 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     }
   };
 
-  // Text Formatting Helpers
+  // Text Formatting Helpers with granular text selection and line-level markdown support
   const selectedElement = elements.find((el) => el.id === selectedElementId);
 
-  const updateSelectedFormatting = (updates: Partial<CanvasElement>) => {
+  const updateSelectedFormatting = useCallback((updates: Partial<CanvasElement>) => {
     if (!selectedElementId) return;
-    const updated = elements.map((el) =>
-      el.id === selectedElementId ? { ...el, ...updates } : el
-    );
-    commitElements(updated);
-  };
+    setElements((prev) => {
+      const updated = prev.map((el) =>
+        el.id === selectedElementId ? { ...el, ...updates } : el
+      );
+      saveWhiteboardToServer(updated);
+      getSocket().emit('whiteboard:update', {
+        channelId: channel.id,
+        data: { elements: updated },
+      });
+      return updated;
+    });
+  }, [selectedElementId, channel.id, saveWhiteboardToServer]);
 
-  const toggleBold = () => {
-    if (!selectedElement) return;
-    updateSelectedFormatting({ isBold: !selectedElement.isBold });
-  };
+  // Format Bold: applies to selected text in textarea, or toggles whole element
+  const handleFormatBold = () => {
+    const textarea = inlineInputRef.current;
+    if (editingId && textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const current = textarea.value;
 
-  const setFontSize = (size: number) => {
-    updateSelectedFormatting({ fontSize: size });
-  };
+      if (start !== end) {
+        const selected = current.slice(start, end);
+        const isAlreadyBold = selected.startsWith('**') && selected.endsWith('**') && selected.length >= 4;
+        const replacement = isAlreadyBold ? selected.slice(2, -2) : `**${selected}**`;
+        const newText = current.slice(0, start) + replacement + current.slice(end);
+        setEditText(newText);
+        updateSelectedFormatting({ text: newText });
 
-  const insertBulletList = () => {
-    if (!selectedElement) return;
-    const currentText = editingId === selectedElement.id ? editText : selectedElement.text || '';
-    const lines = currentText.split('\n');
-    const formatted = lines
-      .map((line) => (line.startsWith('• ') ? line : `• ${line}`))
-      .join('\n');
-    if (editingId === selectedElement.id) {
-      setEditText(formatted);
+        setTimeout(() => {
+          if (textarea) {
+            textarea.focus();
+            textarea.setSelectionRange(
+              start,
+              start + replacement.length
+            );
+          }
+        }, 0);
+      } else {
+        const newText = current.slice(0, start) + '****' + current.slice(end);
+        setEditText(newText);
+        updateSelectedFormatting({ text: newText });
+        setTimeout(() => {
+          if (textarea) {
+            textarea.focus();
+            textarea.setSelectionRange(start + 2, start + 2);
+          }
+        }, 0);
+      }
+    } else if (selectedElement) {
+      updateSelectedFormatting({ isBold: !selectedElement.isBold });
     }
-    updateSelectedFormatting({ text: formatted });
+  };
+
+  // Format Heading: applies # or ## to current line / selected lines
+  const handleFormatHeading = (level: 1 | 2 | 0) => {
+    const prefix = level === 1 ? '# ' : level === 2 ? '## ' : '';
+    const textarea = inlineInputRef.current;
+
+    if (editingId && textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const current = textarea.value;
+
+      const lineStart = current.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
+      let lineEnd = current.indexOf('\n', end);
+      if (lineEnd === -1) lineEnd = current.length;
+
+      const selectedBlock = current.slice(lineStart, lineEnd);
+      const lines = selectedBlock.split('\n');
+      const updatedLines = lines.map((line) => {
+        const cleaned = line.replace(/^(#{1,3}\s*)/, '');
+        return prefix ? `${prefix}${cleaned}` : cleaned;
+      });
+
+      const replacement = updatedLines.join('\n');
+      const newText = current.slice(0, lineStart) + replacement + current.slice(lineEnd);
+      setEditText(newText);
+      updateSelectedFormatting({ text: newText });
+
+      setTimeout(() => {
+        if (textarea) {
+          textarea.focus();
+          textarea.setSelectionRange(lineStart, lineStart + replacement.length);
+        }
+      }, 0);
+    } else if (selectedElement) {
+      const current = selectedElement.text || '';
+      const lines = current.split('\n');
+      const updatedLines = lines.map((line) => {
+        const cleaned = line.replace(/^(#{1,3}\s*)/, '');
+        return prefix ? `${prefix}${cleaned}` : cleaned;
+      });
+      const newText = updatedLines.join('\n');
+      setEditText(newText);
+      updateSelectedFormatting({ text: newText });
+    }
+  };
+
+  // Format Bullet List: applies • to current line / selected lines
+  const handleFormatList = () => {
+    const textarea = inlineInputRef.current;
+    if (editingId && textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const current = textarea.value;
+
+      const lineStart = current.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
+      let lineEnd = current.indexOf('\n', end);
+      if (lineEnd === -1) lineEnd = current.length;
+
+      const selectedBlock = current.slice(lineStart, lineEnd);
+      const lines = selectedBlock.split('\n');
+      const allBulleted = lines.every((l) => l.startsWith('• ') || l.startsWith('- ') || l.startsWith('* '));
+
+      const updatedLines = lines.map((line) => {
+        if (allBulleted) {
+          return line.replace(/^(•\s*|-\s*|\*\s*)/, '');
+        } else {
+          const cleaned = line.replace(/^(•\s*|-\s*|\*\s*)/, '');
+          return `• ${cleaned}`;
+        }
+      });
+
+      const replacement = updatedLines.join('\n');
+      const newText = current.slice(0, lineStart) + replacement + current.slice(lineEnd);
+      setEditText(newText);
+      updateSelectedFormatting({ text: newText });
+
+      setTimeout(() => {
+        if (textarea) {
+          textarea.focus();
+          textarea.setSelectionRange(lineStart, lineStart + replacement.length);
+        }
+      }, 0);
+    } else if (selectedElement) {
+      const current = selectedElement.text || '';
+      const lines = current.split('\n');
+      const allBulleted = lines.every((l) => l.startsWith('• ') || l.startsWith('- ') || l.startsWith('* '));
+      const updatedLines = lines.map((line) => {
+        if (allBulleted) {
+          return line.replace(/^(•\s*|-\s*|\*\s*)/, '');
+        } else {
+          const cleaned = line.replace(/^(•\s*|-\s*|\*\s*)/, '');
+          return `• ${cleaned}`;
+        }
+      });
+      const newText = updatedLines.join('\n');
+      setEditText(newText);
+      updateSelectedFormatting({ text: newText });
+    }
   };
 
   // Canvas Painter Engine
@@ -809,6 +935,58 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     ctx.scale(zoom, zoom);
 
     const renderList = currentElement ? [...elements, currentElement] : elements;
+
+    // Helper to render rich lines with markdown heading and bold tags
+    const renderFormattedLines = (
+      fullText: string,
+      startX: number,
+      startY: number,
+      defaultColor: string,
+      baseSize: number,
+      isGlobalBold?: boolean
+    ) => {
+      const rawLines = (fullText || '').split('\n');
+      let currentY = startY;
+
+      rawLines.forEach((raw) => {
+        let line = raw;
+        let fontSize = baseSize;
+        let isHeading = false;
+
+        if (line.startsWith('# ')) {
+          fontSize = Math.max(baseSize * 1.45, 24);
+          isHeading = true;
+          line = line.slice(2);
+        } else if (line.startsWith('## ')) {
+          fontSize = Math.max(baseSize * 1.25, 19);
+          isHeading = true;
+          line = line.slice(3);
+        } else if (line.startsWith('### ')) {
+          fontSize = Math.max(baseSize * 1.1, 16);
+          isHeading = true;
+          line = line.slice(4);
+        }
+
+        // Parse inline **bold**
+        const parts = line.split(/(\*\*[^*]+\*\*)/g);
+        let currentX = startX;
+
+        parts.forEach((part) => {
+          if (!part) return;
+          const isBoldSegment =
+            isHeading || isGlobalBold || (part.startsWith('**') && part.endsWith('**') && part.length >= 4);
+          const cleanPart =
+            part.startsWith('**') && part.endsWith('**') && part.length >= 4 ? part.slice(2, -2) : part;
+
+          ctx.font = `${isBoldSegment ? 'bold' : '500'} ${fontSize}px sans-serif`;
+          ctx.fillStyle = defaultColor;
+          ctx.fillText(cleanPart, currentX, currentY);
+          currentX += ctx.measureText(cleanPart).width;
+        });
+
+        currentY += fontSize * 1.35;
+      });
+    };
 
     renderList.forEach((el) => {
       // If currently in-place editing this element, hide its text so the textarea shows cleanly
@@ -887,25 +1065,25 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         ctx.stroke();
 
         if (!isCurrentlyEditing) {
-          ctx.fillStyle = el.color;
-          const weight = el.isBold ? 'bold' : '500';
-          const size = el.fontSize || 14;
-          ctx.font = `${weight} ${size}px sans-serif`;
-          const lines = (el.text || '').split('\n');
-          lines.forEach((line, i) => {
-            ctx.fillText(line, el.x + 14, el.y + 26 + i * (size * 1.35), w - 28);
-          });
+          renderFormattedLines(
+            el.text || '',
+            el.x + 14,
+            el.y + 26,
+            el.color || '#713F12',
+            el.fontSize || 14,
+            el.isBold
+          );
         }
       } else if (el.type === 'text') {
         if (!isCurrentlyEditing) {
-          ctx.fillStyle = el.color;
-          const weight = el.isBold ? 'bold' : '600';
-          const size = el.fontSize || 18;
-          ctx.font = `${weight} ${size}px sans-serif`;
-          const lines = (el.text || '').split('\n');
-          lines.forEach((line, i) => {
-            ctx.fillText(line, el.x, el.y + 20 + i * (size * 1.35));
-          });
+          renderFormattedLines(
+            el.text || '',
+            el.x,
+            el.y + 20,
+            el.color || '#FFFFFF',
+            el.fontSize || 18,
+            el.isBold
+          );
         }
       }
 
@@ -1078,53 +1256,50 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         >
           {/* Bold */}
           <button
-            onClick={toggleBold}
-            title="Bold"
-            className={`p-1.5 rounded-lg text-xs font-bold transition ${
-              selectedElement.isBold ? 'bg-slack-green text-white' : 'text-gray-400 hover:text-white'
-            }`}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={handleFormatBold}
+            title="Bold Selection / Text"
+            className="p-1.5 rounded-lg text-xs font-bold transition text-gray-300 hover:text-white hover:bg-gray-700/60 active:scale-95"
           >
             <Bold size={14} />
           </button>
 
           {/* Heading 1 (Large) */}
           <button
-            onClick={() => setFontSize(24)}
-            title="Heading 1"
-            className={`p-1.5 rounded-lg text-xs font-bold transition ${
-              selectedElement.fontSize === 24 ? 'bg-slack-green text-white' : 'text-gray-400 hover:text-white'
-            }`}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => handleFormatHeading(1)}
+            title="Heading 1 (# line)"
+            className="p-1.5 rounded-lg text-xs font-bold transition text-gray-300 hover:text-white hover:bg-gray-700/60 active:scale-95"
           >
             <Heading1 size={14} />
           </button>
 
           {/* Heading 2 (Medium) */}
           <button
-            onClick={() => setFontSize(18)}
-            title="Heading 2"
-            className={`p-1.5 rounded-lg text-xs font-bold transition ${
-              selectedElement.fontSize === 18 ? 'bg-slack-green text-white' : 'text-gray-400 hover:text-white'
-            }`}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => handleFormatHeading(2)}
+            title="Heading 2 (## line)"
+            className="p-1.5 rounded-lg text-xs font-bold transition text-gray-300 hover:text-white hover:bg-gray-700/60 active:scale-95"
           >
             <Heading2 size={14} />
           </button>
 
-          {/* Body (Small) */}
+          {/* Body (Normal) */}
           <button
-            onClick={() => setFontSize(14)}
-            title="Body Text"
-            className={`p-1.5 rounded-lg text-xs font-bold transition ${
-              selectedElement.fontSize === 14 ? 'bg-slack-green text-white' : 'text-gray-400 hover:text-white'
-            }`}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => handleFormatHeading(0)}
+            title="Normal Body Text"
+            className="p-1.5 rounded-lg text-xs font-bold transition text-gray-300 hover:text-white hover:bg-gray-700/60 active:scale-95"
           >
             <span className="text-[11px]">T</span>
           </button>
 
           {/* Bullet List */}
           <button
-            onClick={insertBulletList}
-            title="Bullet List"
-            className="p-1.5 rounded-lg text-xs text-gray-400 hover:text-white transition"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={handleFormatList}
+            title="Bullet List (• line)"
+            className="p-1.5 rounded-lg text-xs text-gray-300 hover:text-white hover:bg-gray-700/60 transition active:scale-95"
           >
             <List size={14} />
           </button>
