@@ -68,11 +68,12 @@ function markdownToHtml(md: string): string {
       html += `<blockquote>${formatInline(line.slice(2))}</blockquote>`;
     } else if (line.startsWith('- ') || line.startsWith('• ') || line.startsWith('* ')) {
       if (inOrdered) { html += '</ol>'; inOrdered = false; }
-      if (!inList) { html += '<ul>'; inList = true; }
-      html += `<li>${formatInline(line.slice(2))}</li>`;
+      if (!inList) { html += '<ul class="list-disc pl-5 my-0.5">'; inList = true; }
+      const itemText = line.replace(/^[-•*]\s*/, '');
+      html += `<li>${formatInline(itemText)}</li>`;
     } else if (/^\d+\.\s/.test(line)) {
       if (inList) { html += '</ul>'; inList = false; }
-      if (!inOrdered) { html += '<ol>'; inOrdered = true; }
+      if (!inOrdered) { html += '<ol class="list-decimal pl-5 my-0.5">'; inOrdered = true; }
       html += `<li>${formatInline(line.replace(/^\d+\.\s*/, ''))}</li>`;
     } else {
       if (inList) { html += '</ul>'; inList = false; }
@@ -133,8 +134,10 @@ function htmlToMarkdown(html: string): string {
       case 'ul':
       case 'ol':
         return `\n${children.trim()}\n`;
-      case 'li':
-        return `- ${children.trim()}\n`;
+      case 'li': {
+        const itemText = children.trim();
+        return itemText ? `- ${itemText}\n` : '';
+      }
       case 'p':
       case 'div':
         return children ? `\n${children}` : '\n';
@@ -335,7 +338,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       if (!targetId) return;
 
       const currentHtml = inlineContentEditableRef.current?.innerHTML || '';
-      const currentMd = htmlToMarkdown(currentHtml) || editText;
+      const currentMd = htmlToMarkdown(currentHtml);
 
       setElements((prev) => {
         const el = prev.find((item) => item.id === targetId);
@@ -366,14 +369,16 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       setEditingId(null);
       setEditText('');
     },
-    [editingId, editText, channel.id, saveWhiteboardToServer]
+    [editingId, channel.id, saveWhiteboardToServer]
   );
 
-  // Auto-focus contentEditable and load initial HTML whenever editingId changes
+  // Auto-focus contentEditable and load initial HTML ONLY when entering edit mode (editingId changes)
   useEffect(() => {
     if (editingId && inlineContentEditableRef.current) {
       const editor = inlineContentEditableRef.current;
-      editor.innerHTML = markdownToHtml(editText);
+      const targetEl = elements.find((el) => el.id === editingId);
+      const textToLoad = targetEl?.text ?? editText;
+      editor.innerHTML = markdownToHtml(textToLoad);
       const timer = setTimeout(() => {
         if (editor) {
           editor.focus();
@@ -386,7 +391,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       }, 30);
       return () => clearTimeout(timer);
     }
-  }, [editingId, editText]);
+  }, [editingId]);
 
   // 2. Real-time collaboration socket listeners
   useEffect(() => {
@@ -922,7 +927,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     }
   };
 
-  // Keyboard events in inline contentEditable (auto-bullet continuation on Enter, Escape, Ctrl+B)
+  // Keyboard events in inline contentEditable (auto-bullet conversion, Escape, Ctrl+B, Tab)
   const handleInlineKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     e.stopPropagation();
     if (e.key === 'Escape') {
@@ -934,7 +939,9 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       executeExecCommand('bold');
       return;
     }
-    if (e.key === 'Enter' && !e.shiftKey) {
+
+    // Auto-convert "- ", "* ", or "• " + Space into a real bullet list
+    if (e.key === ' ') {
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0) {
         const node = sel.anchorNode;
@@ -943,53 +950,15 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
             ? node.closest('li')
             : node?.parentElement?.closest('li');
 
-        // If not already in a native <li> list element, auto-continue plain bullet lines
         if (!parentLi) {
-          const textContent = node?.textContent || '';
+          const text = node?.textContent || '';
           const offset = sel.anchorOffset;
-          const lineBeforeCursor = textContent.slice(0, offset);
-          const bulletMatch = lineBeforeCursor.match(/^(\s*[-•*]\s+)(.*)$/);
-          const emptyBulletMatch = lineBeforeCursor.match(/^(\s*[-•*]\s*)$/);
-
-          if (emptyBulletMatch) {
+          if ((text === '-' || text === '•' || text === '*') && offset === 1) {
             e.preventDefault();
-            if (node && node.parentElement) {
-              node.parentElement.innerHTML = '<br>';
-            }
-            return;
-          } else if (bulletMatch) {
-            e.preventDefault();
-            const prefix = bulletMatch[1];
-            const afterText = textContent.slice(offset);
-
-            const newLineDiv = document.createElement('div');
-            newLineDiv.textContent = prefix + afterText;
-
             if (node && node.nodeType === Node.TEXT_NODE) {
-              node.textContent = lineBeforeCursor;
-              const parent = node.parentElement;
-              if (parent && parent !== inlineContentEditableRef.current) {
-                parent.after(newLineDiv);
-              } else if (parent) {
-                parent.appendChild(newLineDiv);
-              }
+              node.textContent = '';
             }
-
-            const newRange = document.createRange();
-            if (newLineDiv.firstChild) {
-              newRange.setStart(newLineDiv.firstChild, prefix.length);
-              newRange.collapse(true);
-              sel.removeAllRanges();
-              sel.addRange(newRange);
-            }
-
-            if (inlineContentEditableRef.current) {
-              const md = htmlToMarkdown(inlineContentEditableRef.current.innerHTML);
-              setEditText(md);
-              setElements((prev) =>
-                prev.map((el) => (el.id === editingId ? { ...el, text: md } : el))
-              );
-            }
+            document.execCommand('insertUnorderedList');
             return;
           }
         }
@@ -1623,11 +1592,6 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
               if (inlineContentEditableRef.current) {
                 const md = htmlToMarkdown(inlineContentEditableRef.current.innerHTML);
                 setEditText(md);
-                setElements((prev) =>
-                  prev.map((el) =>
-                    el.id === editingElement.id ? { ...el, text: md } : el
-                  )
-                );
               }
             }}
             onBlur={() => finishEditing()}
@@ -1657,7 +1621,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
               overflowWrap: 'break-word',
               wordBreak: 'break-word',
             }}
-            className="font-sans shadow-2xl focus:ring-2 focus:ring-slack-green selection:bg-slack-green selection:text-white empty:before:content-[attr(data-placeholder)] empty:before:text-gray-500 [&_h1]:text-lg [&_h1]:font-bold [&_h2]:text-base [&_h2]:font-bold [&_b]:font-bold [&_strong]:font-bold [&_i]:italic [&_em]:italic [&_s]:line-through [&_strike]:line-through [&_code]:bg-[#2C3136] [&_code]:text-[#ECB22E] [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:font-mono [&_code]:text-xs [&_blockquote]:border-l-4 [&_blockquote]:border-slack-green [&_blockquote]:pl-2 [&_blockquote]:italic [&_blockquote]:text-gray-300 [&_ul]:list-disc [&_ul]:list-inside [&_ol]:list-decimal [&_ol]:list-inside"
+            className="font-sans shadow-2xl focus:ring-2 focus:ring-slack-green selection:bg-slack-green selection:text-white empty:before:content-[attr(data-placeholder)] empty:before:text-gray-500 [&_h1]:text-lg [&_h1]:font-bold [&_h2]:text-base [&_h2]:font-bold [&_b]:font-bold [&_strong]:font-bold [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_li]:leading-normal [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1"
           />
         </div>
       )}
