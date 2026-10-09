@@ -123,6 +123,66 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
 
   // Direct Inline In-Place Text Editing (No Modal!)
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState<string>('');
+
+  // Start in-place editing
+  const startEditing = useCallback((elementId: string, initialText: string) => {
+    setEditingId(elementId);
+    setEditText(initialText);
+  }, []);
+
+  // Finish in-place editing and commit changes
+  const finishEditing = useCallback(
+    (idToFinish?: string) => {
+      const targetId = idToFinish || editingId;
+      if (!targetId) return;
+
+      setElements((prev) => {
+        const el = prev.find((item) => item.id === targetId);
+        if (!el) return prev;
+
+        // Clean up empty standalone text boxes
+        if (el.type === 'text' && !editText.trim()) {
+          const filtered = prev.filter((item) => item.id !== targetId);
+          saveWhiteboardToServer(filtered);
+          getSocket().emit('whiteboard:update', {
+            channelId: channel.id,
+            data: { elements: filtered },
+          });
+          return filtered;
+        }
+
+        const updated = prev.map((item) =>
+          item.id === targetId ? { ...item, text: editText } : item
+        );
+        saveWhiteboardToServer(updated);
+        getSocket().emit('whiteboard:update', {
+          channelId: channel.id,
+          data: { elements: updated },
+        });
+        return updated;
+      });
+
+      setEditingId(null);
+      setEditText('');
+    },
+    [editingId, editText, channel.id, saveWhiteboardToServer]
+  );
+
+  // Auto-focus textarea whenever editingId changes
+  useEffect(() => {
+    if (editingId && inlineInputRef.current) {
+      const textarea = inlineInputRef.current;
+      const timer = setTimeout(() => {
+        if (textarea) {
+          textarea.focus();
+          textarea.selectionStart = textarea.value.length;
+          textarea.selectionEnd = textarea.value.length;
+        }
+      }, 40);
+      return () => clearTimeout(timer);
+    }
+  }, [editingId]);
 
   // Infinite Pan & Zoom
   const [zoom, setZoom] = useState<number>(1);
@@ -480,19 +540,19 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       const newSticky: CanvasElement = {
         id: `sticky-${Date.now()}`,
         type: 'sticky',
-        x: coords.x - 80,
-        y: coords.y - 80,
+        x: coords.x - 85,
+        y: coords.y - 85,
         width: 170,
         height: 170,
         color: stickyColor.text,
         fillColor: stickyColor.bg,
         strokeWidth: 2,
         fontSize: 14,
-        text: 'Brainstorm idea...',
+        text: '',
       };
       commitElements([...elements, newSticky]);
       setSelectedElementId(newSticky.id);
-      setEditingId(newSticky.id);
+      startEditing(newSticky.id, '');
       setActiveTool('select');
       return;
     }
@@ -504,16 +564,16 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         type: 'text',
         x: coords.x,
         y: coords.y,
-        width: 220,
-        height: 40,
-        color: activeColor,
+        width: 240,
+        height: 48,
+        color: activeColor === '#007A5A' ? '#FFFFFF' : activeColor,
         strokeWidth: 1,
         fontSize: 18,
-        text: 'Type heading or note...',
+        text: '',
       };
       commitElements([...elements, newText]);
       setSelectedElementId(newText.id);
-      setEditingId(newText.id);
+      startEditing(newText.id, '');
       setActiveTool('select');
       return;
     }
@@ -673,7 +733,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     const clicked = findElementAtCoords(coords);
     if (clicked && (clicked.type === 'sticky' || clicked.type === 'text')) {
       setSelectedElementId(clicked.id);
-      setEditingId(clicked.id);
+      startEditing(clicked.id, clicked.text || '');
     }
   };
 
@@ -698,11 +758,15 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
   };
 
   const insertBulletList = () => {
-    if (!selectedElement || !selectedElement.text) return;
-    const lines = selectedElement.text.split('\n');
+    if (!selectedElement) return;
+    const currentText = editingId === selectedElement.id ? editText : selectedElement.text || '';
+    const lines = currentText.split('\n');
     const formatted = lines
       .map((line) => (line.startsWith('• ') ? line : `• ${line}`))
       .join('\n');
+    if (editingId === selectedElement.id) {
+      setEditText(formatted);
+    }
     updateSelectedFormatting({ text: formatted });
   };
 
@@ -1167,44 +1231,66 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
 
       {/* DIRECT IN-PLACE INLINE TEXT EDITING (NO MODALS!) */}
       {editingElement && (
-        <textarea
-          ref={inlineInputRef}
-          value={editingElement.text || ''}
-          onChange={(e) => {
-            const val = e.target.value;
-            setElements((prev) =>
-              prev.map((el) => (el.id === editingElement.id ? { ...el, text: val } : el))
-            );
-          }}
-          onBlur={() => {
-            commitElements(elements);
-            setEditingId(null);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              commitElements(elements);
-              setEditingId(null);
-            }
-          }}
-          autoFocus
+        <div
           style={{
             position: 'absolute',
-            left: `${editingElement.x * zoom + pan.x + (editingElement.type === 'sticky' ? 14 : 0)}px`,
-            top: `${editingElement.y * zoom + pan.y + (editingElement.type === 'sticky' ? 14 : 0)}px`,
-            width: `${(editingElement.width || (editingElement.type === 'sticky' ? 170 : 220)) * zoom - (editingElement.type === 'sticky' ? 28 : 0)}px`,
-            height: `${(editingElement.height || (editingElement.type === 'sticky' ? 170 : 40)) * zoom - (editingElement.type === 'sticky' ? 28 : 0)}px`,
-            fontSize: `${(editingElement.fontSize || (editingElement.type === 'sticky' ? 14 : 18)) * zoom}px`,
-            fontWeight: editingElement.isBold ? 'bold' : '500',
-            color: editingElement.color,
-            backgroundColor: editingElement.type === 'sticky' ? editingElement.fillColor : 'transparent',
-            outline: 'none',
-            border: 'none',
-            resize: 'none',
-            lineHeight: 1.35,
+            left: `${editingElement.x * zoom + pan.x}px`,
+            top: `${editingElement.y * zoom + pan.y}px`,
             zIndex: 50,
           }}
-          className="p-0 m-0 font-sans shadow-none focus:ring-0 selection:bg-slack-green selection:text-white"
-        />
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
+          <textarea
+            ref={inlineInputRef}
+            value={editText}
+            placeholder={
+              editingElement.type === 'sticky'
+                ? 'Brainstorm idea...'
+                : 'Type note or heading...'
+            }
+            onChange={(e) => {
+              const val = e.target.value;
+              setEditText(val);
+              setElements((prev) =>
+                prev.map((el) => (el.id === editingElement.id ? { ...el, text: val } : el))
+              );
+            }}
+            onBlur={() => finishEditing()}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === 'Escape') {
+                finishEditing();
+              }
+            }}
+            style={{
+              width: `${(editingElement.width || (editingElement.type === 'sticky' ? 170 : 240)) * zoom}px`,
+              minHeight: `${(editingElement.height || (editingElement.type === 'sticky' ? 170 : 44)) * zoom}px`,
+              fontSize: `${(editingElement.fontSize || (editingElement.type === 'sticky' ? 14 : 18)) * zoom}px`,
+              fontWeight: editingElement.isBold ? 'bold' : '500',
+              color:
+                editingElement.type === 'sticky'
+                  ? editingElement.color
+                  : editingElement.color || '#FFFFFF',
+              backgroundColor:
+                editingElement.type === 'sticky'
+                  ? editingElement.fillColor
+                  : 'rgba(24, 27, 31, 0.92)',
+              border:
+                editingElement.type === 'sticky'
+                  ? `2px dashed ${editingElement.color}40`
+                  : '1.5px dashed #007A5A',
+              borderRadius: editingElement.type === 'sticky' ? '8px' : '6px',
+              padding: `${(editingElement.type === 'sticky' ? 12 : 8) * zoom}px`,
+              outline: 'none',
+              resize: 'both',
+              lineHeight: 1.35,
+              display: 'block',
+            }}
+            className="font-sans shadow-2xl focus:ring-2 focus:ring-slack-green selection:bg-slack-green selection:text-white placeholder:text-gray-500"
+          />
+        </div>
       )}
 
       {/* Real-time Teammates' Cursors Overlay */}
