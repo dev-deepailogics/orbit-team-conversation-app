@@ -96,46 +96,6 @@ async function bootstrap() {
   fastify.decorate('io', io);
   setupSocketServer(io);
 
-  // File Upload Route
-  fastify.post('/api/upload', { preHandler: [fastify.authenticate] }, async (request, reply) => {
-    const data = await request.file();
-    if (!data) {
-      return reply.status(400).send({ error: 'No file uploaded' });
-    }
-
-    const ext = path.extname(data.filename) || '';
-    const safeFilename = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}${ext}`;
-    const filePath = path.join(uploadDir, safeFilename);
-
-    await new Promise<void>((resolve, reject) => {
-      const writeStream = fs.createWriteStream(filePath);
-      data.file.pipe(writeStream);
-      writeStream.on('finish', resolve);
-      writeStream.on('error', reject);
-    });
-
-    const fileUrl = `/api/files/${safeFilename}`;
-    return reply.send({
-      fileUrl,
-      fileName: data.filename,
-      fileType: data.mimetype,
-      fileSize: (await fs.promises.stat(filePath)).size,
-    });
-  });
-
-  // Serve static files
-  fastify.get('/api/files/:filename', async (request, reply) => {
-    const { filename } = request.params as { filename: string };
-    const filePath = path.join(uploadDir, filename);
-
-    if (!fs.existsSync(filePath)) {
-      return reply.status(404).send({ error: 'File not found' });
-    }
-
-    const stream = fs.createReadStream(filePath);
-    return reply.send(stream);
-  });
-
   // Health Check
   fastify.get('/api/health', async () => {
     return { status: 'ok', timestamp: new Date().toISOString(), service: 'orbit-server' };
