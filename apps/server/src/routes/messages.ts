@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 const threadReplySchema = z.object({
   content: z.string().min(1),
+  quotedMessageId: z.string().optional(),
   attachments: z.array(z.object({
     fileUrl: z.string(),
     fileName: z.string(),
@@ -28,6 +29,11 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         user: {
           select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
         },
+        quotedMessage: {
+          include: {
+            user: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+          },
+        },
         attachments: true,
         reactions: {
           include: {
@@ -47,6 +53,11 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       include: {
         user: {
           select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
+        },
+        quotedMessage: {
+          include: {
+            user: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+          },
         },
         attachments: true,
         reactions: {
@@ -87,10 +98,16 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         parentMessageId: parent.id,
         userId,
         content: parseResult.data.content,
+        quotedMessageId: parseResult.data.quotedMessageId || undefined,
       },
       include: {
         user: {
           select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
+        },
+        quotedMessage: {
+          include: {
+            user: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+          },
         },
         attachments: true,
         reactions: true,

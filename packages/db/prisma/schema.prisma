@@ -150,6 +150,7 @@ model Message {
   userId          String?
   botAppId        String?
   parentMessageId String?
+  quotedMessageId String?
   content         String      @db.Text
   isEdited        Boolean     @default(false)
   isDeleted       Boolean     @default(false)
@@ -162,11 +163,14 @@ model Message {
   bot             BotApp?     @relation(fields: [botAppId], references: [id], onDelete: SetNull)
   parentMessage   Message?    @relation("MessageThread", fields: [parentMessageId], references: [id], onDelete: Cascade)
   replies         Message[]   @relation("MessageThread")
+  quotedMessage   Message?    @relation("MessageQuote", fields: [quotedMessageId], references: [id], onDelete: SetNull)
+  quotedBy        Message[]   @relation("MessageQuote")
   attachments     Attachment[]
   reactions       Reaction[]
 
   @@index([channelId, createdAt])
   @@index([parentMessageId])
+  @@index([quotedMessageId])
   @@index([userId])
 }
 

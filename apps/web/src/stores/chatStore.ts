@@ -21,7 +21,7 @@ interface ChatState {
   setThreadReplies: (replies: Message[]) => void;
   addThreadReply: (reply: Message) => void;
   setTypingUser: (channelId: string, username: string, isTyping: boolean) => void;
-  incrementUnread: (channelId: string) => void;
+  incrementUnread: (messageId: string, channelId: string) => void;
   clearUnread: (channelId: string) => void;
 }
 

@@ -12,6 +12,7 @@ const createChannelSchema = z.object({
 
 const postMessageSchema = z.object({
   content: z.string().min(1),
+  quotedMessageId: z.string().optional(),
   attachments: z.array(z.object({
     fileUrl: z.string(),
     fileName: z.string(),
@@ -210,6 +211,13 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
             status: true,
           },
         },
+        quotedMessage: {
+          include: {
+            user: {
+              select: { id: true, username: true, displayName: true, avatarUrl: true },
+            },
+          },
+        },
         bot: true,
         attachments: true,
         reactions: {
@@ -302,7 +310,7 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.status(400).send({ error: parseResult.error.errors[0].message });
     }
 
-    const { content, attachments } = parseResult.data;
+    const { content, attachments, quotedMessageId } = parseResult.data;
 
     const channel = await prisma.channel.findUnique({
       where: { id: channelId },
@@ -317,6 +325,7 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         channelId,
         userId,
         content,
+        quotedMessageId: quotedMessageId || undefined,
         attachments: attachments && attachments.length > 0 ? {
           create: attachments.map((att) => ({
             fileUrl: att.fileUrl,
@@ -334,6 +343,13 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
             displayName: true,
             avatarUrl: true,
             status: true,
+          },
+        },
+        quotedMessage: {
+          include: {
+            user: {
+              select: { id: true, username: true, displayName: true, avatarUrl: true },
+            },
           },
         },
         bot: true,

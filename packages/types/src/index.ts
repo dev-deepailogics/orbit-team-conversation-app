@@ -97,6 +97,8 @@ export interface Message {
   channelId: string;
   userId: string;
   parentMessageId: string | null; // For threads
+  quotedMessageId?: string | null; // For quote replies
+  quotedMessage?: Message | null;
   content: string; // Markdown or rich text
   isEdited: boolean;
   isDeleted: boolean;

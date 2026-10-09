@@ -1,5 +1,3 @@
-'use client';
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Channel, Message, UserProfile } from '@orbit/types';
 import {
@@ -15,6 +13,7 @@ import {
   Bot as BotIcon,
   X,
   FileText,
+  CornerUpLeft,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import EmojiPicker from 'emoji-picker-react';
@@ -42,6 +41,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onOpenAddMembers,
 }) => {
   const [content, setContent] = useState('');
+  const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
   const [attachments, setAttachments] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -94,6 +94,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           useChatStore.getState().addMessage(res.data.message);
         }
         setContent('');
+        setReplyingToMessage(null);
         return;
       } catch (err: any) {
         alert(err.response?.data?.error || 'Failed to execute command');
@@ -105,6 +106,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       const res = await api.post(`/api/channels/${channel.id}/messages`, {
         content: trimmed,
         attachments,
+        quotedMessageId: replyingToMessage?.id,
       });
 
       // Optimistically append sent message immediately to avoid channel reload delay
@@ -112,6 +114,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
       setContent('');
       setAttachments([]);
+      setReplyingToMessage(null);
       setShowEmoji(false);
       const socket = getSocket();
       socket.emit('typing:stop', { channelId: channel.id });
@@ -226,7 +229,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               : (msg.user?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${authorName}`);
 
             return (
-              <div key={msg.id} className="group flex gap-3 hover:bg-[#222529]/60 -mx-6 px-6 py-2 rounded-lg transition relative">
+              <div
+                key={msg.id}
+                id={`msg-${msg.id}`}
+                className="group flex gap-3 hover:bg-[#222529]/60 -mx-6 px-6 py-2 rounded-lg transition-all duration-300 relative"
+              >
                 <img src={avatarUrl} alt={authorName} className="w-9 h-9 rounded-lg object-cover shrink-0 mt-0.5" />
 
                 <div className="flex-1 min-w-0">
@@ -243,6 +250,32 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
+
+                  {/* Quoted Message Preview Box */}
+                  {msg.quotedMessage && (
+                    <div
+                      onClick={() => {
+                        const el = document.getElementById(`msg-${msg.quotedMessage?.id}`);
+                        if (el) {
+                          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          el.classList.add('bg-slack-activeChannel/25', 'ring-2', 'ring-slack-activeChannel');
+                          setTimeout(() => {
+                            el.classList.remove('bg-slack-activeChannel/25', 'ring-2', 'ring-slack-activeChannel');
+                          }, 2000);
+                        }
+                      }}
+                      className="mt-1 mb-1.5 flex items-center gap-2 bg-[#25292D] hover:bg-[#2F3439] border-l-4 border-slack-green rounded-r-lg px-3 py-1.5 cursor-pointer text-xs transition max-w-lg shadow-sm"
+                    >
+                      <div className="min-w-0">
+                        <span className="font-bold text-slack-green text-[11px] block">
+                          {msg.quotedMessage.user?.displayName || 'Teammate'}
+                        </span>
+                        <span className="text-gray-300 text-[11px] truncate block max-w-md">
+                          {msg.quotedMessage.content}
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Message Content */}
                   <div className="text-sm text-gray-200 mt-1 prose prose-invert max-w-none break-words">
@@ -310,6 +343,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 {/* Hover Message Action Bar */}
                 <div className="absolute right-4 -top-3 hidden group-hover:flex items-center bg-[#222529] border border-gray-700 rounded-lg shadow-lg px-1 py-0.5 gap-1 z-10">
                   <button
+                    onClick={() => setReplyingToMessage(msg)}
+                    title="Quote Reply"
+                    className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded"
+                  >
+                    <CornerUpLeft size={15} />
+                  </button>
+                  <button
                     onClick={() => handleReaction(msg.id, '👍')}
                     title="React"
                     className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded"
@@ -341,6 +381,27 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
       {/* Chat Input */}
       <div className="px-6 pb-6 pt-1">
+        {/* Quote Reply Banner */}
+        {replyingToMessage && (
+          <div className="mb-2 bg-[#222529] border-l-4 border-slack-green rounded-r-xl px-3.5 py-2 flex items-center justify-between shadow-lg">
+            <div className="min-w-0 flex-1 mr-2">
+              <span className="text-[11px] font-bold text-slack-green flex items-center gap-1.5">
+                <CornerUpLeft size={12} />
+                Replying to {replyingToMessage.user?.displayName || 'Teammate'}
+              </span>
+              <p className="text-xs text-gray-300 truncate mt-0.5 max-w-2xl">
+                {replyingToMessage.content}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReplyingToMessage(null)}
+              className="p-1 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
         {/* Slash Command Suggestions */}
         {content.startsWith('/') && !content.includes(' ') && (
           <div className="mb-2 bg-[#1F2326] border border-gray-700 rounded-xl p-2 shadow-2xl space-y-1">
