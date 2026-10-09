@@ -176,7 +176,7 @@ export default function AppDashboard() {
         addMessage(msg);
       } else {
         // Different channel or DM -> increment unread badge!
-        incrementUnread(msg.channelId);
+        incrementUnread(msg.id, msg.channelId);
       }
     };
 

@@ -93,13 +93,23 @@ export const useChatStore = create<ChatState>((set) => ({
       };
     }),
 
-  incrementUnread: (channelId) =>
-    set((state) => ({
-      unreadCounts: {
-        ...state.unreadCounts,
-        [channelId]: (state.unreadCounts[channelId] || 0) + 1,
-      },
-    })),
+  incrementUnread: (messageId: string, channelId: string) =>
+    set((state) => {
+      // If message was already processed, do not increment again
+      if ((state as any)._seenMessageIds?.has(messageId)) {
+        return state;
+      }
+      const seen = new Set((state as any)._seenMessageIds || []);
+      seen.add(messageId);
+
+      return {
+        _seenMessageIds: seen,
+        unreadCounts: {
+          ...state.unreadCounts,
+          [channelId]: (state.unreadCounts[channelId] || 0) + 1,
+        },
+      };
+    }),
 
   clearUnread: (channelId) =>
     set((state) => ({

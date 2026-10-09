@@ -351,9 +351,8 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       workspaceId: channel.workspaceId,
     };
 
-    // Realtime broadcast via Socket.IO to both channel and workspace
+    // Realtime broadcast via Socket.IO to workspace
     if (fastify.io) {
-      fastify.io.to(`channel:${channelId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
       fastify.io.to(`workspace:${channel.workspaceId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
     }
 
