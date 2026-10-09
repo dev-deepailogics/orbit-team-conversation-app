@@ -24,12 +24,135 @@ import {
   Users,
   X,
   Bold,
+  Italic,
+  Strikethrough,
   Heading1,
   Heading2,
   List,
+  ListOrdered,
+  Quote,
+  Code,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
+
+// Convert stored markdown to live HTML for contentEditable
+function markdownToHtml(md: string): string {
+  if (!md) return '';
+  const lines = md.split('\n');
+  let inList = false;
+  let inOrdered = false;
+  let html = '';
+
+  const formatInline = (str: string) => {
+    return str
+      .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+      .replace(/\*([^*]+)\*/g, '<i>$1</i>')
+      .replace(/~~([^~]+)~~/g, '<s>$1</s>')
+      .replace(/`([^`]+)`/g, '<code class="bg-[#2C3136] text-[#ECB22E] px-1 py-0.5 rounded font-mono text-xs">$1</code>');
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (line.startsWith('# ')) {
+      if (inList) { html += '</ul>'; inList = false; }
+      if (inOrdered) { html += '</ol>'; inOrdered = false; }
+      html += `<h1>${formatInline(line.slice(2))}</h1>`;
+    } else if (line.startsWith('## ')) {
+      if (inList) { html += '</ul>'; inList = false; }
+      if (inOrdered) { html += '</ol>'; inOrdered = false; }
+      html += `<h2>${formatInline(line.slice(3))}</h2>`;
+    } else if (line.startsWith('### ')) {
+      if (inList) { html += '</ul>'; inList = false; }
+      if (inOrdered) { html += '</ol>'; inOrdered = false; }
+      html += `<h3>${formatInline(line.slice(4))}</h3>`;
+    } else if (line.startsWith('> ')) {
+      if (inList) { html += '</ul>'; inList = false; }
+      if (inOrdered) { html += '</ol>'; inOrdered = false; }
+      html += `<blockquote>${formatInline(line.slice(2))}</blockquote>`;
+    } else if (line.startsWith('- ') || line.startsWith('• ') || line.startsWith('* ')) {
+      if (inOrdered) { html += '</ol>'; inOrdered = false; }
+      if (!inList) { html += '<ul>'; inList = true; }
+      html += `<li>${formatInline(line.slice(2))}</li>`;
+    } else if (/^\d+\.\s/.test(line)) {
+      if (inList) { html += '</ul>'; inList = false; }
+      if (!inOrdered) { html += '<ol>'; inOrdered = true; }
+      html += `<li>${formatInline(line.replace(/^\d+\.\s*/, ''))}</li>`;
+    } else {
+      if (inList) { html += '</ul>'; inList = false; }
+      if (inOrdered) { html += '</ol>'; inOrdered = false; }
+      if (line.trim() === '') {
+        html += '<div><br></div>';
+      } else {
+        html += `<div>${formatInline(line)}</div>`;
+      }
+    }
+  }
+
+  if (inList) html += '</ul>';
+  if (inOrdered) html += '</ol>';
+  return html;
+}
+
+// Convert live contentEditable HTML to clean markdown for storage & drawing
+function htmlToMarkdown(html: string): string {
+  if (!html) return '';
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+
+  function nodeToMd(node: Node): string {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return node.textContent || '';
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return '';
+    }
+    const el = node as HTMLElement;
+    const tag = el.tagName.toLowerCase();
+    const children = Array.from(el.childNodes).map(nodeToMd).join('');
+
+    switch (tag) {
+      case 'b':
+      case 'strong':
+        return children.trim() ? `**${children.trim()}**` : '';
+      case 'i':
+      case 'em':
+        return children.trim() ? `*${children.trim()}*` : '';
+      case 's':
+      case 'strike':
+      case 'del':
+        return children.trim() ? `~~${children.trim()}~~` : '';
+      case 'h1':
+        return `\n# ${children.trim()}\n`;
+      case 'h2':
+        return `\n## ${children.trim()}\n`;
+      case 'h3':
+        return `\n### ${children.trim()}\n`;
+      case 'code':
+        return children.trim() ? `\`${children.trim()}\`` : '';
+      case 'blockquote': {
+        const lines = children.trim().split('\n');
+        return `\n${lines.map((l) => `> ${l}`).join('\n')}\n`;
+      }
+      case 'ul':
+      case 'ol':
+        return `\n${children.trim()}\n`;
+      case 'li':
+        return `- ${children.trim()}\n`;
+      case 'p':
+      case 'div':
+        return children ? `\n${children}` : '\n';
+      case 'br':
+        return '\n';
+      default:
+        return children;
+    }
+  }
+
+  const rawMd = Array.from(doc.body.childNodes).map(nodeToMd).join('');
+  return rawMd.replace(/\n{3,}/g, '\n\n').trim();
+}
 
 export type ToolType =
   | 'select'
@@ -101,7 +224,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const inlineInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const inlineContentEditableRef = useRef<HTMLDivElement | null>(null);
 
   const [activeTool, setActiveTool] = useState<ToolType>('select');
   const [activeColor, setActiveColor] = useState<string>('#007A5A');
@@ -121,7 +244,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
   const [isDraggingElement, setIsDraggingElement] = useState<boolean>(false);
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Direct Inline In-Place Text Editing (No Modal!)
+  // Direct Inline In-Place Live WYSIWYG Text Editing
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState<string>('');
 
@@ -209,12 +332,15 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       const targetId = idToFinish || editingId;
       if (!targetId) return;
 
+      const currentHtml = inlineContentEditableRef.current?.innerHTML || '';
+      const currentMd = htmlToMarkdown(currentHtml) || editText;
+
       setElements((prev) => {
         const el = prev.find((item) => item.id === targetId);
         if (!el) return prev;
 
         // Clean up empty standalone text boxes
-        if (el.type === 'text' && !editText.trim()) {
+        if (el.type === 'text' && !currentMd.trim()) {
           const filtered = prev.filter((item) => item.id !== targetId);
           saveWhiteboardToServer(filtered);
           getSocket().emit('whiteboard:update', {
@@ -225,7 +351,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         }
 
         const updated = prev.map((item) =>
-          item.id === targetId ? { ...item, text: editText } : item
+          item.id === targetId ? { ...item, text: currentMd } : item
         );
         saveWhiteboardToServer(updated);
         getSocket().emit('whiteboard:update', {
@@ -241,20 +367,24 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     [editingId, editText, channel.id, saveWhiteboardToServer]
   );
 
-  // Auto-focus textarea whenever editingId changes
+  // Auto-focus contentEditable and load initial HTML whenever editingId changes
   useEffect(() => {
-    if (editingId && inlineInputRef.current) {
-      const textarea = inlineInputRef.current;
+    if (editingId && inlineContentEditableRef.current) {
+      const editor = inlineContentEditableRef.current;
+      editor.innerHTML = markdownToHtml(editText);
       const timer = setTimeout(() => {
-        if (textarea) {
-          textarea.focus();
-          textarea.selectionStart = textarea.value.length;
-          textarea.selectionEnd = textarea.value.length;
+        if (editor) {
+          editor.focus();
+          const sel = window.getSelection();
+          if (sel) {
+            sel.selectAllChildren(editor);
+            sel.collapseToEnd();
+          }
         }
-      }, 40);
+      }, 30);
       return () => clearTimeout(timer);
     }
-  }, [editingId]);
+  }, [editingId, editText]);
 
   // 2. Real-time collaboration socket listeners
   useEffect(() => {
@@ -738,7 +868,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     }
   };
 
-  // Text Formatting Helpers with granular text selection and line-level markdown support
+  // Text Formatting Helpers for Live WYSIWYG ContentEditable Editing
   const selectedElement = elements.find((el) => el.id === selectedElementId);
 
   const updateSelectedFormatting = useCallback((updates: Partial<CanvasElement>) => {
@@ -756,143 +886,65 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     });
   }, [selectedElementId, channel.id, saveWhiteboardToServer]);
 
-  // Format Bold: applies to selected text in textarea, or toggles whole element
-  const handleFormatBold = () => {
-    const textarea = inlineInputRef.current;
-    if (editingId && textarea) {
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const current = textarea.value;
-
-      if (start !== end) {
-        const selected = current.slice(start, end);
-        const isAlreadyBold = selected.startsWith('**') && selected.endsWith('**') && selected.length >= 4;
-        const replacement = isAlreadyBold ? selected.slice(2, -2) : `**${selected}**`;
-        const newText = current.slice(0, start) + replacement + current.slice(end);
-        setEditText(newText);
-        updateSelectedFormatting({ text: newText });
-
-        setTimeout(() => {
-          if (textarea) {
-            textarea.focus();
-            textarea.setSelectionRange(
-              start,
-              start + replacement.length
-            );
-          }
-        }, 0);
-      } else {
-        const newText = current.slice(0, start) + '****' + current.slice(end);
-        setEditText(newText);
-        updateSelectedFormatting({ text: newText });
-        setTimeout(() => {
-          if (textarea) {
-            textarea.focus();
-            textarea.setSelectionRange(start + 2, start + 2);
-          }
-        }, 0);
-      }
-    } else if (selectedElement) {
-      updateSelectedFormatting({ isBold: !selectedElement.isBold });
+  const executeExecCommand = (command: string, value: string | undefined = undefined) => {
+    const editor = inlineContentEditableRef.current;
+    if (editor) {
+      editor.focus();
+      document.execCommand(command, false, value);
+      const md = htmlToMarkdown(editor.innerHTML);
+      setEditText(md);
+      updateSelectedFormatting({ text: md });
     }
   };
 
-  // Format Heading: applies # or ## to current line / selected lines
+  // Format Heading: live toggle between H1 / H2 / Div in contentEditable
   const handleFormatHeading = (level: 1 | 2 | 0) => {
-    const prefix = level === 1 ? '# ' : level === 2 ? '## ' : '';
-    const textarea = inlineInputRef.current;
-
-    if (editingId && textarea) {
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const current = textarea.value;
-
-      const lineStart = current.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
-      let lineEnd = current.indexOf('\n', end);
-      if (lineEnd === -1) lineEnd = current.length;
-
-      const selectedBlock = current.slice(lineStart, lineEnd);
-      const lines = selectedBlock.split('\n');
-      const updatedLines = lines.map((line) => {
-        const cleaned = line.replace(/^(#{1,3}\s*)/, '');
-        return prefix ? `${prefix}${cleaned}` : cleaned;
-      });
-
-      const replacement = updatedLines.join('\n');
-      const newText = current.slice(0, lineStart) + replacement + current.slice(lineEnd);
-      setEditText(newText);
-      updateSelectedFormatting({ text: newText });
-
-      setTimeout(() => {
-        if (textarea) {
-          textarea.focus();
-          textarea.setSelectionRange(lineStart, lineStart + replacement.length);
+    const editor = inlineContentEditableRef.current;
+    if (editor) {
+      editor.focus();
+      if (level === 0) {
+        document.execCommand('formatBlock', false, '<div>');
+      } else {
+        const tag = level === 1 ? 'H1' : 'H2';
+        const sel = window.getSelection();
+        const parent = sel?.anchorNode?.parentElement;
+        if (parent && parent.tagName === tag) {
+          document.execCommand('formatBlock', false, '<div>');
+        } else {
+          document.execCommand('formatBlock', false, `<${tag}>`);
         }
-      }, 0);
-    } else if (selectedElement) {
-      const current = selectedElement.text || '';
-      const lines = current.split('\n');
-      const updatedLines = lines.map((line) => {
-        const cleaned = line.replace(/^(#{1,3}\s*)/, '');
-        return prefix ? `${prefix}${cleaned}` : cleaned;
-      });
-      const newText = updatedLines.join('\n');
-      setEditText(newText);
-      updateSelectedFormatting({ text: newText });
+      }
+      const md = htmlToMarkdown(editor.innerHTML);
+      setEditText(md);
+      updateSelectedFormatting({ text: md });
     }
   };
 
-  // Format Bullet List: applies • to current line / selected lines
-  const handleFormatList = () => {
-    const textarea = inlineInputRef.current;
-    if (editingId && textarea) {
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const current = textarea.value;
+  // Format Inline Code Chip
+  const handleFormatInlineCode = () => {
+    const editor = inlineContentEditableRef.current;
+    if (editor) {
+      editor.focus();
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      const range = sel.getRangeAt(0);
+      const selectedText = range.toString();
 
-      const lineStart = current.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
-      let lineEnd = current.indexOf('\n', end);
-      if (lineEnd === -1) lineEnd = current.length;
-
-      const selectedBlock = current.slice(lineStart, lineEnd);
-      const lines = selectedBlock.split('\n');
-      const allBulleted = lines.every((l) => l.startsWith('• ') || l.startsWith('- ') || l.startsWith('* '));
-
-      const updatedLines = lines.map((line) => {
-        if (allBulleted) {
-          return line.replace(/^(•\s*|-\s*|\*\s*)/, '');
-        } else {
-          const cleaned = line.replace(/^(•\s*|-\s*|\*\s*)/, '');
-          return `• ${cleaned}`;
-        }
-      });
-
-      const replacement = updatedLines.join('\n');
-      const newText = current.slice(0, lineStart) + replacement + current.slice(lineEnd);
-      setEditText(newText);
-      updateSelectedFormatting({ text: newText });
-
-      setTimeout(() => {
-        if (textarea) {
-          textarea.focus();
-          textarea.setSelectionRange(lineStart, lineStart + replacement.length);
-        }
-      }, 0);
-    } else if (selectedElement) {
-      const current = selectedElement.text || '';
-      const lines = current.split('\n');
-      const allBulleted = lines.every((l) => l.startsWith('• ') || l.startsWith('- ') || l.startsWith('* '));
-      const updatedLines = lines.map((line) => {
-        if (allBulleted) {
-          return line.replace(/^(•\s*|-\s*|\*\s*)/, '');
-        } else {
-          const cleaned = line.replace(/^(•\s*|-\s*|\*\s*)/, '');
-          return `• ${cleaned}`;
-        }
-      });
-      const newText = updatedLines.join('\n');
-      setEditText(newText);
-      updateSelectedFormatting({ text: newText });
+      if (selectedText) {
+        const codeEl = document.createElement('code');
+        codeEl.className =
+          'bg-[#2C3136] text-[#ECB22E] px-1 py-0.5 rounded font-mono text-xs';
+        codeEl.textContent = selectedText;
+        range.deleteContents();
+        range.insertNode(codeEl);
+        range.setStartAfter(codeEl);
+        range.setEndAfter(codeEl);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+      const md = htmlToMarkdown(editor.innerHTML);
+      setEditText(md);
+      updateSelectedFormatting({ text: md });
     }
   };
 
@@ -936,7 +988,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
 
     const renderList = currentElement ? [...elements, currentElement] : elements;
 
-    // Helper to render rich lines with markdown heading and bold tags
+    // Helper to render rich lines with markdown heading, bold, code chips, and quotes
     const renderFormattedLines = (
       fullText: string,
       startX: number,
@@ -952,6 +1004,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         let line = raw;
         let fontSize = baseSize;
         let isHeading = false;
+        let isQuote = false;
 
         if (line.startsWith('# ')) {
           fontSize = Math.max(baseSize * 1.45, 24);
@@ -965,23 +1018,88 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           fontSize = Math.max(baseSize * 1.1, 16);
           isHeading = true;
           line = line.slice(4);
+        } else if (line.startsWith('> ')) {
+          isQuote = true;
+          line = line.slice(2);
+        } else if (line.startsWith('- ') || line.startsWith('• ') || line.startsWith('* ')) {
+          line = '• ' + line.slice(2);
         }
 
-        // Parse inline **bold**
-        const parts = line.split(/(\*\*[^*]+\*\*)/g);
         let currentX = startX;
+
+        // Draw quote line indicator
+        if (isQuote) {
+          ctx.save();
+          ctx.fillStyle = '#007A5A';
+          ctx.fillRect(startX - 6, currentY - fontSize + 2, 3, fontSize * 1.2);
+          ctx.restore();
+          currentX += 4;
+        }
+
+        // Parse inline formatting: **bold**, *italic*, ~~strike~~, `code`
+        const parts = line.split(/(\*\*[^*]+\*\*|\*[^*]+\*|~~[^~]+~~|`[^`]+`)/g);
 
         parts.forEach((part) => {
           if (!part) return;
-          const isBoldSegment =
-            isHeading || isGlobalBold || (part.startsWith('**') && part.endsWith('**') && part.length >= 4);
-          const cleanPart =
-            part.startsWith('**') && part.endsWith('**') && part.length >= 4 ? part.slice(2, -2) : part;
 
-          ctx.font = `${isBoldSegment ? 'bold' : '500'} ${fontSize}px sans-serif`;
-          ctx.fillStyle = defaultColor;
-          ctx.fillText(cleanPart, currentX, currentY);
-          currentX += ctx.measureText(cleanPart).width;
+          let text = part;
+          let isBold = isHeading || isGlobalBold;
+          let isItalic = isQuote;
+          let isStrike = false;
+          let isCode = false;
+
+          if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
+            isBold = true;
+            text = part.slice(2, -2);
+          } else if (part.startsWith('*') && part.endsWith('*') && part.length >= 2) {
+            isItalic = true;
+            text = part.slice(1, -1);
+          } else if (part.startsWith('~~') && part.endsWith('~~') && part.length >= 4) {
+            isStrike = true;
+            text = part.slice(2, -2);
+          } else if (part.startsWith('`') && part.endsWith('`') && part.length >= 2) {
+            isCode = true;
+            text = part.slice(1, -1);
+          }
+
+          const fontStyle = isItalic ? 'italic' : 'normal';
+          const fontWeight = isBold ? 'bold' : '500';
+          ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px sans-serif`;
+
+          const textWidth = ctx.measureText(text).width;
+
+          // Draw code chip background
+          if (isCode) {
+            ctx.save();
+            ctx.fillStyle = '#262A2E';
+            ctx.beginPath();
+            ctx.roundRect(currentX - 2, currentY - fontSize + 2, textWidth + 4, fontSize * 1.2, 4);
+            ctx.fill();
+            ctx.strokeStyle = '#383F45';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.restore();
+
+            ctx.fillStyle = '#ECB22E'; // Gold code text
+          } else {
+            ctx.fillStyle = defaultColor;
+          }
+
+          ctx.fillText(text, currentX, currentY);
+
+          // Draw strikethrough line
+          if (isStrike) {
+            ctx.save();
+            ctx.strokeStyle = defaultColor;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(currentX, currentY - fontSize / 3);
+            ctx.lineTo(currentX + textWidth, currentY - fontSize / 3);
+            ctx.stroke();
+            ctx.restore();
+          }
+
+          currentX += textWidth + (isCode ? 4 : 0);
         });
 
         currentY += fontSize * 1.35;
@@ -1257,18 +1375,40 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           {/* Bold */}
           <button
             onMouseDown={(e) => e.preventDefault()}
-            onClick={handleFormatBold}
-            title="Bold Selection / Text"
+            onClick={() => executeExecCommand('bold')}
+            title="Bold Selection (Ctrl+B)"
             className="p-1.5 rounded-lg text-xs font-bold transition text-gray-300 hover:text-white hover:bg-gray-700/60 active:scale-95"
           >
             <Bold size={14} />
           </button>
 
+          {/* Italic */}
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => executeExecCommand('italic')}
+            title="Italic Selection (Ctrl+I)"
+            className="p-1.5 rounded-lg text-xs transition text-gray-300 hover:text-white hover:bg-gray-700/60 active:scale-95"
+          >
+            <Italic size={14} />
+          </button>
+
+          {/* Strikethrough */}
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => executeExecCommand('strikeThrough')}
+            title="Strikethrough"
+            className="p-1.5 rounded-lg text-xs transition text-gray-300 hover:text-white hover:bg-gray-700/60 active:scale-95"
+          >
+            <Strikethrough size={14} />
+          </button>
+
+          <span className="w-px h-4 bg-gray-700 mx-0.5" />
+
           {/* Heading 1 (Large) */}
           <button
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => handleFormatHeading(1)}
-            title="Heading 1 (# line)"
+            title="Heading 1"
             className="p-1.5 rounded-lg text-xs font-bold transition text-gray-300 hover:text-white hover:bg-gray-700/60 active:scale-95"
           >
             <Heading1 size={14} />
@@ -1278,7 +1418,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           <button
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => handleFormatHeading(2)}
-            title="Heading 2 (## line)"
+            title="Heading 2"
             className="p-1.5 rounded-lg text-xs font-bold transition text-gray-300 hover:text-white hover:bg-gray-700/60 active:scale-95"
           >
             <Heading2 size={14} />
@@ -1291,17 +1431,49 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
             title="Normal Body Text"
             className="p-1.5 rounded-lg text-xs font-bold transition text-gray-300 hover:text-white hover:bg-gray-700/60 active:scale-95"
           >
-            <span className="text-[11px]">T</span>
+            <span className="text-[11px] font-bold">T</span>
           </button>
+
+          <span className="w-px h-4 bg-gray-700 mx-0.5" />
 
           {/* Bullet List */}
           <button
             onMouseDown={(e) => e.preventDefault()}
-            onClick={handleFormatList}
-            title="Bullet List (• line)"
+            onClick={() => executeExecCommand('insertUnorderedList')}
+            title="Bullet List"
             className="p-1.5 rounded-lg text-xs text-gray-300 hover:text-white hover:bg-gray-700/60 transition active:scale-95"
           >
             <List size={14} />
+          </button>
+
+          {/* Numbered List */}
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => executeExecCommand('insertOrderedList')}
+            title="Numbered List"
+            className="p-1.5 rounded-lg text-xs text-gray-300 hover:text-white hover:bg-gray-700/60 transition active:scale-95"
+          >
+            <ListOrdered size={14} />
+          </button>
+
+          {/* Blockquote */}
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => executeExecCommand('formatBlock', '<blockquote>')}
+            title="Quote"
+            className="p-1.5 rounded-lg text-xs text-gray-300 hover:text-white hover:bg-gray-700/60 transition active:scale-95"
+          >
+            <Quote size={14} />
+          </button>
+
+          {/* Inline Code */}
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={handleFormatInlineCode}
+            title="Inline Code"
+            className="p-1.5 rounded-lg text-xs text-gray-300 hover:text-white hover:bg-gray-700/60 transition active:scale-95"
+          >
+            <Code size={14} />
           </button>
 
           {/* Color swatches for Sticky Note background */}
@@ -1404,7 +1576,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         className="w-full h-full cursor-crosshair touch-none"
       />
 
-      {/* DIRECT IN-PLACE INLINE TEXT EDITING (NO MODALS!) */}
+      {/* DIRECT IN-PLACE INLINE LIVE WYSIWYG TEXT EDITING (NO MODALS!) */}
       {editingElement && (
         <div
           style={{
@@ -1417,26 +1589,37 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
         >
-          <textarea
-            ref={inlineInputRef}
-            value={editText}
-            placeholder={
+          <div
+            ref={inlineContentEditableRef}
+            contentEditable
+            suppressContentEditableWarning
+            data-placeholder={
               editingElement.type === 'sticky'
                 ? 'Brainstorm idea...'
                 : 'Type note or heading...'
             }
-            onChange={(e) => {
-              const val = e.target.value;
-              setEditText(val);
-              setElements((prev) =>
-                prev.map((el) => (el.id === editingElement.id ? { ...el, text: val } : el))
-              );
+            onInput={() => {
+              if (inlineContentEditableRef.current) {
+                const md = htmlToMarkdown(inlineContentEditableRef.current.innerHTML);
+                setEditText(md);
+                setElements((prev) =>
+                  prev.map((el) =>
+                    el.id === editingElement.id ? { ...el, text: md } : el
+                  )
+                );
+              }
             }}
             onBlur={() => finishEditing()}
             onKeyDown={(e) => {
               e.stopPropagation();
               if (e.key === 'Escape') {
                 finishEditing();
+              } else if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+                e.preventDefault();
+                executeExecCommand('bold');
+              } else if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
+                e.preventDefault();
+                executeExecCommand('italic');
               }
             }}
             style={{
@@ -1459,11 +1642,12 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
               borderRadius: editingElement.type === 'sticky' ? '8px' : '6px',
               padding: `${(editingElement.type === 'sticky' ? 12 : 8) * zoom}px`,
               outline: 'none',
-              resize: 'both',
               lineHeight: 1.35,
               display: 'block',
+              overflowWrap: 'break-word',
+              wordBreak: 'break-word',
             }}
-            className="font-sans shadow-2xl focus:ring-2 focus:ring-slack-green selection:bg-slack-green selection:text-white placeholder:text-gray-500"
+            className="font-sans shadow-2xl focus:ring-2 focus:ring-slack-green selection:bg-slack-green selection:text-white empty:before:content-[attr(data-placeholder)] empty:before:text-gray-500 [&_h1]:text-lg [&_h1]:font-bold [&_h2]:text-base [&_h2]:font-bold [&_b]:font-bold [&_strong]:font-bold [&_i]:italic [&_em]:italic [&_s]:line-through [&_strike]:line-through [&_code]:bg-[#2C3136] [&_code]:text-[#ECB22E] [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:font-mono [&_code]:text-xs [&_blockquote]:border-l-4 [&_blockquote]:border-slack-green [&_blockquote]:pl-2 [&_blockquote]:italic [&_blockquote]:text-gray-300 [&_ul]:list-disc [&_ul]:list-inside [&_ol]:list-decimal [&_ol]:list-inside"
           />
         </div>
       )}
