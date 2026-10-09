@@ -27,8 +27,8 @@ import { useChatStore } from '../../stores/chatStore';
 import { EmojiPickerPopover } from './EmojiPickerPopover';
 import { getTopEmojis, recordEmojiUsage } from '../../lib/emojiStore';
 import { WhiteboardView } from '../whiteboard/WhiteboardView';
-import { FormatToolbar } from './FormatToolbar';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { RichTextEditor, RichTextEditorRef } from './RichTextEditor';
 
 interface ChatAreaProps {
   channel: Channel;
@@ -58,7 +58,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [showFormatting, setShowFormatting] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<RichTextEditorRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -84,18 +84,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if ((!content.trim() && attachments.length === 0) || !currentUser) return;
+  const handleSendMessage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const rawMarkdown = editorRef.current?.getMarkdown() || content.trim();
+    if ((!rawMarkdown.trim() && attachments.length === 0) || !currentUser) return;
 
-    const trimmed = content.trim();
+    const trimmed = rawMarkdown.trim();
+    const plainText = editorRef.current?.getText() || content.trim();
 
     // Check for Slash Command
-    if (trimmed.startsWith('/')) {
-      const commandParts = trimmed.split(' ');
+    if (plainText.startsWith('/')) {
+      const commandParts = plainText.split(' ');
       const cmd = commandParts[0].toLowerCase();
 
       if (cmd === '/call' || cmd === '/meet' || cmd === '/huddle') {
+        editorRef.current?.clear();
         setContent('');
         onStartHuddle(channel);
         return;
@@ -105,11 +108,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         const res = await api.post('/api/bot/commands/execute', {
           channelId: channel.id,
           workspaceId: channel.workspaceId,
-          commandText: trimmed,
+          commandText: plainText,
         });
         if (res.data.message) {
           useChatStore.getState().addMessage(res.data.message);
         }
+        editorRef.current?.clear();
         setContent('');
         setReplyingToMessage(null);
         return;
@@ -129,6 +133,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       // Optimistically append sent message immediately to avoid channel reload delay
       useChatStore.getState().addMessage(res.data);
 
+      editorRef.current?.clear();
       setContent('');
       setAttachments([]);
       setReplyingToMessage(null);
@@ -588,15 +593,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           onSubmit={handleSendMessage}
           className="bg-[#222529] border border-gray-700 rounded-xl focus-within:border-gray-500 shadow-lg relative overflow-hidden"
         >
-          {/* Format Toolbar (Slack-style rich formatting) */}
-          {showFormatting && (
-            <FormatToolbar
-              textareaRef={textareaRef}
-              content={content}
-              setContent={setContent}
-            />
-          )}
-
           {/* File Attachments Preview */}
           {attachments.length > 0 && (
             <div className="px-3 pt-2 flex flex-wrap gap-2 border-b border-gray-800 pb-2">
@@ -616,47 +612,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </div>
           )}
 
-          <textarea
-            ref={textareaRef}
-            rows={2}
-            value={content}
-            onChange={(e) => handleTyping(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSendMessage(e);
-              } else if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
-                e.preventDefault();
-                const textarea = textareaRef.current;
-                if (!textarea) return;
-                const start = textarea.selectionStart;
-                const end = textarea.selectionEnd;
-                const current = textarea.value;
-                const selected = current.slice(start, end);
-                const replacement = selected ? `**${selected}**` : '****';
-                setContent(current.slice(0, start) + replacement + current.slice(end));
-                setTimeout(() => {
-                  textarea.focus();
-                  textarea.setSelectionRange(start + 2, selected ? start + 2 + selected.length : start + 2);
-                }, 0);
-              } else if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
-                e.preventDefault();
-                const textarea = textareaRef.current;
-                if (!textarea) return;
-                const start = textarea.selectionStart;
-                const end = textarea.selectionEnd;
-                const current = textarea.value;
-                const selected = current.slice(start, end);
-                const replacement = selected ? `*${selected}*` : '**';
-                setContent(current.slice(0, start) + replacement + current.slice(end));
-                setTimeout(() => {
-                  textarea.focus();
-                  textarea.setSelectionRange(start + 1, selected ? start + 1 + selected.length : start + 1);
-                }, 0);
-              }
-            }}
+          {/* Live WYSIWYG In-Place Rich Text Editor */}
+          <RichTextEditor
+            ref={editorRef}
             placeholder={`Message #${channel.name}`}
-            className="w-full bg-transparent px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none resize-none"
+            showToolbar={showFormatting}
+            onTyping={(text) => handleTyping(text)}
+            onSubmit={() => handleSendMessage()}
           />
 
           {/* Action Bar */}
@@ -712,7 +674,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             isOpen={showEmoji}
             onClose={() => setShowEmoji(false)}
             onSelectEmoji={(emoji) => {
-              setContent((prev) => prev + emoji);
+              editorRef.current?.insertEmoji(emoji);
             }}
             title="Add Emoji"
             positionClass="bottom-14 left-4"

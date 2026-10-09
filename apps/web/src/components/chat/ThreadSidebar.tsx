@@ -6,8 +6,8 @@ import { X, Send, CornerUpLeft, Smile, SmilePlus, Type } from 'lucide-react';
 import { api } from '../../lib/api';
 import { EmojiPickerPopover } from './EmojiPickerPopover';
 import { getTopEmojis, recordEmojiUsage } from '../../lib/emojiStore';
-import { FormatToolbar } from './FormatToolbar';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { RichTextEditor, RichTextEditorRef } from './RichTextEditor';
 
 interface ThreadSidebarProps {
   parentMessage: Message;
@@ -32,7 +32,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   const [topEmojis, setTopEmojis] = useState<string[]>(['👍', '❤️', '🔥', '🎉', '🚀']);
   const [showFormatting, setShowFormatting] = useState(true);
   const repliesEndRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<RichTextEditorRef>(null);
 
   useEffect(() => {
     setTopEmojis(getTopEmojis(5));
@@ -52,17 +52,19 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
     }
   };
 
-  const handleSendReply = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!content.trim() || isSubmitting) return;
+  const handleSendReply = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const rawMarkdown = editorRef.current?.getMarkdown() || content.trim();
+    if (!rawMarkdown.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
     try {
       const res = await api.post(`/api/messages/${parentMessage.id}/replies`, {
-        content: content.trim(),
+        content: rawMarkdown.trim(),
         quotedMessageId: replyingToMessage?.id,
       });
       onReplyAdded(res.data);
+      editorRef.current?.clear();
       setContent('');
       setReplyingToMessage(null);
       setShowComposerEmoji(false);
@@ -370,55 +372,13 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
         )}
 
         <form onSubmit={handleSendReply} className="bg-[#222529] border border-gray-700 rounded-lg overflow-hidden relative">
-          {showFormatting && (
-            <FormatToolbar
-              textareaRef={textareaRef}
-              content={content}
-              setContent={setContent}
-            />
-          )}
-
-          <textarea
-            ref={textareaRef}
-            rows={2}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSendReply(e);
-              } else if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
-                e.preventDefault();
-                const textarea = textareaRef.current;
-                if (!textarea) return;
-                const start = textarea.selectionStart;
-                const end = textarea.selectionEnd;
-                const current = textarea.value;
-                const selected = current.slice(start, end);
-                const replacement = selected ? `**${selected}**` : '****';
-                setContent(current.slice(0, start) + replacement + current.slice(end));
-                setTimeout(() => {
-                  textarea.focus();
-                  textarea.setSelectionRange(start + 2, selected ? start + 2 + selected.length : start + 2);
-                }, 0);
-              } else if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
-                e.preventDefault();
-                const textarea = textareaRef.current;
-                if (!textarea) return;
-                const start = textarea.selectionStart;
-                const end = textarea.selectionEnd;
-                const current = textarea.value;
-                const selected = current.slice(start, end);
-                const replacement = selected ? `*${selected}*` : '**';
-                setContent(current.slice(0, start) + replacement + current.slice(end));
-                setTimeout(() => {
-                  textarea.focus();
-                  textarea.setSelectionRange(start + 1, selected ? start + 1 + selected.length : start + 1);
-                }, 0);
-              }
-            }}
+          <RichTextEditor
+            ref={editorRef}
             placeholder="Reply..."
-            className="w-full bg-transparent px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none resize-none"
+            showToolbar={showFormatting}
+            minHeight="44px"
+            onTyping={(text) => setContent(text)}
+            onSubmit={() => handleSendReply()}
           />
           <div className="flex items-center justify-between px-2 py-1.5 bg-[#1C1F23]/60 border-t border-gray-800/40">
             <div className="flex items-center gap-1">
@@ -457,7 +417,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
             isOpen={showComposerEmoji}
             onClose={() => setShowComposerEmoji(false)}
             onSelectEmoji={(emoji) => {
-              setContent((prev) => prev + emoji);
+              editorRef.current?.insertEmoji(emoji);
             }}
             title="Add Emoji"
             positionClass="bottom-12 left-2"
