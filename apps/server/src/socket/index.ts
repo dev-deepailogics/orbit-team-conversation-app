@@ -66,6 +66,19 @@ export function setupSocketServer(io: SocketIOServer) {
       socket.to(`channel:${channelId}`).emit(SOCKET_EVENTS.TYPING_STOP, { channelId, userId });
     });
 
+    // Whiteboard Live Collaboration
+    socket.on(SOCKET_EVENTS.WHITEBOARD_UPDATE, ({ channelId, data }) => {
+      socket.to(`channel:${channelId}`).emit(SOCKET_EVENTS.WHITEBOARD_UPDATE, { channelId, data, userId });
+    });
+
+    socket.on(SOCKET_EVENTS.WHITEBOARD_CURSOR, ({ channelId, cursor, user }) => {
+      socket.to(`channel:${channelId}`).emit(SOCKET_EVENTS.WHITEBOARD_CURSOR, { channelId, cursor, user, userId });
+    });
+
+    socket.on(SOCKET_EVENTS.WHITEBOARD_CLEAR, ({ channelId }) => {
+      socket.to(`channel:${channelId}`).emit(SOCKET_EVENTS.WHITEBOARD_CLEAR, { channelId, userId });
+    });
+
     // Disconnect
     socket.on('disconnect', async () => {
       if (userId && userSocketMap.has(userId)) {

@@ -69,6 +69,7 @@ export interface Channel {
   updatedAt: string;
   members?: WorkspaceMember[];
   unreadCount?: number;
+  whiteboardData?: any;
 }
 
 // ==========================================
@@ -233,6 +234,11 @@ export const SOCKET_EVENTS = {
   // Channels & Workspaces
   CHANNEL_NEW: 'channel:new',
   CHANNEL_UPDATE: 'channel:updated',
+
+  // Whiteboard / Collaborative Canvas
+  WHITEBOARD_UPDATE: 'whiteboard:update',
+  WHITEBOARD_CURSOR: 'whiteboard:cursor',
+  WHITEBOARD_CLEAR: 'whiteboard:clear',
 
   // Presence & Notifications
   USER_STATUS_CHANGE: 'user:status_change',

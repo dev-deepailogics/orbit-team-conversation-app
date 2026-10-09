@@ -435,4 +435,119 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
     return reply.status(201).send(payload);
   });
+
+  // Get Whiteboard Data for Channel/DM
+  fastify.get('/:channelId/whiteboard', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { channelId } = request.params as { channelId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const channel = await prisma.channel.findUnique({
+      where: { id: channelId },
+      include: {
+        members: { select: { userId: true } },
+      },
+    });
+
+    if (!channel) {
+      return reply.status(404).send({ error: 'Channel not found' });
+    }
+
+    if (channel.type !== 'PUBLIC') {
+      const isMember = channel.members.some((m) => m.userId === userId);
+      if (!isMember) {
+        return reply.status(403).send({ error: 'You are not a member of this private channel' });
+      }
+    }
+
+    return reply.send({
+      channelId: channel.id,
+      whiteboardData: channel.whiteboardData || { elements: [] },
+    });
+  });
+
+  // Save Whiteboard Data for Channel/DM
+  fastify.put('/:channelId/whiteboard', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { channelId } = request.params as { channelId: string };
+    const userId = (request.user as { id: string }).id;
+    const { whiteboardData } = request.body as { whiteboardData: any };
+
+    const channel = await prisma.channel.findUnique({
+      where: { id: channelId },
+      include: {
+        members: { select: { userId: true } },
+      },
+    });
+
+    if (!channel) {
+      return reply.status(404).send({ error: 'Channel not found' });
+    }
+
+    if (channel.type !== 'PUBLIC') {
+      const isMember = channel.members.some((m) => m.userId === userId);
+      if (!isMember) {
+        return reply.status(403).send({ error: 'You are not a member of this private channel' });
+      }
+    }
+
+    const updated = await prisma.channel.update({
+      where: { id: channelId },
+      data: {
+        whiteboardData: whiteboardData || {},
+      },
+    });
+
+    // Realtime broadcast to active viewers in channel
+    if (fastify.io) {
+      fastify.io.to(`channel:${channelId}`).emit(SOCKET_EVENTS.WHITEBOARD_UPDATE, {
+        channelId,
+        data: whiteboardData,
+        userId,
+      });
+    }
+
+    return reply.send({
+      success: true,
+      whiteboardData: updated.whiteboardData,
+    });
+  });
+
+  // Clear Whiteboard Data
+  fastify.delete('/:channelId/whiteboard', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { channelId } = request.params as { channelId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const channel = await prisma.channel.findUnique({
+      where: { id: channelId },
+      include: {
+        members: { select: { userId: true } },
+      },
+    });
+
+    if (!channel) {
+      return reply.status(404).send({ error: 'Channel not found' });
+    }
+
+    if (channel.type !== 'PUBLIC') {
+      const isMember = channel.members.some((m) => m.userId === userId);
+      if (!isMember) {
+        return reply.status(403).send({ error: 'You are not a member of this private channel' });
+      }
+    }
+
+    await prisma.channel.update({
+      where: { id: channelId },
+      data: {
+        whiteboardData: { elements: [] },
+      },
+    });
+
+    if (fastify.io) {
+      fastify.io.to(`channel:${channelId}`).emit(SOCKET_EVENTS.WHITEBOARD_CLEAR, {
+        channelId,
+        userId,
+      });
+    }
+
+    return reply.send({ success: true });
+  });
 };

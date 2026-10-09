@@ -17,6 +17,8 @@ import {
   CornerUpLeft,
   Copy,
   Check,
+  PenTool,
+  Presentation,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { api } from '../../lib/api';
@@ -24,6 +26,7 @@ import { getSocket } from '../../lib/socket';
 import { useChatStore } from '../../stores/chatStore';
 import { EmojiPickerPopover } from './EmojiPickerPopover';
 import { getTopEmojis, recordEmojiUsage } from '../../lib/emojiStore';
+import { WhiteboardView } from '../whiteboard/WhiteboardView';
 
 interface ChatAreaProps {
   channel: Channel;
@@ -175,7 +178,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     return channel.name;
   };
 
+  const [activeView, setActiveView] = useState<'messages' | 'whiteboard'>('messages');
   const [copiedChannelId, setCopiedChannelId] = useState(false);
+
+  // Switch back to messages when channel changes
+  useEffect(() => {
+    setActiveView('messages');
+  }, [channel.id]);
 
   const handleCopyChannelId = () => {
     navigator.clipboard.writeText(channel.id);
@@ -221,13 +230,53 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           {channel.topic && channel.type !== 'DIRECT' && (
             <>
               <span className="text-gray-600">|</span>
-              <span className="text-xs text-gray-400 truncate max-w-md">{channel.topic}</span>
+              <span className="text-xs text-gray-400 truncate max-w-xs">{channel.topic}</span>
             </>
           )}
+
+          {/* Chat vs Canvas / Whiteboard Mode Selector */}
+          <div className="flex items-center bg-[#222529] border border-gray-700 rounded-lg p-0.5 ml-2">
+            <button
+              onClick={() => setActiveView('messages')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition ${
+                activeView === 'messages'
+                  ? 'bg-[#383F45] text-white shadow'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <MessageSquare size={13} />
+              <span>Chat</span>
+            </button>
+            <button
+              onClick={() => setActiveView('whiteboard')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition ${
+                activeView === 'whiteboard'
+                  ? 'bg-slack-green text-white shadow font-semibold'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <PenTool size={13} />
+              <span>Canvas</span>
+            </button>
+          </div>
         </div>
 
         {/* Actions in Header */}
         <div className="flex items-center gap-2">
+          {/* Direct Whiteboard / Canvas button */}
+          <button
+            onClick={() => setActiveView(activeView === 'whiteboard' ? 'messages' : 'whiteboard')}
+            title="Open Brainstorming Whiteboard"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${
+              activeView === 'whiteboard'
+                ? 'bg-slack-green text-white border-slack-green shadow'
+                : 'bg-[#2C3136] hover:bg-[#3E4348] text-gray-300 hover:text-white border-gray-700'
+            }`}
+          >
+            <PenTool size={14} className={activeView === 'whiteboard' ? 'text-white' : 'text-slack-green'} />
+            <span>{activeView === 'whiteboard' ? 'Back to Chat' : 'Whiteboard'}</span>
+          </button>
+
           {channel.type !== 'DIRECT' && onOpenAddMembers && (
             <button
               onClick={onOpenAddMembers}
@@ -250,7 +299,18 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       </div>
 
-      {/* Message List */}
+      {/* Main Content: Whiteboard View or Messages View */}
+      {activeView === 'whiteboard' ? (
+        <div className="flex-1 w-full h-full relative">
+          <WhiteboardView
+            channel={channel}
+            currentUser={currentUser}
+            onClose={() => setActiveView('messages')}
+          />
+        </div>
+      ) : (
+        <>
+          {/* Message List */}
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center text-gray-500">
@@ -606,6 +666,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           />
         </form>
       </div>
+      </>
+      )}
     </div>
   );
 };
