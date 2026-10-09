@@ -5,7 +5,8 @@ import { Channel, Message, UserProfile } from '@orbit/types';
 import {
   Hash,
   Lock,
-  Headphones,
+  PhoneCall,
+  UserPlus,
   Paperclip,
   Smile,
   Send,
@@ -19,6 +20,7 @@ import ReactMarkdown from 'react-markdown';
 import EmojiPicker from 'emoji-picker-react';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
+import { useChatStore } from '../../stores/chatStore';
 
 interface ChatAreaProps {
   channel: Channel;
@@ -27,6 +29,7 @@ interface ChatAreaProps {
   typingUsers: string[];
   onOpenThread: (message: Message) => void;
   onStartHuddle: (channel: Channel) => void;
+  onOpenAddMembers?: () => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -36,6 +39,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   typingUsers,
   onOpenThread,
   onStartHuddle,
+  onOpenAddMembers,
 }) => {
   const [content, setContent] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
@@ -74,18 +78,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       const commandParts = trimmed.split(' ');
       const cmd = commandParts[0].toLowerCase();
 
-      if (cmd === '/huddle') {
+      if (cmd === '/call' || cmd === '/meet' || cmd === '/huddle') {
         setContent('');
         onStartHuddle(channel);
         return;
       }
 
       try {
-        await api.post('/api/bot/commands/execute', {
+        const res = await api.post('/api/bot/commands/execute', {
           channelId: channel.id,
           workspaceId: channel.workspaceId,
           commandText: trimmed,
         });
+        if (res.data.message) {
+          useChatStore.getState().addMessage(res.data.message);
+        }
         setContent('');
         return;
       } catch (err: any) {
@@ -95,10 +102,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
 
     try {
-      await api.post(`/api/channels/${channel.id}/messages`, {
+      const res = await api.post(`/api/channels/${channel.id}/messages`, {
         content: trimmed,
         attachments,
       });
+
+      // Optimistically append sent message immediately to avoid channel reload delay
+      useChatStore.getState().addMessage(res.data);
 
       setContent('');
       setAttachments([]);
@@ -161,14 +171,28 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           )}
         </div>
 
-        {/* Huddle Button */}
-        <button
-          onClick={() => onStartHuddle(channel)}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slack-green/10 hover:bg-slack-green/20 text-slack-green border border-slack-green/30 text-xs font-semibold transition"
-        >
-          <Headphones size={15} />
-          <span>Huddle</span>
-        </button>
+        {/* Actions in Header */}
+        <div className="flex items-center gap-2">
+          {channel.type !== 'DIRECT' && onOpenAddMembers && (
+            <button
+              onClick={onOpenAddMembers}
+              title="Add members to channel"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#2C3136] hover:bg-[#3E4348] text-gray-300 hover:text-white border border-gray-700 text-xs font-medium transition"
+            >
+              <UserPlus size={14} />
+              <span>Add People</span>
+            </button>
+          )}
+
+          {/* Call / Meet Button */}
+          <button
+            onClick={() => onStartHuddle(channel)}
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-slack-green/15 hover:bg-slack-green/25 text-slack-green border border-slack-green/40 text-xs font-semibold transition"
+          >
+            <PhoneCall size={14} />
+            <span>Call</span>
+          </button>
+        </div>
       </div>
 
       {/* Message List */}

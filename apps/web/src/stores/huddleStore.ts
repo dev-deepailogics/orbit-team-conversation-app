@@ -1,5 +1,15 @@
 import { create } from 'zustand';
 
+export interface IncomingCallInfo {
+  channelId: string;
+  channelName: string;
+  channelType?: string;
+  channelTopic?: string;
+  callerName: string;
+  callerAvatar?: string;
+  callerId: string;
+}
+
 interface HuddleState {
   isActive: boolean;
   channelId: string | null;
@@ -10,6 +20,7 @@ interface HuddleState {
   isVideoOn: boolean;
   isScreenSharing: boolean;
   isMinimized: boolean;
+  incomingCall: IncomingCallInfo | null;
 
   startHuddle: (channelId: string, channelName: string, token: string, serverUrl: string) => void;
   leaveHuddle: () => void;
@@ -17,6 +28,8 @@ interface HuddleState {
   toggleVideo: () => void;
   toggleScreenShare: () => void;
   toggleMinimized: () => void;
+  setIncomingCall: (call: IncomingCallInfo | null) => void;
+  dismissIncomingCall: () => void;
 }
 
 export const useHuddleStore = create<HuddleState>((set) => ({
@@ -29,6 +42,7 @@ export const useHuddleStore = create<HuddleState>((set) => ({
   isVideoOn: false,
   isScreenSharing: false,
   isMinimized: false,
+  incomingCall: null,
 
   startHuddle: (channelId, channelName, token, serverUrl) =>
     set({
@@ -38,6 +52,7 @@ export const useHuddleStore = create<HuddleState>((set) => ({
       token,
       serverUrl,
       isMinimized: false,
+      incomingCall: null,
     }),
 
   leaveHuddle: () =>
@@ -55,4 +70,6 @@ export const useHuddleStore = create<HuddleState>((set) => ({
   toggleVideo: () => set((state) => ({ isVideoOn: !state.isVideoOn })),
   toggleScreenShare: () => set((state) => ({ isScreenSharing: !state.isScreenSharing })),
   toggleMinimized: () => set((state) => ({ isMinimized: !state.isMinimized })),
+  setIncomingCall: (call) => set({ incomingCall: call }),
+  dismissIncomingCall: () => set({ incomingCall: null }),
 }));

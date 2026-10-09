@@ -179,6 +179,62 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     return reply.send(formatted);
   });
 
+  // Add Members to Channel
+  fastify.post('/:channelId/members', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { channelId } = request.params as { channelId: string };
+    const { userIds } = request.body as { userIds: string[] };
+
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      return reply.status(400).send({ error: 'userIds array is required' });
+    }
+
+    const channel = await prisma.channel.findUnique({
+      where: { id: channelId },
+    });
+
+    if (!channel) {
+      return reply.status(404).send({ error: 'Channel not found' });
+    }
+
+    // Add each user to channel
+    for (const userId of userIds) {
+      await prisma.channelMember.upsert({
+        where: {
+          channelId_userId: {
+            channelId,
+            userId,
+          },
+        },
+        create: {
+          channelId,
+          userId,
+        },
+        update: {},
+      });
+    }
+
+    const updatedChannel = await prisma.channel.findUnique({
+      where: { id: channelId },
+      include: {
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                displayName: true,
+                avatarUrl: true,
+                status: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return reply.send(updatedChannel);
+  });
+
   // Send message in channel
   fastify.post('/:channelId/messages', { preHandler: [fastify.authenticate] }, async (request, reply) => {
     const { channelId } = request.params as { channelId: string };
@@ -190,6 +246,14 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     }
 
     const { content, attachments } = parseResult.data;
+
+    const channel = await prisma.channel.findUnique({
+      where: { id: channelId },
+    });
+
+    if (!channel) {
+      return reply.status(404).send({ error: 'Channel not found' });
+    }
 
     const message = await prisma.message.create({
       data: {
@@ -227,11 +291,13 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     const payload = {
       ...message,
       replyCount: 0,
+      workspaceId: channel.workspaceId,
     };
 
-    // Realtime broadcast via Socket.IO
+    // Realtime broadcast via Socket.IO to both channel and workspace
     if (fastify.io) {
       fastify.io.to(`channel:${channelId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+      fastify.io.to(`workspace:${channel.workspaceId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
     }
 
     return reply.status(201).send(payload);

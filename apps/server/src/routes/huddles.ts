@@ -27,10 +27,14 @@ export const huddleRoutes: FastifyPluginAsync = async (fastify: FastifyInstance)
     });
   });
 
-  // Start / Join Huddle
+  // Start / Join Huddle / Call
   fastify.post('/:channelId/start', { preHandler: [fastify.authenticate] }, async (request, reply) => {
     const { channelId } = request.params as { channelId: string };
-    const userId = (request.user as { id: string; username: string }).id;
+    const userPayload = request.user as { id: string; username: string };
+
+    const user = await prisma.user.findUnique({
+      where: { id: userPayload.id },
+    });
 
     const channel = await prisma.channel.findUnique({
       where: { id: channelId },
@@ -49,18 +53,27 @@ export const huddleRoutes: FastifyPluginAsync = async (fastify: FastifyInstance)
         data: {
           channelId,
           workspaceId: channel.workspaceId,
-          hostUserId: userId,
+          hostUserId: userPayload.id,
           isActive: true,
         },
       });
     }
 
     if (fastify.io) {
-      fastify.io.to(`workspace:${channel.workspaceId}`).emit(SOCKET_EVENTS.HUDDLE_STARTED, {
+      const callData = {
         channelId,
+        channelName: channel.name,
+        channelType: channel.type,
+        channelTopic: channel.topic,
         huddleId: huddle.id,
-        hostUserId: userId,
-      });
+        hostUserId: userPayload.id,
+        callerName: user?.displayName || userPayload.username,
+        callerAvatar: user?.avatarUrl,
+        workspaceId: channel.workspaceId,
+      };
+
+      fastify.io.to(`workspace:${channel.workspaceId}`).emit(SOCKET_EVENTS.HUDDLE_STARTED, callData);
+      fastify.io.to(`channel:${channelId}`).emit(SOCKET_EVENTS.HUDDLE_STARTED, callData);
     }
 
     return reply.send({ success: true, huddle });

@@ -9,6 +9,7 @@ interface ChatState {
   activeThread: Message | null;
   threadReplies: Message[];
   typingUsers: { [channelId: string]: string[] };
+  unreadCounts: { [channelId: string]: number };
 
   setCurrentWorkspace: (workspace: Workspace | null) => void;
   setChannels: (channels: Channel[]) => void;
@@ -20,6 +21,8 @@ interface ChatState {
   setThreadReplies: (replies: Message[]) => void;
   addThreadReply: (reply: Message) => void;
   setTypingUser: (channelId: string, username: string, isTyping: boolean) => void;
+  incrementUnread: (channelId: string) => void;
+  clearUnread: (channelId: string) => void;
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -30,10 +33,18 @@ export const useChatStore = create<ChatState>((set) => ({
   activeThread: null,
   threadReplies: [],
   typingUsers: {},
+  unreadCounts: {},
 
   setCurrentWorkspace: (workspace) => set({ currentWorkspace: workspace }),
   setChannels: (channels) => set({ channels }),
-  setCurrentChannel: (channel) => set({ currentChannel: channel, activeThread: null }),
+  setCurrentChannel: (channel) =>
+    set((state) => ({
+      currentChannel: channel,
+      activeThread: null,
+      unreadCounts: channel
+        ? { ...state.unreadCounts, [channel.id]: 0 }
+        : state.unreadCounts,
+    })),
   setMessages: (messages) => set({ messages }),
   
   addMessage: (message) =>
@@ -81,4 +92,20 @@ export const useChatStore = create<ChatState>((set) => ({
         },
       };
     }),
+
+  incrementUnread: (channelId) =>
+    set((state) => ({
+      unreadCounts: {
+        ...state.unreadCounts,
+        [channelId]: (state.unreadCounts[channelId] || 0) + 1,
+      },
+    })),
+
+  clearUnread: (channelId) =>
+    set((state) => ({
+      unreadCounts: {
+        ...state.unreadCounts,
+        [channelId]: 0,
+      },
+    })),
 }));

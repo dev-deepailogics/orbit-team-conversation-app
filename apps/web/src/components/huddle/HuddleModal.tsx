@@ -8,7 +8,7 @@ import {
   ControlBar,
 } from '@livekit/components-react';
 import '@livekit/components-styles';
-import { Minimize2, Maximize2, X, Headphones } from 'lucide-react';
+import { Minimize2, Maximize2, X, PhoneCall } from 'lucide-react';
 import { useHuddleStore } from '../../stores/huddleStore';
 
 export const HuddleModal: React.FC = () => {
@@ -30,7 +30,7 @@ export const HuddleModal: React.FC = () => {
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-slack-green rounded-full animate-ping" />
           <span className="text-xs font-semibold text-white">
-            Huddle in #{channelName}
+            Call in #{channelName}
           </span>
         </div>
         <div className="flex items-center gap-1">
@@ -54,15 +54,15 @@ export const HuddleModal: React.FC = () => {
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-6">
       <div className="bg-[#1A1D21] border border-gray-700 rounded-2xl w-full max-w-5xl h-[80vh] flex flex-col overflow-hidden shadow-2xl">
-        {/* Huddle Header */}
+        {/* Call Header */}
         <div className="h-14 border-b border-gray-800 px-6 flex items-center justify-between bg-[#1F2326]">
           <div className="flex items-center gap-2.5">
             <div className="p-2 bg-slack-green/20 rounded-lg text-slack-green">
-              <Headphones size={18} />
+              <PhoneCall size={18} />
             </div>
             <div>
               <h2 className="text-sm font-bold text-white leading-tight">
-                Huddle in #{channelName}
+                Call in #{channelName}
               </h2>
               <p className="text-[11px] text-gray-400">Audio, Video & Screen Sharing</p>
             </div>
@@ -78,7 +78,7 @@ export const HuddleModal: React.FC = () => {
             </button>
             <button
               onClick={leaveHuddle}
-              title="Leave Huddle"
+              title="Leave Call"
               className="p-2 hover:bg-red-500/20 rounded-lg text-red-400 hover:text-red-300 transition"
             >
               <X size={20} />

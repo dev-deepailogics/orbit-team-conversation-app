@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Workspace, Channel, Message } from '@orbit/types';
 import { useAuthStore } from '../stores/authStore';
@@ -15,6 +15,8 @@ import { ChannelSidebar } from '../components/channel/ChannelSidebar';
 import { ChatArea } from '../components/chat/ChatArea';
 import { ThreadSidebar } from '../components/chat/ThreadSidebar';
 import { HuddleModal } from '../components/huddle/HuddleModal';
+import { IncomingCallDialog } from '../components/huddle/IncomingCallDialog';
+import { AddMembersDialog } from '../components/channel/AddMembersDialog';
 import { BotPortalDialog } from '../components/bot/BotPortalDialog';
 import { Layers } from 'lucide-react';
 
@@ -39,14 +41,22 @@ export default function AppDashboard() {
     setThreadReplies,
     addThreadReply,
     setTypingUser,
+    incrementUnread,
   } = useChatStore();
 
-  const { startHuddle, channelId: activeHuddleChannelId } = useHuddleStore();
+  const { startHuddle, setIncomingCall, channelId: activeHuddleChannelId } = useHuddleStore();
 
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [showBotPortal, setShowBotPortal] = useState(false);
+  const [showAddMembers, setShowAddMembers] = useState(false);
   const [isDataLoading, setIsDataLoading] = useState(true);
+
+  // Keep a ref to the current channel to avoid stale closures in socket events
+  const currentChannelRef = useRef<Channel | null>(null);
+  useEffect(() => {
+    currentChannelRef.current = currentChannel;
+  }, [currentChannel]);
 
   // 1. Check Auth
   useEffect(() => {
@@ -117,6 +127,12 @@ export default function AppDashboard() {
         targetUserId: targetUser.id,
       });
       const dmChannel: Channel = res.data;
+      
+      // Add to channels list if not already there
+      if (!channels.some((c) => c.id === dmChannel.id)) {
+        setChannels([...channels, dmChannel]);
+      }
+
       handleSelectChannel(dmChannel);
     } catch (err) {
       console.error('Failed to open direct message', err);
@@ -131,20 +147,25 @@ export default function AppDashboard() {
     socket.emit('workspace:join', currentWorkspace.id);
 
     const onNewMessage = (msg: any) => {
+      const activeChannel = currentChannelRef.current;
       if (msg.parentMessageId) {
         addThreadReply(msg);
-      } else if (msg.channelId === currentChannel?.id) {
+      } else if (activeChannel && msg.channelId === activeChannel.id) {
         addMessage(msg);
+      } else {
+        // Different channel or DM -> increment unread badge!
+        incrementUnread(msg.channelId);
       }
     };
 
     const onReaction = (data: any) => {
-      if (currentChannel) {
-        // Update reactions on current messages
-        const updated = messages.map((m) =>
-          m.id === data.messageId ? { ...m, reactions: data.reactions } : m
+      const activeChannel = currentChannelRef.current;
+      if (activeChannel) {
+        setMessages(
+          useChatStore.getState().messages.map((m) =>
+            m.id === data.messageId ? { ...m, reactions: data.reactions } : m
+          )
         );
-        setMessages(updated);
       }
     };
 
@@ -152,22 +173,31 @@ export default function AppDashboard() {
       setTypingUser(channelId, username, true);
     };
 
-    const onTypingStop = ({ channelId, userId }: any) => {
+    const onTypingStop = ({ channelId }: any) => {
       setTypingUser(channelId, '', false);
+    };
+
+    const onCallStarted = (callData: any) => {
+      // If someone else in the workspace started a call, notify user
+      if (callData.hostUserId !== user.id) {
+        setIncomingCall(callData);
+      }
     };
 
     socket.on('message:new', onNewMessage);
     socket.on('message:reaction', onReaction);
     socket.on('typing:start', onTypingStart);
     socket.on('typing:stop', onTypingStop);
+    socket.on('huddle:started', onCallStarted);
 
     return () => {
       socket.off('message:new', onNewMessage);
       socket.off('message:reaction', onReaction);
       socket.off('typing:start', onTypingStart);
       socket.off('typing:stop', onTypingStop);
+      socket.off('huddle:started', onCallStarted);
     };
-  }, [user, currentWorkspace, currentChannel, messages]);
+  }, [user, currentWorkspace]);
 
   // 6. Handle Opening Thread
   const handleOpenThread = async (message: Message) => {
@@ -180,7 +210,7 @@ export default function AppDashboard() {
     }
   };
 
-  // 7. Handle Starting / Joining Huddle
+  // 7. Handle Starting / Joining Call
   const handleStartHuddle = async (channel: Channel) => {
     try {
       const res = await api.post(`/api/huddles/${channel.id}/token`);
@@ -188,7 +218,7 @@ export default function AppDashboard() {
       await api.post(`/api/huddles/${channel.id}/start`);
       startHuddle(channel.id, channel.name, livekitToken, serverUrl);
     } catch (err) {
-      alert('Could not start huddle session');
+      alert('Could not start call session');
     }
   };
 
@@ -246,6 +276,7 @@ export default function AppDashboard() {
           typingUsers={typingUsers[currentChannel.id] || []}
           onOpenThread={handleOpenThread}
           onStartHuddle={handleStartHuddle}
+          onOpenAddMembers={() => setShowAddMembers(true)}
         />
       ) : (
         <div className="flex-1 flex items-center justify-center text-gray-500">
@@ -264,10 +295,45 @@ export default function AppDashboard() {
         />
       )}
 
-      {/* 5. LiveKit Audio/Video Huddle Overlay */}
+      {/* 5. LiveKit Audio/Video Call Overlay */}
       <HuddleModal />
 
-      {/* 6. Bot Developer Portal Dialog */}
+      {/* 6. Incoming Call Ringing Banner */}
+      <IncomingCallDialog
+        onAcceptCall={(channelId, channelName) => {
+          const matched = channels.find((c) => c.id === channelId) || {
+            id: channelId,
+            name: channelName,
+            workspaceId: currentWorkspace?.id || '',
+            type: 'PUBLIC' as any,
+            createdById: '',
+            isArchived: false,
+            createdAt: '',
+            updatedAt: '',
+            topic: null,
+            description: null,
+          };
+          handleStartHuddle(matched);
+        }}
+      />
+
+      {/* 7. Add Members to Channel Dialog */}
+      {showAddMembers && currentChannel && (
+        <AddMembersDialog
+          channel={currentChannel}
+          workspaceMembers={members}
+          onClose={() => setShowAddMembers(false)}
+          onMembersAdded={async () => {
+            // Refresh members
+            if (currentWorkspace) {
+              const res = await api.get(`/api/workspaces/${currentWorkspace.id}`);
+              setMembers(res.data.members || []);
+            }
+          }}
+        />
+      )}
+
+      {/* 8. Bot Developer Portal Dialog */}
       {showBotPortal && currentWorkspace && (
         <BotPortalDialog
           workspace={currentWorkspace}

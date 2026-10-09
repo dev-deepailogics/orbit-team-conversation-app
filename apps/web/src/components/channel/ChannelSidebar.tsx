@@ -7,7 +7,7 @@ import {
   Lock,
   Plus,
   ChevronDown,
-  Headphones,
+  PhoneCall,
   Bot,
   UserPlus,
   LogOut,
@@ -15,6 +15,7 @@ import {
   Volume2,
 } from 'lucide-react';
 import { api } from '../../lib/api';
+import { useChatStore } from '../../stores/chatStore';
 
 interface ChannelSidebarProps {
   workspace: Workspace;
@@ -50,6 +51,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   const [channelTopic, setChannelTopic] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
+  const unreadCounts = useChatStore((s) => s.unreadCounts);
 
   const handleCreateChannel = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,43 +126,55 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           </div>
 
           <div className="space-y-0.5">
-            {channels.map((channel) => {
+            {channels.filter((c) => c.type !== 'DIRECT').map((channel) => {
               const isActive = currentChannel?.id === channel.id;
               const hasHuddle = activeHuddleChannelId === channel.id;
+              const unread = unreadCounts[channel.id] || 0;
+
               return (
                 <div
                   key={channel.id}
                   onClick={() => onSelectChannel(channel)}
                   className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
                     isActive
-                      ? 'bg-slack-activeChannel text-white shadow'
+                      ? 'bg-slack-activeChannel text-white shadow font-semibold'
+                      : unread > 0
+                      ? 'text-white font-bold bg-[#282C30]'
                       : 'text-gray-300 hover:bg-[#2C3136] hover:text-white'
                   }`}
                 >
                   <div className="flex items-center gap-2 truncate">
                     {channel.type === 'PRIVATE' ? (
-                      <Lock size={15} className="text-gray-400" />
+                      <Lock size={15} className={unread > 0 ? 'text-white' : 'text-gray-400'} />
                     ) : (
-                      <Hash size={16} className="text-gray-400" />
+                      <Hash size={16} className={unread > 0 ? 'text-white' : 'text-gray-400'} />
                     )}
                     <span className="truncate">{channel.name}</span>
                   </div>
 
-                  {/* Channel Huddle Action */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onStartHuddle(channel);
-                    }}
-                    title={hasHuddle ? 'Active Huddle - Click to join' : 'Start Huddle'}
-                    className={`p-1 rounded transition ${
-                      hasHuddle
-                        ? 'bg-slack-green text-white animate-pulse'
-                        : 'opacity-0 group-hover:opacity-100 hover:bg-black/20 text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    <Headphones size={14} />
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    {unread > 0 && (
+                      <span className="px-1.5 py-0.5 bg-slack-green text-white text-[10px] font-bold rounded-full min-w-[18px] text-center leading-none">
+                        {unread}
+                      </span>
+                    )}
+
+                    {/* Channel Call Action */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onStartHuddle(channel);
+                      }}
+                      title={hasHuddle ? 'Active Call - Click to join' : 'Start Call'}
+                      className={`p-1 rounded transition ${
+                        hasHuddle
+                          ? 'bg-slack-green text-white animate-pulse'
+                          : 'opacity-0 group-hover:opacity-100 hover:bg-black/20 text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      <PhoneCall size={13} />
+                    </button>
+                  </div>
                 </div>
               );
             })}
