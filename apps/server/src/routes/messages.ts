@@ -4,14 +4,19 @@ import { SOCKET_EVENTS } from '@orbit/types';
 import { z } from 'zod';
 
 const threadReplySchema = z.object({
-  content: z.string().min(1),
+  content: z.string().optional().default(''),
   quotedMessageId: z.string().optional(),
   attachments: z.array(z.object({
+    id: z.string().optional(),
     fileUrl: z.string(),
     fileName: z.string(),
     fileType: z.string(),
     fileSize: z.number(),
+    fileKey: z.string().optional(),
+    storageProvider: z.string().optional(),
   })).optional(),
+}).refine((data) => (data.content && data.content.trim().length > 0) || (data.attachments && data.attachments.length > 0), {
+  message: 'Reply must contain text or at least one attachment',
 });
 
 const reactionSchema = z.object({
@@ -92,14 +97,50 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.status(404).send({ error: 'Parent message not found' });
     }
 
+    const { content, attachments, quotedMessageId } = parseResult.data;
+
     const replyMessage = await prisma.message.create({
       data: {
         channelId: parent.channelId,
         parentMessageId: parent.id,
         userId,
-        content: parseResult.data.content,
-        quotedMessageId: parseResult.data.quotedMessageId || undefined,
+        content: content || '',
+        quotedMessageId: quotedMessageId || undefined,
       },
+    });
+
+    // Link or create attachments
+    if (attachments && attachments.length > 0) {
+      for (const att of attachments) {
+        if (att.id) {
+          await prisma.attachment.update({
+            where: { id: att.id },
+            data: {
+              messageId: replyMessage.id,
+              channelId: parent.channelId,
+            },
+          });
+        } else {
+          await prisma.attachment.create({
+            data: {
+              workspaceId: (await prisma.channel.findUnique({ where: { id: parent.channelId } }))?.workspaceId || '',
+              channelId: parent.channelId,
+              messageId: replyMessage.id,
+              uploaderId: userId,
+              fileName: att.fileName || 'attachment',
+              fileKey: att.fileKey || att.fileUrl,
+              fileUrl: att.fileUrl,
+              fileType: att.fileType || 'application/octet-stream',
+              fileSize: att.fileSize || 0,
+              storageProvider: att.storageProvider || 'LOCAL',
+            },
+          });
+        }
+      }
+    }
+
+    const fullReplyMessage = await prisma.message.findUnique({
+      where: { id: replyMessage.id },
       include: {
         user: {
           select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
@@ -114,15 +155,19 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       },
     });
 
+    if (!fullReplyMessage) {
+      return reply.status(500).send({ error: 'Failed to retrieve reply message' });
+    }
+
     // Realtime notification to channel & thread
     if (fastify.io) {
       fastify.io.to(`channel:${parent.channelId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, {
-        ...replyMessage,
+        ...fullReplyMessage,
         isThreadReply: true,
       });
     }
 
-    return reply.status(201).send(replyMessage);
+    return reply.status(201).send(fullReplyMessage);
   });
 
   // Toggle emoji reaction

@@ -2,12 +2,14 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Message, UserProfile } from '@orbit/types';
-import { X, Send, CornerUpLeft, Smile, SmilePlus, Type } from 'lucide-react';
+import { X, Send, CornerUpLeft, Smile, SmilePlus, Type, Paperclip, FileText, Loader2 } from 'lucide-react';
 import { api } from '../../lib/api';
+import { useChatStore } from '../../stores/chatStore';
 import { EmojiPickerPopover } from './EmojiPickerPopover';
 import { getTopEmojis, recordEmojiUsage } from '../../lib/emojiStore';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { RichTextEditor, RichTextEditorRef } from './RichTextEditor';
+import { FileAttachmentList, formatFileSize, getFileCategory } from './FileAttachmentList';
 
 interface ThreadSidebarProps {
   parentMessage: Message;
@@ -27,12 +29,15 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   const [content, setContent] = useState('');
   const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [threadAttachments, setThreadAttachments] = useState<any[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const [activeEmojiMessageId, setActiveEmojiMessageId] = useState<string | null>(null);
   const [showComposerEmoji, setShowComposerEmoji] = useState(false);
   const [topEmojis, setTopEmojis] = useState<string[]>(['👍', '❤️', '🔥', '🎉', '🚀']);
   const [showFormatting, setShowFormatting] = useState(true);
   const repliesEndRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<RichTextEditorRef>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setTopEmojis(getTopEmojis(5));
@@ -52,20 +57,51 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
     }
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      Array.from(files).forEach((file) => {
+        formData.append('files', file);
+      });
+      if (parentMessage.channelId) {
+        formData.append('channelId', parentMessage.channelId);
+      }
+
+      const res = await api.post('/api/files/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      if (res.data && res.data.attachments) {
+        setThreadAttachments((prev) => [...prev, ...res.data.attachments]);
+      }
+    } catch (err) {
+      console.error('Failed to upload thread file', err);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const handleSendReply = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const rawMarkdown = editorRef.current?.getMarkdown() || content.trim();
-    if (!rawMarkdown.trim() || isSubmitting) return;
+    if ((!rawMarkdown.trim() && threadAttachments.length === 0) || isSubmitting || isUploading) return;
 
     setIsSubmitting(true);
     try {
       const res = await api.post(`/api/messages/${parentMessage.id}/replies`, {
         content: rawMarkdown.trim(),
         quotedMessageId: replyingToMessage?.id,
+        attachments: threadAttachments,
       });
       onReplyAdded(res.data);
       editorRef.current?.clear();
       setContent('');
+      setThreadAttachments([]);
       setReplyingToMessage(null);
       setShowComposerEmoji(false);
     } catch (err) {
@@ -120,6 +156,18 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
             <div className="text-xs text-gray-200 mt-1 max-w-none break-words">
               <MarkdownRenderer content={parentMessage.content} />
             </div>
+
+            {/* Parent Message Attachments */}
+            {parentMessage.attachments && parentMessage.attachments.length > 0 && (
+              <div className="mt-2">
+                <FileAttachmentList
+                  attachments={parentMessage.attachments}
+                  currentUser={currentUser}
+                  onFileDeleted={(id) => useChatStore.getState().removeAttachment(id)}
+                  isThreadView
+                />
+              </div>
+            )}
 
             {/* Parent Message Reactions */}
             {(() => {
@@ -257,6 +305,18 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                   <MarkdownRenderer content={reply.content} />
                 </div>
 
+                {/* Reply Attachments */}
+                {reply.attachments && reply.attachments.length > 0 && (
+                  <div className="mt-2">
+                    <FileAttachmentList
+                      attachments={reply.attachments}
+                      currentUser={currentUser}
+                      onFileDeleted={(id) => useChatStore.getState().removeAttachment(id)}
+                      isThreadView
+                    />
+                  </div>
+                )}
+
                 {/* Reply Reactions */}
                 {(() => {
                   const reactionCounts = (reply.reactions || []).reduce(
@@ -372,6 +432,29 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
         )}
 
         <form onSubmit={handleSendReply} className="bg-[#222529] border border-gray-700 rounded-lg overflow-hidden relative">
+          {/* Uploaded attachments preview */}
+          {threadAttachments.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 p-2 bg-[#1C1F23]/80 border-b border-gray-800">
+              {threadAttachments.map((file, idx) => (
+                <div
+                  key={file.id || idx}
+                  className="flex items-center gap-1.5 px-2 py-1 bg-[#282D32] border border-gray-700/60 rounded-md text-xs text-gray-200"
+                >
+                  <FileText size={12} className="text-slack-green shrink-0" />
+                  <span className="truncate max-w-[120px] font-medium text-[11px]">{file.fileName}</span>
+                  <span className="text-[10px] text-gray-400">({formatFileSize(file.fileSize)})</span>
+                  <button
+                    type="button"
+                    onClick={() => setThreadAttachments((prev) => prev.filter((_, i) => i !== idx))}
+                    className="text-gray-400 hover:text-red-400 ml-1"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <RichTextEditor
             ref={editorRef}
             placeholder="Reply..."
@@ -382,6 +465,23 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
           />
           <div className="flex items-center justify-between px-2 py-1.5 bg-[#1C1F23]/60 border-t border-gray-800/40">
             <div className="flex items-center gap-1">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                multiple
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                title="Attach files"
+                className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition disabled:opacity-40"
+              >
+                {isUploading ? <Loader2 size={14} className="animate-spin text-slack-green" /> : <Paperclip size={14} />}
+              </button>
+
               <button
                 type="button"
                 onClick={() => setShowFormatting(!showFormatting)}
@@ -405,7 +505,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
 
             <button
               type="submit"
-              disabled={!content.trim() || isSubmitting}
+              disabled={(!content.trim() && threadAttachments.length === 0) || isSubmitting || isUploading}
               className="p-1 bg-slack-green hover:bg-[#008a65] text-white rounded transition disabled:opacity-30"
             >
               <Send size={13} />

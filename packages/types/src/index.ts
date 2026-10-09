@@ -77,12 +77,36 @@ export interface Channel {
 // ==========================================
 export interface Attachment {
   id: string;
-  messageId?: string;
-  fileUrl: string;
+  workspaceId: string;
+  channelId?: string | null;
+  messageId?: string | null;
+  uploaderId?: string | null;
   fileName: string;
+  fileKey?: string;
+  fileUrl: string;
   fileType: string;
   fileSize: number;
+  storageProvider?: string;
+  isDeleted?: boolean;
   createdAt: string;
+  updatedAt?: string;
+  uploader?: UserProfile;
+}
+
+export interface StorageCategoryStat {
+  category: 'images' | 'videos' | 'audio' | 'documents' | 'archives' | 'code' | 'other';
+  label: string;
+  bytes: number;
+  count: number;
+  color: string;
+}
+
+export interface StorageStats {
+  totalBytes: number;
+  formattedTotal: string;
+  fileCount: number;
+  categories: StorageCategoryStat[];
+  recentFiles?: Attachment[];
 }
 
 export interface Reaction {
@@ -222,6 +246,7 @@ export const SOCKET_EVENTS = {
   MESSAGE_UPDATE: 'message:update',
   MESSAGE_DELETE: 'message:delete',
   MESSAGE_REACTION: 'message:reaction',
+  FILE_DELETE: 'file:delete',
   TYPING_START: 'typing:start',
   TYPING_STOP: 'typing:stop',
 

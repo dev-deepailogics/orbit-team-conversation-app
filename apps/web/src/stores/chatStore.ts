@@ -23,6 +23,7 @@ interface ChatState {
   setTypingUser: (channelId: string, username: string, isTyping: boolean) => void;
   incrementUnread: (messageId: string, channelId: string) => void;
   clearUnread: (channelId: string) => void;
+  removeAttachment: (fileId: string) => void;
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -59,6 +60,24 @@ export const useChatStore = create<ChatState>((set) => ({
   updateMessage: (message) =>
     set((state) => ({
       messages: state.messages.map((m) => (m.id === message.id ? message : m)),
+    })),
+
+  removeAttachment: (fileId) =>
+    set((state) => ({
+      messages: state.messages.map((m) => ({
+        ...m,
+        attachments: m.attachments?.filter((a) => a.id !== fileId),
+      })),
+      threadReplies: state.threadReplies.map((r) => ({
+        ...r,
+        attachments: r.attachments?.filter((a) => a.id !== fileId),
+      })),
+      activeThread: state.activeThread
+        ? {
+            ...state.activeThread,
+            attachments: state.activeThread.attachments?.filter((a) => a.id !== fileId),
+          }
+        : null,
     })),
 
   setActiveThread: (message) => set({ activeThread: message }),

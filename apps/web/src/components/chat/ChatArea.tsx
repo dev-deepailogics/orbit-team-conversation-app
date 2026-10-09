@@ -20,6 +20,8 @@ import {
   PenTool,
   Presentation,
   Type,
+  HardDrive,
+  Loader2,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
@@ -29,6 +31,8 @@ import { getTopEmojis, recordEmojiUsage } from '../../lib/emojiStore';
 import { WhiteboardView } from '../whiteboard/WhiteboardView';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { RichTextEditor, RichTextEditorRef } from './RichTextEditor';
+import { FileAttachmentList, formatFileSize, getFileCategory } from './FileAttachmentList';
+import { ChannelStorageModal } from './ChannelStorageModal';
 
 interface ChatAreaProps {
   channel: Channel;
@@ -56,7 +60,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [topEmojis, setTopEmojis] = useState<string[]>(['👍', '❤️', '🔥', '🎉', '🚀']);
   const [attachments, setAttachments] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [showFormatting, setShowFormatting] = useState(true);
+  const [showStorageModal, setShowStorageModal] = useState(false);
+  const [activeView, setActiveView] = useState<'messages' | 'whiteboard'>('messages');
+  const [copiedChannelId, setCopiedChannelId] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<RichTextEditorRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -145,25 +153,77 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
   };
 
+  // Multiple File Upload Handler
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
     setIsUploading(true);
     try {
-      const res = await api.post('/api/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      setAttachments((prev) => [...prev, res.data]);
-    } catch (err) {
-      alert('File upload failed');
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('workspaceId', channel.workspaceId);
+        formData.append('channelId', channel.id);
+
+        const res = await api.post('/api/files/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        setAttachments((prev) => [...prev, res.data]);
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'File upload failed');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // Drag & Drop File Upload Handler
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const files = e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('workspaceId', channel.workspaceId);
+        formData.append('channelId', channel.id);
+
+        const res = await api.post('/api/files/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        setAttachments((prev) => [...prev, res.data]);
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'File upload failed');
     } finally {
       setIsUploading(false);
     }
   };
+
+  // Socket listener for real-time file deletions
+  useEffect(() => {
+    const socket = getSocket();
+    const onFileDelete = (payload: { fileId: string; channelId?: string }) => {
+      if (payload.fileId) {
+        useChatStore.getState().removeAttachment(payload.fileId);
+      }
+    };
+
+    socket.on('file:delete', onFileDelete);
+    return () => {
+      socket.off('file:delete', onFileDelete);
+    };
+  }, []);
 
   const handleReaction = async (messageId: string, emoji: string) => {
     recordEmojiUsage(emoji);
@@ -186,9 +246,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
     return channel.name;
   };
-
-  const [activeView, setActiveView] = useState<'messages' | 'whiteboard'>('messages');
-  const [copiedChannelId, setCopiedChannelId] = useState(false);
 
   // Switch back to messages when channel changes
   useEffect(() => {
@@ -297,6 +354,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </button>
           )}
 
+          {/* Channel Files & Storage Button */}
+          <button
+            onClick={() => setShowStorageModal(true)}
+            title="Channel Files & Storage"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#2C3136] hover:bg-[#3E4348] text-gray-300 hover:text-white border border-gray-700 text-xs font-medium transition"
+          >
+            <HardDrive size={14} className="text-slack-green" />
+            <span>Files</span>
+          </button>
+
           {/* Call / Meet Button */}
           <button
             onClick={() => onStartHuddle(channel)}
@@ -393,21 +460,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
                   {/* Attachments */}
                   {msg.attachments && msg.attachments.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {msg.attachments.map((att) => (
-                        <a
-                          key={att.id}
-                          href={att.fileUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center gap-2 bg-[#2C3136] hover:bg-[#3E4348] border border-gray-700 px-3 py-2 rounded-lg text-xs text-blue-400 transition"
-                        >
-                          <FileText size={16} />
-                          <span className="truncate max-w-xs">{att.fileName}</span>
-                          <span className="text-gray-500 text-[10px]">({Math.round(att.fileSize / 1024)} KB)</span>
-                        </a>
-                      ))}
-                    </div>
+                    <FileAttachmentList
+                      attachments={msg.attachments}
+                      currentUser={currentUser}
+                      onFileDeleted={(deletedFileId) => {
+                        useChatStore.getState().removeAttachment(deletedFileId);
+                      }}
+                    />
                   )}
 
                   {/* Reactions Bar */}
@@ -591,31 +650,74 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
         <form
           onSubmit={handleSendMessage}
-          className="bg-[#222529] border border-gray-700 rounded-xl focus-within:border-gray-500 shadow-lg relative overflow-hidden"
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragOver(true);
+          }}
+          onDragLeave={() => setIsDragOver(false)}
+          onDrop={handleDrop}
+          className={`bg-[#222529] border rounded-xl focus-within:border-gray-500 shadow-lg relative overflow-hidden transition ${
+            isDragOver
+              ? 'border-slack-green ring-2 ring-slack-green/50 bg-[#252C28]'
+              : 'border-gray-700'
+          }`}
         >
-          {/* File Attachments Preview */}
-          {attachments.length > 0 && (
-            <div className="px-3 pt-2 flex flex-wrap gap-2 border-b border-gray-800 pb-2">
-              {attachments.map((att, idx) => (
-                <div key={idx} className="flex items-center gap-2 bg-[#2C3136] px-2.5 py-1 rounded text-xs text-white">
-                  <FileText size={14} className="text-blue-400" />
-                  <span className="truncate max-w-[150px]">{att.fileName}</span>
-                  <button
-                    type="button"
-                    onClick={() => setAttachments(attachments.filter((_, i) => i !== idx))}
-                    className="hover:text-red-400"
+          {/* File Attachments Preview & Upload Indicator */}
+          {(attachments.length > 0 || isUploading) && (
+            <div className="px-3 pt-2.5 flex flex-wrap gap-2 border-b border-gray-800/80 pb-2.5 bg-[#1B1E22]/60">
+              {attachments.map((att, idx) => {
+                const isImage = getFileCategory(att.fileType, att.fileName) === 'image';
+                return (
+                  <div
+                    key={att.id || idx}
+                    className="flex items-center gap-2 bg-[#2C3136] border border-gray-700/80 px-2.5 py-1 rounded-lg text-xs text-white shadow-sm animate-in fade-in zoom-in-95 duration-100"
                   >
-                    <X size={13} />
-                  </button>
+                    {isImage ? (
+                      <div className="w-4 h-4 rounded overflow-hidden bg-black/40">
+                        <img
+                          src={att.fileUrl}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <FileText size={14} className="text-blue-400" />
+                    )}
+                    <span className="truncate max-w-[140px] font-medium" title={att.fileName}>
+                      {att.fileName}
+                    </span>
+                    <span className="text-[10px] text-gray-400 font-mono">
+                      ({formatFileSize(att.fileSize)})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setAttachments(attachments.filter((_, i) => i !== idx))}
+                      title="Remove attachment"
+                      className="text-gray-400 hover:text-red-400 p-0.5 rounded transition"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                );
+              })}
+
+              {isUploading && (
+                <div className="flex items-center gap-1.5 bg-[#2C3136] px-2.5 py-1 rounded-lg text-xs text-slack-green border border-slack-green/40 animate-pulse">
+                  <Loader2 size={13} className="animate-spin" />
+                  <span>Uploading file...</span>
                 </div>
-              ))}
+              )}
             </div>
           )}
 
           {/* Live WYSIWYG In-Place Rich Text Editor */}
           <RichTextEditor
             ref={editorRef}
-            placeholder={`Message #${channel.name}`}
+            placeholder={
+              isDragOver
+                ? 'Drop file here to upload to channel...'
+                : `Message #${channel.name}`
+            }
             showToolbar={showFormatting}
             onTyping={(text) => handleTyping(text)}
             onSubmit={() => handleSendMessage()}
@@ -628,12 +730,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileUpload}
+                multiple
                 className="hidden"
               />
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                title="Attach file"
+                title="Attach files (images, docs, code, zip...)"
                 className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition"
               >
                 <Paperclip size={16} />
@@ -662,10 +765,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
             <button
               type="submit"
-              disabled={!content.trim() && attachments.length === 0}
-              className="p-1.5 bg-slack-green hover:bg-[#008a65] text-white rounded-lg transition disabled:opacity-30"
+              disabled={(!content.trim() && attachments.length === 0) || isUploading}
+              className="p-1.5 bg-slack-green hover:bg-[#008a65] text-white rounded-lg transition disabled:opacity-30 flex items-center justify-center"
             >
-              <Send size={15} />
+              {isUploading ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
             </button>
           </div>
 
@@ -682,6 +785,18 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         </form>
       </div>
       </>
+      )}
+
+      {/* Channel Storage & Files Modal */}
+      {showStorageModal && (
+        <ChannelStorageModal
+          channel={channel}
+          currentUser={currentUser}
+          onClose={() => setShowStorageModal(false)}
+          onFileDeleted={(deletedFileId) => {
+            useChatStore.getState().removeAttachment(deletedFileId);
+          }}
+        />
       )}
     </div>
   );

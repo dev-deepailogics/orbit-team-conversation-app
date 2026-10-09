@@ -13,9 +13,11 @@ import {
   LogOut,
   Smile,
   Volume2,
+  HardDrive,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useChatStore } from '../../stores/chatStore';
+import { WorkspaceStorageModal } from '../workspace/WorkspaceStorageModal';
 
 interface ChannelSidebarProps {
   workspace: Workspace;
@@ -47,6 +49,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   onLogout,
 }) => {
   const [showCreateChannel, setShowCreateChannel] = useState(false);
+  const [showStorageModal, setShowStorageModal] = useState(false);
   const [channelName, setChannelName] = useState('');
   const [channelTopic, setChannelTopic] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
@@ -88,6 +91,16 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           <ChevronDown size={16} className="text-gray-400 group-hover:text-white" />
         </div>
         <div className="flex items-center gap-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowStorageModal(true);
+            }}
+            title="Workspace Storage & Files"
+            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition"
+          >
+            <HardDrive size={18} />
+          </button>
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -388,6 +401,16 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Workspace Storage & File Management Modal */}
+      {showStorageModal && (
+        <WorkspaceStorageModal
+          workspace={workspace}
+          currentUser={currentUser}
+          onClose={() => setShowStorageModal(false)}
+          onFileDeleted={(id) => useChatStore.getState().removeAttachment(id)}
+        />
       )}
     </div>
   );

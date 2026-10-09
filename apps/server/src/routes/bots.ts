@@ -19,6 +19,7 @@ const postBotMessageSchema = z.object({
     fileName: z.string(),
     fileType: z.string(),
     fileSize: z.number(),
+    fileKey: z.string().optional(),
   })).optional(),
 });
 
@@ -112,7 +113,9 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
             fileUrl: att.fileUrl,
             fileName: att.fileName,
             fileType: att.fileType,
-            fileSize: att.fileSize,
+            fileSize: att.fileSize || 0,
+            fileKey: att.fileKey || att.fileUrl,
+            workspaceId: channel.workspaceId,
           })),
         } : undefined,
       },

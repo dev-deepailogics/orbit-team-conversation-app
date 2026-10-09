@@ -62,6 +62,7 @@ model User {
   createdBots       BotApp[]          @relation("BotCreator")
   createdWebhooks   Webhook[]         @relation("WebhookCreator")
   createdCommands   SlashCommand[]    @relation("CommandCreator")
+  uploadedFiles     Attachment[]
 
   @@index([email])
   @@index([username])
@@ -86,6 +87,7 @@ model Workspace {
   commands    SlashCommand[]
   notifications Notification[]
   huddles     Huddle[]
+  attachments Attachment[]
 
   @@index([slug])
   @@index([ownerId])
@@ -125,6 +127,7 @@ model Channel {
   messages    Message[]
   webhooks    Webhook[]
   huddles     Huddle[]
+  attachments Attachment[]
 
   @@index([workspaceId])
   @@index([type])
@@ -176,17 +179,30 @@ model Message {
 }
 
 model Attachment {
-  id        String   @id @default(uuid())
-  messageId String
-  fileUrl   String
-  fileName  String
-  fileType  String
-  fileSize  Int
-  createdAt DateTime @default(now())
+  id              String    @id @default(uuid())
+  workspaceId     String
+  channelId       String?
+  messageId       String?
+  uploaderId      String?
+  fileName        String
+  fileKey         String
+  fileUrl         String
+  fileType        String
+  fileSize        Int
+  storageProvider String    @default("LOCAL")
+  isDeleted       Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  channel         Channel?  @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  message         Message?  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  uploader        User?     @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
 
+  @@index([workspaceId, isDeleted])
+  @@index([channelId, isDeleted])
   @@index([messageId])
+  @@index([uploaderId])
 }
 
 model Reaction {

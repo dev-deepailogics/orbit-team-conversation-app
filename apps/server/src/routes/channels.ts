@@ -11,14 +11,19 @@ const createChannelSchema = z.object({
 });
 
 const postMessageSchema = z.object({
-  content: z.string().min(1),
+  content: z.string().optional().default(''),
   quotedMessageId: z.string().optional(),
   attachments: z.array(z.object({
+    id: z.string().optional(),
     fileUrl: z.string(),
     fileName: z.string(),
     fileType: z.string(),
     fileSize: z.number(),
+    fileKey: z.string().optional(),
+    storageProvider: z.string().optional(),
   })).optional(),
+}).refine((data) => (data.content && data.content.trim().length > 0) || (data.attachments && data.attachments.length > 0), {
+  message: 'Message must contain text content or at least one attachment',
 });
 
 export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
@@ -377,17 +382,43 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       data: {
         channelId,
         userId,
-        content,
+        content: content || '',
         quotedMessageId: quotedMessageId || undefined,
-        attachments: attachments && attachments.length > 0 ? {
-          create: attachments.map((att) => ({
-            fileUrl: att.fileUrl,
-            fileName: att.fileName,
-            fileType: att.fileType,
-            fileSize: att.fileSize,
-          })),
-        } : undefined,
       },
+    });
+
+    // Link or create attachments
+    if (attachments && attachments.length > 0) {
+      for (const att of attachments) {
+        if (att.id) {
+          await prisma.attachment.update({
+            where: { id: att.id },
+            data: {
+              messageId: message.id,
+              channelId: channel.id,
+            },
+          });
+        } else {
+          await prisma.attachment.create({
+            data: {
+              workspaceId: channel.workspaceId,
+              channelId: channel.id,
+              messageId: message.id,
+              uploaderId: userId,
+              fileName: att.fileName || 'attachment',
+              fileKey: att.fileKey || att.fileUrl,
+              fileUrl: att.fileUrl,
+              fileType: att.fileType || 'application/octet-stream',
+              fileSize: att.fileSize || 0,
+              storageProvider: att.storageProvider || 'LOCAL',
+            },
+          });
+        }
+      }
+    }
+
+    const fullMessage = await prisma.message.findUnique({
+      where: { id: message.id },
       include: {
         user: {
           select: {
@@ -400,9 +431,7 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         },
         quotedMessage: {
           include: {
-            user: {
-              select: { id: true, username: true, displayName: true, avatarUrl: true },
-            },
+            user: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
           },
         },
         bot: true,
@@ -414,8 +443,12 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       },
     });
 
+    if (!fullMessage) {
+      return reply.status(500).send({ error: 'Failed to retrieve created message' });
+    }
+
     const payload = {
-      ...message,
+      ...fullMessage,
       replyCount: 0,
       workspaceId: channel.workspaceId,
     };

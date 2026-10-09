@@ -16,6 +16,7 @@ import { channelRoutes } from './routes/channels.js';
 import { messageRoutes } from './routes/messages.js';
 import { huddleRoutes } from './routes/huddles.js';
 import { botRoutes } from './routes/bots.js';
+import { fileRoutes } from './routes/files.js';
 import { setupSocketServer } from './socket/index.js';
 
 dotenv.config();
@@ -147,6 +148,7 @@ async function bootstrap() {
   await fastify.register(messageRoutes, { prefix: '/api/messages' });
   await fastify.register(huddleRoutes, { prefix: '/api/huddles' });
   await fastify.register(botRoutes, { prefix: '/api/bot' });
+  await fastify.register(fileRoutes, { prefix: '/api/files' });
 
   // Start Server
   try {
