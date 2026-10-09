@@ -63,20 +63,22 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
 
     setIsUploading(true);
     try {
-      const formData = new FormData();
-      Array.from(files).forEach((file) => {
-        formData.append('files', file);
-      });
-      if (parentMessage.channelId) {
-        formData.append('channelId', parentMessage.channelId);
-      }
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const formData = new FormData();
+        if (parentMessage.channelId) {
+          formData.append('channelId', parentMessage.channelId);
+        }
+        formData.append('file', file);
 
-      const res = await api.post('/api/files/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+        const channelQuery = parentMessage.channelId ? `?channelId=${encodeURIComponent(parentMessage.channelId)}` : '';
+        const res = await api.post(`/api/files/upload${channelQuery}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
 
-      if (res.data && res.data.attachments) {
-        setThreadAttachments((prev) => [...prev, ...res.data.attachments]);
+        if (res.data) {
+          setThreadAttachments((prev) => [...prev, res.data]);
+        }
       }
     } catch (err) {
       console.error('Failed to upload thread file', err);

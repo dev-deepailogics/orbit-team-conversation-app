@@ -15,24 +15,46 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       return reply.status(400).send({ error: 'No file provided in multipart request' });
     }
 
-    // Read fields if sent along with multipart
-    const fields = data.fields as { [key: string]: any } || {};
-    const workspaceId =
-      fields.workspaceId?.value ||
+    // Read fields if sent along with multipart or query
+    const fields = (data.fields as { [key: string]: any }) || {};
+    let workspaceId =
       (request.query as any)?.workspaceId ||
+      fields.workspaceId?.value ||
       fields.workspaceId;
 
     const channelId =
-      fields.channelId?.value ||
       (request.query as any)?.channelId ||
+      fields.channelId?.value ||
       fields.channelId ||
       null;
 
     const messageId =
-      fields.messageId?.value ||
       (request.query as any)?.messageId ||
+      fields.messageId?.value ||
       fields.messageId ||
       null;
+
+    // If workspaceId is not explicitly provided, try to find it via channelId
+    if (!workspaceId && channelId) {
+      const channel = await prisma.channel.findUnique({
+        where: { id: channelId },
+        select: { workspaceId: true },
+      });
+      if (channel?.workspaceId) {
+        workspaceId = channel.workspaceId;
+      }
+    }
+
+    // If still not found, fallback to user's first/active workspace membership
+    if (!workspaceId) {
+      const memberRecord = await prisma.workspaceMember.findFirst({
+        where: { userId },
+        select: { workspaceId: true },
+      });
+      if (memberRecord?.workspaceId) {
+        workspaceId = memberRecord.workspaceId;
+      }
+    }
 
     if (!workspaceId) {
       return reply.status(400).send({ error: 'workspaceId is required for file uploads' });

@@ -163,11 +163,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const formData = new FormData();
-        formData.append('file', file);
         formData.append('workspaceId', channel.workspaceId);
         formData.append('channelId', channel.id);
+        formData.append('file', file);
 
-        const res = await api.post('/api/files/upload', formData, {
+        const url = `/api/files/upload?workspaceId=${encodeURIComponent(channel.workspaceId)}&channelId=${encodeURIComponent(channel.id)}`;
+        const res = await api.post(url, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
         setAttachments((prev) => [...prev, res.data]);
@@ -194,11 +195,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const formData = new FormData();
-        formData.append('file', file);
         formData.append('workspaceId', channel.workspaceId);
         formData.append('channelId', channel.id);
+        formData.append('file', file);
 
-        const res = await api.post('/api/files/upload', formData, {
+        const url = `/api/files/upload?workspaceId=${encodeURIComponent(channel.workspaceId)}&channelId=${encodeURIComponent(channel.id)}`;
+        const res = await api.post(url, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
         setAttachments((prev) => [...prev, res.data]);
