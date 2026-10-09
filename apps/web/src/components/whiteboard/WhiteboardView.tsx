@@ -24,14 +24,9 @@ import {
   Users,
   X,
   Bold,
-  Italic,
-  Strikethrough,
   Heading1,
   Heading2,
   List,
-  ListOrdered,
-  Quote,
-  Code,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
@@ -215,6 +210,13 @@ const STICKY_COLORS = [
   { bg: '#BBF7D0', text: '#14532D', border: '#4ADE80', label: 'Green' },
   { bg: '#FBCFE8', text: '#831843', border: '#F472B6', label: 'Pink' },
   { bg: '#DDD6FE', text: '#4C1D95', border: '#A78BFA', label: 'Purple' },
+];
+
+const FONT_SIZES = [
+  { label: 'S', size: 14, tooltip: 'Small text (14px)' },
+  { label: 'M', size: 18, tooltip: 'Medium text (18px)' },
+  { label: 'L', size: 24, tooltip: 'Large text (24px)' },
+  { label: 'XL', size: 32, tooltip: 'Extra Large text (32px)' },
 ];
 
 export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
@@ -920,31 +922,78 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     }
   };
 
-  // Format Inline Code Chip
-  const handleFormatInlineCode = () => {
-    const editor = inlineContentEditableRef.current;
-    if (editor) {
-      editor.focus();
+  // Keyboard events in inline contentEditable (auto-bullet continuation on Enter, Escape, Ctrl+B)
+  const handleInlineKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    if (e.key === 'Escape') {
+      finishEditing();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+      e.preventDefault();
+      executeExecCommand('bold');
+      return;
+    }
+    if (e.key === 'Enter' && !e.shiftKey) {
       const sel = window.getSelection();
-      if (!sel || sel.rangeCount === 0) return;
-      const range = sel.getRangeAt(0);
-      const selectedText = range.toString();
+      if (sel && sel.rangeCount > 0) {
+        const node = sel.anchorNode;
+        const parentLi =
+          node instanceof HTMLElement
+            ? node.closest('li')
+            : node?.parentElement?.closest('li');
 
-      if (selectedText) {
-        const codeEl = document.createElement('code');
-        codeEl.className =
-          'bg-[#2C3136] text-[#ECB22E] px-1 py-0.5 rounded font-mono text-xs';
-        codeEl.textContent = selectedText;
-        range.deleteContents();
-        range.insertNode(codeEl);
-        range.setStartAfter(codeEl);
-        range.setEndAfter(codeEl);
-        sel.removeAllRanges();
-        sel.addRange(range);
+        // If not already in a native <li> list element, auto-continue plain bullet lines
+        if (!parentLi) {
+          const textContent = node?.textContent || '';
+          const offset = sel.anchorOffset;
+          const lineBeforeCursor = textContent.slice(0, offset);
+          const bulletMatch = lineBeforeCursor.match(/^(\s*[-•*]\s+)(.*)$/);
+          const emptyBulletMatch = lineBeforeCursor.match(/^(\s*[-•*]\s*)$/);
+
+          if (emptyBulletMatch) {
+            e.preventDefault();
+            if (node && node.parentElement) {
+              node.parentElement.innerHTML = '<br>';
+            }
+            return;
+          } else if (bulletMatch) {
+            e.preventDefault();
+            const prefix = bulletMatch[1];
+            const afterText = textContent.slice(offset);
+
+            const newLineDiv = document.createElement('div');
+            newLineDiv.textContent = prefix + afterText;
+
+            if (node && node.nodeType === Node.TEXT_NODE) {
+              node.textContent = lineBeforeCursor;
+              const parent = node.parentElement;
+              if (parent && parent !== inlineContentEditableRef.current) {
+                parent.after(newLineDiv);
+              } else if (parent) {
+                parent.appendChild(newLineDiv);
+              }
+            }
+
+            const newRange = document.createRange();
+            if (newLineDiv.firstChild) {
+              newRange.setStart(newLineDiv.firstChild, prefix.length);
+              newRange.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(newRange);
+            }
+
+            if (inlineContentEditableRef.current) {
+              const md = htmlToMarkdown(inlineContentEditableRef.current.innerHTML);
+              setEditText(md);
+              setElements((prev) =>
+                prev.map((el) => (el.id === editingId ? { ...el, text: md } : el))
+              );
+            }
+            return;
+          }
+        }
       }
-      const md = htmlToMarkdown(editor.innerHTML);
-      setEditText(md);
-      updateSelectedFormatting({ text: md });
     }
   };
 
@@ -1376,33 +1425,11 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           <button
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => executeExecCommand('bold')}
-            title="Bold Selection (Ctrl+B)"
+            title="Bold (Ctrl+B)"
             className="p-1.5 rounded-lg text-xs font-bold transition text-gray-300 hover:text-white hover:bg-gray-700/60 active:scale-95"
           >
             <Bold size={14} />
           </button>
-
-          {/* Italic */}
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => executeExecCommand('italic')}
-            title="Italic Selection (Ctrl+I)"
-            className="p-1.5 rounded-lg text-xs transition text-gray-300 hover:text-white hover:bg-gray-700/60 active:scale-95"
-          >
-            <Italic size={14} />
-          </button>
-
-          {/* Strikethrough */}
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => executeExecCommand('strikeThrough')}
-            title="Strikethrough"
-            className="p-1.5 rounded-lg text-xs transition text-gray-300 hover:text-white hover:bg-gray-700/60 active:scale-95"
-          >
-            <Strikethrough size={14} />
-          </button>
-
-          <span className="w-px h-4 bg-gray-700 mx-0.5" />
 
           {/* Heading 1 (Large) */}
           <button
@@ -1424,57 +1451,51 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
             <Heading2 size={14} />
           </button>
 
-          {/* Body (Normal) */}
+          {/* Simple Text */}
           <button
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => handleFormatHeading(0)}
-            title="Normal Body Text"
+            title="Simple Text"
             className="p-1.5 rounded-lg text-xs font-bold transition text-gray-300 hover:text-white hover:bg-gray-700/60 active:scale-95"
           >
             <span className="text-[11px] font-bold">T</span>
           </button>
 
-          <span className="w-px h-4 bg-gray-700 mx-0.5" />
-
           {/* Bullet List */}
           <button
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => executeExecCommand('insertUnorderedList')}
-            title="Bullet List"
+            title="Bullet List (•)"
             className="p-1.5 rounded-lg text-xs text-gray-300 hover:text-white hover:bg-gray-700/60 transition active:scale-95"
           >
             <List size={14} />
           </button>
 
-          {/* Numbered List */}
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => executeExecCommand('insertOrderedList')}
-            title="Numbered List"
-            className="p-1.5 rounded-lg text-xs text-gray-300 hover:text-white hover:bg-gray-700/60 transition active:scale-95"
-          >
-            <ListOrdered size={14} />
-          </button>
+          <span className="w-px h-4 bg-gray-700 mx-0.5" />
 
-          {/* Blockquote */}
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => executeExecCommand('formatBlock', '<blockquote>')}
-            title="Quote"
-            className="p-1.5 rounded-lg text-xs text-gray-300 hover:text-white hover:bg-gray-700/60 transition active:scale-95"
-          >
-            <Quote size={14} />
-          </button>
-
-          {/* Inline Code */}
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={handleFormatInlineCode}
-            title="Inline Code"
-            className="p-1.5 rounded-lg text-xs text-gray-300 hover:text-white hover:bg-gray-700/60 transition active:scale-95"
-          >
-            <Code size={14} />
-          </button>
+          {/* Text Font Size / Scale Selector */}
+          <div className="flex items-center gap-0.5 bg-gray-800/80 p-0.5 rounded-lg border border-gray-700/60">
+            {FONT_SIZES.map(({ label, size, tooltip }) => {
+              const currentSize =
+                selectedElement.fontSize || (selectedElement.type === 'sticky' ? 14 : 18);
+              const isActive = currentSize === size;
+              return (
+                <button
+                  key={label}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => updateSelectedFormatting({ fontSize: size })}
+                  title={tooltip}
+                  className={`px-1.5 py-0.5 rounded text-[11px] font-bold transition active:scale-95 ${
+                    isActive
+                      ? 'bg-slack-green text-white shadow font-extrabold'
+                      : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
 
           {/* Color swatches for Sticky Note background */}
           {selectedElement.type === 'sticky' && (
@@ -1610,18 +1631,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
               }
             }}
             onBlur={() => finishEditing()}
-            onKeyDown={(e) => {
-              e.stopPropagation();
-              if (e.key === 'Escape') {
-                finishEditing();
-              } else if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
-                e.preventDefault();
-                executeExecCommand('bold');
-              } else if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
-                e.preventDefault();
-                executeExecCommand('italic');
-              }
-            }}
+            onKeyDown={handleInlineKeyDown}
             style={{
               width: `${(editingElement.width || (editingElement.type === 'sticky' ? 170 : 240)) * zoom}px`,
               minHeight: `${(editingElement.height || (editingElement.type === 'sticky' ? 170 : 44)) * zoom}px`,
