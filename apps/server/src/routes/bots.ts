@@ -93,6 +93,9 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
 
     const channel = await prisma.channel.findUnique({
       where: { id: channelId },
+      include: {
+        members: { select: { userId: true } },
+      },
     });
 
     if (!channel || channel.workspaceId !== bot.workspaceId) {
@@ -124,10 +127,18 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
     const payload = {
       ...message,
       replyCount: 0,
+      workspaceId: channel.workspaceId,
     };
 
     if (fastify.io) {
-      fastify.io.to(`channel:${channelId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+      if (channel.type === 'PUBLIC') {
+        fastify.io.to(`workspace:${channel.workspaceId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+      } else {
+        for (const m of channel.members) {
+          fastify.io.to(`user:${m.userId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+        }
+        fastify.io.to(`channel:${channel.id}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+      }
     }
 
     return reply.send({
@@ -173,10 +184,16 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
 
     const webhook = await prisma.webhook.findUnique({
       where: { token },
-      include: { channel: true },
+      include: {
+        channel: {
+          include: {
+            members: { select: { userId: true } },
+          },
+        },
+      },
     });
 
-    if (!webhook) {
+    if (!webhook || !webhook.channel) {
       return reply.status(404).send({ error: 'Webhook not found' });
     }
 
@@ -192,10 +209,21 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
       },
     });
 
-    const payload = { ...message, replyCount: 0 };
+    const payload = {
+      ...message,
+      replyCount: 0,
+      workspaceId: webhook.channel.workspaceId,
+    };
 
     if (fastify.io) {
-      fastify.io.to(`channel:${webhook.channelId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+      if (webhook.channel.type === 'PUBLIC') {
+        fastify.io.to(`workspace:${webhook.channel.workspaceId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+      } else {
+        for (const m of webhook.channel.members) {
+          fastify.io.to(`user:${m.userId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+        }
+        fastify.io.to(`channel:${webhook.channelId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+      }
     }
 
     return reply.send({ success: true, messageId: message.id });
@@ -215,7 +243,12 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
     const commandName = parts[0].toLowerCase();
     const args = parts.slice(1).join(' ');
 
-    const channel = await prisma.channel.findUnique({ where: { id: channelId } });
+    const channel = await prisma.channel.findUnique({
+      where: { id: channelId },
+      include: {
+        members: { select: { userId: true } },
+      },
+    });
     if (!channel) return reply.status(404).send({ error: 'Channel not found' });
 
     // Built-in: /topic <new topic>
@@ -232,8 +265,17 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
         },
       });
 
+      const payload = { ...sysMsg, replyCount: 0, workspaceId: channel.workspaceId };
+
       if (fastify.io) {
-        fastify.io.to(`channel:${channelId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, { ...sysMsg, replyCount: 0 });
+        if (channel.type === 'PUBLIC') {
+          fastify.io.to(`workspace:${channel.workspaceId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+        } else {
+          for (const m of channel.members) {
+            fastify.io.to(`user:${m.userId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+          }
+          fastify.io.to(`channel:${channelId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+        }
       }
 
       return reply.send({ ok: true, channel: updatedChannel });
@@ -252,8 +294,17 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
         },
       });
 
+      const payload = { ...msg, replyCount: 0, workspaceId: channel.workspaceId };
+
       if (fastify.io) {
-        fastify.io.to(`channel:${channelId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, { ...msg, replyCount: 0 });
+        if (channel.type === 'PUBLIC') {
+          fastify.io.to(`workspace:${channel.workspaceId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+        } else {
+          for (const m of channel.members) {
+            fastify.io.to(`user:${m.userId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+          }
+          fastify.io.to(`channel:${channelId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+        }
       }
 
       return reply.send({ ok: true, message: msg });
@@ -305,16 +356,29 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
         include: {
           user: { select: { id: true, username: true, displayName: true, avatarUrl: true, status: true } },
           attachments: true,
-          reactions: true,
+          reactions: {
+            include: {
+              user: { select: { id: true, username: true, displayName: true } },
+            },
+          },
           _count: { select: { replies: true } },
         },
       });
 
-      if (fastify.io && updatedMsg) {
-        fastify.io.to(`channel:${channelId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, { ...updatedMsg, replyCount: 0 });
+      const payload = { ...(updatedMsg || msg), replyCount: 0, workspaceId: channel.workspaceId };
+
+      if (fastify.io) {
+        if (channel.type === 'PUBLIC') {
+          fastify.io.to(`workspace:${channel.workspaceId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+        } else {
+          for (const m of channel.members) {
+            fastify.io.to(`user:${m.userId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+          }
+          fastify.io.to(`channel:${channelId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+        }
       }
 
-      return reply.send({ ok: true, message: updatedMsg });
+      return reply.send({ ok: true, message: updatedMsg || msg });
     }
 
     return reply.status(400).send({ error: `Unknown command: ${commandName}` });

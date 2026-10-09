@@ -37,6 +37,11 @@ export function setupSocketServer(io: SocketIOServer) {
       }
     }
 
+    // Join User Private Room
+    socket.on('user:join', (uId: string) => {
+      socket.join(`user:${uId}`);
+    });
+
     // Join Workspace Room
     socket.on(SOCKET_EVENTS.JOIN_WORKSPACE, (wId: string) => {
       socket.join(`workspace:${wId}`);

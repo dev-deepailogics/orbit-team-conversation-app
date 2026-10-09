@@ -152,15 +152,16 @@ export default function AppDashboard() {
 
     const socket = getSocket(user.id, currentWorkspace.id);
     socket.emit('workspace:join', currentWorkspace.id);
+    socket.emit('user:join', user.id);
 
     // Request desktop notification permission
     DesktopNotifier.requestPermission();
 
     const onNewMessage = (msg: any) => {
       const activeChannel = currentChannelRef.current;
-      const isFromOther = msg.userId && msg.userId !== user.id;
+      const isFromOther = !msg.userId || msg.userId !== user.id;
 
-      // Play message chime if message is from another user
+      // Play message chime if message is from another user or bot
       if (isFromOther) {
         sounds.playMessageSound();
         DesktopNotifier.send(

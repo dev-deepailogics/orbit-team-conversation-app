@@ -328,17 +328,46 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 />
               </div>
 
-              <div className="flex items-center justify-between pt-2">
-                <div>
-                  <span className="text-sm font-semibold text-white block">Make private</span>
-                  <span className="text-xs text-gray-400">Only invited people can join</span>
+              {/* Channel Type / Privacy Cards */}
+              <div className="space-y-2 pt-1">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300">
+                  Channel Privacy
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div
+                    onClick={() => setIsPrivate(false)}
+                    className={`p-3 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
+                      !isPrivate
+                        ? 'border-slack-green bg-slack-green/10 text-white shadow'
+                        : 'border-gray-700 bg-[#222529] text-gray-400 hover:border-gray-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <Hash size={16} className={!isPrivate ? 'text-slack-green' : 'text-gray-400'} />
+                      <span className="font-bold text-xs text-white">Public</span>
+                    </div>
+                    <span className="text-[11px] text-gray-400 leading-snug">
+                      Anyone in workspace can view &amp; join
+                    </span>
+                  </div>
+
+                  <div
+                    onClick={() => setIsPrivate(true)}
+                    className={`p-3 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
+                      isPrivate
+                        ? 'border-slack-green bg-slack-green/10 text-white shadow'
+                        : 'border-gray-700 bg-[#222529] text-gray-400 hover:border-gray-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <Lock size={16} className={isPrivate ? 'text-slack-green' : 'text-gray-400'} />
+                      <span className="font-bold text-xs text-white">Private</span>
+                    </div>
+                    <span className="text-[11px] text-gray-400 leading-snug">
+                      Only invited people can view &amp; join
+                    </span>
+                  </div>
                 </div>
-                <input
-                  type="checkbox"
-                  checked={isPrivate}
-                  onChange={(e) => setIsPrivate(e.target.checked)}
-                  className="w-4 h-4 rounded text-slack-activeChannel"
-                />
               </div>
 
               <div className="flex items-center justify-end gap-3 mt-6">
@@ -353,7 +382,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                   type="submit"
                   className="px-5 py-2 rounded-lg text-sm font-semibold bg-slack-green hover:bg-[#008a65] text-white transition"
                 >
-                  Create
+                  Create Channel
                 </button>
               </div>
             </form>
