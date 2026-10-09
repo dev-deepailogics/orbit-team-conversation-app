@@ -57,7 +57,24 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           },
         },
       },
+      include: {
+        members: {
+          include: {
+            user: {
+              select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
+            },
+          },
+        },
+      },
     });
+
+    if (fastify.io) {
+      if (type === 'PUBLIC') {
+        fastify.io.to(`workspace:${workspaceId}`).emit(SOCKET_EVENTS.CHANNEL_NEW, channel);
+      } else {
+        fastify.io.to(`user:${userId}`).emit(SOCKET_EVENTS.CHANNEL_NEW, channel);
+      }
+    }
 
     return reply.status(201).send(channel);
   });
@@ -190,8 +207,27 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
   // Get messages for a channel
   fastify.get('/:channelId/messages', { preHandler: [fastify.authenticate] }, async (request, reply) => {
     const { channelId } = request.params as { channelId: string };
+    const userId = (request.user as { id: string }).id;
     const { cursor, limit = '50' } = request.query as { cursor?: string; limit?: string };
     const take = parseInt(limit, 10);
+
+    const channel = await prisma.channel.findUnique({
+      where: { id: channelId },
+      include: {
+        members: { select: { userId: true } },
+      },
+    });
+
+    if (!channel) {
+      return reply.status(404).send({ error: 'Channel not found' });
+    }
+
+    if (channel.type !== 'PUBLIC') {
+      const isMember = channel.members.some((m) => m.userId === userId);
+      if (!isMember) {
+        return reply.status(403).send({ error: 'You are not a member of this private channel' });
+      }
+    }
 
     const messages = await prisma.message.findMany({
       where: {
@@ -297,6 +333,13 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       },
     });
 
+    if (fastify.io && updatedChannel) {
+      for (const uId of userIds) {
+        fastify.io.to(`user:${uId}`).emit(SOCKET_EVENTS.CHANNEL_NEW, updatedChannel);
+      }
+      fastify.io.to(`channel:${channelId}`).emit('channel:updated', updatedChannel);
+    }
+
     return reply.send(updatedChannel);
   });
 
@@ -314,10 +357,20 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
     const channel = await prisma.channel.findUnique({
       where: { id: channelId },
+      include: {
+        members: { select: { userId: true } },
+      },
     });
 
     if (!channel) {
       return reply.status(404).send({ error: 'Channel not found' });
+    }
+
+    if (channel.type !== 'PUBLIC') {
+      const isMember = channel.members.some((m) => m.userId === userId);
+      if (!isMember) {
+        return reply.status(403).send({ error: 'You are not a member of this private channel' });
+      }
     }
 
     const message = await prisma.message.create({
@@ -367,9 +420,17 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       workspaceId: channel.workspaceId,
     };
 
-    // Realtime broadcast via Socket.IO to workspace
+    // Scoped realtime broadcast via Socket.IO
     if (fastify.io) {
-      fastify.io.to(`workspace:${channel.workspaceId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+      if (channel.type === 'PUBLIC') {
+        fastify.io.to(`workspace:${channel.workspaceId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+      } else {
+        // Emit only to members of this private / direct channel
+        for (const m of channel.members) {
+          fastify.io.to(`user:${m.userId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+        }
+        fastify.io.to(`channel:${channel.id}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+      }
     }
 
     return reply.status(201).send(payload);

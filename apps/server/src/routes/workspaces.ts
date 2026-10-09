@@ -139,6 +139,12 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       where: { id: workspaceId },
       include: {
         channels: {
+          where: {
+            OR: [
+              { type: 'PUBLIC' },
+              { members: { some: { userId } } },
+            ],
+          },
           include: {
             members: {
               include: {

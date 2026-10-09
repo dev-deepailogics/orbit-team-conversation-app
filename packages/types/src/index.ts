@@ -230,6 +230,10 @@ export const SOCKET_EVENTS = {
   HUDDLE_JOINED: 'huddle:joined',
   HUDDLE_LEFT: 'huddle:left',
 
+  // Channels & Workspaces
+  CHANNEL_NEW: 'channel:new',
+  CHANNEL_UPDATE: 'channel:updated',
+
   // Presence & Notifications
   USER_STATUS_CHANGE: 'user:status_change',
   NOTIFICATION_NEW: 'notification:new',

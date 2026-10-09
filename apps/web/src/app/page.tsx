@@ -200,9 +200,26 @@ export default function AppDashboard() {
     };
 
     const onCallStarted = (callData: any) => {
-      // If someone else in the workspace started a call, notify user
+      // If someone else started a call, notify user
       if (callData.hostUserId !== user.id) {
         setIncomingCall(callData);
+      }
+    };
+
+    const onChannelNew = (newChan: Channel) => {
+      setChannels(
+        useChatStore.getState().channels.some((c) => c.id === newChan.id)
+          ? useChatStore.getState().channels.map((c) => (c.id === newChan.id ? newChan : c))
+          : [...useChatStore.getState().channels, newChan]
+      );
+    };
+
+    const onChannelUpdated = (updatedChan: Channel) => {
+      setChannels(
+        useChatStore.getState().channels.map((c) => (c.id === updatedChan.id ? updatedChan : c))
+      );
+      if (currentChannelRef.current?.id === updatedChan.id) {
+        setCurrentChannel(updatedChan);
       }
     };
 
@@ -211,6 +228,8 @@ export default function AppDashboard() {
     socket.on('typing:start', onTypingStart);
     socket.on('typing:stop', onTypingStop);
     socket.on('huddle:started', onCallStarted);
+    socket.on('channel:new', onChannelNew);
+    socket.on('channel:updated', onChannelUpdated);
 
     return () => {
       socket.off('message:new', onNewMessage);
@@ -218,6 +237,8 @@ export default function AppDashboard() {
       socket.off('typing:start', onTypingStart);
       socket.off('typing:stop', onTypingStop);
       socket.off('huddle:started', onCallStarted);
+      socket.off('channel:new', onChannelNew);
+      socket.off('channel:updated', onChannelUpdated);
     };
   }, [user, currentWorkspace]);
 

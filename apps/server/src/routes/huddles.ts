@@ -11,10 +11,20 @@ export const huddleRoutes: FastifyPluginAsync = async (fastify: FastifyInstance)
 
     const channel = await prisma.channel.findUnique({
       where: { id: channelId },
+      include: {
+        members: { select: { userId: true } },
+      },
     });
 
     if (!channel) {
       return reply.status(404).send({ error: 'Channel not found' });
+    }
+
+    if (channel.type !== 'PUBLIC') {
+      const isMember = channel.members.some((m) => m.userId === userPayload.id);
+      if (!isMember) {
+        return reply.status(403).send({ error: 'You are not a member of this private channel' });
+      }
     }
 
     const roomName = `orbit-huddle-${channel.id}`;
@@ -38,10 +48,20 @@ export const huddleRoutes: FastifyPluginAsync = async (fastify: FastifyInstance)
 
     const channel = await prisma.channel.findUnique({
       where: { id: channelId },
+      include: {
+        members: { select: { userId: true } },
+      },
     });
 
     if (!channel) {
       return reply.status(404).send({ error: 'Channel not found' });
+    }
+
+    if (channel.type !== 'PUBLIC') {
+      const isMember = channel.members.some((m) => m.userId === userPayload.id);
+      if (!isMember) {
+        return reply.status(403).send({ error: 'You are not a member of this private channel' });
+      }
     }
 
     let huddle = await prisma.huddle.findFirst({
@@ -72,7 +92,13 @@ export const huddleRoutes: FastifyPluginAsync = async (fastify: FastifyInstance)
         workspaceId: channel.workspaceId,
       };
 
-      fastify.io.to(`workspace:${channel.workspaceId}`).emit(SOCKET_EVENTS.HUDDLE_STARTED, callData);
+      if (channel.type === 'PUBLIC') {
+        fastify.io.to(`workspace:${channel.workspaceId}`).emit(SOCKET_EVENTS.HUDDLE_STARTED, callData);
+      } else {
+        for (const m of channel.members) {
+          fastify.io.to(`user:${m.userId}`).emit(SOCKET_EVENTS.HUDDLE_STARTED, callData);
+        }
+      }
       fastify.io.to(`channel:${channelId}`).emit(SOCKET_EVENTS.HUDDLE_STARTED, callData);
     }
 

@@ -25,6 +25,9 @@ export function setupSocketServer(io: SocketIOServer) {
         data: { status: 'ONLINE' },
       }).catch(() => {});
 
+      // Join user specific room for private messaging and notifications
+      socket.join(`user:${userId}`);
+
       if (workspaceId) {
         socket.join(`workspace:${workspaceId}`);
         io.to(`workspace:${workspaceId}`).emit(SOCKET_EVENTS.USER_STATUS_CHANGE, {
