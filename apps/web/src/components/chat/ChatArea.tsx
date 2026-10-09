@@ -148,6 +148,18 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
   };
 
+  const getDirectChannelTitle = () => {
+    if (channel.type !== 'DIRECT') return channel.name;
+    if (channel.members && channel.members.length > 0) {
+      const otherMember = channel.members.find((m) => m.userId !== currentUser?.id);
+      if (otherMember && otherMember.user) {
+        return otherMember.user.displayName;
+      }
+      return `${currentUser?.displayName || 'You'} (you)`;
+    }
+    return channel.name;
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full bg-[#1A1D21] relative min-w-0">
       {/* Channel Header */}
@@ -161,7 +173,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <Hash size={20} className="text-gray-400 shrink-0" />
           )}
           <span className="font-bold text-white text-base truncate">
-            {channel.type === 'DIRECT' ? (channel.topic?.replace('Direct message with ', '') || channel.name) : channel.name}
+            {getDirectChannelTitle()}
           </span>
           {channel.topic && channel.type !== 'DIRECT' && (
             <>

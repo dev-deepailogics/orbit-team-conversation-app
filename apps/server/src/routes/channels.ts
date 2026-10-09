@@ -79,7 +79,60 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.status(404).send({ error: 'User not found' });
     }
 
-    // Check if DM channel already exists between these 2 users in this workspace
+    // Handle self-DM (chat with yourself) vs peer-DM
+    if (currentUserId === targetUserId) {
+      const existingSelfDm = await prisma.channel.findFirst({
+        where: {
+          workspaceId,
+          type: 'DIRECT',
+          createdById: currentUserId,
+          members: {
+            none: {
+              userId: { not: currentUserId },
+            },
+          },
+        },
+        include: {
+          members: {
+            include: {
+              user: {
+                select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
+              },
+            },
+          },
+        },
+      });
+
+      if (existingSelfDm) {
+        return reply.send(existingSelfDm);
+      }
+
+      const selfDmChannel = await prisma.channel.create({
+        data: {
+          workspaceId,
+          name: `dm-${currentUserId.slice(0, 8)}`,
+          topic: `Self Note`,
+          type: 'DIRECT',
+          createdById: currentUserId,
+          members: {
+            create: [{ userId: currentUserId }],
+          },
+        },
+        include: {
+          members: {
+            include: {
+              user: {
+                select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
+              },
+            },
+          },
+        },
+      });
+
+      return reply.status(201).send(selfDmChannel);
+    }
+
+    // Peer-to-peer 1:1 DM between two different users
     const existingDm = await prisma.channel.findFirst({
       where: {
         workspaceId,
@@ -92,7 +145,9 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       include: {
         members: {
           include: {
-            user: true,
+            user: {
+              select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
+            },
           },
         },
       },
@@ -102,25 +157,27 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.send(existingDm);
     }
 
-    // Create new DM channel
+    // Create new 1:1 DM channel
     const dmChannel = await prisma.channel.create({
       data: {
         workspaceId,
         name: `dm-${currentUserId.slice(0, 4)}-${targetUserId.slice(0, 4)}`,
-        topic: `Direct message with ${targetUser.displayName}`,
+        topic: `Direct message`,
         type: 'DIRECT',
         createdById: currentUserId,
         members: {
           create: [
             { userId: currentUserId },
-            ...(currentUserId !== targetUserId ? [{ userId: targetUserId }] : []),
+            { userId: targetUserId },
           ],
         },
       },
       include: {
         members: {
           include: {
-            user: true,
+            user: {
+              select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
+            },
           },
         },
       },

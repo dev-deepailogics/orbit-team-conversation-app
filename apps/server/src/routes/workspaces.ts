@@ -139,6 +139,21 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       where: { id: workspaceId },
       include: {
         channels: {
+          include: {
+            members: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    username: true,
+                    displayName: true,
+                    avatarUrl: true,
+                    status: true,
+                  },
+                },
+              },
+            },
+          },
           orderBy: { createdAt: 'asc' },
         },
         members: {

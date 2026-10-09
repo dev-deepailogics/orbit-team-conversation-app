@@ -128,8 +128,12 @@ export default function AppDashboard() {
       });
       const dmChannel: Channel = res.data;
       
-      // Add to channels list if not already there
-      if (!channels.some((c) => c.id === dmChannel.id)) {
+      const existingIdx = channels.findIndex((c) => c.id === dmChannel.id);
+      if (existingIdx >= 0) {
+        const updated = [...channels];
+        updated[existingIdx] = dmChannel;
+        setChannels(updated);
+      } else {
         setChannels([...channels, dmChannel]);
       }
 

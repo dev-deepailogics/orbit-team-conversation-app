@@ -192,7 +192,12 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
               const user = member.user;
               if (!user) return null;
               const isOnline = user.status === 'ONLINE';
-              const isSelectedDM = currentChannel?.type === 'DIRECT' && currentChannel.topic?.includes(user.displayName);
+              const isSelf = user.id === currentUser?.id;
+              const isSelectedDM = currentChannel?.type === 'DIRECT' && (
+                isSelf
+                  ? (!currentChannel.members || currentChannel.members.length <= 1 || currentChannel.members.every((m) => m.userId === currentUser?.id))
+                  : (currentChannel.members?.some((m) => m.userId === user.id) && currentChannel.members?.some((m) => m.userId === currentUser?.id))
+              );
 
               return (
                 <div
