@@ -125,6 +125,78 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState<string>('');
 
+  // Infinite Pan & Zoom
+  const [zoom, setZoom] = useState<number>(1);
+  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState<boolean>(false);
+  const [panStart, setPanStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isSpacePressed, setIsSpacePressed] = useState<boolean>(false);
+
+  const [peerCursors, setPeerCursors] = useState<{ [userId: string]: PeerCursor }>({});
+  const [activeUsersCount, setActiveUsersCount] = useState<number>(1);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 1. Fetch channel whiteboard data on load
+  useEffect(() => {
+    let isMounted = true;
+    const loadWhiteboard = async () => {
+      try {
+        const res = await api.get(`/api/channels/${channel.id}/whiteboard`);
+        if (isMounted && res.data.whiteboardData?.elements) {
+          const loaded = res.data.whiteboardData.elements;
+          setElements(loaded);
+          setHistory([loaded]);
+          setHistoryIndex(0);
+        }
+      } catch (err) {
+        console.error('Failed to load whiteboard', err);
+      }
+    };
+
+    loadWhiteboard();
+    return () => {
+      isMounted = false;
+    };
+  }, [channel.id]);
+
+  // 2. Debounced Auto-save to Server
+  const saveWhiteboardToServer = useCallback(
+    (newElements: CanvasElement[]) => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = setTimeout(async () => {
+        try {
+          setIsSaving(true);
+          await api.put(`/api/channels/${channel.id}/whiteboard`, {
+            whiteboardData: { elements: newElements },
+          });
+        } catch (err) {
+          console.error('Failed to auto-save whiteboard', err);
+        } finally {
+          setIsSaving(false);
+        }
+      }, 1000);
+    },
+    [channel.id]
+  );
+
+  // History Commit
+  const commitElements = (newElements: CanvasElement[]) => {
+    setElements(newElements);
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(newElements);
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+    saveWhiteboardToServer(newElements);
+
+    const socket = getSocket();
+    socket.emit('whiteboard:update', {
+      channelId: channel.id,
+      data: { elements: newElements },
+    });
+  };
+
   // Start in-place editing
   const startEditing = useCallback((elementId: string, initialText: string) => {
     setEditingId(elementId);
@@ -183,42 +255,6 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       return () => clearTimeout(timer);
     }
   }, [editingId]);
-
-  // Infinite Pan & Zoom
-  const [zoom, setZoom] = useState<number>(1);
-  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState<boolean>(false);
-  const [panStart, setPanStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [isSpacePressed, setIsSpacePressed] = useState<boolean>(false);
-
-  const [peerCursors, setPeerCursors] = useState<{ [userId: string]: PeerCursor }>({});
-  const [activeUsersCount, setActiveUsersCount] = useState<number>(1);
-  const [isSaving, setIsSaving] = useState<boolean>(false);
-
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // 1. Fetch channel whiteboard data on load
-  useEffect(() => {
-    let isMounted = true;
-    const loadWhiteboard = async () => {
-      try {
-        const res = await api.get(`/api/channels/${channel.id}/whiteboard`);
-        if (isMounted && res.data.whiteboardData?.elements) {
-          const loaded = res.data.whiteboardData.elements;
-          setElements(loaded);
-          setHistory([loaded]);
-          setHistoryIndex(0);
-        }
-      } catch (err) {
-        console.error('Failed to load whiteboard', err);
-      }
-    };
-
-    loadWhiteboard();
-    return () => {
-      isMounted = false;
-    };
-  }, [channel.id]);
 
   // 2. Real-time collaboration socket listeners
   useEffect(() => {
@@ -292,42 +328,6 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       clearInterval(cursorInterval);
     };
   }, [channel.id, channel.workspaceId, currentUser?.id]);
-
-  // 3. Debounced Auto-save to Server
-  const saveWhiteboardToServer = useCallback(
-    (newElements: CanvasElement[]) => {
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = setTimeout(async () => {
-        try {
-          setIsSaving(true);
-          await api.put(`/api/channels/${channel.id}/whiteboard`, {
-            whiteboardData: { elements: newElements },
-          });
-        } catch (err) {
-          console.error('Failed to auto-save whiteboard', err);
-        } finally {
-          setIsSaving(false);
-        }
-      }, 1000);
-    },
-    [channel.id]
-  );
-
-  // History Commit
-  const commitElements = (newElements: CanvasElement[]) => {
-    setElements(newElements);
-    const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push(newElements);
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
-    saveWhiteboardToServer(newElements);
-
-    const socket = getSocket();
-    socket.emit('whiteboard:update', {
-      channelId: channel.id,
-      data: { elements: newElements },
-    });
-  };
 
   const handleUndo = () => {
     if (historyIndex > 0) {
