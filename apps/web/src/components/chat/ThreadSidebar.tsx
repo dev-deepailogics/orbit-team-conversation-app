@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Message, UserProfile } from '@orbit/types';
-import { X, Send, CornerUpLeft } from 'lucide-react';
+import { X, Send, CornerUpLeft, Smile, SmilePlus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { api } from '../../lib/api';
+import { EmojiPickerPopover } from './EmojiPickerPopover';
+import { getTopEmojis, recordEmojiUsage } from '../../lib/emojiStore';
 
 interface ThreadSidebarProps {
   parentMessage: Message;
@@ -24,11 +26,28 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   const [content, setContent] = useState('');
   const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeEmojiMessageId, setActiveEmojiMessageId] = useState<string | null>(null);
+  const [showComposerEmoji, setShowComposerEmoji] = useState(false);
+  const [topEmojis, setTopEmojis] = useState<string[]>(['👍', '❤️', '🔥', '🎉', '🚀']);
   const repliesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setTopEmojis(getTopEmojis(5));
+  }, []);
 
   useEffect(() => {
     repliesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [replies]);
+
+  const handleReaction = async (messageId: string, emoji: string) => {
+    recordEmojiUsage(emoji);
+    setTopEmojis(getTopEmojis(5));
+    try {
+      await api.post(`/api/messages/${messageId}/reactions`, { emoji });
+    } catch (err) {
+      console.error('Failed to react in thread', err);
+    }
+  };
 
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,6 +62,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
       onReplyAdded(res.data);
       setContent('');
       setReplyingToMessage(null);
+      setShowComposerEmoji(false);
     } catch (err) {
       console.error('Failed to post reply', err);
     } finally {
@@ -95,10 +115,73 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
             <div className="text-xs text-gray-200 mt-1 prose prose-invert max-w-none break-words">
               <ReactMarkdown>{parentMessage.content}</ReactMarkdown>
             </div>
+
+            {/* Parent Message Reactions */}
+            {(() => {
+              const reactionCounts = (parentMessage.reactions || []).reduce(
+                (acc: { [emoji: string]: { count: number; users: string[]; hasReacted: boolean } }, r) => {
+                  if (!acc[r.emoji]) {
+                    acc[r.emoji] = { count: 0, users: [], hasReacted: false };
+                  }
+                  acc[r.emoji].count += 1;
+                  if (r.user?.displayName) acc[r.emoji].users.push(r.user.displayName);
+                  if (r.userId === currentUser?.id) acc[r.emoji].hasReacted = true;
+                  return acc;
+                },
+                {}
+              );
+
+              return (
+                <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                  {Object.entries(reactionCounts).map(([emoji, data]) => (
+                    <button
+                      key={emoji}
+                      onClick={() => handleReaction(parentMessage.id, emoji)}
+                      title={data.users.join(', ')}
+                      className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] transition border ${
+                        data.hasReacted
+                          ? 'bg-slack-activeChannel/20 border-slack-activeChannel text-slack-activeChannel font-bold'
+                          : 'bg-[#2C3136]/80 hover:bg-[#3E4348] border-gray-700/60 text-gray-300'
+                      }`}
+                    >
+                      <span>{emoji}</span>
+                      <span>{data.count}</span>
+                    </button>
+                  ))}
+                  {/* Top 5 Quick Reaction on Hover */}
+                  <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition ml-1">
+                    {topEmojis.map((em) => (
+                      <button
+                        key={em}
+                        onClick={() => handleReaction(parentMessage.id, em)}
+                        className="hover:scale-125 transition text-[11px] p-0.5"
+                        title={`React with ${em}`}
+                      >
+                        {em}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === parentMessage.id ? null : parentMessage.id)}
+                      className="p-0.5 text-gray-400 hover:text-white rounded transition text-[11px]"
+                      title="More emojis..."
+                    >
+                      <SmilePlus size={11} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Quick quote action for parent message */}
-          <div className="absolute right-2 top-1 hidden group-hover:flex items-center bg-[#222529] border border-gray-700 rounded shadow-md px-1 py-0.5 z-10">
+          <div className="absolute right-2 top-1 hidden group-hover:flex items-center bg-[#222529] border border-gray-700 rounded shadow-md px-1 py-0.5 gap-1 z-10">
+            <button
+              onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === parentMessage.id ? null : parentMessage.id)}
+              title="React with emoji"
+              className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
+            >
+              <SmilePlus size={13} />
+            </button>
             <button
               onClick={() => setReplyingToMessage(parentMessage)}
               title="Quote Reply"
@@ -107,6 +190,17 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
               <CornerUpLeft size={13} />
             </button>
           </div>
+
+          {/* Anchored Mini Emoji Popover */}
+          {activeEmojiMessageId === parentMessage.id && (
+            <EmojiPickerPopover
+              isOpen={true}
+              onClose={() => setActiveEmojiMessageId(null)}
+              onSelectEmoji={(emoji) => handleReaction(parentMessage.id, emoji)}
+              title="React in Thread"
+              positionClass="top-8 right-2"
+            />
+          )}
         </div>
 
         {/* Reply Count Separator */}
@@ -157,10 +251,73 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                 <div className="text-xs text-gray-200 mt-0.5 prose prose-invert max-w-none break-words">
                   <ReactMarkdown>{reply.content}</ReactMarkdown>
                 </div>
+
+                {/* Reply Reactions */}
+                {(() => {
+                  const reactionCounts = (reply.reactions || []).reduce(
+                    (acc: { [emoji: string]: { count: number; users: string[]; hasReacted: boolean } }, r) => {
+                      if (!acc[r.emoji]) {
+                        acc[r.emoji] = { count: 0, users: [], hasReacted: false };
+                      }
+                      acc[r.emoji].count += 1;
+                      if (r.user?.displayName) acc[r.emoji].users.push(r.user.displayName);
+                      if (r.userId === currentUser?.id) acc[r.emoji].hasReacted = true;
+                      return acc;
+                    },
+                    {}
+                  );
+
+                  return (
+                    <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                      {Object.entries(reactionCounts).map(([emoji, data]) => (
+                        <button
+                          key={emoji}
+                          onClick={() => handleReaction(reply.id, emoji)}
+                          title={data.users.join(', ')}
+                          className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] transition border ${
+                            data.hasReacted
+                              ? 'bg-slack-activeChannel/20 border-slack-activeChannel text-slack-activeChannel font-bold'
+                              : 'bg-[#2C3136]/80 hover:bg-[#3E4348] border-gray-700/60 text-gray-300'
+                          }`}
+                        >
+                          <span>{emoji}</span>
+                          <span>{data.count}</span>
+                        </button>
+                      ))}
+                      {/* Top 5 Quick Reaction on Hover */}
+                      <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition ml-1">
+                        {topEmojis.map((em) => (
+                          <button
+                            key={em}
+                            onClick={() => handleReaction(reply.id, em)}
+                            className="hover:scale-125 transition text-[11px] p-0.5"
+                            title={`React with ${em}`}
+                          >
+                            {em}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === reply.id ? null : reply.id)}
+                          className="p-0.5 text-gray-400 hover:text-white rounded transition text-[11px]"
+                          title="More emojis..."
+                        >
+                          <SmilePlus size={11} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
-              {/* Quick quote action for reply */}
-              <div className="absolute right-2 top-1 hidden group-hover:flex items-center bg-[#222529] border border-gray-700 rounded shadow-md px-1 py-0.5 z-10">
+              {/* Quick actions for reply */}
+              <div className="absolute right-2 top-1 hidden group-hover:flex items-center bg-[#222529] border border-gray-700 rounded shadow-md px-1 py-0.5 gap-1 z-10">
+                <button
+                  onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === reply.id ? null : reply.id)}
+                  title="React with emoji"
+                  className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
+                >
+                  <SmilePlus size={13} />
+                </button>
                 <button
                   onClick={() => setReplyingToMessage(reply)}
                   title="Quote Reply"
@@ -169,6 +326,17 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                   <CornerUpLeft size={13} />
                 </button>
               </div>
+
+              {/* Anchored Mini Emoji Popover */}
+              {activeEmojiMessageId === reply.id && (
+                <EmojiPickerPopover
+                  isOpen={true}
+                  onClose={() => setActiveEmojiMessageId(null)}
+                  onSelectEmoji={(emoji) => handleReaction(reply.id, emoji)}
+                  title="React in Thread"
+                  positionClass="top-8 right-2"
+                />
+              )}
             </div>
           );
         })}
@@ -176,7 +344,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
       </div>
 
       {/* Reply Input */}
-      <div className="p-3 border-t border-[#383F45]/40 bg-[#181B1E]">
+      <div className="p-3 border-t border-[#383F45]/40 bg-[#181B1E] relative">
         {/* Quote Reply Banner */}
         {replyingToMessage && (
           <div className="flex items-center justify-between bg-[#222529] border-l-4 border-slack-green rounded-t-lg px-3 py-1.5 mb-1 text-xs">
@@ -198,7 +366,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
           </div>
         )}
 
-        <form onSubmit={handleSendReply} className="bg-[#222529] border border-gray-700 rounded-lg overflow-hidden">
+        <form onSubmit={handleSendReply} className="bg-[#222529] border border-gray-700 rounded-lg overflow-hidden relative">
           <textarea
             rows={2}
             value={content}
@@ -212,7 +380,16 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
             placeholder="Reply..."
             className="w-full bg-transparent px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none resize-none"
           />
-          <div className="flex items-center justify-end px-2 py-1.5 bg-[#1C1F23]/60 border-t border-gray-800/40">
+          <div className="flex items-center justify-between px-2 py-1.5 bg-[#1C1F23]/60 border-t border-gray-800/40">
+            <button
+              type="button"
+              onClick={() => setShowComposerEmoji(!showComposerEmoji)}
+              className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
+              title="Add emoji"
+            >
+              <Smile size={14} />
+            </button>
+
             <button
               type="submit"
               disabled={!content.trim() || isSubmitting}
@@ -221,6 +398,17 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
               <Send size={13} />
             </button>
           </div>
+
+          {/* Thread Composer Emoji Popover */}
+          <EmojiPickerPopover
+            isOpen={showComposerEmoji}
+            onClose={() => setShowComposerEmoji(false)}
+            onSelectEmoji={(emoji) => {
+              setContent((prev) => prev + emoji);
+            }}
+            title="Add Emoji"
+            positionClass="bottom-12 left-2"
+          />
         </form>
       </div>
     </div>

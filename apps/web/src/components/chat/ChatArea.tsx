@@ -7,6 +7,7 @@ import {
   UserPlus,
   Paperclip,
   Smile,
+  SmilePlus,
   Send,
   MessageSquare,
   Sparkles,
@@ -16,10 +17,11 @@ import {
   CornerUpLeft,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import EmojiPicker from 'emoji-picker-react';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
 import { useChatStore } from '../../stores/chatStore';
+import { EmojiPickerPopover } from './EmojiPickerPopover';
+import { getTopEmojis, recordEmojiUsage } from '../../lib/emojiStore';
 
 interface ChatAreaProps {
   channel: Channel;
@@ -43,6 +45,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [content, setContent] = useState('');
   const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
+  const [activeEmojiMessageId, setActiveEmojiMessageId] = useState<string | null>(null);
+  const [topEmojis, setTopEmojis] = useState<string[]>(['👍', '❤️', '🔥', '🎉', '🚀']);
   const [attachments, setAttachments] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -52,6 +56,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    setTopEmojis(getTopEmojis(5));
+  }, []);
 
   const handleTyping = (text: string) => {
     setContent(text);
@@ -144,6 +152,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   const handleReaction = async (messageId: string, emoji: string) => {
+    recordEmojiUsage(emoji);
+    setTopEmojis(getTopEmojis(5));
     try {
       await api.post(`/api/messages/${messageId}/reactions`, { emoji });
     } catch (err) {
@@ -302,31 +312,72 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   )}
 
                   {/* Reactions Bar */}
-                  <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                    {msg.reactions?.map((reaction) => (
-                      <button
-                        key={reaction.id}
-                        onClick={() => handleReaction(msg.id, reaction.emoji)}
-                        className="flex items-center gap-1 bg-[#2C3136]/80 hover:bg-[#3E4348] border border-gray-700/60 px-2 py-0.5 rounded-full text-xs text-gray-300 transition"
-                      >
-                        <span>{reaction.emoji}</span>
-                        <span className="text-[11px] font-semibold">1</span>
-                      </button>
-                    ))}
+                  {(() => {
+                    const reactionCounts = (msg.reactions || []).reduce(
+                      (acc: { [emoji: string]: { count: number; users: string[]; hasReacted: boolean } }, r) => {
+                        if (!acc[r.emoji]) {
+                          acc[r.emoji] = { count: 0, users: [], hasReacted: false };
+                        }
+                        acc[r.emoji].count += 1;
+                        if (r.user?.displayName) acc[r.emoji].users.push(r.user.displayName);
+                        if (r.userId === currentUser?.id) acc[r.emoji].hasReacted = true;
+                        return acc;
+                      },
+                      {}
+                    );
 
-                    {/* Quick Reactions */}
-                    <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition">
-                      {['👍', '❤️', '🔥', '🚀'].map((em) => (
-                        <button
-                          key={em}
-                          onClick={() => handleReaction(msg.id, em)}
-                          className="hover:scale-125 transition text-xs p-1"
-                        >
-                          {em}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                    return (
+                      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                        {Object.entries(reactionCounts).map(([emoji, data]) => (
+                          <button
+                            key={emoji}
+                            onClick={() => handleReaction(msg.id, emoji)}
+                            title={data.users.join(', ')}
+                            className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition border ${
+                              data.hasReacted
+                                ? 'bg-slack-activeChannel/20 border-slack-activeChannel text-slack-activeChannel font-bold'
+                                : 'bg-[#2C3136]/80 hover:bg-[#3E4348] border-gray-700/60 text-gray-300'
+                            }`}
+                          >
+                            <span>{emoji}</span>
+                            <span className="text-[11px]">{data.count}</span>
+                          </button>
+                        ))}
+
+                        {/* Add reaction plus button if message already has reactions */}
+                        {Object.keys(reactionCounts).length > 0 && (
+                          <button
+                            onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === msg.id ? null : msg.id)}
+                            title="Add reaction"
+                            className="flex items-center justify-center w-6 h-6 rounded-full bg-[#2C3136]/60 hover:bg-[#3E4348] border border-gray-700/50 text-gray-400 hover:text-white transition"
+                          >
+                            <SmilePlus size={12} />
+                          </button>
+                        )}
+
+                        {/* Quick Top 5 Most Used Reactions on Hover */}
+                        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition ml-1">
+                          {topEmojis.map((em) => (
+                            <button
+                              key={em}
+                              onClick={() => handleReaction(msg.id, em)}
+                              className="hover:scale-125 transition text-xs p-1"
+                              title={`React with ${em}`}
+                            >
+                              {em}
+                            </button>
+                          ))}
+                          <button
+                            onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === msg.id ? null : msg.id)}
+                            className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition text-xs"
+                            title="More emojis..."
+                          >
+                            <SmilePlus size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Thread Replies Button */}
                   {(msg.replyCount || 0) > 0 && (
@@ -350,11 +401,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     <CornerUpLeft size={15} />
                   </button>
                   <button
-                    onClick={() => handleReaction(msg.id, '👍')}
-                    title="React"
+                    onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === msg.id ? null : msg.id)}
+                    title="React with emoji"
                     className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded"
                   >
-                    <Smile size={15} />
+                    <SmilePlus size={15} />
                   </button>
                   <button
                     onClick={() => onOpenThread(msg)}
@@ -364,6 +415,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     <MessageSquare size={15} />
                   </button>
                 </div>
+
+                {/* Anchored Mini Emoji Popover */}
+                {activeEmojiMessageId === msg.id && (
+                  <EmojiPickerPopover
+                    isOpen={true}
+                    onClose={() => setActiveEmojiMessageId(null)}
+                    onSelectEmoji={(emoji) => handleReaction(msg.id, emoji)}
+                    title="Add Reaction"
+                    positionClass="top-8 right-4"
+                  />
+                )}
               </div>
             );
           })
@@ -503,17 +565,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           </div>
 
           {/* Emoji Picker Popover */}
-          {showEmoji && (
-            <div className="absolute bottom-14 left-4 z-50">
-              <EmojiPicker
-                theme={"dark" as any}
-                onEmojiClick={(emojiData) => {
-                  setContent((prev) => prev + emojiData.emoji);
-                  setShowEmoji(false);
-                }}
-              />
-            </div>
-          )}
+          <EmojiPickerPopover
+            isOpen={showEmoji}
+            onClose={() => setShowEmoji(false)}
+            onSelectEmoji={(emoji) => {
+              setContent((prev) => prev + emoji);
+            }}
+            title="Add Emoji"
+            positionClass="bottom-14 left-4"
+          />
         </form>
       </div>
     </div>
