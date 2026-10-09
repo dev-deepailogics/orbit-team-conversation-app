@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Channel, UserProfile } from '@orbit/types';
 import {
   MousePointer,
+  Hand,
   Pencil,
   Square,
   Circle,
@@ -22,13 +23,17 @@ import {
   Sparkles,
   Users,
   X,
-  Palette,
+  Bold,
+  Heading1,
+  Heading2,
+  List,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
 
 export type ToolType =
   | 'select'
+  | 'hand'
   | 'pen'
   | 'rect'
   | 'circle'
@@ -51,6 +56,7 @@ export interface CanvasElement {
   strokeWidth: number;
   text?: string;
   fontSize?: number;
+  isBold?: boolean;
 }
 
 interface PeerCursor {
@@ -95,8 +101,9 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const inlineInputRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const [activeTool, setActiveTool] = useState<ToolType>('pen');
+  const [activeTool, setActiveTool] = useState<ToolType>('select');
   const [activeColor, setActiveColor] = useState<string>('#007A5A');
   const [strokeWidth, setStrokeWidth] = useState<number>(3);
   const [stickyColorIdx, setStickyColorIdx] = useState<number>(0);
@@ -105,20 +112,27 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
   const [history, setHistory] = useState<CanvasElement[][]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
 
+  // Drawing & Interaction State
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
   const [currentElement, setCurrentElement] = useState<CanvasElement | null>(null);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
-  const [editingTextElementId, setEditingTextElementId] = useState<string | null>(null);
-  const [editingTextValue, setEditingTextValue] = useState<string>('');
 
+  // Dragging elements state
+  const [isDraggingElement, setIsDraggingElement] = useState<boolean>(false);
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Direct Inline In-Place Text Editing (No Modal!)
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Infinite Pan & Zoom
   const [zoom, setZoom] = useState<number>(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState<boolean>(false);
   const [panStart, setPanStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isSpacePressed, setIsSpacePressed] = useState<boolean>(false);
 
   const [peerCursors, setPeerCursors] = useState<{ [userId: string]: PeerCursor }>({});
   const [activeUsersCount, setActiveUsersCount] = useState<number>(1);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -128,7 +142,6 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     let isMounted = true;
     const loadWhiteboard = async () => {
       try {
-        setIsLoading(true);
         const res = await api.get(`/api/channels/${channel.id}/whiteboard`);
         if (isMounted && res.data.whiteboardData?.elements) {
           const loaded = res.data.whiteboardData.elements;
@@ -138,8 +151,6 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         }
       } catch (err) {
         console.error('Failed to load whiteboard', err);
-      } finally {
-        if (isMounted) setIsLoading(false);
       }
     };
 
@@ -149,7 +160,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     };
   }, [channel.id]);
 
-  // 2. Real-time collaboration listeners via Socket.IO
+  // 2. Real-time collaboration socket listeners
   useEffect(() => {
     const socket = getSocket(currentUser?.id, channel.workspaceId);
     socket.emit('channel:join', channel.id);
@@ -189,6 +200,8 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         setElements([]);
         setHistory([[]]);
         setHistoryIndex(0);
+        setSelectedElementId(null);
+        setEditingId(null);
       }
     };
 
@@ -196,7 +209,6 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     socket.on('whiteboard:cursor', onWhiteboardCursor);
     socket.on('whiteboard:clear', onWhiteboardClear);
 
-    // Clean up stale cursors every 3 seconds
     const cursorInterval = setInterval(() => {
       const now = Date.now();
       setPeerCursors((prev) => {
@@ -241,7 +253,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     [channel.id]
   );
 
-  // Push elements into undo/redo history
+  // History Commit
   const commitElements = (newElements: CanvasElement[]) => {
     setElements(newElements);
     const newHistory = history.slice(0, historyIndex + 1);
@@ -278,8 +290,10 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
   };
 
   const handleClearBoard = async () => {
-    if (confirm('Are you sure you want to clear the entire whiteboard?')) {
+    if (confirm('Clear the entire whiteboard?')) {
       commitElements([]);
+      setSelectedElementId(null);
+      setEditingId(null);
       try {
         await api.delete(`/api/channels/${channel.id}/whiteboard`);
       } catch (err) {
@@ -288,7 +302,58 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     }
   };
 
-  // Convert client coordinates to canvas world coordinates
+  // Keyboard Shortcuts & Space Pan
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept when typing in inline text
+      if (editingId) return;
+
+      if (e.code === 'Space') {
+        setIsSpacePressed(true);
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedElementId) {
+          commitElements(elements.filter((el) => el.id !== selectedElementId));
+          setSelectedElementId(null);
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        if (e.shiftKey) handleRedo();
+        else handleUndo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        handleRedo();
+      } else if (e.key === 'v' || e.key === 'V') {
+        setActiveTool('select');
+      } else if (e.key === 'h' || e.key === 'H') {
+        setActiveTool('hand');
+      } else if (e.key === 'p' || e.key === 'P') {
+        setActiveTool('pen');
+      } else if (e.key === 't' || e.key === 'T') {
+        setActiveTool('text');
+      } else if (e.key === 's' || e.key === 'S') {
+        setActiveTool('sticky');
+      } else if (e.key === 'r' || e.key === 'R') {
+        setActiveTool('rect');
+      } else if (e.key === 'c' || e.key === 'C') {
+        setActiveTool('circle');
+      } else if (e.key === 'e' || e.key === 'E') {
+        setActiveTool('eraser');
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        setIsSpacePressed(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [editingId, selectedElementId, elements, historyIndex, history]);
+
+  // Coordinate Conversion (Infinite Canvas World)
   const getCanvasCoords = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return { x: 0, y: 0 };
@@ -298,7 +363,6 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     };
   };
 
-  // Broadcast mouse cursor to teammates
   const emitCursor = (coords: { x: number; y: number }) => {
     if (currentUser) {
       getSocket().emit('whiteboard:cursor', {
@@ -312,113 +376,149 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     }
   };
 
-  // Mouse Handlers for Drawing & Interacting
+  // Smooth Infinite Wheel Zoom & Pan (2-finger scroll / mouse wheel)
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (e.ctrlKey || e.metaKey) {
+      // Zoom centered on cursor
+      const zoomFactor = 1 - e.deltaY * 0.002;
+      const newZoom = Math.min(3, Math.max(0.2, zoom * zoomFactor));
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const newPanX = mouseX - (mouseX - pan.x) * (newZoom / zoom);
+      const newPanY = mouseY - (mouseY - pan.y) * (newZoom / zoom);
+
+      setZoom(newZoom);
+      setPan({ x: newPanX, y: newPanY });
+    } else {
+      // Pan infinitely
+      setPan((p) => ({
+        x: p.x - e.deltaX,
+        y: p.y - e.deltaY,
+      }));
+    }
+  };
+
+  // Find clicked element
+  const findElementAtCoords = (coords: { x: number; y: number }): CanvasElement | null => {
+    return (
+      [...elements].reverse().find((el) => {
+        if (el.type === 'rect' || el.type === 'sticky') {
+          const w = el.width || (el.type === 'sticky' ? 160 : 100);
+          const h = el.height || (el.type === 'sticky' ? 160 : 100);
+          return (
+            coords.x >= el.x &&
+            coords.x <= el.x + w &&
+            coords.y >= el.y &&
+            coords.y <= el.y + h
+          );
+        }
+        if (el.type === 'circle') {
+          const r = Math.abs(el.width || 60) / 2;
+          const cx = el.x + (el.width || 60) / 2;
+          const cy = el.y + (el.height || 60) / 2;
+          return Math.hypot(coords.x - cx, coords.y - cy) <= r;
+        }
+        if (el.type === 'text') {
+          const w = el.width || 200;
+          const h = el.height || 40;
+          return (
+            coords.x >= el.x &&
+            coords.x <= el.x + w &&
+            coords.y >= el.y &&
+            coords.y <= el.y + h
+          );
+        }
+        if (el.type === 'pen' && el.points) {
+          return el.points.some((pt) => Math.hypot(coords.x - pt.x, coords.y - pt.y) < 10);
+        }
+        return false;
+      }) || null
+    );
+  };
+
+  // Mouse Handlers
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const coords = getCanvasCoords(e);
 
-    // Right-click or middle-click or Space for pan
-    if (e.button === 1 || e.button === 2 || e.shiftKey) {
+    // Pan via middle button, spacebar, or hand tool
+    if (e.button === 1 || e.button === 2 || isSpacePressed || activeTool === 'hand') {
       setIsPanning(true);
       setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
       return;
     }
 
     if (activeTool === 'select') {
-      // Find clicked element in reverse order
-      const clicked = [...elements].reverse().find((el) => {
-        if (el.type === 'rect' || el.type === 'sticky') {
-          return (
-            coords.x >= el.x &&
-            coords.x <= el.x + (el.width || 100) &&
-            coords.y >= el.y &&
-            coords.y <= el.y + (el.height || 100)
-          );
-        }
-        if (el.type === 'circle') {
-          const r = (el.width || 50) / 2;
-          const cx = el.x + r;
-          const cy = el.y + r;
-          return Math.hypot(coords.x - cx, coords.y - cy) <= r;
-        }
-        if (el.type === 'text') {
-          return (
-            coords.x >= el.x &&
-            coords.x <= el.x + (el.width || 120) &&
-            coords.y >= el.y &&
-            coords.y <= el.y + (el.height || 30)
-          );
-        }
-        return false;
-      });
-
-      setSelectedElementId(clicked?.id || null);
-      return;
-    }
-
-    if (activeTool === 'eraser') {
-      const remaining = elements.filter((el) => {
-        if (el.type === 'rect' || el.type === 'sticky') {
-          return !(
-            coords.x >= el.x &&
-            coords.x <= el.x + (el.width || 100) &&
-            coords.y >= el.y &&
-            coords.y <= el.y + (el.height || 100)
-          );
-        }
-        if (el.type === 'circle') {
-          const r = (el.width || 50) / 2;
-          return Math.hypot(coords.x - (el.x + r), coords.y - (el.y + r)) > r;
-        }
-        return true;
-      });
-      if (remaining.length !== elements.length) {
-        commitElements(remaining);
+      const clicked = findElementAtCoords(coords);
+      if (clicked) {
+        setSelectedElementId(clicked.id);
+        setIsDraggingElement(true);
+        setDragOffset({ x: coords.x - clicked.x, y: coords.y - clicked.y });
+      } else {
+        setSelectedElementId(null);
+        setEditingId(null);
       }
       return;
     }
 
+    if (activeTool === 'eraser') {
+      const clicked = findElementAtCoords(coords);
+      if (clicked) {
+        commitElements(elements.filter((el) => el.id !== clicked.id));
+        if (selectedElementId === clicked.id) setSelectedElementId(null);
+      }
+      return;
+    }
+
+    // Direct in-place Sticky Note Creation
     if (activeTool === 'sticky') {
       const stickyColor = STICKY_COLORS[stickyColorIdx];
       const newSticky: CanvasElement = {
         id: `sticky-${Date.now()}`,
         type: 'sticky',
-        x: coords.x,
-        y: coords.y,
-        width: 140,
-        height: 140,
+        x: coords.x - 80,
+        y: coords.y - 80,
+        width: 170,
+        height: 170,
         color: stickyColor.text,
         fillColor: stickyColor.bg,
         strokeWidth: 2,
-        text: 'Type a thought...',
+        fontSize: 14,
+        text: 'Brainstorm idea...',
       };
       commitElements([...elements, newSticky]);
-      setEditingTextElementId(newSticky.id);
-      setEditingTextValue(newSticky.text || '');
+      setSelectedElementId(newSticky.id);
+      setEditingId(newSticky.id);
       setActiveTool('select');
       return;
     }
 
+    // Direct in-place Text Creation
     if (activeTool === 'text') {
       const newText: CanvasElement = {
         id: `text-${Date.now()}`,
         type: 'text',
         x: coords.x,
         y: coords.y,
-        width: 160,
-        height: 36,
+        width: 220,
+        height: 40,
         color: activeColor,
         strokeWidth: 1,
-        fontSize: 16,
-        text: 'Heading / Idea',
+        fontSize: 18,
+        text: 'Type heading or note...',
       };
       commitElements([...elements, newText]);
-      setEditingTextElementId(newText.id);
-      setEditingTextValue(newText.text || '');
+      setSelectedElementId(newText.id);
+      setEditingId(newText.id);
       setActiveTool('select');
       return;
     }
 
-    // Start drawing shape or freehand
+    // Start drawing shape
     setIsDrawing(true);
     const newId = `el-${Date.now()}`;
 
@@ -479,6 +579,42 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       return;
     }
 
+    // Dragging selected element
+    if (isDraggingElement && selectedElementId) {
+      setElements((prev) =>
+        prev.map((el) => {
+          if (el.id === selectedElementId) {
+            const dx = coords.x - dragOffset.x - el.x;
+            const dy = coords.y - dragOffset.y - el.y;
+
+            if (el.type === 'pen' && el.points) {
+              return {
+                ...el,
+                x: el.x + dx,
+                y: el.y + dy,
+                points: el.points.map((pt) => ({ x: pt.x + dx, y: pt.y + dy })),
+              };
+            }
+            if ((el.type === 'arrow' || el.type === 'line') && el.points) {
+              return {
+                ...el,
+                x: el.x + dx,
+                y: el.y + dy,
+                points: el.points.map((pt) => ({ x: pt.x + dx, y: pt.y + dy })),
+              };
+            }
+            return {
+              ...el,
+              x: coords.x - dragOffset.x,
+              y: coords.y - dragOffset.y,
+            };
+          }
+          return el;
+        })
+      );
+      return;
+    }
+
     if (!isDrawing || !currentElement) return;
 
     if (currentElement.type === 'pen') {
@@ -518,6 +654,12 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       return;
     }
 
+    if (isDraggingElement) {
+      setIsDraggingElement(false);
+      commitElements(elements);
+      return;
+    }
+
     if (isDrawing && currentElement) {
       commitElements([...elements, currentElement]);
       setCurrentElement(null);
@@ -525,14 +667,52 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     }
   };
 
-  // Render Canvas
+  // Double Click directly activates In-Place text editing
+  const handleDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const coords = getCanvasCoords(e);
+    const clicked = findElementAtCoords(coords);
+    if (clicked && (clicked.type === 'sticky' || clicked.type === 'text')) {
+      setSelectedElementId(clicked.id);
+      setEditingId(clicked.id);
+    }
+  };
+
+  // Text Formatting Helpers
+  const selectedElement = elements.find((el) => el.id === selectedElementId);
+
+  const updateSelectedFormatting = (updates: Partial<CanvasElement>) => {
+    if (!selectedElementId) return;
+    const updated = elements.map((el) =>
+      el.id === selectedElementId ? { ...el, ...updates } : el
+    );
+    commitElements(updated);
+  };
+
+  const toggleBold = () => {
+    if (!selectedElement) return;
+    updateSelectedFormatting({ isBold: !selectedElement.isBold });
+  };
+
+  const setFontSize = (size: number) => {
+    updateSelectedFormatting({ fontSize: size });
+  };
+
+  const insertBulletList = () => {
+    if (!selectedElement || !selectedElement.text) return;
+    const lines = selectedElement.text.split('\n');
+    const formatted = lines
+      .map((line) => (line.startsWith('• ') ? line : `• ${line}`))
+      .join('\n');
+    updateSelectedFormatting({ text: formatted });
+  };
+
+  // Canvas Painter Engine
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Resize canvas to container
     const width = containerRef.current?.clientWidth || window.innerWidth;
     const height = containerRef.current?.clientHeight || window.innerHeight;
     if (canvas.width !== width || canvas.height !== height) {
@@ -540,26 +720,26 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       canvas.height = height;
     }
 
-    // Clear background
-    ctx.fillStyle = '#181B1E';
+    // Background Canvas
+    ctx.fillStyle = '#141618';
     ctx.fillRect(0, 0, width, height);
 
-    // Draw grid dots
+    // Dynamic Infinite Grid Dots
     ctx.save();
-    ctx.fillStyle = '#2C3136';
-    const dotSpacing = 24 * zoom;
+    ctx.fillStyle = '#262A2E';
+    const dotSpacing = 28 * zoom;
     const offsetX = (pan.x % dotSpacing + dotSpacing) % dotSpacing;
     const offsetY = (pan.y % dotSpacing + dotSpacing) % dotSpacing;
     for (let x = offsetX; x < width; x += dotSpacing) {
       for (let y = offsetY; y < height; y += dotSpacing) {
         ctx.beginPath();
-        ctx.arc(x, y, 1.2, 0, Math.PI * 2);
+        ctx.arc(x, y, 1.2 * Math.min(1.5, zoom), 0, Math.PI * 2);
         ctx.fill();
       }
     }
     ctx.restore();
 
-    // Apply zoom & pan transformations
+    // Apply Infinite Transform
     ctx.save();
     ctx.translate(pan.x, pan.y);
     ctx.scale(zoom, zoom);
@@ -567,6 +747,9 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     const renderList = currentElement ? [...elements, currentElement] : elements;
 
     renderList.forEach((el) => {
+      // If currently in-place editing this element, hide its text so the textarea shows cleanly
+      const isCurrentlyEditing = editingId === el.id;
+
       ctx.save();
       ctx.strokeStyle = el.color;
       ctx.fillStyle = el.fillColor || el.color;
@@ -586,7 +769,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         const h = el.height || 0;
         ctx.beginPath();
         ctx.roundRect(el.x, el.y, w, h, 8);
-        ctx.fillStyle = el.color + '15'; // 10% opacity fill
+        ctx.fillStyle = el.color + '18';
         ctx.fill();
         ctx.stroke();
       } else if (el.type === 'circle') {
@@ -596,7 +779,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         const cy = el.y + (el.height || 0) / 2;
         ctx.beginPath();
         ctx.ellipse(cx, cy, Math.max(1, rx), Math.max(1, ry), 0, 0, Math.PI * 2);
-        ctx.fillStyle = el.color + '15';
+        ctx.fillStyle = el.color + '18';
         ctx.fill();
         ctx.stroke();
       } else if ((el.type === 'arrow' || el.type === 'line') && el.points && el.points.length === 2) {
@@ -623,39 +806,75 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           ctx.stroke();
         }
       } else if (el.type === 'sticky') {
-        const w = el.width || 140;
-        const h = el.height || 140;
-        ctx.shadowColor = 'rgba(0,0,0,0.35)';
-        ctx.shadowBlur = 10;
-        ctx.shadowOffsetY = 4;
+        const w = el.width || 170;
+        const h = el.height || 170;
+
+        ctx.shadowColor = 'rgba(0,0,0,0.4)';
+        ctx.shadowBlur = 12;
+        ctx.shadowOffsetY = 5;
         ctx.fillStyle = el.fillColor || '#FEF08A';
         ctx.beginPath();
-        ctx.roundRect(el.x, el.y, w, h, 6);
+        ctx.roundRect(el.x, el.y, w, h, 8);
         ctx.fill();
 
         ctx.shadowColor = 'transparent';
-        ctx.strokeStyle = el.color + '33';
+        ctx.strokeStyle = el.color + '25';
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        // Render sticky note text
-        ctx.fillStyle = el.color;
-        ctx.font = '500 13px sans-serif';
-        const lines = (el.text || '').split('\n');
-        lines.forEach((line, i) => {
-          ctx.fillText(line, el.x + 12, el.y + 24 + i * 18, w - 24);
-        });
+        if (!isCurrentlyEditing) {
+          ctx.fillStyle = el.color;
+          const weight = el.isBold ? 'bold' : '500';
+          const size = el.fontSize || 14;
+          ctx.font = `${weight} ${size}px sans-serif`;
+          const lines = (el.text || '').split('\n');
+          lines.forEach((line, i) => {
+            ctx.fillText(line, el.x + 14, el.y + 26 + i * (size * 1.35), w - 28);
+          });
+        }
       } else if (el.type === 'text') {
-        ctx.fillStyle = el.color;
-        ctx.font = `600 ${el.fontSize || 16}px sans-serif`;
-        ctx.fillText(el.text || '', el.x, el.y + 18);
+        if (!isCurrentlyEditing) {
+          ctx.fillStyle = el.color;
+          const weight = el.isBold ? 'bold' : '600';
+          const size = el.fontSize || 18;
+          ctx.font = `${weight} ${size}px sans-serif`;
+          const lines = (el.text || '').split('\n');
+          lines.forEach((line, i) => {
+            ctx.fillText(line, el.x, el.y + 20 + i * (size * 1.35));
+          });
+        }
+      }
+
+      // Selection Highlight Box
+      if (selectedElementId === el.id) {
+        ctx.strokeStyle = '#007A5A';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+
+        const pad = 6;
+        let bx = el.x - pad;
+        let by = el.y - pad;
+        let bw = (el.width || 100) + pad * 2;
+        let bh = (el.height || 100) + pad * 2;
+
+        if (el.type === 'pen' && el.points && el.points.length > 0) {
+          const xs = el.points.map((p) => p.x);
+          const ys = el.points.map((p) => p.y);
+          bx = Math.min(...xs) - pad;
+          by = Math.min(...ys) - pad;
+          bw = Math.max(...xs) - bx + pad;
+          bh = Math.max(...ys) - by + pad;
+        }
+
+        ctx.strokeRect(bx, by, bw, bh);
+        ctx.setLineDash([]);
       }
 
       ctx.restore();
     });
 
     ctx.restore();
-  }, [elements, currentElement, zoom, pan]);
+  }, [elements, currentElement, zoom, pan, selectedElementId, editingId]);
 
   // Export to PNG Image
   const handleExportImage = () => {
@@ -664,43 +883,48 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     const url = canvas.toDataURL('image/png');
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${channel.name}-whiteboard.png`;
+    a.download = `${channel.name}-brainstorm-canvas.png`;
     a.click();
   };
+
+  // Locate the currently editing element in screen space
+  const editingElement = elements.find((el) => el.id === editingId);
 
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full flex flex-col bg-[#181B1E] overflow-hidden select-none"
+      onWheel={handleWheel}
+      className={`relative w-full h-full flex flex-col bg-[#141618] overflow-hidden select-none ${
+        isSpacePressed || activeTool === 'hand' ? 'cursor-grab active:cursor-grabbing' : ''
+      }`}
     >
-      {/* Top Controls Header */}
+      {/* Top Header Bar */}
       <div className="absolute top-4 left-4 right-4 z-30 flex items-center justify-between pointer-events-none">
-        {/* Left: Channel Title & Active Users */}
-        <div className="flex items-center gap-3 bg-[#222529]/90 backdrop-blur border border-gray-700/80 px-4 py-2 rounded-2xl shadow-2xl pointer-events-auto">
+        {/* Left: Channel Canvas Info */}
+        <div className="flex items-center gap-3 bg-[#1F2326]/90 backdrop-blur border border-gray-700/80 px-4 py-2 rounded-2xl shadow-2xl pointer-events-auto">
           <div className="flex items-center gap-2">
             <Sparkles size={16} className="text-slack-green animate-pulse" />
-            <span className="font-bold text-sm text-white">{channel.name} Canvas</span>
+            <span className="font-bold text-sm text-white">#{channel.name} Canvas</span>
           </div>
 
           <span className="text-gray-600">|</span>
 
-          {/* Real-time collaborator count */}
           <div className="flex items-center gap-1.5 text-xs text-gray-300">
             <Users size={14} className="text-slack-green" />
             <span>{activeUsersCount} Live</span>
           </div>
 
           {isSaving && (
-            <span className="text-[11px] text-gray-400 italic ml-2">Saving...</span>
+            <span className="text-[11px] text-gray-400 italic ml-2">Auto-saving...</span>
           )}
         </div>
 
-        {/* Right: Actions (Undo/Redo, Export, Zoom, Close) */}
-        <div className="flex items-center gap-1.5 bg-[#222529]/90 backdrop-blur border border-gray-700/80 p-1.5 rounded-2xl shadow-2xl pointer-events-auto">
+        {/* Right: Actions */}
+        <div className="flex items-center gap-1.5 bg-[#1F2326]/90 backdrop-blur border border-gray-700/80 p-1.5 rounded-2xl shadow-2xl pointer-events-auto">
           <button
             onClick={handleUndo}
             disabled={historyIndex <= 0}
-            title="Undo"
+            title="Undo (Ctrl+Z)"
             className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition disabled:opacity-30"
           >
             <Undo2 size={16} />
@@ -708,7 +932,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           <button
             onClick={handleRedo}
             disabled={historyIndex >= history.length - 1}
-            title="Redo"
+            title="Redo (Ctrl+Y)"
             className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition disabled:opacity-30"
           >
             <Redo2 size={16} />
@@ -716,9 +940,9 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
 
           <span className="w-px h-5 bg-gray-700 mx-1" />
 
-          {/* Zoom In / Out */}
+          {/* Zoom Controls */}
           <button
-            onClick={() => setZoom((z) => Math.min(2.5, z + 0.15))}
+            onClick={() => setZoom((z) => Math.min(3, z + 0.15))}
             title="Zoom In"
             className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition"
           >
@@ -726,7 +950,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           </button>
           <span className="text-xs text-gray-400 px-1 font-mono">{Math.round(zoom * 100)}%</span>
           <button
-            onClick={() => setZoom((z) => Math.max(0.4, z - 0.15))}
+            onClick={() => setZoom((z) => Math.max(0.2, z - 0.15))}
             title="Zoom Out"
             className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition"
           >
@@ -737,7 +961,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
               setZoom(1);
               setPan({ x: 0, y: 0 });
             }}
-            title="Reset Zoom & Pan"
+            title="Reset View (100%)"
             className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition"
           >
             <Maximize2 size={15} />
@@ -778,20 +1002,106 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         </div>
       </div>
 
-      {/* Floating Center Bottom / Left Toolbar */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-[#222529]/95 backdrop-blur border border-gray-700/80 p-2 rounded-2xl shadow-2xl">
-        {/* Tool Buttons */}
+      {/* Floating Formatting Toolbar (When Text / Sticky Note is Selected) */}
+      {selectedElement && (selectedElement.type === 'text' || selectedElement.type === 'sticky') && (
+        <div
+          style={{
+            transform: `translate(${selectedElement.x * zoom + pan.x}px, ${
+              selectedElement.y * zoom + pan.y - 48
+            }px)`,
+          }}
+          className="absolute top-0 left-0 z-40 flex items-center gap-1 bg-[#1F2326] border border-gray-700 px-2 py-1 rounded-xl shadow-2xl animate-in fade-in zoom-in-95 duration-100"
+        >
+          {/* Bold */}
+          <button
+            onClick={toggleBold}
+            title="Bold"
+            className={`p-1.5 rounded-lg text-xs font-bold transition ${
+              selectedElement.isBold ? 'bg-slack-green text-white' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <Bold size={14} />
+          </button>
+
+          {/* Heading 1 (Large) */}
+          <button
+            onClick={() => setFontSize(24)}
+            title="Heading 1"
+            className={`p-1.5 rounded-lg text-xs font-bold transition ${
+              selectedElement.fontSize === 24 ? 'bg-slack-green text-white' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <Heading1 size={14} />
+          </button>
+
+          {/* Heading 2 (Medium) */}
+          <button
+            onClick={() => setFontSize(18)}
+            title="Heading 2"
+            className={`p-1.5 rounded-lg text-xs font-bold transition ${
+              selectedElement.fontSize === 18 ? 'bg-slack-green text-white' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <Heading2 size={14} />
+          </button>
+
+          {/* Body (Small) */}
+          <button
+            onClick={() => setFontSize(14)}
+            title="Body Text"
+            className={`p-1.5 rounded-lg text-xs font-bold transition ${
+              selectedElement.fontSize === 14 ? 'bg-slack-green text-white' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <span className="text-[11px]">T</span>
+          </button>
+
+          {/* Bullet List */}
+          <button
+            onClick={insertBulletList}
+            title="Bullet List"
+            className="p-1.5 rounded-lg text-xs text-gray-400 hover:text-white transition"
+          >
+            <List size={14} />
+          </button>
+
+          {/* Color swatches for Sticky Note background */}
+          {selectedElement.type === 'sticky' && (
+            <>
+              <span className="w-px h-4 bg-gray-700 mx-0.5" />
+              {STICKY_COLORS.map((sc) => (
+                <button
+                  key={sc.label}
+                  onClick={() =>
+                    updateSelectedFormatting({ fillColor: sc.bg, color: sc.text })
+                  }
+                  style={{ backgroundColor: sc.bg }}
+                  title={sc.label}
+                  className={`w-4 h-4 rounded-full border transition hover:scale-125 ${
+                    selectedElement.fillColor === sc.bg ? 'ring-2 ring-slack-green' : 'border-gray-600'
+                  }`}
+                />
+              ))}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Floating Center Bottom Toolbar (Tools & Palettes) */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-[#1F2326]/95 backdrop-blur border border-gray-700/80 p-2 rounded-2xl shadow-2xl">
+        {/* Tool Selector */}
         <div className="flex items-center gap-1">
           {[
-            { tool: 'select', icon: MousePointer, label: 'Select' },
-            { tool: 'pen', icon: Pencil, label: 'Draw' },
-            { tool: 'rect', icon: Square, label: 'Rectangle' },
-            { tool: 'circle', icon: Circle, label: 'Circle' },
+            { tool: 'select', icon: MousePointer, label: 'Select & Move (V)' },
+            { tool: 'hand', icon: Hand, label: 'Pan Hand (H / Space)' },
+            { tool: 'pen', icon: Pencil, label: 'Draw Pen (P)' },
+            { tool: 'sticky', icon: StickyNote, label: 'Sticky Note (S)' },
+            { tool: 'text', icon: Type, label: 'Text Box (T)' },
+            { tool: 'rect', icon: Square, label: 'Rectangle (R)' },
+            { tool: 'circle', icon: Circle, label: 'Circle (C)' },
             { tool: 'arrow', icon: ArrowRight, label: 'Arrow' },
             { tool: 'line', icon: Minus, label: 'Line' },
-            { tool: 'sticky', icon: StickyNote, label: 'Sticky Note' },
-            { tool: 'text', icon: Type, label: 'Text' },
-            { tool: 'eraser', icon: Eraser, label: 'Eraser' },
+            { tool: 'eraser', icon: Eraser, label: 'Eraser (E)' },
           ].map(({ tool, icon: Icon, label }) => (
             <button
               key={tool}
@@ -818,7 +1128,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
               onClick={() => setActiveColor(c)}
               style={{ backgroundColor: c }}
               className={`w-6 h-6 rounded-full transition transform hover:scale-125 border ${
-                activeColor === c ? 'ring-2 ring-slack-green ring-offset-2 ring-offset-[#222529]' : 'border-gray-700'
+                activeColor === c ? 'ring-2 ring-slack-green ring-offset-2 ring-offset-[#1F2326]' : 'border-gray-700'
               }`}
             />
           ))}
@@ -851,44 +1161,50 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onDoubleClick={handleDoubleClick}
         className="w-full h-full cursor-crosshair touch-none"
       />
 
-      {/* Inline Text Editor for Sticky Note / Text Editing */}
-      {editingTextElementId && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-[#222529] border border-gray-700 p-5 rounded-2xl shadow-2xl w-96 space-y-4">
-            <h4 className="text-sm font-bold text-white">Edit Note / Text</h4>
-            <textarea
-              rows={4}
-              value={editingTextValue}
-              onChange={(e) => setEditingTextValue(e.target.value)}
-              autoFocus
-              className="w-full bg-[#181B1E] border border-gray-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-slack-green resize-none"
-            />
-            <div className="flex items-center justify-end gap-2">
-              <button
-                onClick={() => setEditingTextElementId(null)}
-                className="px-3 py-1.5 text-xs text-gray-400 hover:text-white rounded-lg transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  commitElements(
-                    elements.map((el) =>
-                      el.id === editingTextElementId ? { ...el, text: editingTextValue } : el
-                    )
-                  );
-                  setEditingTextElementId(null);
-                }}
-                className="px-4 py-1.5 text-xs font-semibold bg-slack-green hover:bg-[#008a65] text-white rounded-lg transition"
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* DIRECT IN-PLACE INLINE TEXT EDITING (NO MODALS!) */}
+      {editingElement && (
+        <textarea
+          ref={inlineInputRef}
+          value={editingElement.text || ''}
+          onChange={(e) => {
+            const val = e.target.value;
+            setElements((prev) =>
+              prev.map((el) => (el.id === editingElement.id ? { ...el, text: val } : el))
+            );
+          }}
+          onBlur={() => {
+            commitElements(elements);
+            setEditingId(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              commitElements(elements);
+              setEditingId(null);
+            }
+          }}
+          autoFocus
+          style={{
+            position: 'absolute',
+            left: `${editingElement.x * zoom + pan.x + (editingElement.type === 'sticky' ? 14 : 0)}px`,
+            top: `${editingElement.y * zoom + pan.y + (editingElement.type === 'sticky' ? 14 : 0)}px`,
+            width: `${(editingElement.width || (editingElement.type === 'sticky' ? 170 : 220)) * zoom - (editingElement.type === 'sticky' ? 28 : 0)}px`,
+            height: `${(editingElement.height || (editingElement.type === 'sticky' ? 170 : 40)) * zoom - (editingElement.type === 'sticky' ? 28 : 0)}px`,
+            fontSize: `${(editingElement.fontSize || (editingElement.type === 'sticky' ? 14 : 18)) * zoom}px`,
+            fontWeight: editingElement.isBold ? 'bold' : '500',
+            color: editingElement.color,
+            backgroundColor: editingElement.type === 'sticky' ? editingElement.fillColor : 'transparent',
+            outline: 'none',
+            border: 'none',
+            resize: 'none',
+            lineHeight: 1.35,
+            zIndex: 50,
+          }}
+          className="p-0 m-0 font-sans shadow-none focus:ring-0 selection:bg-slack-green selection:text-white"
+        />
       )}
 
       {/* Real-time Teammates' Cursors Overlay */}
