@@ -15,6 +15,8 @@ import {
   X,
   FileText,
   CornerUpLeft,
+  Copy,
+  Check,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { api } from '../../lib/api';
@@ -173,6 +175,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     return channel.name;
   };
 
+  const [copiedChannelId, setCopiedChannelId] = useState(false);
+
+  const handleCopyChannelId = () => {
+    navigator.clipboard.writeText(channel.id);
+    setCopiedChannelId(true);
+    setTimeout(() => setCopiedChannelId(false), 2000);
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full bg-[#1A1D21] relative min-w-0">
       {/* Channel Header */}
@@ -188,6 +198,26 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           <span className="font-bold text-white text-base truncate">
             {getDirectChannelTitle()}
           </span>
+
+          {/* Copy Channel ID button for developer & bot testing */}
+          <button
+            onClick={handleCopyChannelId}
+            title={copiedChannelId ? 'Channel ID Copied!' : `Click to copy Channel ID: ${channel.id}`}
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#2C3136]/60 hover:bg-[#3E4348] text-gray-400 hover:text-white border border-gray-700/60 text-[10px] font-mono transition"
+          >
+            {copiedChannelId ? (
+              <>
+                <Check size={11} className="text-slack-green" />
+                <span className="text-slack-green font-semibold">Copied!</span>
+              </>
+            ) : (
+              <>
+                <Copy size={11} />
+                <span className="truncate max-w-[80px]">{channel.id.slice(0, 8)}...</span>
+              </>
+            )}
+          </button>
+
           {channel.topic && channel.type !== 'DIRECT' && (
             <>
               <span className="text-gray-600">|</span>
