@@ -200,4 +200,123 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
 
     return reply.send({ success: true, messageId: message.id });
   });
+
+  // Execute Slash Command (/poll, /topic, /shrug, /huddle, or custom registered bot commands)
+  fastify.post('/commands/execute', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const userId = (request.user as { id: string; username: string }).id;
+    const body = request.body as {
+      channelId: string;
+      workspaceId: string;
+      commandText: string;
+    };
+
+    const { channelId, workspaceId, commandText } = body;
+    const parts = commandText.trim().split(' ');
+    const commandName = parts[0].toLowerCase();
+    const args = parts.slice(1).join(' ');
+
+    const channel = await prisma.channel.findUnique({ where: { id: channelId } });
+    if (!channel) return reply.status(404).send({ error: 'Channel not found' });
+
+    // Built-in: /topic <new topic>
+    if (commandName === '/topic') {
+      const updatedChannel = await prisma.channel.update({
+        where: { id: channelId },
+        data: { topic: args },
+      });
+
+      const sysMsg = await prisma.message.create({
+        data: {
+          channelId,
+          content: `📢 *Channel topic changed to:* **${args}**`,
+        },
+      });
+
+      if (fastify.io) {
+        fastify.io.to(`channel:${channelId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, { ...sysMsg, replyCount: 0 });
+      }
+
+      return reply.send({ ok: true, channel: updatedChannel });
+    }
+
+    // Built-in: /shrug [message]
+    if (commandName === '/shrug') {
+      const content = `${args ? args + ' ' : ''}¯\\_(ツ)_/¯`;
+      const msg = await prisma.message.create({
+        data: { channelId, userId, content },
+        include: {
+          user: { select: { id: true, username: true, displayName: true, avatarUrl: true, status: true } },
+          attachments: true,
+          reactions: true,
+          _count: { select: { replies: true } },
+        },
+      });
+
+      if (fastify.io) {
+        fastify.io.to(`channel:${channelId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, { ...msg, replyCount: 0 });
+      }
+
+      return reply.send({ ok: true, message: msg });
+    }
+
+    // Built-in: /poll "Question" "Option 1" "Option 2" ...
+    if (commandName === '/poll') {
+      const matches = args.match(/"([^"]+)"|'([^']+)'|(\S+)/g) || [];
+      const cleanArgs = matches.map((m) => m.replace(/^["']|["']$/g, ''));
+      const question = cleanArgs[0] || 'Quick Poll';
+      const options = cleanArgs.slice(1);
+
+      const emojiNumbers = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+      let pollBody = `📊 **POLL: ${question}**\n\n`;
+
+      if (options.length > 0) {
+        options.forEach((opt, idx) => {
+          const emoji = emojiNumbers[idx] || `•`;
+          pollBody += `${emoji} ${opt}\n`;
+        });
+      } else {
+        pollBody += `👍 Yes / Agree\n👎 No / Disagree\n`;
+      }
+
+      const msg = await prisma.message.create({
+        data: { channelId, userId, content: pollBody },
+        include: {
+          user: { select: { id: true, username: true, displayName: true, avatarUrl: true, status: true } },
+          attachments: true,
+          reactions: true,
+          _count: { select: { replies: true } },
+        },
+      });
+
+      // Auto-add emoji reactions
+      if (options.length > 0) {
+        for (let i = 0; i < Math.min(options.length, 10); i++) {
+          await prisma.reaction.create({
+            data: { messageId: msg.id, userId, emoji: emojiNumbers[i] },
+          }).catch(() => {});
+        }
+      } else {
+        await prisma.reaction.create({ data: { messageId: msg.id, userId, emoji: '👍' } }).catch(() => {});
+        await prisma.reaction.create({ data: { messageId: msg.id, userId, emoji: '👎' } }).catch(() => {});
+      }
+
+      const updatedMsg = await prisma.message.findUnique({
+        where: { id: msg.id },
+        include: {
+          user: { select: { id: true, username: true, displayName: true, avatarUrl: true, status: true } },
+          attachments: true,
+          reactions: true,
+          _count: { select: { replies: true } },
+        },
+      });
+
+      if (fastify.io && updatedMsg) {
+        fastify.io.to(`channel:${channelId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, { ...updatedMsg, replyCount: 0 });
+      }
+
+      return reply.send({ ok: true, message: updatedMsg });
+    }
+
+    return reply.status(400).send({ error: `Unknown command: ${commandName}` });
+  });
 };

@@ -67,9 +67,36 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     e.preventDefault();
     if ((!content.trim() && attachments.length === 0) || !currentUser) return;
 
+    const trimmed = content.trim();
+
+    // Check for Slash Command
+    if (trimmed.startsWith('/')) {
+      const commandParts = trimmed.split(' ');
+      const cmd = commandParts[0].toLowerCase();
+
+      if (cmd === '/huddle') {
+        setContent('');
+        onStartHuddle(channel);
+        return;
+      }
+
+      try {
+        await api.post('/api/bot/commands/execute', {
+          channelId: channel.id,
+          workspaceId: channel.workspaceId,
+          commandText: trimmed,
+        });
+        setContent('');
+        return;
+      } catch (err: any) {
+        alert(err.response?.data?.error || 'Failed to execute command');
+        return;
+      }
+    }
+
     try {
       await api.post(`/api/channels/${channel.id}/messages`, {
-        content: content.trim(),
+        content: trimmed,
         attachments,
       });
 
@@ -274,6 +301,32 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
       {/* Chat Input */}
       <div className="px-6 pb-6 pt-1">
+        {/* Slash Command Suggestions */}
+        {content.startsWith('/') && !content.includes(' ') && (
+          <div className="mb-2 bg-[#1F2326] border border-gray-700 rounded-xl p-2 shadow-2xl space-y-1">
+            <div className="text-[10px] font-bold uppercase text-gray-400 px-2 py-1 tracking-wider">
+              Available Slash Commands
+            </div>
+            {[
+              { cmd: '/poll "Question" "Opt 1" "Opt 2"', desc: 'Create an interactive vote with reactions' },
+              { cmd: '/topic <new topic>', desc: 'Set or change channel topic' },
+              { cmd: '/huddle', desc: 'Start an instant voice/video huddle' },
+              { cmd: '/shrug <message>', desc: 'Append ¯\\_(ツ)_/¯ to message' },
+            ]
+              .filter((c) => c.cmd.toLowerCase().startsWith(content.toLowerCase()))
+              .map((c, i) => (
+                <div
+                  key={i}
+                  onClick={() => setContent(c.cmd.split(' ')[0] + ' ')}
+                  className="flex items-center justify-between px-3 py-1.5 hover:bg-[#2C3136] rounded-lg cursor-pointer text-xs transition"
+                >
+                  <span className="font-mono text-slack-green font-semibold">{c.cmd}</span>
+                  <span className="text-gray-400">{c.desc}</span>
+                </div>
+              ))}
+          </div>
+        )}
+
         <form
           onSubmit={handleSendMessage}
           className="bg-[#222529] border border-gray-700 rounded-xl focus-within:border-gray-500 shadow-lg relative overflow-hidden"

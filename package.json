@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspaces --if-present",
+    "dev": "concurrently -n \"server,web\" -c \"blue,magenta\" \"npm run dev:server\" \"npm run dev:web\"",
     "dev:web": "npm run dev --workspace=@orbit/web",
     "dev:server": "npm run dev --workspace=@orbit/server",
     "build": "npm run build --workspaces --if-present",
