@@ -193,37 +193,60 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
               if (!user) return null;
               const isOnline = user.status === 'ONLINE';
               const isSelf = user.id === currentUser?.id;
+              
+              // Find matching DM channel to check selection and unread counts
+              const dmChannel = channels.find(
+                (c) =>
+                  c.type === 'DIRECT' &&
+                  c.members &&
+                  (isSelf
+                    ? c.members.length === 1 || c.members.every((m) => m.userId === currentUser?.id)
+                    : c.members.some((m) => m.userId === user.id) && c.members.some((m) => m.userId === currentUser?.id))
+              );
+
               const isSelectedDM = currentChannel?.type === 'DIRECT' && (
                 isSelf
                   ? (!currentChannel.members || currentChannel.members.length <= 1 || currentChannel.members.every((m) => m.userId === currentUser?.id))
                   : (currentChannel.members?.some((m) => m.userId === user.id) && currentChannel.members?.some((m) => m.userId === currentUser?.id))
               );
 
+              const unread = dmChannel ? (unreadCounts[dmChannel.id] || 0) : 0;
+
               return (
                 <div
                   key={member.id}
                   onClick={() => onSelectUserDM(user)}
-                  className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
+                  className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
                     isSelectedDM
-                      ? 'bg-slack-activeChannel text-white shadow'
+                      ? 'bg-slack-activeChannel text-white shadow font-semibold'
+                      : unread > 0
+                      ? 'text-white font-bold bg-[#282C30]'
                       : 'text-gray-300 hover:bg-[#2C3136] hover:text-white'
                   }`}
                 >
-                  <div className="relative">
-                    <img
-                      src={user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`}
-                      alt={user.displayName}
-                      className="w-5 h-5 rounded-md object-cover"
-                    />
-                    <span
-                      className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-1 ring-[#1F2326] ${
-                        isOnline ? 'bg-slack-green' : 'bg-gray-500'
-                      }`}
-                    />
+                  <div className="flex items-center gap-2.5 truncate min-w-0">
+                    <div className="relative shrink-0">
+                      <img
+                        src={user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`}
+                        alt={user.displayName}
+                        className="w-5 h-5 rounded-md object-cover"
+                      />
+                      <span
+                        className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-1 ring-[#1F2326] ${
+                          isOnline ? 'bg-slack-green' : 'bg-gray-500'
+                        }`}
+                      />
+                    </div>
+                    <span className="truncate">{user.displayName}</span>
+                    {isSelf && (
+                      <span className="text-[10px] text-gray-500 shrink-0">you</span>
+                    )}
                   </div>
-                  <span className="truncate">{user.displayName}</span>
-                  {user.id === currentUser?.id && (
-                    <span className="text-[10px] text-gray-500 ml-auto">you</span>
+
+                  {unread > 0 && (
+                    <span className="px-1.5 py-0.5 bg-slack-green text-white text-[10px] font-bold rounded-full min-w-[18px] text-center leading-none shrink-0 ml-1">
+                      {unread}
+                    </span>
                   )}
                 </div>
               );

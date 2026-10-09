@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { PhoneCall, PhoneOff, Video } from 'lucide-react';
 import { useHuddleStore } from '../../stores/huddleStore';
+import { sounds } from '../../lib/sound';
 
 interface IncomingCallDialogProps {
   onAcceptCall: (channelId: string, channelName: string) => void;
@@ -10,6 +11,18 @@ interface IncomingCallDialogProps {
 
 export const IncomingCallDialog: React.FC<IncomingCallDialogProps> = ({ onAcceptCall }) => {
   const { incomingCall, dismissIncomingCall, isActive } = useHuddleStore();
+
+  useEffect(() => {
+    if (incomingCall && !isActive) {
+      sounds.startCallRing();
+    } else {
+      sounds.stopCallRing();
+    }
+
+    return () => {
+      sounds.stopCallRing();
+    };
+  }, [incomingCall, isActive]);
 
   if (!incomingCall || isActive) return null;
 
@@ -44,6 +57,7 @@ export const IncomingCallDialog: React.FC<IncomingCallDialogProps> = ({ onAccept
             <button
               onClick={() => {
                 const { channelId, channelName } = incomingCall;
+                sounds.stopCallRing();
                 dismissIncomingCall();
                 onAcceptCall(channelId, channelName);
               }}
@@ -54,7 +68,10 @@ export const IncomingCallDialog: React.FC<IncomingCallDialogProps> = ({ onAccept
             </button>
 
             <button
-              onClick={dismissIncomingCall}
+              onClick={() => {
+                sounds.stopCallRing();
+                dismissIncomingCall();
+              }}
               className="px-3 py-1.5 bg-[#2C3136] hover:bg-red-500/20 text-gray-300 hover:text-red-400 text-xs font-semibold rounded-lg border border-gray-700 transition"
             >
               <PhoneOff size={13} />

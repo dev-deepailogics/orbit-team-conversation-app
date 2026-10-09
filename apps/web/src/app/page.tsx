@@ -9,6 +9,9 @@ import { useHuddleStore } from '../stores/huddleStore';
 import { api } from '../lib/api';
 import { getSocket } from '../lib/socket';
 
+import { sounds } from '../lib/sound';
+import { DesktopNotifier } from '../lib/notifications';
+
 // Components
 import { WorkspaceSidebar } from '../components/workspace/WorkspaceSidebar';
 import { ChannelSidebar } from '../components/channel/ChannelSidebar';
@@ -150,8 +153,23 @@ export default function AppDashboard() {
     const socket = getSocket(user.id, currentWorkspace.id);
     socket.emit('workspace:join', currentWorkspace.id);
 
+    // Request desktop notification permission
+    DesktopNotifier.requestPermission();
+
     const onNewMessage = (msg: any) => {
       const activeChannel = currentChannelRef.current;
+      const isFromOther = msg.userId && msg.userId !== user.id;
+
+      // Play message chime if message is from another user
+      if (isFromOther) {
+        sounds.playMessageSound();
+        DesktopNotifier.send(
+          msg.user?.displayName || msg.bot?.name || 'New Message',
+          msg.content,
+          msg.user?.avatarUrl || msg.bot?.avatarUrl
+        );
+      }
+
       if (msg.parentMessageId) {
         addThreadReply(msg);
       } else if (activeChannel && msg.channelId === activeChannel.id) {
