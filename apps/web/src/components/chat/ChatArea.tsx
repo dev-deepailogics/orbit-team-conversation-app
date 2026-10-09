@@ -143,13 +143,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       {/* Channel Header */}
       <div className="h-14 border-b border-[#383F45]/40 px-6 flex items-center justify-between bg-[#1A1D21]/90 backdrop-blur z-10">
         <div className="flex items-center gap-2 min-w-0">
-          {channel.type === 'PRIVATE' ? (
+          {channel.type === 'DIRECT' ? (
+            <span className="font-bold text-slack-green text-base">@</span>
+          ) : channel.type === 'PRIVATE' ? (
             <Lock size={18} className="text-gray-400 shrink-0" />
           ) : (
             <Hash size={20} className="text-gray-400 shrink-0" />
           )}
-          <span className="font-bold text-white text-base truncate">{channel.name}</span>
-          {channel.topic && (
+          <span className="font-bold text-white text-base truncate">
+            {channel.type === 'DIRECT' ? (channel.topic?.replace('Direct message with ', '') || channel.name) : channel.name}
+          </span>
+          {channel.topic && channel.type !== 'DIRECT' && (
             <>
               <span className="text-gray-600">|</span>
               <span className="text-xs text-gray-400 truncate max-w-md">{channel.topic}</span>

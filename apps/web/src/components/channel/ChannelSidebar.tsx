@@ -24,6 +24,7 @@ interface ChannelSidebarProps {
   members: any[];
   activeHuddleChannelId?: string | null;
   onSelectChannel: (channel: Channel) => void;
+  onSelectUserDM: (targetUser: UserProfile) => void;
   onChannelCreated: (channel: Channel) => void;
   onOpenBotPortal: () => void;
   onStartHuddle: (channel: Channel) => void;
@@ -38,6 +39,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   members,
   activeHuddleChannelId,
   onSelectChannel,
+  onSelectUserDM,
   onChannelCreated,
   onOpenBotPortal,
   onStartHuddle,
@@ -176,10 +178,17 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
               const user = member.user;
               if (!user) return null;
               const isOnline = user.status === 'ONLINE';
+              const isSelectedDM = currentChannel?.type === 'DIRECT' && currentChannel.topic?.includes(user.displayName);
+
               return (
                 <div
                   key={member.id}
-                  className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm font-medium text-gray-300 hover:bg-[#2C3136] hover:text-white transition cursor-pointer"
+                  onClick={() => onSelectUserDM(user)}
+                  className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
+                    isSelectedDM
+                      ? 'bg-slack-activeChannel text-white shadow'
+                      : 'text-gray-300 hover:bg-[#2C3136] hover:text-white'
+                  }`}
                 >
                   <div className="relative">
                     <img
@@ -195,7 +204,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                   </div>
                   <span className="truncate">{user.displayName}</span>
                   {user.id === currentUser?.id && (
-                    <span className="text-[10px] text-gray-500">you</span>
+                    <span className="text-[10px] text-gray-500 ml-auto">you</span>
                   )}
                 </div>
               );

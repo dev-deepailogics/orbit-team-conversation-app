@@ -109,6 +109,20 @@ export default function AppDashboard() {
     }
   };
 
+  // 4b. Handle DM Selection
+  const handleSelectUserDM = async (targetUser: any) => {
+    if (!currentWorkspace || !user) return;
+    try {
+      const res = await api.post(`/api/channels/workspaces/${currentWorkspace.id}/dm`, {
+        targetUserId: targetUser.id,
+      });
+      const dmChannel: Channel = res.data;
+      handleSelectChannel(dmChannel);
+    } catch (err) {
+      console.error('Failed to open direct message', err);
+    }
+  };
+
   // 5. Socket.IO Realtime listeners
   useEffect(() => {
     if (!user || !currentWorkspace) return;
@@ -212,6 +226,7 @@ export default function AppDashboard() {
           members={members}
           activeHuddleChannelId={activeHuddleChannelId}
           onSelectChannel={handleSelectChannel}
+          onSelectUserDM={handleSelectUserDM}
           onChannelCreated={(ch) => {
             setChannels([...channels, ch]);
             handleSelectChannel(ch);

@@ -61,6 +61,74 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     return reply.status(201).send(channel);
   });
 
+  // Get or Create Direct Message (DM) Channel
+  fastify.post('/workspaces/:workspaceId/dm', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    const currentUserId = (request.user as { id: string }).id;
+    const { targetUserId } = request.body as { targetUserId: string };
+
+    if (!targetUserId) {
+      return reply.status(400).send({ error: 'targetUserId is required' });
+    }
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId },
+    });
+
+    if (!targetUser) {
+      return reply.status(404).send({ error: 'User not found' });
+    }
+
+    // Check if DM channel already exists between these 2 users in this workspace
+    const existingDm = await prisma.channel.findFirst({
+      where: {
+        workspaceId,
+        type: 'DIRECT',
+        AND: [
+          { members: { some: { userId: currentUserId } } },
+          { members: { some: { userId: targetUserId } } },
+        ],
+      },
+      include: {
+        members: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    if (existingDm) {
+      return reply.send(existingDm);
+    }
+
+    // Create new DM channel
+    const dmChannel = await prisma.channel.create({
+      data: {
+        workspaceId,
+        name: `dm-${currentUserId.slice(0, 4)}-${targetUserId.slice(0, 4)}`,
+        topic: `Direct message with ${targetUser.displayName}`,
+        type: 'DIRECT',
+        createdById: currentUserId,
+        members: {
+          create: [
+            { userId: currentUserId },
+            ...(currentUserId !== targetUserId ? [{ userId: targetUserId }] : []),
+          ],
+        },
+      },
+      include: {
+        members: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    return reply.status(201).send(dmChannel);
+  });
+
   // Get messages for a channel
   fastify.get('/:channelId/messages', { preHandler: [fastify.authenticate] }, async (request, reply) => {
     const { channelId } = request.params as { channelId: string };

@@ -6,6 +6,7 @@ rtc:
   use_external_ip: false
 redis:
   address: redis:6379
+  password: "orbit_redis_password"
 keys:
   API_KEY_ORBIT: "orbit_livekit_secret_key_change_in_production"
 logging:

@@ -87,15 +87,20 @@ export const HuddleModal: React.FC = () => {
         </div>
 
         {/* LiveKit WebRTC Video/Audio Conference Area */}
-        <div className="flex-1 bg-black/90 relative overflow-hidden">
+        <div className="flex-1 bg-black/90 relative overflow-hidden flex flex-col">
           <LiveKitRoom
-            video={true}
+            video={false}
             audio={true}
             token={token}
             serverUrl={serverUrl}
-            onDisconnected={leaveHuddle}
+            onDisconnected={() => {
+              console.log('LiveKit disconnected');
+            }}
+            onError={(err) => {
+              console.error('LiveKit Room error:', err);
+            }}
             data-lk-theme="default"
-            style={{ height: '100%' }}
+            style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
           >
             <VideoConference />
             <RoomAudioRenderer />
