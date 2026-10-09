@@ -1,0 +1,314 @@
+'use client';
+
+import React, { useState } from 'react';
+import { Workspace, Channel, UserProfile } from '@orbit/types';
+import {
+  Hash,
+  Lock,
+  Plus,
+  ChevronDown,
+  Headphones,
+  Bot,
+  UserPlus,
+  LogOut,
+  Smile,
+  Volume2,
+} from 'lucide-react';
+import { api } from '../../lib/api';
+
+interface ChannelSidebarProps {
+  workspace: Workspace;
+  channels: Channel[];
+  currentChannel: Channel | null;
+  currentUser: UserProfile | null;
+  members: any[];
+  activeHuddleChannelId?: string | null;
+  onSelectChannel: (channel: Channel) => void;
+  onChannelCreated: (channel: Channel) => void;
+  onOpenBotPortal: () => void;
+  onStartHuddle: (channel: Channel) => void;
+  onLogout: () => void;
+}
+
+export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
+  workspace,
+  channels,
+  currentChannel,
+  currentUser,
+  members,
+  activeHuddleChannelId,
+  onSelectChannel,
+  onChannelCreated,
+  onOpenBotPortal,
+  onStartHuddle,
+  onLogout,
+}) => {
+  const [showCreateChannel, setShowCreateChannel] = useState(false);
+  const [channelName, setChannelName] = useState('');
+  const [channelTopic, setChannelTopic] = useState('');
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [copiedInvite, setCopiedInvite] = useState(false);
+
+  const handleCreateChannel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!channelName) return;
+    try {
+      const res = await api.post(`/api/channels/workspaces/${workspace.id}/channels`, {
+        name: channelName.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+        topic: channelTopic,
+        type: isPrivate ? 'PRIVATE' : 'PUBLIC',
+      });
+      onChannelCreated(res.data);
+      setShowCreateChannel(false);
+      setChannelName('');
+      setChannelTopic('');
+      setIsPrivate(false);
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to create channel');
+    }
+  };
+
+  const copyInviteLink = () => {
+    const inviteLink = `${window.location.origin}/join/${(workspace as any).inviteCode || workspace.id}`;
+    navigator.clipboard.writeText(inviteLink);
+    setCopiedInvite(true);
+    setTimeout(() => setCopiedInvite(false), 2500);
+  };
+
+  return (
+    <div className="w-64 bg-[#1F2326] border-r border-[#383F45]/40 flex flex-col h-full select-none">
+      {/* Workspace Header */}
+      <div className="h-14 border-b border-[#383F45]/40 px-4 flex items-center justify-between text-white font-bold hover:bg-white/5 transition cursor-pointer group">
+        <div className="flex items-center gap-2 truncate">
+          <span className="truncate">{workspace.name}</span>
+          <ChevronDown size={16} className="text-gray-400 group-hover:text-white" />
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenBotPortal();
+            }}
+            title="Integrations & Bot Developer Portal"
+            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition"
+          >
+            <Bot size={18} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              copyInviteLink();
+            }}
+            title={copiedInvite ? 'Copied Link!' : 'Invite Members'}
+            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition"
+          >
+            <UserPlus size={18} className={copiedInvite ? 'text-slack-green' : ''} />
+          </button>
+        </div>
+      </div>
+
+      {/* Channel & DMs List */}
+      <div className="flex-1 overflow-y-auto px-2 py-3 space-y-4">
+        {/* Channels Section */}
+        <div>
+          <div className="flex items-center justify-between px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
+            <span>Channels</span>
+            <button
+              onClick={() => setShowCreateChannel(true)}
+              className="p-1 hover:text-white hover:bg-gray-700/50 rounded transition"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+
+          <div className="space-y-0.5">
+            {channels.map((channel) => {
+              const isActive = currentChannel?.id === channel.id;
+              const hasHuddle = activeHuddleChannelId === channel.id;
+              return (
+                <div
+                  key={channel.id}
+                  onClick={() => onSelectChannel(channel)}
+                  className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
+                    isActive
+                      ? 'bg-slack-activeChannel text-white shadow'
+                      : 'text-gray-300 hover:bg-[#2C3136] hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    {channel.type === 'PRIVATE' ? (
+                      <Lock size={15} className="text-gray-400" />
+                    ) : (
+                      <Hash size={16} className="text-gray-400" />
+                    )}
+                    <span className="truncate">{channel.name}</span>
+                  </div>
+
+                  {/* Channel Huddle Action */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onStartHuddle(channel);
+                    }}
+                    title={hasHuddle ? 'Active Huddle - Click to join' : 'Start Huddle'}
+                    className={`p-1 rounded transition ${
+                      hasHuddle
+                        ? 'bg-slack-green text-white animate-pulse'
+                        : 'opacity-0 group-hover:opacity-100 hover:bg-black/20 text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <Headphones size={14} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Direct Messages Section */}
+        <div>
+          <div className="flex items-center justify-between px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
+            <span>Direct Messages</span>
+          </div>
+
+          <div className="space-y-0.5">
+            {members.map((member) => {
+              const user = member.user;
+              if (!user) return null;
+              const isOnline = user.status === 'ONLINE';
+              return (
+                <div
+                  key={member.id}
+                  className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm font-medium text-gray-300 hover:bg-[#2C3136] hover:text-white transition cursor-pointer"
+                >
+                  <div className="relative">
+                    <img
+                      src={user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`}
+                      alt={user.displayName}
+                      className="w-5 h-5 rounded-md object-cover"
+                    />
+                    <span
+                      className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-1 ring-[#1F2326] ${
+                        isOnline ? 'bg-slack-green' : 'bg-gray-500'
+                      }`}
+                    />
+                  </div>
+                  <span className="truncate">{user.displayName}</span>
+                  {user.id === currentUser?.id && (
+                    <span className="text-[10px] text-gray-500">you</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* User Bottom Bar */}
+      {currentUser && (
+        <div className="h-14 bg-[#181B1E] border-t border-[#383F45]/40 px-3 flex items-center justify-between">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="relative">
+              <img
+                src={currentUser.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${currentUser.username}`}
+                alt={currentUser.displayName}
+                className="w-8 h-8 rounded-lg object-cover"
+              />
+              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-slack-green rounded-full ring-2 ring-[#181B1E]" />
+            </div>
+            <div className="truncate">
+              <p className="text-sm font-semibold text-white truncate leading-tight">
+                {currentUser.displayName}
+              </p>
+              <p className="text-xs text-gray-400 truncate">@{currentUser.username}</p>
+            </div>
+          </div>
+
+          <button
+            onClick={onLogout}
+            title="Log out"
+            className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-gray-800 rounded-lg transition"
+          >
+            <LogOut size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* Create Channel Modal */}
+      {showCreateChannel && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1A1D21] border border-gray-700 rounded-xl w-full max-w-md p-6 shadow-2xl">
+            <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+              <Hash className="text-slack-activeChannel" size={22} />
+              Create a channel
+            </h2>
+            <p className="text-sm text-gray-400 mb-5">
+              Channels are where conversations happen around a topic.
+            </p>
+
+            <form onSubmit={handleCreateChannel} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1">
+                  Name
+                </label>
+                <div className="flex items-center bg-[#222529] border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-400">
+                  <span>#</span>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. project-updates"
+                    value={channelName}
+                    onChange={(e) => setChannelName(e.target.value)}
+                    className="flex-1 bg-transparent text-white focus:outline-none ml-1"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1">
+                  Topic (optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="What is this channel about?"
+                  value={channelTopic}
+                  onChange={(e) => setChannelTopic(e.target.value)}
+                  className="w-full bg-[#222529] border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-slack-activeChannel text-sm"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <div>
+                  <span className="text-sm font-semibold text-white block">Make private</span>
+                  <span className="text-xs text-gray-400">Only invited people can join</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={isPrivate}
+                  onChange={(e) => setIsPrivate(e.target.checked)}
+                  className="w-4 h-4 rounded text-slack-activeChannel"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateChannel(false)}
+                  className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-lg text-sm font-semibold bg-slack-green hover:bg-[#008a65] text-white transition"
+                >
+                  Create
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

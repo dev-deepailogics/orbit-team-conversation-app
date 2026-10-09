@@ -1,0 +1,29 @@
+# Orbit Production Caddyfile with Automatic Let's Encrypt SSL
+# Replace orbit.yourdomain.com with your actual VPS domain name
+
+{$DOMAIN:localhost} {
+    # Next.js Web Frontend
+    handle /* {
+        reverse_proxy web:3000
+    }
+
+    # Node.js API & Socket.IO
+    handle /api/* {
+        reverse_proxy server:4000
+    }
+
+    handle /socket.io/* {
+        reverse_proxy server:4000
+    }
+
+    # LiveKit WebRTC Signaling
+    handle /livekit/* {
+        reverse_proxy livekit:7880
+    }
+
+    encode gzip zstd
+    log {
+        output stdout
+        format console
+    }
+}

@@ -1,0 +1,292 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ONLINE
+  OFFLINE
+  AWAY
+  BUSY
+  IN_HUDDLE
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+  GUEST
+}
+
+enum ChannelType {
+  PUBLIC
+  PRIVATE
+  DIRECT
+  GROUP_DIRECT
+}
+
+enum NotificationType {
+  MENTION
+  DIRECT_MESSAGE
+  REACTION
+  THREAD_REPLY
+  HUDDLE_INVITE
+  SYSTEM
+}
+
+model User {
+  id                String       @id @default(uuid())
+  email             String       @unique
+  passwordHash      String
+  username          String       @unique
+  displayName       String
+  avatarUrl         String?
+  status            UserStatus   @default(OFFLINE)
+  customStatusText  String?
+  customStatusEmoji String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  // Relations
+  ownedWorkspaces   Workspace[]       @relation("WorkspaceOwner")
+  memberships       WorkspaceMember[]
+  channelMemberships ChannelMember[]
+  messages          Message[]
+  reactions         Reaction[]
+  notifications     Notification[]
+  huddlesHosted     Huddle[]          @relation("HuddleHost")
+  createdBots       BotApp[]          @relation("BotCreator")
+  createdWebhooks   Webhook[]         @relation("WebhookCreator")
+  createdCommands   SlashCommand[]    @relation("CommandCreator")
+
+  @@index([email])
+  @@index([username])
+}
+
+model Workspace {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  iconUrl     String?
+  inviteCode  String   @unique @default(uuid())
+  ownerId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  owner       User              @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members     WorkspaceMember[]
+  channels    Channel[]
+  bots        BotApp[]
+  webhooks    Webhook[]
+  commands    SlashCommand[]
+  notifications Notification[]
+  huddles     Huddle[]
+
+  @@index([slug])
+  @@index([ownerId])
+}
+
+model WorkspaceMember {
+  id          String        @id @default(uuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole @default(MEMBER)
+  nickname    String?
+  joinedAt    DateTime      @default(now())
+
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+}
+
+model Channel {
+  id          String      @id @default(uuid())
+  workspaceId String
+  name        String
+  topic       String?
+  description String?
+  type        ChannelType @default(PUBLIC)
+  isArchived  Boolean     @default(false)
+  createdById String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  members     ChannelMember[]
+  messages    Message[]
+  webhooks    Webhook[]
+  huddles     Huddle[]
+
+  @@index([workspaceId])
+  @@index([type])
+}
+
+model ChannelMember {
+  id         String    @id @default(uuid())
+  channelId  String
+  userId     String
+  joinedAt   DateTime  @default(now())
+  lastReadAt DateTime  @default(now())
+
+  channel    Channel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, userId])
+  @@index([channelId])
+  @@index([userId])
+}
+
+model Message {
+  id              String      @id @default(uuid())
+  channelId       String
+  userId          String?
+  botAppId        String?
+  parentMessageId String?
+  content         String      @db.Text
+  isEdited        Boolean     @default(false)
+  isDeleted       Boolean     @default(false)
+  isPinned        Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  channel         Channel     @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user            User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  bot             BotApp?     @relation(fields: [botAppId], references: [id], onDelete: SetNull)
+  parentMessage   Message?    @relation("MessageThread", fields: [parentMessageId], references: [id], onDelete: Cascade)
+  replies         Message[]   @relation("MessageThread")
+  attachments     Attachment[]
+  reactions       Reaction[]
+
+  @@index([channelId, createdAt])
+  @@index([parentMessageId])
+  @@index([userId])
+}
+
+model Attachment {
+  id        String   @id @default(uuid())
+  messageId String
+  fileUrl   String
+  fileName  String
+  fileType  String
+  fileSize  Int
+  createdAt DateTime @default(now())
+
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+}
+
+model Reaction {
+  id        String   @id @default(uuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+}
+
+model Notification {
+  id          String           @id @default(uuid())
+  userId      String
+  workspaceId String
+  type        NotificationType
+  title       String
+  body        String
+  read        Boolean          @default(false)
+  linkUrl     String?
+  channelId   String?
+  messageId   String?
+  createdAt   DateTime         @default(now())
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([workspaceId])
+}
+
+model Huddle {
+  id          String    @id @default(uuid())
+  channelId   String
+  workspaceId String
+  hostUserId  String
+  isActive    Boolean   @default(true)
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
+
+  channel     Channel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  host        User      @relation("HuddleHost", fields: [hostUserId], references: [id], onDelete: Cascade)
+
+  @@index([channelId, isActive])
+  @@index([workspaceId])
+}
+
+model BotApp {
+  id          String         @id @default(uuid())
+  workspaceId String
+  name        String
+  description String?
+  avatarUrl   String?
+  botToken    String         @unique
+  scopes      String[]       @default(["chat:write"])
+  isActive    Boolean        @default(true)
+  createdById String
+  createdAt   DateTime       @default(now())
+
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  creator     User           @relation("BotCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  messages    Message[]
+  commands    SlashCommand[]
+
+  @@index([workspaceId])
+  @@index([botToken])
+}
+
+model SlashCommand {
+  id          String    @id @default(uuid())
+  workspaceId String
+  botAppId    String?
+  command     String    // e.g. "/poll"
+  description String?
+  requestUrl  String
+  createdById String
+  createdAt   DateTime  @default(now())
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  bot         BotApp?   @relation(fields: [botAppId], references: [id], onDelete: Cascade)
+  creator     User      @relation("CommandCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, command])
+  @@index([workspaceId])
+}
+
+model Webhook {
+  id          String    @id @default(uuid())
+  channelId   String
+  workspaceId String
+  name        String
+  token       String    @unique @default(uuid())
+  createdById String
+  createdAt   DateTime  @default(now())
+
+  channel     Channel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  creator     User      @relation("WebhookCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([channelId])
+}

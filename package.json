@@ -1,0 +1,28 @@
+{
+  "name": "orbit",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "dev:web": "npm run dev --workspace=@orbit/web",
+    "dev:server": "npm run dev --workspace=@orbit/server",
+    "build": "npm run build --workspaces --if-present",
+    "start": "npm run start --workspaces --if-present",
+    "db:generate": "npm run generate --workspace=@orbit/db",
+    "db:migrate": "npm run migrate:dev --workspace=@orbit/db",
+    "db:push": "npm run push --workspace=@orbit/db",
+    "db:studio": "npm run studio --workspace=@orbit/db",
+    "db:seed": "npm run seed --workspace=@orbit/db",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "dotenv-cli": "^7.4.4",
+    "typescript": "^5.6.3"
+  }
+}

@@ -1,0 +1,100 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: orbit-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+      - server
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: orbit-web
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_SERVER_URL: https://${DOMAIN:-localhost}
+      NEXT_PUBLIC_LIVEKIT_URL: wss://${DOMAIN:-localhost}/livekit
+    depends_on:
+      - server
+
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    container_name: orbit-server
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-orbit_admin}:${POSTGRES_PASSWORD:-orbit_secret_password}@postgres:5432/${POSTGRES_DB:-orbit_db}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD:-orbit_redis_password}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:-orbit_production_jwt_secret_key_change_me}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-API_KEY_ORBIT}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-orbit_livekit_secret_key_change_in_production}
+      LIVEKIT_URL: http://livekit:7880
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: orbit-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-orbit_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orbit_secret_password}
+      POSTGRES_DB: ${POSTGRES_DB:-orbit_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-orbit_admin} -d ${POSTGRES_DB:-orbit_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: orbit-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-orbit_redis_password}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-orbit_redis_password}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: orbit-livekit
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml
+    volumes:
+      - ./docker/livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "40000-40050:40000-40050/udp"
+    depends_on:
+      - redis
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
