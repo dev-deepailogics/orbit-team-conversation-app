@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Message, UserProfile } from '@orbit/types';
-import { X, Send, CornerUpLeft, Smile, SmilePlus } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
+import { X, Send, CornerUpLeft, Smile, SmilePlus, Type } from 'lucide-react';
 import { api } from '../../lib/api';
 import { EmojiPickerPopover } from './EmojiPickerPopover';
 import { getTopEmojis, recordEmojiUsage } from '../../lib/emojiStore';
+import { FormatToolbar } from './FormatToolbar';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface ThreadSidebarProps {
   parentMessage: Message;
@@ -29,7 +30,9 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   const [activeEmojiMessageId, setActiveEmojiMessageId] = useState<string | null>(null);
   const [showComposerEmoji, setShowComposerEmoji] = useState(false);
   const [topEmojis, setTopEmojis] = useState<string[]>(['👍', '❤️', '🔥', '🎉', '🚀']);
+  const [showFormatting, setShowFormatting] = useState(true);
   const repliesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     setTopEmojis(getTopEmojis(5));
@@ -112,8 +115,8 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                 {new Date(parentMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
-            <div className="text-xs text-gray-200 mt-1 prose prose-invert max-w-none break-words">
-              <ReactMarkdown>{parentMessage.content}</ReactMarkdown>
+            <div className="text-xs text-gray-200 mt-1 max-w-none break-words">
+              <MarkdownRenderer content={parentMessage.content} />
             </div>
 
             {/* Parent Message Reactions */}
@@ -248,8 +251,8 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                   </div>
                 )}
 
-                <div className="text-xs text-gray-200 mt-0.5 prose prose-invert max-w-none break-words">
-                  <ReactMarkdown>{reply.content}</ReactMarkdown>
+                <div className="text-xs text-gray-200 mt-0.5 max-w-none break-words">
+                  <MarkdownRenderer content={reply.content} />
                 </div>
 
                 {/* Reply Reactions */}
@@ -367,7 +370,16 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
         )}
 
         <form onSubmit={handleSendReply} className="bg-[#222529] border border-gray-700 rounded-lg overflow-hidden relative">
+          {showFormatting && (
+            <FormatToolbar
+              textareaRef={textareaRef}
+              content={content}
+              setContent={setContent}
+            />
+          )}
+
           <textarea
+            ref={textareaRef}
             rows={2}
             value={content}
             onChange={(e) => setContent(e.target.value)}
@@ -375,20 +387,61 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 handleSendReply(e);
+              } else if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+                e.preventDefault();
+                const textarea = textareaRef.current;
+                if (!textarea) return;
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const current = textarea.value;
+                const selected = current.slice(start, end);
+                const replacement = selected ? `**${selected}**` : '****';
+                setContent(current.slice(0, start) + replacement + current.slice(end));
+                setTimeout(() => {
+                  textarea.focus();
+                  textarea.setSelectionRange(start + 2, selected ? start + 2 + selected.length : start + 2);
+                }, 0);
+              } else if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
+                e.preventDefault();
+                const textarea = textareaRef.current;
+                if (!textarea) return;
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const current = textarea.value;
+                const selected = current.slice(start, end);
+                const replacement = selected ? `*${selected}*` : '**';
+                setContent(current.slice(0, start) + replacement + current.slice(end));
+                setTimeout(() => {
+                  textarea.focus();
+                  textarea.setSelectionRange(start + 1, selected ? start + 1 + selected.length : start + 1);
+                }, 0);
               }
             }}
             placeholder="Reply..."
             className="w-full bg-transparent px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none resize-none"
           />
           <div className="flex items-center justify-between px-2 py-1.5 bg-[#1C1F23]/60 border-t border-gray-800/40">
-            <button
-              type="button"
-              onClick={() => setShowComposerEmoji(!showComposerEmoji)}
-              className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
-              title="Add emoji"
-            >
-              <Smile size={14} />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setShowFormatting(!showFormatting)}
+                title={showFormatting ? 'Hide formatting toolbar' : 'Show formatting toolbar'}
+                className={`p-1 rounded transition ${
+                  showFormatting ? 'bg-[#383F45] text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                }`}
+              >
+                <Type size={14} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowComposerEmoji(!showComposerEmoji)}
+                className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
+                title="Add emoji"
+              >
+                <Smile size={14} />
+              </button>
+            </div>
 
             <button
               type="submit"

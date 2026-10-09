@@ -19,14 +19,16 @@ import {
   Check,
   PenTool,
   Presentation,
+  Type,
 } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
 import { useChatStore } from '../../stores/chatStore';
 import { EmojiPickerPopover } from './EmojiPickerPopover';
 import { getTopEmojis, recordEmojiUsage } from '../../lib/emojiStore';
 import { WhiteboardView } from '../whiteboard/WhiteboardView';
+import { FormatToolbar } from './FormatToolbar';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface ChatAreaProps {
   channel: Channel;
@@ -54,7 +56,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [topEmojis, setTopEmojis] = useState<string[]>(['👍', '❤️', '🔥', '🎉', '🚀']);
   const [attachments, setAttachments] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [showFormatting, setShowFormatting] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -378,8 +382,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   )}
 
                   {/* Message Content */}
-                  <div className="text-sm text-gray-200 mt-1 prose prose-invert max-w-none break-words">
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  <div className="text-sm text-gray-200 mt-1 max-w-none break-words">
+                    <MarkdownRenderer content={msg.content} />
                   </div>
 
                   {/* Attachments */}
@@ -584,6 +588,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           onSubmit={handleSendMessage}
           className="bg-[#222529] border border-gray-700 rounded-xl focus-within:border-gray-500 shadow-lg relative overflow-hidden"
         >
+          {/* Format Toolbar (Slack-style rich formatting) */}
+          {showFormatting && (
+            <FormatToolbar
+              textareaRef={textareaRef}
+              content={content}
+              setContent={setContent}
+            />
+          )}
+
           {/* File Attachments Preview */}
           {attachments.length > 0 && (
             <div className="px-3 pt-2 flex flex-wrap gap-2 border-b border-gray-800 pb-2">
@@ -604,6 +617,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           )}
 
           <textarea
+            ref={textareaRef}
             rows={2}
             value={content}
             onChange={(e) => handleTyping(e.target.value)}
@@ -611,6 +625,34 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 handleSendMessage(e);
+              } else if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+                e.preventDefault();
+                const textarea = textareaRef.current;
+                if (!textarea) return;
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const current = textarea.value;
+                const selected = current.slice(start, end);
+                const replacement = selected ? `**${selected}**` : '****';
+                setContent(current.slice(0, start) + replacement + current.slice(end));
+                setTimeout(() => {
+                  textarea.focus();
+                  textarea.setSelectionRange(start + 2, selected ? start + 2 + selected.length : start + 2);
+                }, 0);
+              } else if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
+                e.preventDefault();
+                const textarea = textareaRef.current;
+                if (!textarea) return;
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const current = textarea.value;
+                const selected = current.slice(start, end);
+                const replacement = selected ? `*${selected}*` : '**';
+                setContent(current.slice(0, start) + replacement + current.slice(end));
+                setTimeout(() => {
+                  textarea.focus();
+                  textarea.setSelectionRange(start + 1, selected ? start + 1 + selected.length : start + 1);
+                }, 0);
               }
             }}
             placeholder={`Message #${channel.name}`}
@@ -633,6 +675,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition"
               >
                 <Paperclip size={16} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowFormatting(!showFormatting)}
+                title={showFormatting ? 'Hide formatting toolbar' : 'Show formatting toolbar'}
+                className={`p-1.5 rounded-lg transition ${
+                  showFormatting ? 'bg-[#383F45] text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                }`}
+              >
+                <Type size={16} />
               </button>
 
               <button
