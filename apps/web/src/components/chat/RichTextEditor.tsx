@@ -33,6 +33,45 @@ interface RichTextEditorProps {
   className?: string;
 }
 
+function getInlineFormattingParent(node: Node | null, rootEl: HTMLElement): HTMLElement | null {
+  const inlineTags = new Set(['code', 'b', 'strong', 'i', 'em', 's', 'strike', 'del', 'a', 'u']);
+  let curr: Node | null = node;
+  while (curr && curr !== rootEl) {
+    if (curr.nodeType === Node.ELEMENT_NODE) {
+      const tag = (curr as HTMLElement).tagName.toLowerCase();
+      if (inlineTags.has(tag)) {
+        return curr as HTMLElement;
+      }
+    }
+    curr = curr.parentNode;
+  }
+  return null;
+}
+
+function isCursorAtEndOfNode(range: Range, inlineEl: HTMLElement): boolean {
+  if (!range.collapsed) return false;
+  try {
+    const testRange = document.createRange();
+    testRange.selectNodeContents(inlineEl);
+    testRange.setStart(range.endContainer, range.endOffset);
+    return testRange.toString().replace(/\u200B/g, '').length === 0;
+  } catch (err) {
+    return false;
+  }
+}
+
+function isCursorAtStartOfNode(range: Range, inlineEl: HTMLElement): boolean {
+  if (!range.collapsed) return false;
+  try {
+    const testRange = document.createRange();
+    testRange.selectNodeContents(inlineEl);
+    testRange.setEnd(range.startContainer, range.startOffset);
+    return testRange.toString().replace(/\u200B/g, '').length === 0;
+  } catch (err) {
+    return false;
+  }
+}
+
 // Convert live DOM tree from contentEditable to clean markdown
 export function htmlToMarkdown(html: string): string {
   if (!html) return '';
@@ -42,7 +81,7 @@ export function htmlToMarkdown(html: string): string {
 
   function nodeToMd(node: Node): string {
     if (node.nodeType === Node.TEXT_NODE) {
-      return node.textContent || '';
+      return (node.textContent || '').replace(/\u200B/g, '');
     }
 
     if (node.nodeType !== Node.ELEMENT_NODE) {
@@ -51,7 +90,7 @@ export function htmlToMarkdown(html: string): string {
 
     const el = node as HTMLElement;
     const tag = el.tagName.toLowerCase();
-    const children = Array.from(el.childNodes).map(nodeToMd).join('');
+    const children = Array.from(el.childNodes).map(nodeToMd).join('').replace(/\u200B/g, '');
 
     switch (tag) {
       case 'b':
@@ -101,6 +140,7 @@ export function htmlToMarkdown(html: string): string {
 
   const rawMd = Array.from(doc.body.childNodes).map(nodeToMd).join('');
   return rawMd
+    .replace(/\u200B/g, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
@@ -149,7 +189,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         return htmlToMarkdown(editorRef.current.innerHTML);
       },
       getText: () => {
-        return editorRef.current?.innerText.trim() || '';
+        return (editorRef.current?.innerText || '').replace(/\u200B/g, '').trim();
       },
       clear: () => {
         if (editorRef.current) {
@@ -167,7 +207,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       if (!editor) return;
       editor.focus();
       document.execCommand(command, false, value);
-      if (onTyping) onTyping(editor.innerText);
+      if (onTyping) onTyping(editor.innerText.replace(/\u200B/g, ''));
     };
 
     const handleFormatHeading = (level: 1 | 2) => {
@@ -190,7 +230,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         document.execCommand('formatBlock', false, `<${tag}>`);
       }
 
-      if (onTyping) onTyping(editor.innerText);
+      if (onTyping) onTyping(editor.innerText.replace(/\u200B/g, ''));
     };
 
     const handleFormatInlineCode = () => {
@@ -217,6 +257,11 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
           codeEl.textContent = selectedText;
           range.deleteContents();
           range.insertNode(codeEl);
+
+          // Add trailing empty text node so right arrow immediately steps into normal text
+          const postNode = document.createTextNode('\u200B');
+          codeEl.parentNode?.insertBefore(postNode, codeEl.nextSibling);
+
           range.setStartAfter(codeEl);
           range.setEndAfter(codeEl);
           sel.removeAllRanges();
@@ -228,12 +273,16 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
           'bg-[#2C3136] text-[#ECB22E] px-1.5 py-0.5 rounded font-mono text-xs border border-gray-700/60 font-medium';
         codeEl.textContent = 'code';
         range.insertNode(codeEl);
+
+        const postNode = document.createTextNode('\u200B');
+        codeEl.parentNode?.insertBefore(postNode, codeEl.nextSibling);
+
         range.selectNodeContents(codeEl);
         sel.removeAllRanges();
         sel.addRange(range);
       }
 
-      if (onTyping) onTyping(editor.innerText);
+      if (onTyping) onTyping(editor.innerText.replace(/\u200B/g, ''));
     };
 
     const handleFormatCodeBlock = () => {
@@ -266,7 +315,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       sel.removeAllRanges();
       sel.addRange(range);
 
-      if (onTyping) onTyping(editor.innerText);
+      if (onTyping) onTyping(editor.innerText.replace(/\u200B/g, ''));
     };
 
     const handleFormatLink = () => {
@@ -284,10 +333,143 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
           document.execCommand('insertHTML', false, `<a href="${url}" target="_blank" class="text-blue-400 hover:underline">${url}</a>`);
         }
       }
-      if (onTyping) onTyping(editor.innerText);
+      if (onTyping) onTyping(editor.innerText.replace(/\u200B/g, ''));
     };
 
     const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+      const editor = editorRef.current;
+
+      // 1. Arrow Right Escape from inline formatting tags (code, b, strong, i, em, s, a, etc.)
+      if (e.key === 'ArrowRight' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && editor) {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+          const range = sel.getRangeAt(0);
+          const inlineEl = getInlineFormattingParent(range.endContainer, editor);
+          if (inlineEl && isCursorAtEndOfNode(range, inlineEl)) {
+            e.preventDefault();
+            let nextNode = inlineEl.nextSibling;
+            if (!nextNode || nextNode.nodeType !== Node.TEXT_NODE) {
+              const textNode = document.createTextNode('\u200B');
+              inlineEl.parentNode?.insertBefore(textNode, inlineEl.nextSibling);
+              nextNode = textNode;
+            }
+            const newRange = document.createRange();
+            if (nextNode.nodeType === Node.TEXT_NODE) {
+              const text = nextNode.textContent || '';
+              const offset = text.startsWith('\u200B') ? 1 : 0;
+              newRange.setStart(nextNode, offset);
+              newRange.setEnd(nextNode, offset);
+            } else {
+              newRange.setStartAfter(inlineEl);
+              newRange.setEndAfter(inlineEl);
+            }
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+            return;
+          }
+        }
+      }
+
+      // 2. Arrow Left Escape from start of inline formatting tags
+      if (e.key === 'ArrowLeft' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && editor) {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+          const range = sel.getRangeAt(0);
+          const inlineEl = getInlineFormattingParent(range.startContainer, editor);
+          if (inlineEl && isCursorAtStartOfNode(range, inlineEl)) {
+            e.preventDefault();
+            let prevNode = inlineEl.previousSibling;
+            if (!prevNode || prevNode.nodeType !== Node.TEXT_NODE) {
+              const textNode = document.createTextNode('\u200B');
+              inlineEl.parentNode?.insertBefore(textNode, inlineEl);
+              prevNode = textNode;
+            }
+            const newRange = document.createRange();
+            const prevLen = prevNode.textContent?.length || 0;
+            newRange.setStart(prevNode, prevLen);
+            newRange.setEnd(prevNode, prevLen);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+            return;
+          }
+        }
+      }
+
+      // 3. Live delimiter conversion on typing closing backtick `
+      if (e.key === '`' && !e.ctrlKey && !e.metaKey && editor) {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+          const range = sel.getRangeAt(0);
+          if (range.collapsed && range.startContainer.nodeType === Node.TEXT_NODE) {
+            const textNode = range.startContainer;
+            const fullText = textNode.textContent || '';
+            const beforeCursor = fullText.slice(0, range.startOffset);
+            const lastBacktickIdx = beforeCursor.lastIndexOf('`');
+
+            if (lastBacktickIdx !== -1) {
+              const codeText = beforeCursor.slice(lastBacktickIdx + 1);
+              if (codeText.length > 0 && !codeText.includes('\n')) {
+                e.preventDefault();
+                const textBefore = beforeCursor.slice(0, lastBacktickIdx);
+                const textAfter = fullText.slice(range.startOffset);
+
+                const codeEl = document.createElement('code');
+                codeEl.className =
+                  'bg-[#2C3136] text-[#ECB22E] px-1.5 py-0.5 rounded font-mono text-xs border border-gray-700/60 font-medium';
+                codeEl.textContent = codeText;
+
+                const parent = textNode.parentNode;
+                if (parent) {
+                  const frag = document.createDocumentFragment();
+                  if (textBefore) frag.appendChild(document.createTextNode(textBefore));
+                  frag.appendChild(codeEl);
+                  const postNode = document.createTextNode('\u200B' + textAfter);
+                  frag.appendChild(postNode);
+
+                  parent.replaceChild(frag, textNode);
+
+                  const newRange = document.createRange();
+                  newRange.setStart(postNode, 1);
+                  newRange.setEnd(postNode, 1);
+                  sel.removeAllRanges();
+                  sel.addRange(newRange);
+
+                  if (onTyping) onTyping(editor.innerText.replace(/\u200B/g, ''));
+                  return;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // 4. Space after inline code tag: escape into regular text space
+      if (e.key === ' ' && !e.shiftKey && !e.ctrlKey && !e.metaKey && editor) {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+          const range = sel.getRangeAt(0);
+          const inlineEl = getInlineFormattingParent(range.endContainer, editor);
+          if (inlineEl && inlineEl.tagName.toLowerCase() === 'code' && isCursorAtEndOfNode(range, inlineEl)) {
+            e.preventDefault();
+            let nextNode = inlineEl.nextSibling;
+            if (!nextNode || nextNode.nodeType !== Node.TEXT_NODE) {
+              const textNode = document.createTextNode(' ');
+              inlineEl.parentNode?.insertBefore(textNode, inlineEl.nextSibling);
+              nextNode = textNode;
+            } else {
+              nextNode.textContent = ' ' + (nextNode.textContent || '').replace(/^\u200B/, '');
+            }
+            const newRange = document.createRange();
+            newRange.setStart(nextNode, 1);
+            newRange.setEnd(nextNode, 1);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+            if (onTyping) onTyping(editor.innerText.replace(/\u200B/g, ''));
+            return;
+          }
+        }
+      }
+
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         if (onSubmit) onSubmit();
@@ -325,7 +507,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
 
     const handleInput = () => {
       if (editorRef.current && onTyping) {
-        onTyping(editorRef.current.innerText);
+        onTyping(editorRef.current.innerText.replace(/\u200B/g, ''));
       }
     };
 

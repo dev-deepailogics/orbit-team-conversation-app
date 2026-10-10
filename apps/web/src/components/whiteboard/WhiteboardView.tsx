@@ -99,14 +99,14 @@ function htmlToMarkdown(html: string): string {
 
   function nodeToMd(node: Node): string {
     if (node.nodeType === Node.TEXT_NODE) {
-      return node.textContent || '';
+      return (node.textContent || '').replace(/\u200B/g, '');
     }
     if (node.nodeType !== Node.ELEMENT_NODE) {
       return '';
     }
     const el = node as HTMLElement;
     const tag = el.tagName.toLowerCase();
-    const children = Array.from(el.childNodes).map(nodeToMd).join('');
+    const children = Array.from(el.childNodes).map(nodeToMd).join('').replace(/\u200B/g, '');
 
     switch (tag) {
       case 'b':
@@ -927,7 +927,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     }
   };
 
-  // Keyboard events in inline contentEditable (auto-bullet conversion, Escape, Ctrl+B, Tab)
+  // Keyboard events in inline contentEditable (auto-bullet conversion, Escape, Ctrl+B, Tab, Arrow escape)
   const handleInlineKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     e.stopPropagation();
     if (e.key === 'Escape') {
@@ -938,6 +938,93 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       e.preventDefault();
       executeExecCommand('bold');
       return;
+    }
+
+    const editor = inlineContentEditableRef.current;
+
+    // Arrow Right escape from inline formatting tags (code, b, i, s, etc.)
+    if (e.key === 'ArrowRight' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && editor) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        const inlineTags = new Set(['code', 'b', 'strong', 'i', 'em', 's', 'strike', 'del', 'a', 'u']);
+        let curr: Node | null = range.endContainer;
+        let inlineEl: HTMLElement | null = null;
+        while (curr && curr !== editor) {
+          if (curr.nodeType === Node.ELEMENT_NODE && inlineTags.has((curr as HTMLElement).tagName.toLowerCase())) {
+            inlineEl = curr as HTMLElement;
+            break;
+          }
+          curr = curr.parentNode;
+        }
+
+        if (inlineEl && range.collapsed) {
+          try {
+            const testRange = document.createRange();
+            testRange.selectNodeContents(inlineEl);
+            testRange.setStart(range.endContainer, range.endOffset);
+            if (testRange.toString().replace(/\u200B/g, '').length === 0) {
+              e.preventDefault();
+              let nextNode = inlineEl.nextSibling;
+              if (!nextNode || nextNode.nodeType !== Node.TEXT_NODE) {
+                const textNode = document.createTextNode('\u200B');
+                inlineEl.parentNode?.insertBefore(textNode, inlineEl.nextSibling);
+                nextNode = textNode;
+              }
+              const newRange = document.createRange();
+              const text = nextNode.textContent || '';
+              const offset = text.startsWith('\u200B') ? 1 : 0;
+              newRange.setStart(nextNode, offset);
+              newRange.setEnd(nextNode, offset);
+              sel.removeAllRanges();
+              sel.addRange(newRange);
+              return;
+            }
+          } catch (err) {}
+        }
+      }
+    }
+
+    // Arrow Left escape from start of inline tags
+    if (e.key === 'ArrowLeft' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && editor) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        const inlineTags = new Set(['code', 'b', 'strong', 'i', 'em', 's', 'strike', 'del', 'a', 'u']);
+        let curr: Node | null = range.startContainer;
+        let inlineEl: HTMLElement | null = null;
+        while (curr && curr !== editor) {
+          if (curr.nodeType === Node.ELEMENT_NODE && inlineTags.has((curr as HTMLElement).tagName.toLowerCase())) {
+            inlineEl = curr as HTMLElement;
+            break;
+          }
+          curr = curr.parentNode;
+        }
+
+        if (inlineEl && range.collapsed) {
+          try {
+            const testRange = document.createRange();
+            testRange.selectNodeContents(inlineEl);
+            testRange.setEnd(range.startContainer, range.startOffset);
+            if (testRange.toString().replace(/\u200B/g, '').length === 0) {
+              e.preventDefault();
+              let prevNode = inlineEl.previousSibling;
+              if (!prevNode || prevNode.nodeType !== Node.TEXT_NODE) {
+                const textNode = document.createTextNode('\u200B');
+                inlineEl.parentNode?.insertBefore(textNode, inlineEl);
+                prevNode = textNode;
+              }
+              const newRange = document.createRange();
+              const prevLen = prevNode.textContent?.length || 0;
+              newRange.setStart(prevNode, prevLen);
+              newRange.setEnd(prevNode, prevLen);
+              sel.removeAllRanges();
+              sel.addRange(newRange);
+              return;
+            }
+          } catch (err) {}
+        }
+      }
     }
 
     // Auto-convert "- ", "* ", or "• " + Space into a real bullet list
