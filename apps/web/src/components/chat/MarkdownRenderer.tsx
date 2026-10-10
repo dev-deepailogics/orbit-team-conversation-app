@@ -10,7 +10,9 @@ interface MarkdownRendererProps {
 
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, className = '' }) => {
   return (
-    <div className={`prose prose-invert max-w-none break-words text-gray-200 ${className}`}>
+    <div
+      className={`prose prose-invert max-w-none break-words text-gray-200 text-sm leading-relaxed prose-code:before:content-none prose-code:after:content-none ${className}`}
+    >
       <ReactMarkdown
         components={{
           h1: ({ children }) => (
@@ -40,21 +42,19 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, cla
               {children}
             </blockquote>
           ),
-          code: ({ node, inline, className, children, ...props }: any) => {
-            if (inline) {
-              return (
-                <code
-                  className="bg-[#2C3136] text-[#ECB22E] px-1.5 py-0.5 rounded font-mono text-[12px] border border-gray-700/60 font-medium"
-                  {...props}
-                >
-                  {children}
-                </code>
-              );
-            }
+          pre: ({ children }) => (
+            <pre className="bg-[#141618] border border-gray-700/70 rounded-xl p-3 my-2 font-mono text-xs text-gray-200 overflow-x-auto shadow-inner leading-relaxed block [&_code]:bg-transparent [&_code]:text-gray-200 [&_code]:border-0 [&_code]:p-0 [&_code]:font-mono [&_code]:text-xs [&_code]:font-normal">
+              {children}
+            </pre>
+          ),
+          code: ({ children, ...props }: any) => {
             return (
-              <pre className="bg-[#141618] border border-gray-700/70 rounded-xl p-3 my-2 font-mono text-xs text-gray-200 overflow-x-auto shadow-inner">
-                <code {...props}>{children}</code>
-              </pre>
+              <code
+                className="bg-[#2C3136] text-[#ECB22E] px-1.5 py-0.5 rounded font-mono text-[12px] border border-gray-700/60 font-medium inline leading-none align-baseline"
+                {...props}
+              >
+                {children}
+              </code>
             );
           },
           a: ({ href, children }) => (

@@ -171,7 +171,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
               </div>
             )}
 
-            {/* Parent Message Reactions */}
+            {/* Parent Message Reactions - ONLY rendered if reactions exist */}
             {(() => {
               const reactionCounts = (parentMessage.reactions || []).reduce(
                 (acc: { [emoji: string]: { count: number; users: string[]; hasReacted: boolean } }, r) => {
@@ -186,9 +186,12 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                 {}
               );
 
+              const entries = Object.entries(reactionCounts);
+              if (entries.length === 0) return null;
+
               return (
                 <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-                  {Object.entries(reactionCounts).map(([emoji, data]) => (
+                  {entries.map(([emoji, data]) => (
                     <button
                       key={emoji}
                       onClick={() => handleReaction(parentMessage.id, emoji)}
@@ -203,46 +206,47 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                       <span>{data.count}</span>
                     </button>
                   ))}
-                  {/* Top 5 Quick Reaction on Hover */}
-                  <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition ml-1">
-                    {topEmojis.map((em) => (
-                      <button
-                        key={em}
-                        onClick={() => handleReaction(parentMessage.id, em)}
-                        className="hover:scale-125 transition text-[11px] p-0.5"
-                        title={`React with ${em}`}
-                      >
-                        {em}
-                      </button>
-                    ))}
-                    <button
-                      onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === parentMessage.id ? null : parentMessage.id)}
-                      className="p-0.5 text-gray-400 hover:text-white rounded transition text-[11px]"
-                      title="More emojis..."
-                    >
-                      <SmilePlus size={11} />
-                    </button>
-                  </div>
+
+                  <button
+                    onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === parentMessage.id ? null : parentMessage.id)}
+                    className="flex items-center justify-center w-5 h-5 rounded-full bg-[#2C3136]/60 hover:bg-[#3E4348] border border-gray-700/50 text-gray-400 hover:text-white transition"
+                    title="Add reaction"
+                  >
+                    <SmilePlus size={10} />
+                  </button>
                 </div>
               );
             })()}
           </div>
 
-          {/* Quick quote action for parent message */}
-          <div className="absolute right-2 top-1 hidden group-hover:flex items-center bg-[#222529] border border-gray-700 rounded shadow-md px-1 py-0.5 gap-1 z-10">
+          {/* Floating Hover Bubble for parent message */}
+          <div className="absolute right-2 -top-2.5 hidden group-hover:flex items-center bg-[#222529] border border-gray-700/90 rounded-xl shadow-xl px-1.5 py-0.5 gap-0.5 z-20 backdrop-blur-sm">
+            {/* Top 3 Quick Reactions */}
+            <div className="flex items-center gap-0.5 pr-1 border-r border-gray-700/80 mr-0.5">
+              {topEmojis.slice(0, 3).map((em) => (
+                <button
+                  key={em}
+                  onClick={() => handleReaction(parentMessage.id, em)}
+                  className="hover:scale-125 transition text-[11px] p-0.5 rounded hover:bg-gray-700/50"
+                  title={`React with ${em}`}
+                >
+                  {em}
+                </button>
+              ))}
+            </div>
             <button
               onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === parentMessage.id ? null : parentMessage.id)}
-              title="React with emoji"
+              title="More emojis..."
               className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
             >
-              <SmilePlus size={13} />
+              <SmilePlus size={12} />
             </button>
             <button
               onClick={() => setReplyingToMessage(parentMessage)}
               title="Quote Reply"
               className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
             >
-              <CornerUpLeft size={13} />
+              <CornerUpLeft size={12} />
             </button>
           </div>
 
@@ -319,7 +323,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                   </div>
                 )}
 
-                {/* Reply Reactions */}
+                {/* Reply Reactions - ONLY rendered when reactions exist */}
                 {(() => {
                   const reactionCounts = (reply.reactions || []).reduce(
                     (acc: { [emoji: string]: { count: number; users: string[]; hasReacted: boolean } }, r) => {
@@ -334,9 +338,12 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                     {}
                   );
 
+                  const entries = Object.entries(reactionCounts);
+                  if (entries.length === 0) return null;
+
                   return (
                     <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-                      {Object.entries(reactionCounts).map(([emoji, data]) => (
+                      {entries.map(([emoji, data]) => (
                         <button
                           key={emoji}
                           onClick={() => handleReaction(reply.id, emoji)}
@@ -351,46 +358,47 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                           <span>{data.count}</span>
                         </button>
                       ))}
-                      {/* Top 5 Quick Reaction on Hover */}
-                      <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition ml-1">
-                        {topEmojis.map((em) => (
-                          <button
-                            key={em}
-                            onClick={() => handleReaction(reply.id, em)}
-                            className="hover:scale-125 transition text-[11px] p-0.5"
-                            title={`React with ${em}`}
-                          >
-                            {em}
-                          </button>
-                        ))}
-                        <button
-                          onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === reply.id ? null : reply.id)}
-                          className="p-0.5 text-gray-400 hover:text-white rounded transition text-[11px]"
-                          title="More emojis..."
-                        >
-                          <SmilePlus size={11} />
-                        </button>
-                      </div>
+
+                      <button
+                        onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === reply.id ? null : reply.id)}
+                        className="flex items-center justify-center w-5 h-5 rounded-full bg-[#2C3136]/60 hover:bg-[#3E4348] border border-gray-700/50 text-gray-400 hover:text-white transition"
+                        title="Add reaction"
+                      >
+                        <SmilePlus size={10} />
+                      </button>
                     </div>
                   );
                 })()}
               </div>
 
-              {/* Quick actions for reply */}
-              <div className="absolute right-2 top-1 hidden group-hover:flex items-center bg-[#222529] border border-gray-700 rounded shadow-md px-1 py-0.5 gap-1 z-10">
+              {/* Floating Hover Bubble for reply */}
+              <div className="absolute right-2 -top-2 hidden group-hover:flex items-center bg-[#222529] border border-gray-700/90 rounded-xl shadow-xl px-1.5 py-0.5 gap-0.5 z-20 backdrop-blur-sm">
+                {/* Top 3 Quick Reactions */}
+                <div className="flex items-center gap-0.5 pr-1 border-r border-gray-700/80 mr-0.5">
+                  {topEmojis.slice(0, 3).map((em) => (
+                    <button
+                      key={em}
+                      onClick={() => handleReaction(reply.id, em)}
+                      className="hover:scale-125 transition text-[11px] p-0.5 rounded hover:bg-gray-700/50"
+                      title={`React with ${em}`}
+                    >
+                      {em}
+                    </button>
+                  ))}
+                </div>
                 <button
                   onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === reply.id ? null : reply.id)}
-                  title="React with emoji"
+                  title="More emojis..."
                   className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
                 >
-                  <SmilePlus size={13} />
+                  <SmilePlus size={12} />
                 </button>
                 <button
                   onClick={() => setReplyingToMessage(reply)}
                   title="Quote Reply"
                   className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
                 >
-                  <CornerUpLeft size={13} />
+                  <CornerUpLeft size={12} />
                 </button>
               </div>
 

@@ -471,7 +471,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     />
                   )}
 
-                  {/* Reactions Bar */}
+                  {/* Reactions Bar - ONLY displayed when reactions exist */}
                   {(() => {
                     const reactionCounts = (msg.reactions || []).reduce(
                       (acc: { [emoji: string]: { count: number; users: string[]; hasReacted: boolean } }, r) => {
@@ -486,9 +486,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       {}
                     );
 
+                    const entries = Object.entries(reactionCounts);
+                    if (entries.length === 0) return null;
+
                     return (
                       <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                        {Object.entries(reactionCounts).map(([emoji, data]) => (
+                        {entries.map(([emoji, data]) => (
                           <button
                             key={emoji}
                             onClick={() => handleReaction(msg.id, emoji)}
@@ -504,37 +507,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           </button>
                         ))}
 
-                        {/* Add reaction plus button if message already has reactions */}
-                        {Object.keys(reactionCounts).length > 0 && (
-                          <button
-                            onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === msg.id ? null : msg.id)}
-                            title="Add reaction"
-                            className="flex items-center justify-center w-6 h-6 rounded-full bg-[#2C3136]/60 hover:bg-[#3E4348] border border-gray-700/50 text-gray-400 hover:text-white transition"
-                          >
-                            <SmilePlus size={12} />
-                          </button>
-                        )}
-
-                        {/* Quick Top 5 Most Used Reactions on Hover */}
-                        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition ml-1">
-                          {topEmojis.map((em) => (
-                            <button
-                              key={em}
-                              onClick={() => handleReaction(msg.id, em)}
-                              className="hover:scale-125 transition text-xs p-1"
-                              title={`React with ${em}`}
-                            >
-                              {em}
-                            </button>
-                          ))}
-                          <button
-                            onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === msg.id ? null : msg.id)}
-                            className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition text-xs"
-                            title="More emojis..."
-                          >
-                            <SmilePlus size={13} />
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === msg.id ? null : msg.id)}
+                          title="Add reaction"
+                          className="flex items-center justify-center w-6 h-6 rounded-full bg-[#2C3136]/60 hover:bg-[#3E4348] border border-gray-700/50 text-gray-400 hover:text-white transition"
+                        >
+                          <SmilePlus size={12} />
+                        </button>
                       </div>
                     );
                   })()}
@@ -551,28 +530,42 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   )}
                 </div>
 
-                {/* Hover Message Action Bar */}
-                <div className="absolute right-4 -top-3 hidden group-hover:flex items-center bg-[#222529] border border-gray-700 rounded-lg shadow-lg px-1 py-0.5 gap-1 z-10">
+                {/* Floating Hover Bubble Layer */}
+                <div className="absolute right-4 -top-3.5 hidden group-hover:flex items-center bg-[#222529] border border-gray-700/90 rounded-xl shadow-2xl px-1.5 py-1 gap-1 z-20">
+                  {/* Top 4 Quick Reaction Emojis */}
+                  <div className="flex items-center gap-0.5 pr-1 border-r border-gray-700/80 mr-0.5">
+                    {topEmojis.slice(0, 4).map((em) => (
+                      <button
+                        key={em}
+                        onClick={() => handleReaction(msg.id, em)}
+                        className="hover:scale-125 transition text-xs p-1 rounded hover:bg-gray-700/50"
+                        title={`React with ${em}`}
+                      >
+                        {em}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === msg.id ? null : msg.id)}
+                    title="More emojis..."
+                    className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
+                  >
+                    <SmilePlus size={14} />
+                  </button>
                   <button
                     onClick={() => setReplyingToMessage(msg)}
                     title="Quote Reply"
-                    className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded"
+                    className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
                   >
-                    <CornerUpLeft size={15} />
-                  </button>
-                  <button
-                    onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === msg.id ? null : msg.id)}
-                    title="React with emoji"
-                    className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded"
-                  >
-                    <SmilePlus size={15} />
+                    <CornerUpLeft size={14} />
                   </button>
                   <button
                     onClick={() => onOpenThread(msg)}
                     title="Reply in thread"
-                    className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded"
+                    className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
                   >
-                    <MessageSquare size={15} />
+                    <MessageSquare size={14} />
                   </button>
                 </div>
 
