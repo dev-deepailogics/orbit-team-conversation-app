@@ -1,0 +1,3 @@
+ also add channel deletion functionality in the channel details modal with confirmation with typing text. there must be a default section or channel
+  called activity, where notifications or messages like this is sent and it is not deletable, and upon deletion of a channel send message to the
+  activity channel, about who deleted the channel. and also message reacts etc, must also be shared in there.

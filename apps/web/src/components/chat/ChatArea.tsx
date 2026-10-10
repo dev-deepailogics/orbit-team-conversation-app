@@ -386,16 +386,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </span>
           </button>
 
-          {/* Show Details Button */}
-          <button
-            onClick={() => setShowDetailsModal(true)}
-            title="Channel info, description, and members"
-            className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#2C3136]/50 hover:bg-[#383F45] text-gray-400 hover:text-white border border-gray-700/60 text-xs font-medium transition shrink-0 ml-1"
-          >
-            <Info size={13} className="text-slack-green" />
-            <span className="hidden sm:inline">Details</span>
-          </button>
-
           {/* Chat vs Canvas Mode Switch */}
           <div className="flex items-center bg-[#222529] border border-gray-700/80 rounded-lg p-0.5 ml-1 sm:ml-2 shrink-0">
             <button
