@@ -27,6 +27,8 @@ import {
   Heading1,
   Heading2,
   List,
+  AlertTriangle,
+  Loader2,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
@@ -252,6 +254,11 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
   // Direct Inline In-Place Live WYSIWYG Text Editing
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState<string>('');
+
+  // Clear Canvas Confirmation Modal State
+  const [showClearModal, setShowClearModal] = useState<boolean>(false);
+  const [clearConfirmText, setClearConfirmText] = useState<string>('');
+  const [isClearing, setIsClearing] = useState<boolean>(false);
 
   // Infinite Pan & Zoom
   const [zoom, setZoom] = useState<number>(1);
@@ -486,16 +493,25 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     }
   };
 
-  const handleClearBoard = async () => {
-    if (confirm('Clear the entire whiteboard?')) {
+  const handleClearBoard = () => {
+    setClearConfirmText('');
+    setShowClearModal(true);
+  };
+
+  const handleConfirmClearBoard = async () => {
+    if (clearConfirmText.trim().toLowerCase() !== 'clear-canvas' || isClearing) return;
+    try {
+      setIsClearing(true);
       commitElements([]);
       setSelectedElementId(null);
       setEditingId(null);
-      try {
-        await api.delete(`/api/channels/${channel.id}/whiteboard`);
-      } catch (err) {
-        console.error('Failed to clear whiteboard', err);
-      }
+      await api.delete(`/api/channels/${channel.id}/whiteboard`);
+      setShowClearModal(false);
+      setClearConfirmText('');
+    } catch (err) {
+      console.error('Failed to clear whiteboard', err);
+    } finally {
+      setIsClearing(false);
     }
   };
 
@@ -1794,6 +1810,77 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           </span>
         </div>
       ))}
+      {/* Clear Canvas Confirmation Modal */}
+      {showClearModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 select-none">
+          <div className="bg-[#1F2326] border border-gray-700/80 rounded-2xl max-w-md w-full p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-red-400 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
+                <AlertTriangle size={22} className="text-red-400" />
+              </div>
+              <div>
+                <h3 className="font-bold text-white text-base">Clear Entire Whiteboard</h3>
+                <p className="text-xs text-gray-400">Destructive action for all teammates</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-300 mb-4 leading-relaxed">
+              This will permanently delete all drawings, shapes, sticky notes, and text for everyone on <span className="font-semibold text-white">#{channel.name}</span>. This action cannot be undone.
+            </p>
+
+            <div className="bg-[#141618] border border-gray-800 rounded-xl p-3 mb-5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
+                Type <span className="text-red-400 font-mono font-bold lowercase">clear-canvas</span> to confirm:
+              </label>
+              <input
+                type="text"
+                autoFocus
+                value={clearConfirmText}
+                onChange={(e) => setClearConfirmText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && clearConfirmText.trim().toLowerCase() === 'clear-canvas') {
+                    handleConfirmClearBoard();
+                  }
+                }}
+                placeholder="clear-canvas"
+                className="w-full bg-[#1F2326] border border-gray-700 focus:border-red-500 rounded-lg px-3 py-2 text-sm text-white font-mono placeholder-gray-600 focus:outline-none transition"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowClearModal(false);
+                  setClearConfirmText('');
+                }}
+                disabled={isClearing}
+                className="px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmClearBoard}
+                disabled={clearConfirmText.trim().toLowerCase() !== 'clear-canvas' || isClearing}
+                className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold bg-red-600 hover:bg-red-500 text-white transition disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-red-900/30"
+              >
+                {isClearing ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Clearing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={16} />
+                    <span>Clear Everything</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

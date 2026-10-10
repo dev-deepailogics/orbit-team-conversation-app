@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { prisma } from '@orbit/db';
 import { z } from 'zod';
+import { sendSystemNotification } from '../services/systemBot.js';
 
 const createWorkspaceSchema = z.object({
   name: z.string().min(2).max(50),
@@ -245,6 +246,30 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
           },
           update: {},
         });
+      }
+
+      // Send welcome notification to default public channel
+      try {
+        const joinedUser = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { displayName: true, username: true },
+        });
+        const targetChannel =
+          workspace.channels.find((c) => c.name === 'general' && c.type === 'PUBLIC') ||
+          workspace.channels.find((c) => c.type === 'PUBLIC') ||
+          workspace.channels[0];
+
+        if (targetChannel) {
+          const uName = joinedUser?.displayName || joinedUser?.username || 'A new teammate';
+          await sendSystemNotification({
+            workspaceId: workspace.id,
+            channelId: targetChannel.id,
+            content: `👋 **${uName}** joined the workspace! Welcome aboard! 🚀`,
+            io: fastify.io,
+          });
+        }
+      } catch (botErr) {
+        fastify.log.error(botErr, 'Failed to send workspace join notification');
       }
     }
 

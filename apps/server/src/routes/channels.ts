@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { prisma } from '@orbit/db';
 import { SOCKET_EVENTS } from '@orbit/types';
 import { z } from 'zod';
+import { sendSystemNotification } from '../services/systemBot.js';
 
 const createChannelSchema = z.object({
   name: z.string().min(2).max(50).regex(/^[a-z0-9-]+$/),
@@ -289,6 +290,7 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
   fastify.post('/:channelId/members', { preHandler: [fastify.authenticate] }, async (request, reply) => {
     const { channelId } = request.params as { channelId: string };
     const { userIds } = request.body as { userIds: string[] };
+    const currentUserId = (request.user as { id: string }).id;
 
     if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
       return reply.status(400).send({ error: 'userIds array is required' });
@@ -343,6 +345,28 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         fastify.io.to(`user:${uId}`).emit(SOCKET_EVENTS.CHANNEL_NEW, updatedChannel);
       }
       fastify.io.to(`channel:${channelId}`).emit('channel:updated', updatedChannel);
+
+      // Post system notification from default Orbit Bot
+      try {
+        const inviter = await prisma.user.findUnique({
+          where: { id: currentUserId },
+          select: { displayName: true, username: true },
+        });
+        const addedUsers = await prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { displayName: true, username: true },
+        });
+        const inviterName = inviter?.displayName || inviter?.username || 'Someone';
+        const addedNames = addedUsers.map((u) => u.displayName || u.username).join(', ');
+        await sendSystemNotification({
+          workspaceId: channel.workspaceId,
+          channelId,
+          content: `🎉 **${inviterName}** added **${addedNames}** to #${channel.name}.`,
+          io: fastify.io,
+        });
+      } catch (botErr) {
+        fastify.log.error(botErr, 'Failed to send channel member addition notification');
+      }
     }
 
     return reply.send(updatedChannel);
@@ -579,6 +603,23 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         channelId,
         userId,
       });
+
+      // Post system notification from default Orbit Bot
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { displayName: true, username: true },
+        });
+        const userName = user?.displayName || user?.username || 'Someone';
+        await sendSystemNotification({
+          workspaceId: channel.workspaceId,
+          channelId,
+          content: `🧹 **${userName}** cleared the whiteboard canvas.`,
+          io: fastify.io,
+        });
+      } catch (botErr) {
+        fastify.log.error(botErr, 'Failed to send whiteboard clear notification');
+      }
     }
 
     return reply.send({ success: true });
