@@ -14,6 +14,7 @@ import {
   Smile,
   Volume2,
   HardDrive,
+  X,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useChatStore } from '../../stores/chatStore';
@@ -32,6 +33,7 @@ interface ChannelSidebarProps {
   onOpenBotPortal: () => void;
   onStartHuddle: (channel: Channel) => void;
   onLogout: () => void;
+  onCloseMobile?: () => void;
 }
 
 export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
@@ -47,6 +49,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   onOpenBotPortal,
   onStartHuddle,
   onLogout,
+  onCloseMobile,
 }) => {
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [showStorageModal, setShowStorageModal] = useState(false);
@@ -121,6 +124,18 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           >
             <UserPlus size={18} className={copiedInvite ? 'text-slack-green' : ''} />
           </button>
+          {onCloseMobile && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onCloseMobile();
+              }}
+              title="Close Menu"
+              className="md:hidden p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition"
+            >
+              <X size={18} />
+            </button>
+          )}
         </div>
       </div>
 

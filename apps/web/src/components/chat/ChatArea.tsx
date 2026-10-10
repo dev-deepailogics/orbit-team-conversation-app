@@ -22,6 +22,7 @@ import {
   Type,
   HardDrive,
   Loader2,
+  Menu,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
@@ -42,6 +43,7 @@ interface ChatAreaProps {
   onOpenThread: (message: Message) => void;
   onStartHuddle: (channel: Channel) => void;
   onOpenAddMembers?: () => void;
+  onToggleMobileSidebar?: () => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -52,6 +54,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onOpenThread,
   onStartHuddle,
   onOpenAddMembers,
+  onToggleMobileSidebar,
 }) => {
   const [content, setContent] = useState('');
   const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
@@ -263,16 +266,27 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   return (
     <div className="flex-1 flex flex-col h-full bg-[#1A1D21] relative min-w-0">
       {/* Channel Header */}
-      <div className="h-14 border-b border-[#383F45]/40 px-6 flex items-center justify-between bg-[#1A1D21]/90 backdrop-blur z-10">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="h-14 border-b border-[#383F45]/40 px-3 sm:px-6 flex items-center justify-between bg-[#1A1D21]/90 backdrop-blur z-10 gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+          {/* Mobile hamburger menu toggle */}
+          {onToggleMobileSidebar && (
+            <button
+              onClick={onToggleMobileSidebar}
+              title="Open Navigation"
+              className="md:hidden p-1.5 -ml-1 text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-lg transition shrink-0"
+            >
+              <Menu size={20} />
+            </button>
+          )}
+
           {channel.type === 'DIRECT' ? (
-            <span className="font-bold text-slack-green text-base">@</span>
+            <span className="font-bold text-slack-green text-base shrink-0">@</span>
           ) : channel.type === 'PRIVATE' ? (
             <Lock size={18} className="text-gray-400 shrink-0" />
           ) : (
             <Hash size={20} className="text-gray-400 shrink-0" />
           )}
-          <span className="font-bold text-white text-base truncate">
+          <span className="font-bold text-white text-sm sm:text-base truncate">
             {getDirectChannelTitle()}
           </span>
 
@@ -280,7 +294,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           <button
             onClick={handleCopyChannelId}
             title={copiedChannelId ? 'Channel ID Copied!' : `Click to copy Channel ID: ${channel.id}`}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#2C3136]/60 hover:bg-[#3E4348] text-gray-400 hover:text-white border border-gray-700/60 text-[10px] font-mono transition"
+            className="hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#2C3136]/60 hover:bg-[#3E4348] text-gray-400 hover:text-white border border-gray-700/60 text-[10px] font-mono transition shrink-0"
           >
             {copiedChannelId ? (
               <>
@@ -297,16 +311,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
           {channel.topic && channel.type !== 'DIRECT' && (
             <>
-              <span className="text-gray-600">|</span>
-              <span className="text-xs text-gray-400 truncate max-w-xs">{channel.topic}</span>
+              <span className="text-gray-600 hidden md:inline">|</span>
+              <span className="text-xs text-gray-400 truncate max-w-xs hidden md:inline">{channel.topic}</span>
             </>
           )}
 
           {/* Chat vs Canvas / Whiteboard Mode Selector */}
-          <div className="flex items-center bg-[#222529] border border-gray-700 rounded-lg p-0.5 ml-2">
+          <div className="flex items-center bg-[#222529] border border-gray-700 rounded-lg p-0.5 ml-1 sm:ml-2 shrink-0">
             <button
               onClick={() => setActiveView('messages')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition ${
+              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-xs font-medium transition ${
                 activeView === 'messages'
                   ? 'bg-[#383F45] text-white shadow'
                   : 'text-gray-400 hover:text-white'
@@ -317,7 +331,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </button>
             <button
               onClick={() => setActiveView('whiteboard')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition ${
+              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-xs font-medium transition ${
                 activeView === 'whiteboard'
                   ? 'bg-slack-green text-white shadow font-semibold'
                   : 'text-gray-400 hover:text-white'
@@ -330,12 +344,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
 
         {/* Actions in Header */}
-        <div className="flex items-center gap-2">
-          {/* Direct Whiteboard / Canvas button */}
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          {/* Direct Whiteboard / Canvas button on desktop */}
           <button
             onClick={() => setActiveView(activeView === 'whiteboard' ? 'messages' : 'whiteboard')}
             title="Open Brainstorming Whiteboard"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${
+            className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${
               activeView === 'whiteboard'
                 ? 'bg-slack-green text-white border-slack-green shadow'
                 : 'bg-[#2C3136] hover:bg-[#3E4348] text-gray-300 hover:text-white border-gray-700'
@@ -349,10 +363,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <button
               onClick={onOpenAddMembers}
               title="Add members to channel"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#2C3136] hover:bg-[#3E4348] text-gray-300 hover:text-white border border-gray-700 text-xs font-medium transition"
+              className="flex items-center gap-1.5 p-1.5 sm:px-3 sm:py-1.5 rounded-lg bg-[#2C3136] hover:bg-[#3E4348] text-gray-300 hover:text-white border border-gray-700 text-xs font-medium transition"
             >
               <UserPlus size={14} />
-              <span>Add People</span>
+              <span className="hidden sm:inline">Add People</span>
             </button>
           )}
 
@@ -360,19 +374,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           <button
             onClick={() => setShowStorageModal(true)}
             title="Channel Files & Storage"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#2C3136] hover:bg-[#3E4348] text-gray-300 hover:text-white border border-gray-700 text-xs font-medium transition"
+            className="flex items-center gap-1.5 p-1.5 sm:px-3 sm:py-1.5 rounded-lg bg-[#2C3136] hover:bg-[#3E4348] text-gray-300 hover:text-white border border-gray-700 text-xs font-medium transition"
           >
             <HardDrive size={14} className="text-slack-green" />
-            <span>Files</span>
+            <span className="hidden sm:inline">Files</span>
           </button>
 
           {/* Call / Meet Button */}
           <button
             onClick={() => onStartHuddle(channel)}
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-slack-green/15 hover:bg-slack-green/25 text-slack-green border border-slack-green/40 text-xs font-semibold transition"
+            title="Start Audio/Video Call"
+            className="flex items-center gap-1.5 sm:gap-2 p-1.5 sm:px-3.5 sm:py-1.5 rounded-lg bg-slack-green/15 hover:bg-slack-green/25 text-slack-green border border-slack-green/40 text-xs font-semibold transition"
           >
             <PhoneCall size={14} />
-            <span>Call</span>
+            <span className="hidden sm:inline">Call</span>
           </button>
         </div>
       </div>
@@ -389,7 +404,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       ) : (
         <>
           {/* Message List */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-4">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center text-gray-500">
             <div className="w-12 h-12 rounded-full bg-[#2C3136] flex items-center justify-center mb-3 text-gray-400">
@@ -410,7 +425,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               <div
                 key={msg.id}
                 id={`msg-${msg.id}`}
-                className="group flex gap-3 hover:bg-[#222529]/60 -mx-6 px-6 py-2 rounded-lg transition-all duration-300 relative"
+                className="group flex gap-2.5 sm:gap-3 hover:bg-[#222529]/60 -mx-3 sm:-mx-6 px-3 sm:px-6 py-2 rounded-lg transition-all duration-300 relative"
               >
                 <img src={avatarUrl} alt={authorName} className="w-9 h-9 rounded-lg object-cover shrink-0 mt-0.5" />
 
@@ -531,7 +546,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 </div>
 
                 {/* Floating Hover Bubble Layer */}
-                <div className="absolute right-4 -top-3.5 hidden group-hover:flex items-center bg-[#222529] border border-gray-700/90 rounded-xl shadow-2xl px-1.5 py-1 gap-1 z-20">
+                <div className="absolute right-2 sm:right-4 -top-3.5 hidden group-hover:flex items-center bg-[#222529] border border-gray-700/90 rounded-xl shadow-2xl px-1.5 py-1 gap-1 z-20">
                   {/* Top 4 Quick Reaction Emojis */}
                   <div className="flex items-center gap-0.5 pr-1 border-r border-gray-700/80 mr-0.5">
                     {topEmojis.slice(0, 4).map((em) => (
@@ -576,7 +591,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     onClose={() => setActiveEmojiMessageId(null)}
                     onSelectEmoji={(emoji) => handleReaction(msg.id, emoji)}
                     title="Add Reaction"
-                    positionClass="top-8 right-4"
+                    positionClass="top-8 right-2 sm:right-4"
                   />
                 )}
               </div>
@@ -588,14 +603,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
       {/* Typing Indicator */}
       {typingUsers.length > 0 && (
-        <div className="px-6 py-1 text-xs text-gray-400 italic flex items-center gap-1.5">
+        <div className="px-3 sm:px-6 py-1 text-xs text-gray-400 italic flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" />
           <span>{typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...</span>
         </div>
       )}
 
       {/* Chat Input */}
-      <div className="px-6 pb-6 pt-1">
+      <div className="px-3 sm:px-6 pb-3 sm:pb-6 pt-1">
         {/* Quote Reply Banner */}
         {replyingToMessage && (
           <div className="mb-2 bg-[#222529] border-l-4 border-slack-green rounded-r-xl px-3.5 py-2 flex items-center justify-between shadow-lg">

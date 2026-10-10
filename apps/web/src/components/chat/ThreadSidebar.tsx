@@ -128,7 +128,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   const avatarUrl = parentMessage.user?.avatarUrl || parentMessage.bot?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${authorName}`;
 
   return (
-    <div className="w-80 md:w-96 bg-[#1F2326] border-l border-[#383F45]/40 flex flex-col h-full select-none z-20">
+    <div className="w-full h-full bg-[#1F2326] border-l border-[#383F45]/40 flex flex-col select-none">
       {/* Thread Header */}
       <div className="h-14 border-b border-[#383F45]/40 px-4 flex items-center justify-between">
         <h3 className="font-bold text-white text-sm">Thread</h3>

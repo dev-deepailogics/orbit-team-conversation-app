@@ -131,15 +131,15 @@ export const ChannelStorageModal: React.FC<ChannelStorageModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2.5 sm:p-4 animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl bg-[#1F2326] border border-gray-700/80 rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-in zoom-in-95 duration-150"
+        className="w-full max-w-2xl bg-[#1F2326] border border-gray-700/80 rounded-2xl shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[85vh] overflow-hidden animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="p-5 border-b border-gray-700/80 flex items-center justify-between bg-[#1A1D20]">
+        <div className="p-3.5 sm:p-5 border-b border-gray-700/80 flex items-center justify-between bg-[#1A1D20]">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-slack-green/15 border border-slack-green/30 flex items-center justify-center text-slack-green">
               <HardDrive size={20} />
@@ -174,10 +174,10 @@ export const ChannelStorageModal: React.FC<ChannelStorageModalProps> = ({
         </div>
 
         {/* Storage Summary Banner */}
-        <div className="p-5 bg-gradient-to-b from-[#22262A] to-[#1F2326] border-b border-gray-700/80">
+        <div className="p-3.5 sm:p-5 bg-gradient-to-b from-[#22262A] to-[#1F2326] border-b border-gray-700/80">
           <div className="flex items-end justify-between mb-2">
             <div>
-              <span className="text-2xl font-extrabold text-white">
+              <span className="text-xl sm:text-2xl font-extrabold text-white">
                 {stats?.formattedTotal || '0 B'}
               </span>
               <span className="text-xs text-gray-400 ml-2">
@@ -212,7 +212,7 @@ export const ChannelStorageModal: React.FC<ChannelStorageModalProps> = ({
 
           {/* Category Badges */}
           {stats && (
-            <div className="flex items-center gap-3 mt-3 flex-wrap">
+            <div className="flex items-center gap-2 sm:gap-3 mt-3 flex-wrap">
               {stats.categories
                 .filter((c) => c.bytes > 0)
                 .map((cat) => (
@@ -232,9 +232,9 @@ export const ChannelStorageModal: React.FC<ChannelStorageModalProps> = ({
         </div>
 
         {/* Filter Bar & Search */}
-        <div className="px-5 py-3 border-b border-gray-700/70 flex items-center justify-between gap-3 bg-[#1A1D20]">
+        <div className="px-3.5 sm:px-5 py-3 border-b border-gray-700/70 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-[#1A1D20]">
           {/* Category Tabs */}
-          <div className="flex items-center gap-1 overflow-x-auto py-1">
+          <div className="flex items-center gap-1 overflow-x-auto py-1 scrollbar-none w-full sm:w-auto">
             {[
               { id: 'all', label: 'All' },
               { id: 'images', label: 'Images' },
@@ -246,10 +246,10 @@ export const ChannelStorageModal: React.FC<ChannelStorageModalProps> = ({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
+                className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-semibold transition shrink-0 ${
                   activeTab === tab.id
                     ? 'bg-slack-green text-white shadow'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-800'
                 }`}
               >
                 {tab.label}
@@ -258,7 +258,7 @@ export const ChannelStorageModal: React.FC<ChannelStorageModalProps> = ({
           </div>
 
           {/* Search Input */}
-          <div className="relative w-48 sm:w-56">
+          <div className="relative w-full sm:w-56 shrink-0">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"

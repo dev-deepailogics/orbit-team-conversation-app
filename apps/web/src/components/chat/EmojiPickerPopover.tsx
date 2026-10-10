@@ -72,7 +72,7 @@ export const EmojiPickerPopover: React.FC<EmojiPickerPopoverProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`absolute z-50 bg-[#1F2326] border border-gray-700 rounded-2xl shadow-2xl overflow-hidden w-80 animate-in fade-in zoom-in-95 duration-150 ${positionClass}`}
+      className={`absolute z-50 bg-[#1F2326] border border-gray-700 rounded-2xl shadow-2xl overflow-hidden w-80 max-w-[calc(100vw-2rem)] animate-in fade-in zoom-in-95 duration-150 ${positionClass}`}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-gray-800 bg-[#181B1E]">

@@ -52,10 +52,10 @@ export const HuddleModal: React.FC = () => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-6">
-      <div className="bg-[#1A1D21] border border-gray-700 rounded-2xl w-full max-w-5xl h-[80vh] flex flex-col overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-2 sm:p-6">
+      <div className="bg-[#1A1D21] border border-gray-700 rounded-2xl w-full max-w-5xl h-[92vh] sm:h-[80vh] flex flex-col overflow-hidden shadow-2xl">
         {/* Call Header */}
-        <div className="h-14 border-b border-gray-800 px-6 flex items-center justify-between bg-[#1F2326]">
+        <div className="h-14 border-b border-gray-800 px-3.5 sm:px-6 flex items-center justify-between bg-[#1F2326]">
           <div className="flex items-center gap-2.5">
             <div className="p-2 bg-slack-green/20 rounded-lg text-slack-green">
               <PhoneCall size={18} />

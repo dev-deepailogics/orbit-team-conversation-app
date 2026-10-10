@@ -1446,62 +1446,68 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       }`}
     >
       {/* Top Header Bar */}
-      <div className="absolute top-4 left-4 right-4 z-30 flex items-center justify-between pointer-events-none">
+      <div className="absolute top-2 sm:top-4 left-2 sm:left-4 right-2 sm:right-4 z-30 flex items-center justify-between pointer-events-none gap-2">
         {/* Left: Channel Canvas Info */}
-        <div className="flex items-center gap-3 bg-[#1F2326]/90 backdrop-blur border border-gray-700/80 px-4 py-2 rounded-2xl shadow-2xl pointer-events-auto">
-          <div className="flex items-center gap-2">
-            <Sparkles size={16} className="text-slack-green animate-pulse" />
-            <span className="font-bold text-sm text-white">#{channel.name} Canvas</span>
+        <div className="flex items-center gap-2 sm:gap-3 bg-[#1F2326]/90 backdrop-blur border border-gray-700/80 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl shadow-2xl pointer-events-auto min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <Sparkles size={15} className="text-slack-green animate-pulse shrink-0" />
+            <span className="font-bold text-xs sm:text-sm text-white truncate max-w-[100px] sm:max-w-none">
+              #{channel.name} Canvas
+            </span>
           </div>
 
-          <span className="text-gray-600">|</span>
+          <span className="text-gray-600 hidden xs:inline">|</span>
 
-          <div className="flex items-center gap-1.5 text-xs text-gray-300">
-            <Users size={14} className="text-slack-green" />
+          <div className="hidden xs:flex items-center gap-1 text-[11px] sm:text-xs text-gray-300 shrink-0">
+            <Users size={13} className="text-slack-green" />
             <span>{activeUsersCount} Live</span>
           </div>
 
           {isSaving && (
-            <span className="text-[11px] text-gray-400 italic ml-2">Auto-saving...</span>
+            <span className="text-[10px] sm:text-[11px] text-gray-400 italic hidden sm:inline ml-1">
+              Saving...
+            </span>
           )}
         </div>
 
         {/* Right: Actions */}
-        <div className="flex items-center gap-1.5 bg-[#1F2326]/90 backdrop-blur border border-gray-700/80 p-1.5 rounded-2xl shadow-2xl pointer-events-auto">
+        <div className="flex items-center gap-1 sm:gap-1.5 bg-[#1F2326]/90 backdrop-blur border border-gray-700/80 p-1 sm:p-1.5 rounded-xl sm:rounded-2xl shadow-2xl pointer-events-auto shrink-0">
           <button
             onClick={handleUndo}
             disabled={historyIndex <= 0}
             title="Undo (Ctrl+Z)"
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition disabled:opacity-30"
+            className="p-1.5 sm:p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg sm:rounded-xl transition disabled:opacity-30"
           >
-            <Undo2 size={16} />
+            <Undo2 size={15} />
           </button>
           <button
             onClick={handleRedo}
             disabled={historyIndex >= history.length - 1}
             title="Redo (Ctrl+Y)"
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition disabled:opacity-30"
+            className="p-1.5 sm:p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg sm:rounded-xl transition disabled:opacity-30"
           >
-            <Redo2 size={16} />
+            <Redo2 size={15} />
           </button>
 
-          <span className="w-px h-5 bg-gray-700 mx-1" />
+          <span className="w-px h-4 sm:h-5 bg-gray-700 mx-0.5" />
 
           {/* Zoom Controls */}
           <button
             onClick={() => setZoom((z) => Math.min(3, z + 0.15))}
             title="Zoom In"
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition"
+            className="p-1.5 sm:p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg sm:rounded-xl transition"
           >
-            <ZoomIn size={16} />
+            <ZoomIn size={15} />
           </button>
-          <span className="text-xs text-gray-400 px-1 font-mono">{Math.round(zoom * 100)}%</span>
+          <span className="text-[11px] sm:text-xs text-gray-400 px-0.5 font-mono hidden sm:inline">
+            {Math.round(zoom * 100)}%
+          </span>
           <button
             onClick={() => setZoom((z) => Math.max(0.2, z - 0.15))}
             title="Zoom Out"
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition"
+            className="p-1.5 sm:p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg sm:rounded-xl transition"
           >
-            <ZoomOut size={16} />
+            <ZoomOut size={15} />
           </button>
           <button
             onClick={() => {
@@ -1509,40 +1515,40 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
               setPan({ x: 0, y: 0 });
             }}
             title="Reset View (100%)"
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition"
+            className="hidden sm:flex p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition"
           >
             <Maximize2 size={15} />
           </button>
 
-          <span className="w-px h-5 bg-gray-700 mx-1" />
+          <span className="w-px h-4 sm:h-5 bg-gray-700 mx-0.5" />
 
           {/* Export PNG */}
           <button
             onClick={handleExportImage}
             title="Export as PNG"
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition"
+            className="p-1.5 sm:p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg sm:rounded-xl transition"
           >
-            <Download size={16} />
+            <Download size={15} />
           </button>
 
           {/* Clear Board */}
           <button
             onClick={handleClearBoard}
             title="Clear Board"
-            className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition"
+            className="p-1.5 sm:p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg sm:rounded-xl transition"
           >
-            <Trash2 size={16} />
+            <Trash2 size={15} />
           </button>
 
           {onClose && (
             <>
-              <span className="w-px h-5 bg-gray-700 mx-1" />
+              <span className="w-px h-4 sm:h-5 bg-gray-700 mx-0.5" />
               <button
                 onClick={onClose}
                 title="Back to Chat"
-                className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition"
+                className="p-1.5 sm:p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg sm:rounded-xl transition"
               >
-                <X size={16} />
+                <X size={15} />
               </button>
             </>
           )}
@@ -1658,9 +1664,9 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       )}
 
       {/* Floating Center Bottom Toolbar (Tools & Palettes) */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-[#1F2326]/95 backdrop-blur border border-gray-700/80 p-2 rounded-2xl shadow-2xl">
+      <div className="absolute bottom-3 sm:bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 sm:gap-2 bg-[#1F2326]/95 backdrop-blur border border-gray-700/80 p-1.5 sm:p-2 rounded-xl sm:rounded-2xl shadow-2xl max-w-[96vw] overflow-x-auto scrollbar-none">
         {/* Tool Selector */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
           {[
             { tool: 'select', icon: MousePointer, label: 'Select & Move (V)' },
             { tool: 'hand', icon: Hand, label: 'Pan Hand (H / Space)' },
@@ -1677,42 +1683,42 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
               key={tool}
               onClick={() => setActiveTool(tool as ToolType)}
               title={label}
-              className={`p-2.5 rounded-xl transition flex items-center justify-center ${
+              className={`p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl transition flex items-center justify-center shrink-0 ${
                 activeTool === tool
                   ? 'bg-slack-green text-white shadow-lg scale-105 font-bold'
                   : 'text-gray-400 hover:text-white hover:bg-gray-700/60'
               }`}
             >
-              <Icon size={18} />
+              <Icon size={16} />
             </button>
           ))}
         </div>
 
-        <span className="w-px h-6 bg-gray-700 mx-1" />
+        <span className="w-px h-5 sm:h-6 bg-gray-700 mx-0.5 sm:mx-1 shrink-0" />
 
         {/* Color Palette */}
-        <div className="flex items-center gap-1.5 px-1">
+        <div className="flex items-center gap-1 sm:gap-1.5 px-0.5 sm:px-1 shrink-0">
           {COLOR_PALETTE.map((c) => (
             <button
               key={c}
               onClick={() => setActiveColor(c)}
               style={{ backgroundColor: c }}
-              className={`w-6 h-6 rounded-full transition transform hover:scale-125 border ${
+              className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full transition transform hover:scale-125 border shrink-0 ${
                 activeColor === c ? 'ring-2 ring-slack-green ring-offset-2 ring-offset-[#1F2326]' : 'border-gray-700'
               }`}
             />
           ))}
         </div>
 
-        <span className="w-px h-6 bg-gray-700 mx-1" />
+        <span className="w-px h-5 sm:h-6 bg-gray-700 mx-0.5 sm:mx-1 shrink-0" />
 
         {/* Stroke Width Selector */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
           {[2, 4, 8].map((w) => (
             <button
               key={w}
               onClick={() => setStrokeWidth(w)}
-              className={`px-2 py-1 rounded-lg text-xs font-mono font-bold transition ${
+              className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-mono font-bold transition shrink-0 ${
                 strokeWidth === w
                   ? 'bg-[#383F45] text-white border border-slack-green'
                   : 'text-gray-400 hover:text-white'

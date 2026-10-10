@@ -31,8 +31,8 @@ export const IncomingCallDialog: React.FC<IncomingCallDialogProps> = ({ onAccept
     : `${incomingCall.callerName} started a Call in #${incomingCall.channelName}`;
 
   return (
-    <div className="fixed top-6 right-6 z-50 animate-bounce-short">
-      <div className="bg-[#1F2326] border-2 border-slack-green shadow-2xl rounded-2xl p-5 flex items-center gap-4 max-w-sm backdrop-blur">
+    <div className="fixed top-3 right-3 left-3 sm:left-auto sm:top-6 sm:right-6 z-50 animate-bounce-short">
+      <div className="bg-[#1F2326] border-2 border-slack-green shadow-2xl rounded-2xl p-3.5 sm:p-5 flex items-center gap-3 sm:gap-4 max-w-sm backdrop-blur">
         {/* Caller Avatar with pulsing ring */}
         <div className="relative">
           <img

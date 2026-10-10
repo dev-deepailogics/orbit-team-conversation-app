@@ -57,10 +57,10 @@ export const BotPortalDialog: React.FC<BotPortalDialogProps> = ({ workspace, onC
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-      <div className="bg-[#1A1D21] border border-gray-700 rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-2.5 sm:p-6">
+      <div className="bg-[#1A1D21] border border-gray-700 rounded-2xl w-full max-w-3xl max-h-[92vh] sm:max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="h-14 border-b border-gray-800 px-6 flex items-center justify-between bg-[#1F2326]">
+        <div className="h-14 border-b border-gray-800 px-3.5 sm:px-6 flex items-center justify-between bg-[#1F2326]">
           <div className="flex items-center gap-2.5">
             <div className="p-2 bg-slack-activeChannel/20 rounded-lg text-slack-activeChannel">
               <Bot size={18} />
@@ -83,7 +83,7 @@ export const BotPortalDialog: React.FC<BotPortalDialogProps> = ({ workspace, onC
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-3.5 sm:p-6 space-y-4 sm:space-y-6">
           {/* Create New Bot Card */}
           <div className="bg-[#222529] border border-gray-700/60 rounded-xl p-5">
             <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">

@@ -56,10 +56,10 @@ export const AddMembersDialog: React.FC<AddMembersDialogProps> = ({
   });
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-[#1A1D21] border border-gray-700 rounded-2xl w-full max-w-md flex flex-col shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-2.5 sm:p-4">
+      <div className="bg-[#1A1D21] border border-gray-700 rounded-2xl w-full max-w-md max-h-[92vh] sm:max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="h-14 border-b border-gray-800 px-6 flex items-center justify-between bg-[#1F2326]">
+        <div className="h-14 border-b border-gray-800 px-3.5 sm:px-6 flex items-center justify-between bg-[#1F2326]">
           <div className="flex items-center gap-2">
             <UserPlus size={18} className="text-slack-green" />
             <h3 className="text-sm font-bold text-white">Add people to #{channel.name}</h3>

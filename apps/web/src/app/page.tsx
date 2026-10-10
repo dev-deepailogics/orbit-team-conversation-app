@@ -54,6 +54,7 @@ export default function AppDashboard() {
   const [showBotPortal, setShowBotPortal] = useState(false);
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [isDataLoading, setIsDataLoading] = useState(true);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Keep a ref to the current channel to avoid stale closures in socket events
   const currentChannelRef = useRef<Channel | null>(null);
@@ -278,37 +279,97 @@ export default function AppDashboard() {
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#1A1D21]">
-      {/* 1. Workspaces Left-most Sidebar */}
-      <WorkspaceSidebar
-        workspaces={workspaces}
-        currentWorkspace={currentWorkspace}
-        onSelectWorkspace={handleSelectWorkspace}
-        onWorkspaceCreated={(ws) => {
-          setWorkspaces([...workspaces, ws]);
-          handleSelectWorkspace(ws);
-        }}
-      />
+    <div className="flex h-screen w-screen overflow-hidden bg-[#1A1D21] relative">
+      {/* Mobile Navigation Drawer (Backdrop + Slide-over Sidebars) */}
+      {isMobileSidebarOpen && (
+        <div className="fixed inset-0 z-50 flex md:hidden animate-in fade-in duration-200">
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-xs transition-opacity"
+            onClick={() => setIsMobileSidebarOpen(false)}
+          />
+          <div className="relative flex h-full max-w-[92vw] shadow-2xl z-10 animate-in slide-in-from-left duration-200">
+            <WorkspaceSidebar
+              workspaces={workspaces}
+              currentWorkspace={currentWorkspace}
+              onSelectWorkspace={(ws) => {
+                handleSelectWorkspace(ws);
+              }}
+              onWorkspaceCreated={(ws) => {
+                setWorkspaces([...workspaces, ws]);
+                handleSelectWorkspace(ws);
+              }}
+            />
+            {currentWorkspace && (
+              <ChannelSidebar
+                workspace={currentWorkspace}
+                channels={channels}
+                currentChannel={currentChannel}
+                currentUser={user}
+                members={members}
+                activeHuddleChannelId={activeHuddleChannelId}
+                onSelectChannel={(ch) => {
+                  handleSelectChannel(ch);
+                  setIsMobileSidebarOpen(false);
+                }}
+                onSelectUserDM={(u) => {
+                  handleSelectUserDM(u);
+                  setIsMobileSidebarOpen(false);
+                }}
+                onChannelCreated={(ch) => {
+                  setChannels([...channels, ch]);
+                  handleSelectChannel(ch);
+                  setIsMobileSidebarOpen(false);
+                }}
+                onOpenBotPortal={() => {
+                  setIsMobileSidebarOpen(false);
+                  setShowBotPortal(true);
+                }}
+                onStartHuddle={(ch) => {
+                  setIsMobileSidebarOpen(false);
+                  handleStartHuddle(ch);
+                }}
+                onLogout={logout}
+                onCloseMobile={() => setIsMobileSidebarOpen(false)}
+              />
+            )}
+          </div>
+        </div>
+      )}
 
-      {/* 2. Channels & Members Sidebar */}
-      {currentWorkspace && (
-        <ChannelSidebar
-          workspace={currentWorkspace}
-          channels={channels}
-          currentChannel={currentChannel}
-          currentUser={user}
-          members={members}
-          activeHuddleChannelId={activeHuddleChannelId}
-          onSelectChannel={handleSelectChannel}
-          onSelectUserDM={handleSelectUserDM}
-          onChannelCreated={(ch) => {
-            setChannels([...channels, ch]);
-            handleSelectChannel(ch);
+      {/* 1. Workspaces Left-most Sidebar (Desktop) */}
+      <div className="hidden md:flex shrink-0 h-full">
+        <WorkspaceSidebar
+          workspaces={workspaces}
+          currentWorkspace={currentWorkspace}
+          onSelectWorkspace={handleSelectWorkspace}
+          onWorkspaceCreated={(ws) => {
+            setWorkspaces([...workspaces, ws]);
+            handleSelectWorkspace(ws);
           }}
-          onOpenBotPortal={() => setShowBotPortal(true)}
-          onStartHuddle={handleStartHuddle}
-          onLogout={logout}
         />
+      </div>
+
+      {/* 2. Channels & Members Sidebar (Desktop) */}
+      {currentWorkspace && (
+        <div className="hidden md:flex shrink-0 h-full">
+          <ChannelSidebar
+            workspace={currentWorkspace}
+            channels={channels}
+            currentChannel={currentChannel}
+            currentUser={user}
+            members={members}
+            activeHuddleChannelId={activeHuddleChannelId}
+            onSelectChannel={handleSelectChannel}
+            onSelectUserDM={handleSelectUserDM}
+            onChannelCreated={(ch) => {
+              setChannels([...channels, ch]);
+              handleSelectChannel(ch);
+            }}
+            onOpenBotPortal={() => setShowBotPortal(true)}
+            onStartHuddle={handleStartHuddle}
+            onLogout={logout}
+          />
+        </div>
       )}
 
       {/* 3. Main Chat View */}
@@ -321,22 +382,38 @@ export default function AppDashboard() {
           onOpenThread={handleOpenThread}
           onStartHuddle={handleStartHuddle}
           onOpenAddMembers={() => setShowAddMembers(true)}
+          onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
         />
       ) : (
-        <div className="flex-1 flex items-center justify-center text-gray-500">
-          Select or create a channel to begin
+        <div className="flex-1 flex flex-col items-center justify-center text-gray-500 p-4 text-center">
+          <p className="text-base font-semibold text-gray-300">No channel selected</p>
+          <p className="text-xs text-gray-500 mt-1">Select or create a channel to begin chatting</p>
+          <button
+            onClick={() => setIsMobileSidebarOpen(true)}
+            className="mt-4 md:hidden px-4 py-2 bg-slack-green hover:bg-[#008a65] text-white text-xs font-semibold rounded-lg shadow transition"
+          >
+            Browse Channels
+          </button>
         </div>
       )}
 
-      {/* 4. Active Thread Panel (if open) */}
+      {/* 4. Active Thread Panel (Responsive Drawer on Mobile, Column on Desktop) */}
       {activeThread && (
-        <ThreadSidebar
-          parentMessage={activeThread}
-          replies={threadReplies}
-          currentUser={user}
-          onClose={() => setActiveThread(null)}
-          onReplyAdded={addThreadReply}
-        />
+        <div className="fixed inset-0 z-40 md:static md:z-20 md:flex h-full shrink-0">
+          <div
+            className="fixed inset-0 bg-black/60 md:hidden transition-opacity"
+            onClick={() => setActiveThread(null)}
+          />
+          <div className="relative ml-auto h-full w-full sm:w-96 md:w-80 lg:w-96 shadow-2xl md:shadow-none animate-in slide-in-from-right duration-200">
+            <ThreadSidebar
+              parentMessage={activeThread}
+              replies={threadReplies}
+              currentUser={user}
+              onClose={() => setActiveThread(null)}
+              onReplyAdded={addThreadReply}
+            />
+          </div>
+        </div>
       )}
 
       {/* 5. LiveKit Audio/Video Call Overlay */}
