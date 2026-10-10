@@ -39,7 +39,14 @@ pnpm-debug.log*
 *.sln
 *.sw?
 
-# Storage / Docker volumes
+# Storage / Docker volumes / Uploads
 minio_data/
 postgres_data/
 redis_data/
+uploads/
+**/uploads/
+upload/
+**/upload/
+
+# TypeScript build info
+*.tsbuildinfo
