@@ -4,6 +4,7 @@ import { SOCKET_EVENTS } from '@orbit/types';
 import path from 'path';
 import fs from 'fs';
 import { storageDriver, classifyFileType, formatBytes } from '../services/storage.js';
+import { verifyChannelAccess } from '../utils/security.js';
 
 export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   // 1. Upload File with rich metadata
@@ -164,17 +165,22 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
   fastify.get('/:filename', async (request, reply) => {
     const { filename } = request.params as { filename: string };
     const uploadDir = process.env.UPLOAD_DIR || path.resolve(process.cwd(), 'uploads');
-    const directPath = path.join(uploadDir, filename);
+    const safeFilename = path.basename(filename);
+    const directPath = path.resolve(uploadDir, safeFilename);
+
+    if (!directPath.startsWith(uploadDir)) {
+      return reply.status(403).send({ error: 'Access denied' });
+    }
 
     if (fs.existsSync(directPath)) {
       const stream = fs.createReadStream(directPath);
       return reply.send(stream);
     }
 
-    // Try finding by fileKey ending with filename
+    // Try finding by fileKey ending with safeFilename
     const attachment = await prisma.attachment.findFirst({
       where: {
-        fileKey: { endsWith: filename },
+        fileKey: { endsWith: safeFilename },
         isDeleted: false,
       },
     });
@@ -212,12 +218,17 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       return reply.status(404).send({ error: 'File attachment not found' });
     }
 
-    // Verify permission: Uploader OR Workspace Admin/Owner
+    // Verify permission: Uploader OR Workspace Admin/Owner OR Super Admin
+    const callerUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { systemRole: true },
+    });
+    const isSuperAdmin = callerUser?.systemRole === 'SUPER_ADMIN';
     const member = attachment.workspace?.members?.[0];
     const isOwnerOrAdmin = member?.role === 'OWNER' || member?.role === 'ADMIN';
     const isUploader = attachment.uploaderId === userId;
 
-    if (!isUploader && !isOwnerOrAdmin) {
+    if (!isUploader && !isOwnerOrAdmin && !isSuperAdmin) {
       return reply.status(403).send({ error: 'You do not have permission to delete this file' });
     }
 
@@ -323,23 +334,8 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     const { channelId } = request.params as { channelId: string };
     const userId = (request.user as { id: string }).id;
 
-    const channel = await prisma.channel.findUnique({
-      where: { id: channelId },
-      include: {
-        members: { select: { userId: true } },
-      },
-    });
-
-    if (!channel) {
-      return reply.status(404).send({ error: 'Channel not found' });
-    }
-
-    if (channel.type !== 'PUBLIC') {
-      const isMember = channel.members.some((m) => m.userId === userId);
-      if (!isMember) {
-        return reply.status(403).send({ error: 'You are not a member of this channel' });
-      }
-    }
+    const access = await verifyChannelAccess(userId, channelId, reply);
+    if (!access) return;
 
     const attachments = await prisma.attachment.findMany({
       where: {

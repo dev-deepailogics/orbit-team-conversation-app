@@ -16,6 +16,7 @@ async function main() {
       displayName: 'Demo User',
       passwordHash,
       avatarUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=demouser',
+      systemRole: 'SUPER_ADMIN',
       status: 'ONLINE',
     },
   });

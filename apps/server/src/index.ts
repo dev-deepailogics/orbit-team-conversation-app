@@ -17,6 +17,7 @@ import { messageRoutes } from './routes/messages.js';
 import { huddleRoutes } from './routes/huddles.js';
 import { botRoutes } from './routes/bots.js';
 import { fileRoutes } from './routes/files.js';
+import { adminRoutes } from './routes/admin.js';
 import { setupSocketServer } from './socket/index.js';
 
 dotenv.config();
@@ -94,7 +95,7 @@ async function bootstrap() {
   }
 
   fastify.decorate('io', io);
-  setupSocketServer(io);
+  setupSocketServer(fastify, io);
 
   // Health Check
   fastify.get('/api/health', async () => {
@@ -109,6 +110,7 @@ async function bootstrap() {
   await fastify.register(huddleRoutes, { prefix: '/api/huddles' });
   await fastify.register(botRoutes, { prefix: '/api/bot' });
   await fastify.register(fileRoutes, { prefix: '/api/files' });
+  await fastify.register(adminRoutes, { prefix: '/api/admin' });
 
   // Start Server
   try {

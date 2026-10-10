@@ -3,6 +3,7 @@ import { prisma } from '@orbit/db';
 import { SOCKET_EVENTS } from '@orbit/types';
 import { z } from 'zod';
 import { sendSystemNotification } from '../services/systemBot.js';
+import { verifyChannelAccess } from '../utils/security.js';
 
 const createChannelSchema = z.object({
   name: z.string().min(2).max(50).regex(/^[a-z0-9-]+$/),
@@ -93,6 +94,22 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
     if (!targetUserId) {
       return reply.status(400).send({ error: 'targetUserId is required' });
+    }
+
+    // Verify current user belongs to workspace
+    const currentMember = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId, userId: currentUserId } },
+    });
+    if (!currentMember) {
+      return reply.status(403).send({ error: 'You are not a member of this workspace' });
+    }
+
+    // Verify target user belongs to workspace
+    const targetMember = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId, userId: targetUserId } },
+    });
+    if (!targetMember) {
+      return reply.status(403).send({ error: 'Target user is not a member of this workspace' });
     }
 
     const targetUser = await prisma.user.findUnique({
@@ -210,17 +227,41 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     return reply.status(201).send(dmChannel);
   });
 
-  // Get messages for a channel
-  fastify.get('/:channelId/messages', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+  // Get complete details for a channel
+  fastify.get('/:channelId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
     const { channelId } = request.params as { channelId: string };
     const userId = (request.user as { id: string }).id;
-    const { cursor, limit = '50' } = request.query as { cursor?: string; limit?: string };
-    const take = parseInt(limit, 10);
+
+    const access = await verifyChannelAccess(userId, channelId, reply);
+    if (!access) return;
 
     const channel = await prisma.channel.findUnique({
       where: { id: channelId },
       include: {
-        members: { select: { userId: true } },
+        workspace: {
+          select: { id: true, name: true, slug: true },
+        },
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                displayName: true,
+                avatarUrl: true,
+                status: true,
+                systemRole: true,
+                email: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            messages: true,
+            attachments: true,
+          },
+        },
       },
     });
 
@@ -228,19 +269,78 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.status(404).send({ error: 'Channel not found' });
     }
 
-    if (channel.type !== 'PUBLIC') {
-      const isMember = channel.members.some((m) => m.userId === userId);
-      if (!isMember) {
-        return reply.status(403).send({ error: 'You are not a member of this private channel' });
-      }
-    }
+    const creator = await prisma.user.findUnique({
+      where: { id: channel.createdById },
+      select: { id: true, username: true, displayName: true, email: true },
+    });
 
-    const messages = await prisma.message.findMany({
+    return reply.send({
+      ...channel,
+      creator,
+    });
+  });
+
+  // Get pinned messages for a channel
+  fastify.get('/:channelId/pins', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { channelId } = request.params as { channelId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const access = await verifyChannelAccess(userId, channelId, reply);
+    if (!access) return;
+
+    const pinnedMessages = await prisma.message.findMany({
+      where: {
+        channelId,
+        isPinned: true,
+        isDeleted: false,
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: {
+          select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
+        },
+        bot: {
+          select: { id: true, name: true, avatarUrl: true },
+        },
+        quotedMessage: {
+          include: {
+            user: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+          },
+        },
+        attachments: {
+          where: { isDeleted: false },
+        },
+        reactions: {
+          include: {
+            user: { select: { id: true, username: true, displayName: true } },
+          },
+        },
+        _count: {
+          select: { replies: true },
+        },
+      },
+    });
+
+    return reply.send(pinnedMessages);
+  });
+
+  // Get messages for a channel (Cursor-based Chunked Pagination)
+  fastify.get('/:channelId/messages', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { channelId } = request.params as { channelId: string };
+    const userId = (request.user as { id: string }).id;
+    const { cursor, limit = '30' } = request.query as { cursor?: string; limit?: string };
+    const take = Math.min(Math.max(parseInt(limit, 10) || 30, 5), 100);
+
+    const access = await verifyChannelAccess(userId, channelId, reply);
+    if (!access) return;
+
+    // Fetch take + 1 to detect if older messages exist
+    const rawMessages = await prisma.message.findMany({
       where: {
         channelId,
         parentMessageId: null, // Root channel messages only
       },
-      take,
+      take: take + 1,
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
       orderBy: { createdAt: 'desc' },
       include: {
@@ -277,13 +377,21 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       },
     });
 
-    // Format response
-    const formatted = messages.map((m) => ({
+    const hasMore = rawMessages.length > take;
+    const chunk = hasMore ? rawMessages.slice(0, take) : rawMessages;
+    const nextCursor = hasMore && chunk.length > 0 ? chunk[chunk.length - 1].id : null;
+
+    // Format response and reverse to chronological order (oldest to newest)
+    const formatted = chunk.map((m) => ({
       ...m,
       replyCount: m._count.replies,
     })).reverse();
 
-    return reply.send(formatted);
+    return reply.send({
+      messages: formatted,
+      hasMore,
+      nextCursor,
+    });
   });
 
   // Add Members to Channel
@@ -296,16 +404,26 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.status(400).send({ error: 'userIds array is required' });
     }
 
-    const channel = await prisma.channel.findUnique({
-      where: { id: channelId },
+    const access = await verifyChannelAccess(currentUserId, channelId, reply);
+    if (!access) return;
+    const channel = access.channel;
+
+    // Verify all candidate userIds are members of this workspace
+    const validMembers = await prisma.workspaceMember.findMany({
+      where: {
+        workspaceId: channel.workspaceId,
+        userId: { in: userIds },
+      },
+      select: { userId: true },
     });
 
-    if (!channel) {
-      return reply.status(404).send({ error: 'Channel not found' });
+    const validUserIds = validMembers.map((m) => m.userId);
+    if (validUserIds.length === 0) {
+      return reply.status(400).send({ error: 'Selected users must belong to this workspace' });
     }
 
-    // Add each user to channel
-    for (const userId of userIds) {
+    // Add each verified user to channel
+    for (const userId of validUserIds) {
       await prisma.channelMember.upsert({
         where: {
           channelId_userId: {
@@ -384,23 +502,9 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
     const { content, attachments, quotedMessageId } = parseResult.data;
 
-    const channel = await prisma.channel.findUnique({
-      where: { id: channelId },
-      include: {
-        members: { select: { userId: true } },
-      },
-    });
-
-    if (!channel) {
-      return reply.status(404).send({ error: 'Channel not found' });
-    }
-
-    if (channel.type !== 'PUBLIC') {
-      const isMember = channel.members.some((m) => m.userId === userId);
-      if (!isMember) {
-        return reply.status(403).send({ error: 'You are not a member of this private channel' });
-      }
-    }
+    const access = await verifyChannelAccess(userId, channelId, reply);
+    if (!access) return;
+    const channel = access.channel;
 
     const message = await prisma.message.create({
       data: {
@@ -498,23 +602,9 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     const { channelId } = request.params as { channelId: string };
     const userId = (request.user as { id: string }).id;
 
-    const channel = await prisma.channel.findUnique({
-      where: { id: channelId },
-      include: {
-        members: { select: { userId: true } },
-      },
-    });
-
-    if (!channel) {
-      return reply.status(404).send({ error: 'Channel not found' });
-    }
-
-    if (channel.type !== 'PUBLIC') {
-      const isMember = channel.members.some((m) => m.userId === userId);
-      if (!isMember) {
-        return reply.status(403).send({ error: 'You are not a member of this private channel' });
-      }
-    }
+    const access = await verifyChannelAccess(userId, channelId, reply);
+    if (!access) return;
+    const channel = access.channel;
 
     return reply.send({
       channelId: channel.id,
@@ -528,23 +618,8 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     const userId = (request.user as { id: string }).id;
     const { whiteboardData } = request.body as { whiteboardData: any };
 
-    const channel = await prisma.channel.findUnique({
-      where: { id: channelId },
-      include: {
-        members: { select: { userId: true } },
-      },
-    });
-
-    if (!channel) {
-      return reply.status(404).send({ error: 'Channel not found' });
-    }
-
-    if (channel.type !== 'PUBLIC') {
-      const isMember = channel.members.some((m) => m.userId === userId);
-      if (!isMember) {
-        return reply.status(403).send({ error: 'You are not a member of this private channel' });
-      }
-    }
+    const access = await verifyChannelAccess(userId, channelId, reply);
+    if (!access) return;
 
     const updated = await prisma.channel.update({
       where: { id: channelId },
@@ -573,23 +648,9 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     const { channelId } = request.params as { channelId: string };
     const userId = (request.user as { id: string }).id;
 
-    const channel = await prisma.channel.findUnique({
-      where: { id: channelId },
-      include: {
-        members: { select: { userId: true } },
-      },
-    });
-
-    if (!channel) {
-      return reply.status(404).send({ error: 'Channel not found' });
-    }
-
-    if (channel.type !== 'PUBLIC') {
-      const isMember = channel.members.some((m) => m.userId === userId);
-      if (!isMember) {
-        return reply.status(403).send({ error: 'You are not a member of this private channel' });
-      }
-    }
+    const access = await verifyChannelAccess(userId, channelId, reply);
+    if (!access) return;
+    const channel = access.channel;
 
     await prisma.channel.update({
       where: { id: channelId },
@@ -623,5 +684,74 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     }
 
     return reply.send({ success: true });
+  });
+
+  // Update Channel topic & description
+  fastify.patch('/:channelId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { channelId } = request.params as { channelId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const access = await verifyChannelAccess(userId, channelId, reply);
+    if (!access) return;
+
+    const updateSchema = z.object({
+      topic: z.string().max(250).optional(),
+      description: z.string().max(500).optional(),
+    });
+
+    const parseResult = updateSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.errors[0].message });
+    }
+
+    const updated = await prisma.channel.update({
+      where: { id: channelId },
+      data: parseResult.data,
+    });
+
+    if (fastify.io) {
+      fastify.io.to(`channel:${channelId}`).emit('channel:updated', updated);
+      fastify.io.to(`workspace:${updated.workspaceId}`).emit('channel:updated', updated);
+    }
+
+    return reply.send(updated);
+  });
+
+  // Delete Channel
+  fastify.delete('/:channelId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { channelId } = request.params as { channelId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const access = await verifyChannelAccess(userId, channelId, reply);
+    if (!access) return;
+    const channel = access.channel;
+
+    if (channel.name === 'general') {
+      return reply.status(400).send({ error: 'The default general channel cannot be deleted' });
+    }
+
+    const wsMember = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: channel.workspaceId, userId } },
+    });
+
+    const canDelete =
+      access.isSuperAdmin ||
+      channel.createdById === userId ||
+      wsMember?.role === 'OWNER' ||
+      wsMember?.role === 'ADMIN';
+
+    if (!canDelete) {
+      return reply.status(403).send({ error: 'You do not have permission to delete this channel' });
+    }
+
+    await prisma.channel.delete({
+      where: { id: channelId },
+    });
+
+    if (fastify.io) {
+      fastify.io.to(`workspace:${channel.workspaceId}`).emit('channel:deleted', { channelId });
+    }
+
+    return reply.send({ success: true, channelId });
   });
 };

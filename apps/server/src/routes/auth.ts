@@ -50,6 +50,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       id: user.id,
       email: user.email,
       username: user.username,
+      systemRole: user.systemRole,
     });
 
     return reply.status(201).send({
@@ -60,6 +61,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         username: user.username,
         displayName: user.displayName,
         avatarUrl: user.avatarUrl,
+        systemRole: user.systemRole,
         status: user.status,
         customStatusText: user.customStatusText,
         customStatusEmoji: user.customStatusEmoji,
@@ -95,6 +97,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       id: user.id,
       email: user.email,
       username: user.username,
+      systemRole: user.systemRole,
     });
 
     return reply.send({
@@ -105,6 +108,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         username: user.username,
         displayName: user.displayName,
         avatarUrl: user.avatarUrl,
+        systemRole: user.systemRole,
         status: user.status,
         customStatusText: user.customStatusText,
         customStatusEmoji: user.customStatusEmoji,
@@ -131,6 +135,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       username: user.username,
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
+      systemRole: user.systemRole,
       status: user.status,
       customStatusText: user.customStatusText,
       customStatusEmoji: user.customStatusEmoji,

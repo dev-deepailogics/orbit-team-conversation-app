@@ -13,8 +13,10 @@ interface ChatState {
 
   setCurrentWorkspace: (workspace: Workspace | null) => void;
   setChannels: (channels: Channel[]) => void;
+  updateChannel: (channel: Channel) => void;
   setCurrentChannel: (channel: Channel | null) => void;
   setMessages: (messages: Message[]) => void;
+  prependMessages: (olderMessages: Message[]) => void;
   addMessage: (message: Message) => void;
   updateMessage: (message: Message) => void;
   setActiveThread: (message: Message | null) => void;
@@ -24,6 +26,7 @@ interface ChatState {
   incrementUnread: (messageId: string, channelId: string) => void;
   clearUnread: (channelId: string) => void;
   removeAttachment: (fileId: string) => void;
+  reset: () => void;
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -36,8 +39,25 @@ export const useChatStore = create<ChatState>((set) => ({
   typingUsers: {},
   unreadCounts: {},
 
+  reset: () =>
+    set({
+      currentWorkspace: null,
+      channels: [],
+      currentChannel: null,
+      messages: [],
+      activeThread: null,
+      threadReplies: [],
+      typingUsers: {},
+      unreadCounts: {},
+    }),
+
   setCurrentWorkspace: (workspace) => set({ currentWorkspace: workspace }),
   setChannels: (channels) => set({ channels }),
+  updateChannel: (channel) =>
+    set((state) => ({
+      channels: state.channels.map((c) => (c.id === channel.id ? channel : c)),
+      currentChannel: state.currentChannel?.id === channel.id ? channel : state.currentChannel,
+    })),
   setCurrentChannel: (channel) =>
     set((state) => ({
       currentChannel: channel,
@@ -48,6 +68,13 @@ export const useChatStore = create<ChatState>((set) => ({
     })),
   setMessages: (messages) => set({ messages }),
   
+  prependMessages: (olderMessages) =>
+    set((state) => {
+      const existingIds = new Set(state.messages.map((m) => m.id));
+      const uniqueOlder = olderMessages.filter((m) => !existingIds.has(m.id));
+      return { messages: [...uniqueOlder, ...state.messages] };
+    }),
+
   addMessage: (message) =>
     set((state) => {
       // Don't duplicate

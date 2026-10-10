@@ -2,6 +2,7 @@
 // 1. User & Auth Types
 // ==========================================
 export type UserStatus = 'ONLINE' | 'OFFLINE' | 'AWAY' | 'BUSY' | 'IN_HUDDLE';
+export type SystemRole = 'SUPER_ADMIN' | 'WORKSPACE_ADMIN' | 'USER';
 
 export interface UserProfile {
   id: string;
@@ -9,6 +10,7 @@ export interface UserProfile {
   username: string;
   displayName: string;
   avatarUrl: string | null;
+  systemRole: SystemRole;
   status: UserStatus;
   customStatusText: string | null;
   customStatusEmoji: string | null;

@@ -3,6 +3,7 @@ import { prisma } from '@orbit/db';
 import { SOCKET_EVENTS } from '@orbit/types';
 import crypto from 'crypto';
 import { z } from 'zod';
+import { verifyWorkspaceMember } from '../utils/security.js';
 
 const createBotSchema = z.object({
   name: z.string().min(2).max(50),
@@ -29,10 +30,22 @@ const incomingWebhookSchema = z.object({
 });
 
 export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
-  // Create Bot App (Workspace Admin/Owner)
+  // Create Bot App (Workspace Admin/Owner or Super Admin)
   fastify.post('/workspaces/:workspaceId/bots', { preHandler: [fastify.authenticate] }, async (request, reply) => {
     const { workspaceId } = request.params as { workspaceId: string };
     const userId = (request.user as { id: string }).id;
+
+    const access = await verifyWorkspaceMember(userId, workspaceId, reply);
+    if (!access) return;
+
+    const isWsAdmin =
+      access.isSuperAdmin ||
+      access.workspaceMember?.role === 'OWNER' ||
+      access.workspaceMember?.role === 'ADMIN';
+
+    if (!isWsAdmin) {
+      return reply.status(403).send({ error: 'Only workspace administrators can create bot applications' });
+    }
 
     const parseResult = createBotSchema.safeParse(request.body);
     if (!parseResult.success) {
@@ -62,6 +75,11 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
   // List bots for workspace
   fastify.get('/workspaces/:workspaceId/bots', { preHandler: [fastify.authenticate] }, async (request, reply) => {
     const { workspaceId } = request.params as { workspaceId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const access = await verifyWorkspaceMember(userId, workspaceId, reply);
+    if (!access) return;
+
     const bots = await prisma.botApp.findMany({
       where: { workspaceId },
       orderBy: { createdAt: 'desc' },

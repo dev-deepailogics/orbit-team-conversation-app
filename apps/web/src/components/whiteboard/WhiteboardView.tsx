@@ -254,6 +254,9 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
   // Direct Inline In-Place Live WYSIWYG Text Editing
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState<string>('');
+  const editingIdRef = useRef<string | null>(null);
+  const latestTextRef = useRef<string>('');
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Clear Canvas Confirmation Modal State
   const [showClearModal, setShowClearModal] = useState<boolean>(false);
@@ -334,6 +337,8 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
 
   // Start in-place editing
   const startEditing = useCallback((elementId: string, initialText: string) => {
+    editingIdRef.current = elementId;
+    latestTextRef.current = initialText;
     setEditingId(elementId);
     setEditText(initialText);
   }, []);
@@ -341,11 +346,25 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
   // Finish in-place editing and commit changes
   const finishEditing = useCallback(
     (idToFinish?: string) => {
-      const targetId = idToFinish || editingId;
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+
+      const targetId = idToFinish || editingIdRef.current || editingId;
       if (!targetId) return;
 
-      const currentHtml = inlineContentEditableRef.current?.innerHTML || '';
-      const currentMd = htmlToMarkdown(currentHtml);
+      let currentMd = '';
+      if (inlineContentEditableRef.current) {
+        currentMd = htmlToMarkdown(inlineContentEditableRef.current.innerHTML);
+      } else if (latestTextRef.current !== undefined && latestTextRef.current !== '') {
+        currentMd = latestTextRef.current;
+      } else {
+        currentMd = editText;
+      }
+
+      editingIdRef.current = null;
+      latestTextRef.current = '';
 
       setElements((prev) => {
         const el = prev.find((item) => item.id === targetId);
@@ -376,15 +395,24 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       setEditingId(null);
       setEditText('');
     },
-    [editingId, channel.id, saveWhiteboardToServer]
+    [editingId, editText, channel.id, saveWhiteboardToServer]
   );
+
+  // Clean up autoSave timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, []);
 
   // Auto-focus contentEditable and load initial HTML ONLY when entering edit mode (editingId changes)
   useEffect(() => {
     if (editingId && inlineContentEditableRef.current) {
       const editor = inlineContentEditableRef.current;
       const targetEl = elements.find((el) => el.id === editingId);
-      const textToLoad = targetEl?.text ?? editText;
+      const textToLoad = targetEl?.text ?? latestTextRef.current ?? editText;
       editor.innerHTML = markdownToHtml(textToLoad);
       const timer = setTimeout(() => {
         if (editor) {
@@ -659,6 +687,11 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const coords = getCanvasCoords(e);
 
+    // If currently in-place editing, finish and commit before performing canvas actions
+    if (editingIdRef.current || editingId) {
+      finishEditing();
+    }
+
     // Pan via middle button, spacebar, or hand tool
     if (e.button === 1 || e.button === 2 || isSpacePressed || activeTool === 'hand') {
       setIsPanning(true);
@@ -674,7 +707,6 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         setDragOffset({ x: coords.x - clicked.x, y: coords.y - clicked.y });
       } else {
         setSelectedElementId(null);
-        setEditingId(null);
       }
       return;
     }
@@ -886,6 +918,9 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     const coords = getCanvasCoords(e);
     const clicked = findElementAtCoords(coords);
     if (clicked && (clicked.type === 'sticky' || clicked.type === 'text')) {
+      if ((editingIdRef.current || editingId) && (editingIdRef.current !== clicked.id)) {
+        finishEditing();
+      }
       setSelectedElementId(clicked.id);
       startEditing(clicked.id, clicked.text || '');
     }
@@ -915,6 +950,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       editor.focus();
       document.execCommand(command, false, value);
       const md = htmlToMarkdown(editor.innerHTML);
+      latestTextRef.current = md;
       setEditText(md);
       updateSelectedFormatting({ text: md });
     }
@@ -938,6 +974,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         }
       }
       const md = htmlToMarkdown(editor.innerHTML);
+      latestTextRef.current = md;
       setEditText(md);
       updateSelectedFormatting({ text: md });
     }
@@ -1062,6 +1099,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
             }
             document.execCommand('insertUnorderedList');
             const md = htmlToMarkdown(editor.innerHTML);
+            latestTextRef.current = md;
             setEditText(md);
             updateSelectedFormatting({ text: md });
             return;
@@ -1088,13 +1126,19 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           if (!liRawText) {
             // Empty bullet: exit bullet list
             const parentList = parentLi.parentElement;
+            const parentListNextSibling = parentList?.nextSibling;
+            const parentListParent = parentList?.parentNode;
             parentLi.remove();
+            const isListEmpty = parentList && parentList.children.length === 0;
+            if (isListEmpty) {
+              parentList.remove();
+            }
             const newDiv = document.createElement('div');
             newDiv.innerHTML = '<br>';
-            if (parentList && parentList.nextSibling) {
-              parentList.parentNode?.insertBefore(newDiv, parentList.nextSibling);
-            } else if (parentList && parentList.parentNode) {
-              parentList.parentNode.appendChild(newDiv);
+            if (parentListParent && parentListNextSibling) {
+              parentListParent.insertBefore(newDiv, parentListNextSibling);
+            } else if (parentListParent && !isListEmpty) {
+              parentListParent.appendChild(newDiv);
             } else {
               editor.appendChild(newDiv);
             }
@@ -1127,6 +1171,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           }
 
           const md = htmlToMarkdown(editor.innerHTML);
+          latestTextRef.current = md;
           setEditText(md);
           updateSelectedFormatting({ text: md });
           return;
@@ -1766,7 +1811,29 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
             onInput={() => {
               if (inlineContentEditableRef.current) {
                 const md = htmlToMarkdown(inlineContentEditableRef.current.innerHTML);
+                latestTextRef.current = md;
                 setEditText(md);
+
+                if (autoSaveTimerRef.current) {
+                  clearTimeout(autoSaveTimerRef.current);
+                }
+                autoSaveTimerRef.current = setTimeout(() => {
+                  const targetId = editingIdRef.current;
+                  if (targetId && latestTextRef.current !== undefined) {
+                    const currentText = latestTextRef.current;
+                    setElements((prev) => {
+                      const updated = prev.map((el) =>
+                        el.id === targetId ? { ...el, text: currentText } : el
+                      );
+                      saveWhiteboardToServer(updated);
+                      getSocket().emit('whiteboard:update', {
+                        channelId: channel.id,
+                        data: { elements: updated },
+                      });
+                      return updated;
+                    });
+                  }
+                }, 500);
               }
             }}
             onBlur={() => finishEditing()}

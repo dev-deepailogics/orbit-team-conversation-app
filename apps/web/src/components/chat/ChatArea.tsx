@@ -23,6 +23,11 @@ import {
   HardDrive,
   Loader2,
   Menu,
+  Search,
+  MoreVertical,
+  Info,
+  Pin,
+  PinOff,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
@@ -34,15 +39,21 @@ import { MarkdownRenderer } from './MarkdownRenderer';
 import { RichTextEditor, RichTextEditorRef } from './RichTextEditor';
 import { FileAttachmentList, formatFileSize, getFileCategory } from './FileAttachmentList';
 import { ChannelStorageModal } from './ChannelStorageModal';
+import { ChannelDetailsModal } from '../channel/ChannelDetailsModal';
+import { PinnedMessagesModal } from './PinnedMessagesModal';
 
 interface ChatAreaProps {
   channel: Channel;
   messages: Message[];
   currentUser: UserProfile | null;
   typingUsers: string[];
+  hasMoreMessages?: boolean;
+  isLoadingOlder?: boolean;
+  onLoadOlderMessages?: () => void;
   onOpenThread: (message: Message) => void;
   onStartHuddle: (channel: Channel) => void;
   onOpenAddMembers?: () => void;
+  onOpenSearch?: () => void;
   onToggleMobileSidebar?: () => void;
 }
 
@@ -51,9 +62,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   messages,
   currentUser,
   typingUsers,
+  hasMoreMessages = false,
+  isLoadingOlder = false,
+  onLoadOlderMessages,
   onOpenThread,
   onStartHuddle,
   onOpenAddMembers,
+  onOpenSearch,
   onToggleMobileSidebar,
 }) => {
   const [content, setContent] = useState('');
@@ -66,16 +81,79 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [isDragOver, setIsDragOver] = useState(false);
   const [showFormatting, setShowFormatting] = useState(true);
   const [showStorageModal, setShowStorageModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showPinsModal, setShowPinsModal] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
   const [activeView, setActiveView] = useState<'messages' | 'whiteboard'>('messages');
   const [copiedChannelId, setCopiedChannelId] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const previousScrollHeightRef = useRef<number>(0);
+  const isInitialLoadRef = useRef(true);
+  const previousMessagesCountRef = useRef(0);
   const editorRef = useRef<RichTextEditorRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Close more menu when clicking outside
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const handleClickOutside = (e: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setShowMoreMenu(false);
+      }
+    };
+    if (showMoreMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showMoreMenu]);
+
+  // Reset scroll and load state when channel changes
+  useEffect(() => {
+    isInitialLoadRef.current = true;
+    previousMessagesCountRef.current = 0;
+    previousScrollHeightRef.current = 0;
+  }, [channel.id]);
+
+  useEffect(() => {
+    // 1. Initial load of channel messages: jump straight to bottom
+    if (isInitialLoadRef.current) {
+      if (messages.length > 0) {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+        isInitialLoadRef.current = false;
+      }
+      previousMessagesCountRef.current = messages.length;
+      return;
+    }
+
+    // 2. Older messages prepended at top: maintain exact scroll position
+    if (previousScrollHeightRef.current > 0 && scrollContainerRef.current) {
+      const newScrollHeight = scrollContainerRef.current.scrollHeight;
+      const heightDifference = newScrollHeight - previousScrollHeightRef.current;
+      scrollContainerRef.current.scrollTop += heightDifference;
+      previousScrollHeightRef.current = 0;
+      previousMessagesCountRef.current = messages.length;
+      return;
+    }
+
+    // 3. New message added at the bottom: scroll to bottom
+    if (messages.length > previousMessagesCountRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    previousMessagesCountRef.current = messages.length;
   }, [messages]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    // When user scrolls close to top (within 40px), trigger loading older messages
+    if (target.scrollTop <= 40 && hasMoreMessages && !isLoadingOlder && onLoadOlderMessages) {
+      previousScrollHeightRef.current = target.scrollHeight;
+      onLoadOlderMessages();
+    }
+  };
 
   useEffect(() => {
     setTopEmojis(getTopEmojis(5));
@@ -240,6 +318,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
   };
 
+  const handleTogglePin = async (msg: Message) => {
+    try {
+      const res = await api.post(`/api/messages/${msg.id}/pin`, {
+        isPinned: !msg.isPinned,
+      });
+      useChatStore.getState().updateMessage(res.data.message);
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to toggle pin');
+    }
+  };
+
   const getDirectChannelTitle = () => {
     if (channel.type !== 'DIRECT') return channel.name;
     if (channel.members && channel.members.length > 0) {
@@ -279,50 +368,41 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </button>
           )}
 
-          {channel.type === 'DIRECT' ? (
-            <span className="font-bold text-slack-green text-base shrink-0">@</span>
-          ) : channel.type === 'PRIVATE' ? (
-            <Lock size={18} className="text-gray-400 shrink-0" />
-          ) : (
-            <Hash size={20} className="text-gray-400 shrink-0" />
-          )}
-          <span className="font-bold text-white text-sm sm:text-base truncate">
-            {getDirectChannelTitle()}
-          </span>
-
-          {/* Copy Channel ID button for developer & bot testing */}
+          {/* Channel Name Button (Click to open details) */}
           <button
-            onClick={handleCopyChannelId}
-            title={copiedChannelId ? 'Channel ID Copied!' : `Click to copy Channel ID: ${channel.id}`}
-            className="hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#2C3136]/60 hover:bg-[#3E4348] text-gray-400 hover:text-white border border-gray-700/60 text-[10px] font-mono transition shrink-0"
+            onClick={() => setShowDetailsModal(true)}
+            title="Click to view channel details"
+            className="flex items-center gap-1.5 hover:bg-white/5 px-2 py-1 rounded-lg transition group min-w-0"
           >
-            {copiedChannelId ? (
-              <>
-                <Check size={11} className="text-slack-green" />
-                <span className="text-slack-green font-semibold">Copied!</span>
-              </>
+            {channel.type === 'DIRECT' ? (
+              <span className="font-bold text-slack-green text-base shrink-0">@</span>
+            ) : channel.type === 'PRIVATE' ? (
+              <Lock size={18} className="text-gray-400 group-hover:text-white shrink-0" />
             ) : (
-              <>
-                <Copy size={11} />
-                <span className="truncate max-w-[80px]">{channel.id.slice(0, 8)}...</span>
-              </>
+              <Hash size={20} className="text-gray-400 group-hover:text-white shrink-0" />
             )}
+            <span className="font-bold text-white text-sm sm:text-base truncate group-hover:underline">
+              {getDirectChannelTitle()}
+            </span>
           </button>
 
-          {channel.topic && channel.type !== 'DIRECT' && (
-            <>
-              <span className="text-gray-600 hidden md:inline">|</span>
-              <span className="text-xs text-gray-400 truncate max-w-xs hidden md:inline">{channel.topic}</span>
-            </>
-          )}
+          {/* Show Details Button */}
+          <button
+            onClick={() => setShowDetailsModal(true)}
+            title="Channel info, description, and members"
+            className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#2C3136]/50 hover:bg-[#383F45] text-gray-400 hover:text-white border border-gray-700/60 text-xs font-medium transition shrink-0 ml-1"
+          >
+            <Info size={13} className="text-slack-green" />
+            <span className="hidden sm:inline">Details</span>
+          </button>
 
-          {/* Chat vs Canvas / Whiteboard Mode Selector */}
-          <div className="flex items-center bg-[#222529] border border-gray-700 rounded-lg p-0.5 ml-1 sm:ml-2 shrink-0">
+          {/* Chat vs Canvas Mode Switch */}
+          <div className="flex items-center bg-[#222529] border border-gray-700/80 rounded-lg p-0.5 ml-1 sm:ml-2 shrink-0">
             <button
               onClick={() => setActiveView('messages')}
               className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-xs font-medium transition ${
                 activeView === 'messages'
-                  ? 'bg-[#383F45] text-white shadow'
+                  ? 'bg-[#383F45] text-white shadow font-semibold'
                   : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -344,40 +424,30 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
 
         {/* Actions in Header */}
-        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-          {/* Direct Whiteboard / Canvas button on desktop */}
-          <button
-            onClick={() => setActiveView(activeView === 'whiteboard' ? 'messages' : 'whiteboard')}
-            title="Open Brainstorming Whiteboard"
-            className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${
-              activeView === 'whiteboard'
-                ? 'bg-slack-green text-white border-slack-green shadow'
-                : 'bg-[#2C3136] hover:bg-[#3E4348] text-gray-300 hover:text-white border-gray-700'
-            }`}
-          >
-            <PenTool size={14} className={activeView === 'whiteboard' ? 'text-white' : 'text-slack-green'} />
-            <span>{activeView === 'whiteboard' ? 'Back to Chat' : 'Whiteboard'}</span>
-          </button>
-
-          {channel.type !== 'DIRECT' && onOpenAddMembers && (
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Search Messages Button */}
+          {onOpenSearch && (
             <button
-              onClick={onOpenAddMembers}
-              title="Add members to channel"
+              onClick={onOpenSearch}
+              title="Search messages (Cmd+K / Ctrl+K)"
               className="flex items-center gap-1.5 p-1.5 sm:px-3 sm:py-1.5 rounded-lg bg-[#2C3136] hover:bg-[#3E4348] text-gray-300 hover:text-white border border-gray-700 text-xs font-medium transition"
             >
-              <UserPlus size={14} />
-              <span className="hidden sm:inline">Add People</span>
+              <Search size={14} className="text-slack-green" />
+              <span className="hidden sm:inline">Search</span>
+              <kbd className="hidden lg:inline text-[10px] bg-[#1F2326] px-1 py-0.2 rounded text-gray-400 font-mono border border-gray-700 ml-0.5">
+                ⌘K
+              </kbd>
             </button>
           )}
 
-          {/* Channel Files & Storage Button */}
+          {/* Pinned Messages Button */}
           <button
-            onClick={() => setShowStorageModal(true)}
-            title="Channel Files & Storage"
-            className="flex items-center gap-1.5 p-1.5 sm:px-3 sm:py-1.5 rounded-lg bg-[#2C3136] hover:bg-[#3E4348] text-gray-300 hover:text-white border border-gray-700 text-xs font-medium transition"
+            onClick={() => setShowPinsModal(true)}
+            title="View Pinned Messages"
+            className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg bg-[#2C3136] hover:bg-[#3E4348] text-gray-300 hover:text-white border border-gray-700 text-xs font-medium transition"
           >
-            <HardDrive size={14} className="text-slack-green" />
-            <span className="hidden sm:inline">Files</span>
+            <Pin size={14} className="text-amber-400 fill-amber-400/30" />
+            <span className="hidden sm:inline">Pins</span>
           </button>
 
           {/* Call / Meet Button */}
@@ -389,6 +459,99 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <PhoneCall size={14} />
             <span className="hidden sm:inline">Call</span>
           </button>
+
+          {/* Vertical Three Dots Menu (Most Right Corner) */}
+          <div className="relative" ref={moreMenuRef}>
+            <button
+              onClick={() => setShowMoreMenu(!showMoreMenu)}
+              title="More options"
+              className={`p-1.5 sm:p-2 rounded-lg border text-gray-300 hover:text-white transition ${
+                showMoreMenu
+                  ? 'bg-slack-green/20 border-slack-green text-slack-green'
+                  : 'bg-[#2C3136] hover:bg-[#3E4348] border-gray-700'
+              }`}
+            >
+              <MoreVertical size={16} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {showMoreMenu && (
+              <div className="absolute right-0 mt-1.5 w-56 bg-[#222529] border border-gray-700 rounded-xl shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+                {channel.type !== 'DIRECT' && onOpenAddMembers && (
+                  <button
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      onOpenAddMembers();
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-xs text-gray-200 hover:text-white hover:bg-white/5 flex items-center gap-2.5 transition"
+                  >
+                    <UserPlus size={14} className="text-slack-green" />
+                    <span>Add People</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    setShowPinsModal(true);
+                  }}
+                  className="w-full px-3.5 py-2 text-left text-xs text-gray-200 hover:text-white hover:bg-white/5 flex items-center gap-2.5 transition"
+                >
+                  <Pin size={14} className="text-amber-400 fill-amber-400" />
+                  <span>Pinned Messages</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    setShowDetailsModal(true);
+                  }}
+                  className="w-full px-3.5 py-2 text-left text-xs text-gray-200 hover:text-white hover:bg-white/5 flex items-center gap-2.5 transition"
+                >
+                  <Info size={14} className="text-slack-green" />
+                  <span>Channel Details & Info</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    setShowStorageModal(true);
+                  }}
+                  className="w-full px-3.5 py-2 text-left text-xs text-gray-200 hover:text-white hover:bg-white/5 flex items-center gap-2.5 transition"
+                >
+                  <HardDrive size={14} className="text-slack-green" />
+                  <span>Channel Files & Storage</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    setActiveView(activeView === 'whiteboard' ? 'messages' : 'whiteboard');
+                  }}
+                  className="w-full px-3.5 py-2 text-left text-xs text-gray-200 hover:text-white hover:bg-white/5 flex items-center gap-2.5 transition"
+                >
+                  <PenTool size={14} className="text-slack-green" />
+                  <span>{activeView === 'whiteboard' ? 'Back to Chat' : 'Whiteboard & Canvas'}</span>
+                </button>
+
+                <div className="h-px bg-gray-700/60 my-1" />
+
+                <button
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    handleCopyChannelId();
+                  }}
+                  className="w-full px-3.5 py-2 text-left text-xs text-gray-400 hover:text-white hover:bg-white/5 flex items-center justify-between transition"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <Copy size={14} />
+                    <span>Copy Channel ID</span>
+                  </span>
+                  {copiedChannelId && <Check size={12} className="text-slack-green" />}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -404,7 +567,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       ) : (
         <>
           {/* Message List */}
-      <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-4">
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-4"
+      >
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center text-gray-500">
             <div className="w-12 h-12 rounded-full bg-[#2C3136] flex items-center justify-center mb-3 text-gray-400">
@@ -414,7 +581,47 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <p className="text-sm max-w-xs mt-1">This channel was created for your team. Send a message to get started!</p>
           </div>
         ) : (
-          messages.map((msg) => {
+          <>
+            {/* Load older messages button / indicator */}
+            {hasMoreMessages && (
+              <div className="flex justify-center py-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (scrollContainerRef.current) {
+                      previousScrollHeightRef.current = scrollContainerRef.current.scrollHeight;
+                    }
+                    onLoadOlderMessages?.();
+                  }}
+                  disabled={isLoadingOlder}
+                  className="px-4 py-1.5 bg-[#2C3136] hover:bg-[#383F45] text-xs font-medium text-gray-300 hover:text-white rounded-full transition flex items-center gap-2 border border-gray-700/60 shadow-xs disabled:opacity-50 cursor-pointer"
+                >
+                  {isLoadingOlder ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin text-slack-green" />
+                      <span>Loading older messages...</span>
+                    </>
+                  ) : (
+                    <span>Load older messages</span>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* Start of channel header (only shown when user has scrolled all the way to the beginning) */}
+            {!hasMoreMessages && (
+              <div className="py-6 border-b border-gray-800/60 mb-2">
+                <div className="w-12 h-12 rounded-2xl bg-[#2C3136] flex items-center justify-center mb-3 text-gray-300 shadow">
+                  <Hash size={24} />
+                </div>
+                <h3 className="font-bold text-lg text-white">This is the start of #{channel.name}</h3>
+                <p className="text-xs text-gray-400 mt-1 max-w-md">
+                  {channel.description || channel.topic || 'This is the very beginning of the channel history.'}
+                </p>
+              </div>
+            )}
+
+            {messages.map((msg) => {
             const isBot = !!msg.bot;
             const authorName = isBot ? msg.bot?.name : (msg.user?.displayName || 'Unknown');
             const avatarUrl = isBot
@@ -425,11 +632,19 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               <div
                 key={msg.id}
                 id={`msg-${msg.id}`}
-                className="group flex gap-2.5 sm:gap-3 hover:bg-[#222529]/60 -mx-3 sm:-mx-6 px-3 sm:px-6 py-2 rounded-lg transition-all duration-300 relative"
+                className={`group flex gap-2.5 sm:gap-3 hover:bg-[#222529]/60 -mx-3 sm:-mx-6 px-3 sm:px-6 py-2 rounded-lg transition-all duration-300 relative ${
+                  msg.isPinned ? 'bg-amber-500/5 border-l-2 border-amber-400/80 pl-2 sm:pl-5' : ''
+                }`}
               >
                 <img src={avatarUrl} alt={authorName} className="w-9 h-9 rounded-lg object-cover shrink-0 mt-0.5" />
 
                 <div className="flex-1 min-w-0">
+                  {msg.isPinned && (
+                    <div className="flex items-center gap-1 text-[11px] text-amber-400 font-semibold mb-1">
+                      <Pin size={11} className="fill-amber-400" />
+                      <span>Pinned to channel</span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-sm text-white hover:underline cursor-pointer flex items-center gap-1.5">
                       {authorName}
@@ -582,6 +797,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   >
                     <MessageSquare size={14} />
                   </button>
+                  <button
+                    onClick={() => handleTogglePin(msg)}
+                    title={msg.isPinned ? 'Unpin message' : 'Pin message to channel'}
+                    className={`p-1 rounded transition ${
+                      msg.isPinned
+                        ? 'text-amber-400 hover:text-amber-300'
+                        : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                    }`}
+                  >
+                    <Pin size={14} className={msg.isPinned ? 'fill-amber-400' : ''} />
+                  </button>
                 </div>
 
                 {/* Anchored Mini Emoji Popover */}
@@ -596,9 +822,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 )}
               </div>
             );
-          })
-        )}
-        <div ref={messagesEndRef} />
+          })}
+        </>
+      )}
+      <div ref={messagesEndRef} />
       </div>
 
       {/* Typing Indicator */}
@@ -805,6 +1032,43 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           onClose={() => setShowStorageModal(false)}
           onFileDeleted={(deletedFileId) => {
             useChatStore.getState().removeAttachment(deletedFileId);
+          }}
+        />
+      )}
+
+      {/* Channel Details & Info Modal */}
+      {showDetailsModal && (
+        <ChannelDetailsModal
+          isOpen={showDetailsModal}
+          onClose={() => setShowDetailsModal(false)}
+          channel={channel}
+          currentUser={currentUser}
+          onOpenAddMembers={onOpenAddMembers}
+          onOpenWhiteboard={() => setActiveView('whiteboard')}
+          onOpenStorage={() => setShowStorageModal(true)}
+          onChannelUpdated={(updated) => {
+            // Update channel in store if needed
+            useChatStore.getState().updateChannel(updated);
+          }}
+        />
+      )}
+
+      {/* Pinned Messages Modal */}
+      {showPinsModal && (
+        <PinnedMessagesModal
+          isOpen={showPinsModal}
+          onClose={() => setShowPinsModal(false)}
+          channel={channel}
+          currentUser={currentUser}
+          onJumpToMessage={(msg) => {
+            const el = document.getElementById(`msg-${msg.id}`);
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              el.classList.add('bg-slack-activeChannel/25', 'ring-2', 'ring-slack-activeChannel');
+              setTimeout(() => {
+                el.classList.remove('bg-slack-activeChannel/25', 'ring-2', 'ring-slack-activeChannel');
+              }, 3000);
+            }
           }}
         />
       )}

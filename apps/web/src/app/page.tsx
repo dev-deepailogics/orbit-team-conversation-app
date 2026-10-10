@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Workspace, Channel, Message } from '@orbit/types';
 import { useAuthStore } from '../stores/authStore';
@@ -21,7 +22,17 @@ import { HuddleModal } from '../components/huddle/HuddleModal';
 import { IncomingCallDialog } from '../components/huddle/IncomingCallDialog';
 import { AddMembersDialog } from '../components/channel/AddMembersDialog';
 import { BotPortalDialog } from '../components/bot/BotPortalDialog';
-import { Layers } from 'lucide-react';
+import { SearchMessagesDialog } from '../components/chat/SearchMessagesDialog';
+import {
+  Layers,
+  ShieldCheck,
+  Building2,
+  LogOut,
+  RefreshCw,
+  Copy,
+  Check,
+  Plus,
+} from 'lucide-react';
 
 export default function AppDashboard() {
   const router = useRouter();
@@ -56,6 +67,34 @@ export default function AppDashboard() {
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
+  // Empty workspace state management
+  const [copiedEmail, setCopiedEmail] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showCreateWsModal, setShowCreateWsModal] = useState(false);
+  const [newWsName, setNewWsName] = useState('');
+  const [newWsSlug, setNewWsSlug] = useState('');
+  const [isCreatingWs, setIsCreatingWs] = useState(false);
+
+  // Message chunking & pagination
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+
+  // Message search modal state
+  const [showSearchModal, setShowSearchModal] = useState(false);
+
+  // Global search shortcut (Cmd+K / Ctrl+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowSearchModal((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Keep a ref to the current channel to avoid stale closures in socket events
   const currentChannelRef = useRef<Channel | null>(null);
   useEffect(() => {
@@ -74,23 +113,31 @@ export default function AppDashboard() {
   }, [isLoading, token, router]);
 
   // 2. Fetch User's Workspaces
-  useEffect(() => {
-    if (!user || !token) return;
-
-    const loadWorkspaces = async () => {
-      try {
-        const res = await api.get('/api/workspaces');
-        setWorkspaces(res.data);
-        if (res.data.length > 0 && !currentWorkspace) {
+  const loadWorkspaces = async () => {
+    try {
+      const res = await api.get('/api/workspaces');
+      setWorkspaces(res.data);
+      if (res.data.length > 0) {
+        if (!currentWorkspace || !res.data.some((w: Workspace) => w.id === currentWorkspace.id)) {
           handleSelectWorkspace(res.data[0]);
         }
-      } catch (err) {
-        console.error('Failed to load workspaces', err);
-      } finally {
-        setIsDataLoading(false);
+      } else {
+        // Clear active workspace and channels when user has 0 workspaces
+        setCurrentWorkspace(null);
+        setChannels([]);
+        setCurrentChannel(null);
+        setMessages([]);
       }
-    };
+    } catch (err) {
+      console.error('Failed to load workspaces', err);
+    } finally {
+      setIsDataLoading(false);
+      setIsRefreshing(false);
+    }
+  };
 
+  useEffect(() => {
+    if (!user || !token) return;
     loadWorkspaces();
   }, [user, token]);
 
@@ -110,16 +157,74 @@ export default function AppDashboard() {
     }
   };
 
-  // 4. Handle Channel Selection
+  const handleCreateWorkspace = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newWsName.trim() || !newWsSlug.trim()) return;
+    setIsCreatingWs(true);
+    try {
+      const res = await api.post('/api/workspaces', {
+        name: newWsName.trim(),
+        slug: newWsSlug.trim(),
+      });
+      const createdWs = res.data;
+      setWorkspaces((prev) => [...prev, createdWs]);
+      handleSelectWorkspace(createdWs);
+      setShowCreateWsModal(false);
+      setNewWsName('');
+      setNewWsSlug('');
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to create workspace');
+    } finally {
+      setIsCreatingWs(false);
+    }
+  };
+
+  // 4. Handle Channel Selection (Chunked Initial Load)
   const handleSelectChannel = async (channel: Channel) => {
     setCurrentChannel(channel);
+    setHasMoreMessages(false);
+    setNextCursor(null);
     try {
-      const res = await api.get(`/api/channels/${channel.id}/messages`);
-      setMessages(res.data);
+      const res = await api.get(`/api/channels/${channel.id}/messages?limit=30`);
+      if (Array.isArray(res.data)) {
+        setMessages(res.data);
+        setHasMoreMessages(res.data.length >= 30);
+        setNextCursor(res.data.length > 0 ? res.data[0].id : null);
+      } else {
+        setMessages(res.data.messages || []);
+        setHasMoreMessages(!!res.data.hasMore);
+        setNextCursor(res.data.nextCursor || null);
+      }
       const socket = getSocket(user?.id, currentWorkspace?.id);
       socket.emit('channel:join', channel.id);
     } catch (err) {
       console.error('Failed to fetch channel messages', err);
+    }
+  };
+
+  // 4a. Load Older Messages (Cursor-based Pagination)
+  const handleLoadOlderMessages = async () => {
+    if (!currentChannel || !nextCursor || isLoadingOlder) return;
+    setIsLoadingOlder(true);
+    try {
+      const res = await api.get(
+        `/api/channels/${currentChannel.id}/messages?cursor=${nextCursor}&limit=30`
+      );
+      const olderChunk = Array.isArray(res.data) ? res.data : res.data.messages || [];
+      const more = Array.isArray(res.data) ? olderChunk.length >= 30 : !!res.data.hasMore;
+      const cursor = Array.isArray(res.data)
+        ? olderChunk.length > 0
+          ? olderChunk[0].id
+          : null
+        : res.data.nextCursor || null;
+
+      useChatStore.getState().prependMessages(olderChunk);
+      setHasMoreMessages(more);
+      setNextCursor(cursor);
+    } catch (err) {
+      console.error('Failed to load older messages', err);
+    } finally {
+      setIsLoadingOlder(false);
     }
   };
 
@@ -144,6 +249,47 @@ export default function AppDashboard() {
       handleSelectChannel(dmChannel);
     } catch (err) {
       console.error('Failed to open direct message', err);
+    }
+  };
+
+  // 4c. Handle selection of searched message
+  const handleSelectSearchedMessage = async (searchedMsg: any) => {
+    try {
+      // 1. If message belongs to a channel that is not currently selected, switch to that channel
+      if (!currentChannel || currentChannel.id !== searchedMsg.channelId) {
+        let targetChannel = channels.find((c) => c.id === searchedMsg.channelId);
+        if (!targetChannel && currentWorkspace) {
+          const res = await api.get(`/api/channels/workspaces/${currentWorkspace.id}`);
+          const fetchedChannels: Channel[] = res.data;
+          setChannels(fetchedChannels);
+          targetChannel = fetchedChannels.find((c) => c.id === searchedMsg.channelId);
+        }
+        if (targetChannel) {
+          await handleSelectChannel(targetChannel);
+        }
+      }
+
+      // 2. If it's a thread reply, open the thread sidepanel
+      if (searchedMsg.parentMessageId) {
+        const threadRes = await api.get(`/api/messages/${searchedMsg.parentMessageId}/replies`);
+        if (threadRes.data.parent) {
+          handleOpenThread(threadRes.data.parent);
+        }
+      } else {
+        // 3. Highlight message in ChatArea
+        setTimeout(() => {
+          const el = document.getElementById(`msg-${searchedMsg.id}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('bg-slack-activeChannel/25', 'ring-2', 'ring-slack-activeChannel');
+            setTimeout(() => {
+              el.classList.remove('bg-slack-activeChannel/25', 'ring-2', 'ring-slack-activeChannel');
+            }, 3000);
+          }
+        }, 350);
+      }
+    } catch (err) {
+      console.error('Failed to jump to searched message', err);
     }
   };
 
@@ -225,8 +371,27 @@ export default function AppDashboard() {
       }
     };
 
+    const onMessageUpdated = (updatedMsg: Message) => {
+      useChatStore.getState().updateMessage(updatedMsg);
+    };
+
+    const onMessagePinned = (payload: { messageId: string; channelId: string; isPinned: boolean; message: Message }) => {
+      if (payload?.message) {
+        useChatStore.getState().updateMessage(payload.message);
+      }
+    };
+
+    const onMessageDeleted = (payload: { messageId: string; channelId: string }) => {
+      if (payload?.messageId) {
+        setMessages(useChatStore.getState().messages.filter((m) => m.id !== payload.messageId));
+      }
+    };
+
     socket.on('message:new', onNewMessage);
     socket.on('message:reaction', onReaction);
+    socket.on('message:updated', onMessageUpdated);
+    socket.on('message:pinned', onMessagePinned);
+    socket.on('message:deleted', onMessageDeleted);
     socket.on('typing:start', onTypingStart);
     socket.on('typing:stop', onTypingStop);
     socket.on('huddle:started', onCallStarted);
@@ -236,6 +401,9 @@ export default function AppDashboard() {
     return () => {
       socket.off('message:new', onNewMessage);
       socket.off('message:reaction', onReaction);
+      socket.off('message:updated', onMessageUpdated);
+      socket.off('message:pinned', onMessagePinned);
+      socket.off('message:deleted', onMessageDeleted);
       socket.off('typing:start', onTypingStart);
       socket.off('typing:stop', onTypingStop);
       socket.off('huddle:started', onCallStarted);
@@ -291,6 +459,7 @@ export default function AppDashboard() {
             <WorkspaceSidebar
               workspaces={workspaces}
               currentWorkspace={currentWorkspace}
+              currentUser={user}
               onSelectWorkspace={(ws) => {
                 handleSelectWorkspace(ws);
               }}
@@ -329,7 +498,17 @@ export default function AppDashboard() {
                   handleStartHuddle(ch);
                 }}
                 onLogout={logout}
+                onOpenSearch={() => {
+                  setIsMobileSidebarOpen(false);
+                  setShowSearchModal(true);
+                }}
                 onCloseMobile={() => setIsMobileSidebarOpen(false)}
+                onMemberAdded={async () => {
+                  if (currentWorkspace) {
+                    const res = await api.get(`/api/workspaces/${currentWorkspace.id}`);
+                    setMembers(res.data.members || []);
+                  }
+                }}
               />
             )}
           </div>
@@ -341,6 +520,7 @@ export default function AppDashboard() {
         <WorkspaceSidebar
           workspaces={workspaces}
           currentWorkspace={currentWorkspace}
+          currentUser={user}
           onSelectWorkspace={handleSelectWorkspace}
           onWorkspaceCreated={(ws) => {
             setWorkspaces([...workspaces, ws]);
@@ -368,20 +548,139 @@ export default function AppDashboard() {
             onOpenBotPortal={() => setShowBotPortal(true)}
             onStartHuddle={handleStartHuddle}
             onLogout={logout}
+            onOpenSearch={() => setShowSearchModal(true)}
+            onMemberAdded={async () => {
+              if (currentWorkspace) {
+                const res = await api.get(`/api/workspaces/${currentWorkspace.id}`);
+                setMembers(res.data.members || []);
+              }
+            }}
           />
         </div>
       )}
 
-      {/* 3. Main Chat View */}
-      {currentChannel ? (
+      {/* 3. Main Chat View or Empty Workspace State */}
+      {workspaces.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-[#1A1D21] relative overflow-y-auto">
+          <div className="max-w-md w-full flex flex-col items-center animate-in fade-in zoom-in-95 duration-200">
+            {user?.systemRole === 'SUPER_ADMIN' ? (
+              <>
+                <div className="w-16 h-16 rounded-2xl bg-purple-900/30 border border-purple-500/40 flex items-center justify-center mb-6 shadow-xl text-purple-400">
+                  <ShieldCheck size={36} />
+                </div>
+                <h1 className="text-2xl font-bold text-white mb-2">Orbit Super Admin</h1>
+                <p className="text-sm text-gray-400 mb-6 leading-relaxed">
+                  You are signed in as Developer & Super Administrator. You can monitor the system, assign roles, reset user passwords, or launch workspaces.
+                </p>
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full justify-center mb-6">
+                  <Link
+                    href="/admin"
+                    className="w-full sm:w-auto px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-xl shadow-lg flex items-center justify-center gap-2 transition"
+                  >
+                    <ShieldCheck size={18} />
+                    Super Admin Console
+                  </Link>
+                  <button
+                    onClick={() => setShowCreateWsModal(true)}
+                    className="w-full sm:w-auto px-5 py-2.5 bg-[#2C3136] hover:bg-[#3E4348] text-gray-200 hover:text-white text-sm font-semibold rounded-xl border border-gray-700 flex items-center justify-center gap-2 transition"
+                  >
+                    <Plus size={18} />
+                    Create Workspace
+                  </button>
+                </div>
+              </>
+            ) : user?.systemRole === 'WORKSPACE_ADMIN' ? (
+              <>
+                <div className="w-16 h-16 rounded-2xl bg-slack-activeChannel/20 border border-slack-activeChannel/40 flex items-center justify-center mb-6 shadow-xl text-slack-activeChannel">
+                  <Building2 size={36} />
+                </div>
+                <h1 className="text-2xl font-bold text-white mb-2">
+                  Welcome, {user?.displayName || 'Admin'}!
+                </h1>
+                <p className="text-sm text-gray-400 mb-6 leading-relaxed">
+                  You have been designated as a Company Administrator. Create your organization workspace to start adding channels and inviting your team members.
+                </p>
+                <div className="w-full mb-6">
+                  <button
+                    onClick={() => setShowCreateWsModal(true)}
+                    className="w-full px-5 py-3 bg-slack-green hover:bg-[#008a65] text-white text-sm font-semibold rounded-xl shadow-lg flex items-center justify-center gap-2 transition"
+                  >
+                    <Plus size={18} />
+                    Create Company Workspace
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 rounded-2xl bg-[#222529] border border-gray-700/60 flex items-center justify-center mb-6 shadow-xl text-gray-400">
+                  <Building2 size={36} />
+                </div>
+                <h1 className="text-2xl font-bold text-white mb-2">
+                  Welcome to Orbit, {user?.displayName}!
+                </h1>
+                <p className="text-sm text-gray-400 mb-6 leading-relaxed">
+                  You are not a member of any workspace yet. Orbit workspaces are private organizations. Ask your company CEO or workspace admin to add you using your account email:
+                </p>
+                <div className="w-full bg-[#19171D] border border-gray-800 rounded-xl p-4 mb-6 text-left">
+                  <span className="text-xs uppercase tracking-wider font-semibold text-gray-500 block mb-1">
+                    Your Account Email
+                  </span>
+                  <div className="flex items-center justify-between gap-2 bg-[#222529] border border-gray-700/50 rounded-lg px-3 py-2">
+                    <span className="text-sm font-mono text-gray-200 truncate">{user?.email}</span>
+                    <button
+                      onClick={() => {
+                        if (user?.email) {
+                          navigator.clipboard.writeText(user.email);
+                          setCopiedEmail(true);
+                          setTimeout(() => setCopiedEmail(false), 2000);
+                        }
+                      }}
+                      className="px-2.5 py-1 text-xs font-medium rounded bg-gray-700 hover:bg-gray-600 text-white flex items-center gap-1.5 transition shrink-0"
+                    >
+                      {copiedEmail ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
+                      {copiedEmail ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Common bottom action bar */}
+            <div className="flex items-center gap-3 w-full justify-center">
+              <button
+                onClick={() => {
+                  setIsRefreshing(true);
+                  loadWorkspaces();
+                }}
+                disabled={isRefreshing}
+                className="px-4 py-2 bg-slack-activeChannel hover:bg-[#1164A3] text-white text-xs font-semibold rounded-lg shadow flex items-center gap-2 transition disabled:opacity-50"
+              >
+                <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+                Check for Invites
+              </button>
+              <button
+                onClick={logout}
+                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-semibold rounded-lg transition flex items-center gap-2"
+              >
+                <LogOut size={14} />
+                Log out
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : currentChannel ? (
         <ChatArea
           channel={currentChannel}
           messages={messages}
           currentUser={user}
           typingUsers={typingUsers[currentChannel.id] || []}
+          hasMoreMessages={hasMoreMessages}
+          isLoadingOlder={isLoadingOlder}
+          onLoadOlderMessages={handleLoadOlderMessages}
           onOpenThread={handleOpenThread}
           onStartHuddle={handleStartHuddle}
           onOpenAddMembers={() => setShowAddMembers(true)}
+          onOpenSearch={() => setShowSearchModal(true)}
           onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
         />
       ) : (
@@ -394,6 +693,73 @@ export default function AppDashboard() {
           >
             Browse Channels
           </button>
+        </div>
+      )}
+
+      {/* Workspace Creation Modal for Admins */}
+      {showCreateWsModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in">
+          <div className="bg-[#222529] border border-gray-700/60 rounded-xl p-6 w-full max-w-md shadow-2xl">
+            <h3 className="text-lg font-bold text-white mb-1">Create a New Workspace</h3>
+            <p className="text-xs text-gray-400 mb-5">
+              Set up a dedicated workspace for your company or team.
+            </p>
+
+            <form onSubmit={handleCreateWorkspace} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+                  Workspace Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Acme Corp"
+                  value={newWsName}
+                  onChange={(e) => {
+                    setNewWsName(e.target.value);
+                    if (!newWsSlug || newWsSlug === newWsName.toLowerCase().replace(/[^a-z0-9]/g, '-')) {
+                      setNewWsSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '-'));
+                    }
+                  }}
+                  className="w-full bg-[#1A1D21] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-hidden focus:border-slack-activeChannel"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+                  Workspace URL Slug
+                </label>
+                <div className="flex items-center bg-[#1A1D21] border border-gray-700 rounded-lg px-3 py-2">
+                  <span className="text-xs text-gray-500 select-none mr-1">orbit.chat/</span>
+                  <input
+                    type="text"
+                    required
+                    placeholder="acme-corp"
+                    value={newWsSlug}
+                    onChange={(e) => setNewWsSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '-'))}
+                    className="w-full bg-transparent text-sm text-white placeholder-gray-500 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateWsModal(false)}
+                  className="px-4 py-2 text-sm text-gray-400 hover:text-white transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreatingWs}
+                  className="px-5 py-2 text-sm font-semibold rounded-lg bg-slack-green hover:bg-[#008a65] text-white transition disabled:opacity-50"
+                >
+                  {isCreatingWs ? 'Creating...' : 'Create Workspace'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
@@ -461,6 +827,17 @@ export default function AppDashboard() {
           onClose={() => setShowBotPortal(false)}
         />
       )}
+
+      {/* 9. Global Message Search Dialog */}
+      <SearchMessagesDialog
+        isOpen={showSearchModal}
+        onClose={() => setShowSearchModal(false)}
+        workspace={currentWorkspace}
+        currentChannel={currentChannel}
+        channels={channels}
+        members={members}
+        onSelectMessage={handleSelectSearchedMessage}
+      />
     </div>
   );
 }

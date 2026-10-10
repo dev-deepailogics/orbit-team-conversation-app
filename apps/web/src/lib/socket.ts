@@ -5,17 +5,20 @@ const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:4000'
 let socket: Socket | null = null;
 
 export function getSocket(userId?: string, workspaceId?: string): Socket {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('orbit_token') : null;
+
   if (!socket) {
     socket = io(SERVER_URL, {
       auth: {
+        token,
         userId,
         workspaceId,
       },
       transports: ['websocket', 'polling'],
       autoConnect: true,
     });
-  } else if (userId || workspaceId) {
-    socket.auth = { userId, workspaceId };
+  } else {
+    socket.auth = { token, userId, workspaceId };
     if (!socket.connected) {
       socket.connect();
     }

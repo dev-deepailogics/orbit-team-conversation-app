@@ -15,10 +15,12 @@ import {
   Volume2,
   HardDrive,
   X,
+  Search,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useChatStore } from '../../stores/chatStore';
 import { WorkspaceStorageModal } from '../workspace/WorkspaceStorageModal';
+import { AddWorkspaceMemberDialog } from '../workspace/AddWorkspaceMemberDialog';
 
 interface ChannelSidebarProps {
   workspace: Workspace;
@@ -33,7 +35,9 @@ interface ChannelSidebarProps {
   onOpenBotPortal: () => void;
   onStartHuddle: (channel: Channel) => void;
   onLogout: () => void;
+  onOpenSearch?: () => void;
   onCloseMobile?: () => void;
+  onMemberAdded?: () => void;
 }
 
 export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
@@ -49,10 +53,13 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   onOpenBotPortal,
   onStartHuddle,
   onLogout,
+  onOpenSearch,
   onCloseMobile,
+  onMemberAdded,
 }) => {
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [showStorageModal, setShowStorageModal] = useState(false);
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [channelName, setChannelName] = useState('');
   const [channelTopic, setChannelTopic] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
@@ -117,12 +124,12 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              copyInviteLink();
+              setShowAddMemberModal(true);
             }}
-            title={copiedInvite ? 'Copied Link!' : 'Invite Members'}
+            title="Invite & Add Members"
             className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition"
           >
-            <UserPlus size={18} className={copiedInvite ? 'text-slack-green' : ''} />
+            <UserPlus size={18} />
           </button>
           {onCloseMobile && (
             <button
@@ -141,6 +148,25 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 
       {/* Channel & DMs List */}
       <div className="flex-1 overflow-y-auto px-2 py-3 space-y-4">
+        {/* Quick Search Bar */}
+        {onOpenSearch && (
+          <div className="px-1 mb-2">
+            <button
+              onClick={onOpenSearch}
+              title="Search messages (Cmd+K / Ctrl+K)"
+              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-[#272B30] hover:bg-[#2F343A] text-gray-400 hover:text-gray-200 border border-gray-700/60 text-xs transition group"
+            >
+              <div className="flex items-center gap-2">
+                <Search size={14} className="text-gray-400 group-hover:text-slack-green transition" />
+                <span>Search messages...</span>
+              </div>
+              <kbd className="text-[10px] bg-[#1A1D21] px-1.5 py-0.5 rounded text-gray-400 font-mono border border-gray-700">
+                ⌘K
+              </kbd>
+            </button>
+          </div>
+        )}
+
         {/* Channels Section */}
         <div>
           <div className="flex items-center justify-between px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
@@ -425,6 +451,16 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           currentUser={currentUser}
           onClose={() => setShowStorageModal(false)}
           onFileDeleted={(id) => useChatStore.getState().removeAttachment(id)}
+        />
+      )}
+
+      {/* Add Workspace Member Modal */}
+      {showAddMemberModal && (
+        <AddWorkspaceMemberDialog
+          workspace={workspace}
+          currentUser={currentUser}
+          onClose={() => setShowAddMemberModal(false)}
+          onMemberAdded={onMemberAdded}
         />
       )}
     </div>

@@ -13,6 +13,11 @@ const joinWorkspaceSchema = z.object({
   inviteCode: z.string().min(1),
 });
 
+const addWorkspaceMemberSchema = z.object({
+  emailOrUsername: z.string().min(1),
+  role: z.enum(['ADMIN', 'MEMBER']).default('MEMBER'),
+});
+
 export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   // List all workspaces user belongs to
   fastify.get('/', { preHandler: [fastify.authenticate] }, async (request, reply) => {
@@ -41,6 +46,19 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
   // Create workspace
   fastify.post('/', { preHandler: [fastify.authenticate] }, async (request, reply) => {
     const userId = (request.user as { id: string }).id;
+
+    // Check user system role
+    const caller = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { systemRole: true },
+    });
+
+    if (caller?.systemRole !== 'SUPER_ADMIN' && caller?.systemRole !== 'WORKSPACE_ADMIN') {
+      return reply.status(403).send({
+        error: 'Only workspace administrators or super admins can create workspaces. Please contact the administrator.',
+      });
+    }
+
     const parseResult = createWorkspaceSchema.safeParse(request.body);
 
     if (!parseResult.success) {
@@ -274,5 +292,205 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
     }
 
     return reply.send({ success: true, workspaceId: workspace.id });
+  });
+
+  // Add member to workspace by email or username
+  fastify.post('/:workspaceId/members', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    const callerId = (request.user as { id: string }).id;
+
+    // Caller must be SUPER_ADMIN or OWNER/ADMIN of this workspace
+    const callerUser = await prisma.user.findUnique({
+      where: { id: callerId },
+      select: { systemRole: true },
+    });
+
+    const callerMember = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId, userId: callerId } },
+    });
+
+    const isAuthorized =
+      callerUser?.systemRole === 'SUPER_ADMIN' ||
+      callerMember?.role === 'OWNER' ||
+      callerMember?.role === 'ADMIN';
+
+    if (!isAuthorized) {
+      return reply.status(403).send({ error: 'Only workspace administrators can add new members' });
+    }
+
+    const parseResult = addWorkspaceMemberSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: 'emailOrUsername is required' });
+    }
+
+    const { emailOrUsername, role } = parseResult.data;
+
+    // Find target user by email, username, or id
+    const targetUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: { equals: emailOrUsername, mode: 'insensitive' } },
+          { username: { equals: emailOrUsername, mode: 'insensitive' } },
+          { id: emailOrUsername },
+        ],
+      },
+    });
+
+    if (!targetUser) {
+      return reply.status(404).send({ error: `User "${emailOrUsername}" not found. Ensure they have signed up first.` });
+    }
+
+    // Check if already in workspace
+    const existingMember = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId, userId: targetUser.id } },
+    });
+
+    if (existingMember) {
+      return reply.status(400).send({ error: `${targetUser.displayName} is already a member of this workspace` });
+    }
+
+    const member = await prisma.workspaceMember.create({
+      data: {
+        workspaceId,
+        userId: targetUser.id,
+        role: role as any,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+            status: true,
+            systemRole: true,
+          },
+        },
+      },
+    });
+
+    // Auto-join public channels
+    const publicChannels = await prisma.channel.findMany({
+      where: { workspaceId, type: 'PUBLIC' },
+    });
+
+    for (const ch of publicChannels) {
+      await prisma.channelMember.upsert({
+        where: { channelId_userId: { channelId: ch.id, userId: targetUser.id } },
+        create: { channelId: ch.id, userId: targetUser.id },
+        update: {},
+      });
+    }
+
+    // Notify default channel
+    const defaultChannel =
+      publicChannels.find((c) => c.name === 'general') || publicChannels[0];
+    if (defaultChannel) {
+      try {
+        await sendSystemNotification({
+          workspaceId,
+          channelId: defaultChannel.id,
+          content: `👋 **${targetUser.displayName}** was added to the workspace! Welcome! 🎉`,
+          io: fastify.io,
+        });
+      } catch (err) {
+        fastify.log.error(err, 'Failed to send welcome message');
+      }
+    }
+
+    return reply.status(201).send(member);
+  });
+
+  // Remove member from workspace
+  fastify.delete('/:workspaceId/members/:memberUserId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { workspaceId, memberUserId } = request.params as { workspaceId: string; memberUserId: string };
+    const callerId = (request.user as { id: string }).id;
+
+    const callerUser = await prisma.user.findUnique({
+      where: { id: callerId },
+      select: { systemRole: true },
+    });
+
+    const callerMember = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId, userId: callerId } },
+    });
+
+    const isAuthorized =
+      callerUser?.systemRole === 'SUPER_ADMIN' ||
+      callerMember?.role === 'OWNER' ||
+      callerMember?.role === 'ADMIN';
+
+    if (!isAuthorized) {
+      return reply.status(403).send({ error: 'Only workspace administrators can remove members' });
+    }
+
+    const workspace = await prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { ownerId: true },
+    });
+
+    if (workspace?.ownerId === memberUserId) {
+      return reply.status(400).send({ error: 'Cannot remove the workspace owner' });
+    }
+
+    await prisma.workspaceMember.deleteMany({
+      where: { workspaceId, userId: memberUserId },
+    });
+
+    // Remove from channels of that workspace
+    const channels = await prisma.channel.findMany({
+      where: { workspaceId },
+      select: { id: true },
+    });
+
+    await prisma.channelMember.deleteMany({
+      where: {
+        userId: memberUserId,
+        channelId: { in: channels.map((c) => c.id) },
+      },
+    });
+
+    return reply.send({ success: true, removedUserId: memberUserId });
+  });
+
+  // Update workspace settings (Name, Icon)
+  fastify.patch('/:workspaceId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    const callerId = (request.user as { id: string }).id;
+
+    const callerUser = await prisma.user.findUnique({
+      where: { id: callerId },
+      select: { systemRole: true },
+    });
+
+    const callerMember = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId, userId: callerId } },
+    });
+
+    const isAuthorized =
+      callerUser?.systemRole === 'SUPER_ADMIN' ||
+      callerMember?.role === 'OWNER' ||
+      callerMember?.role === 'ADMIN';
+
+    if (!isAuthorized) {
+      return reply.status(403).send({ error: 'Only workspace administrators can update workspace settings' });
+    }
+
+    const updateWsSchema = z.object({
+      name: z.string().min(2).max(50).optional(),
+      iconUrl: z.string().url().optional(),
+    });
+
+    const parseResult = updateWsSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.errors[0].message });
+    }
+
+    const updated = await prisma.workspace.update({
+      where: { id: workspaceId },
+      data: parseResult.data,
+    });
+
+    return reply.send(updated);
   });
 };

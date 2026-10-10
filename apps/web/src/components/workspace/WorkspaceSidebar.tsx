@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Workspace } from '@orbit/types';
-import { Plus, Hash, Layers } from 'lucide-react';
+import Link from 'next/link';
+import { Workspace, UserProfile } from '@orbit/types';
+import { Plus, Hash, Layers, ShieldCheck } from 'lucide-react';
 import { api } from '../../lib/api';
 
 interface WorkspaceSidebarProps {
   workspaces: Workspace[];
   currentWorkspace: Workspace | null;
+  currentUser?: UserProfile | null;
   onSelectWorkspace: (workspace: Workspace) => void;
   onWorkspaceCreated: (workspace: Workspace) => void;
 }
@@ -15,6 +17,7 @@ interface WorkspaceSidebarProps {
 export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   workspaces,
   currentWorkspace,
+  currentUser,
   onSelectWorkspace,
   onWorkspaceCreated,
 }) => {
@@ -70,14 +73,28 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           );
         })}
 
-        {/* Add Workspace Button */}
-        <button
-          onClick={() => setShowCreateModal(true)}
-          title="Add a Workspace"
-          className="w-11 h-11 rounded-xl bg-[#2C3136]/60 border border-dashed border-gray-600 text-gray-400 hover:text-white hover:bg-[#2C3136] hover:border-gray-400 flex items-center justify-center transition-all duration-200"
-        >
-          <Plus size={20} />
-        </button>
+        {/* Add Workspace Button (Only for Super Admin and Workspace Admins) */}
+        {(currentUser?.systemRole === 'SUPER_ADMIN' || currentUser?.systemRole === 'WORKSPACE_ADMIN') && (
+          <button
+            onClick={() => setShowCreateModal(true)}
+            title="Create a Workspace"
+            className="w-11 h-11 rounded-xl bg-[#2C3136]/60 border border-dashed border-gray-600 text-gray-400 hover:text-white hover:bg-[#2C3136] hover:border-gray-400 flex items-center justify-center transition-all duration-200"
+          >
+            <Plus size={20} />
+          </button>
+        )}
+
+        {/* Super Admin Control Center Button */}
+        {currentUser?.systemRole === 'SUPER_ADMIN' && (
+          <Link
+            href="/admin"
+            title="Super Admin Control Center"
+            className="w-11 h-11 rounded-xl bg-purple-900/30 border border-purple-500/40 text-purple-400 hover:bg-purple-600 hover:text-white flex items-center justify-center transition-all duration-200 shadow-lg group relative"
+          >
+            <ShieldCheck size={20} className="transition group-hover:scale-110" />
+            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-purple-500 rounded-full animate-ping" />
+          </Link>
+        )}
       </div>
 
       {/* Create Workspace Modal */}

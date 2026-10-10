@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { UserProfile } from '@orbit/types';
 import { api } from '../lib/api';
+import { useChatStore } from './chatStore';
 
 interface AuthState {
   user: UserProfile | null;
@@ -27,6 +28,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (typeof window !== 'undefined') {
       localStorage.removeItem('orbit_token');
     }
+    useChatStore.getState().reset();
     set({ user: null, token: null, isLoading: false });
   },
 
