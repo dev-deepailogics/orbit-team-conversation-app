@@ -385,9 +385,8 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
               prevNode = textNode;
             }
             const newRange = document.createRange();
-            const prevLen = prevNode.textContent?.length || 0;
-            newRange.setStart(prevNode, prevLen);
-            newRange.setEnd(prevNode, prevLen);
+            newRange.setStart(prevNode, 0);
+            newRange.setEnd(prevNode, 0);
             sel.removeAllRanges();
             sel.addRange(newRange);
             return;
@@ -443,12 +442,14 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         }
       }
 
-      // 4. Space after inline code tag: escape into regular text space
+      // 4. Space after inline code tag OR space after "- / * / •" to create bullet list
       if (e.key === ' ' && !e.shiftKey && !e.ctrlKey && !e.metaKey && editor) {
         const sel = window.getSelection();
         if (sel && sel.rangeCount > 0) {
           const range = sel.getRangeAt(0);
           const inlineEl = getInlineFormattingParent(range.endContainer, editor);
+
+          // If at end of code tag, exit code tag and insert regular space
           if (inlineEl && inlineEl.tagName.toLowerCase() === 'code' && isCursorAtEndOfNode(range, inlineEl)) {
             e.preventDefault();
             let nextNode = inlineEl.nextSibling;
@@ -467,13 +468,90 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
             if (onTyping) onTyping(editor.innerText.replace(/\u200B/g, ''));
             return;
           }
+
+          // Auto-convert "- " / "• " / "* " into bullet list
+          const node = sel.anchorNode;
+          const parentLi = node instanceof HTMLElement ? node.closest('li') : node?.parentElement?.closest('li');
+          if (!parentLi) {
+            const text = node?.textContent || '';
+            const offset = sel.anchorOffset;
+            if ((text === '-' || text === '•' || text === '*') && offset === 1) {
+              e.preventDefault();
+              if (node && node.nodeType === Node.TEXT_NODE) {
+                node.textContent = '';
+              }
+              document.execCommand('insertUnorderedList');
+              if (onTyping) onTyping(editor.innerText.replace(/\u200B/g, ''));
+              return;
+            }
+          }
         }
       }
 
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        if (onSubmit) onSubmit();
-        return;
+      // 5. Enter key handling: Continue bullet lists on next line OR submit message
+      if (e.key === 'Enter') {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0 && editor) {
+          const range = sel.getRangeAt(0);
+          const node = sel.anchorNode;
+          const parentLi = node instanceof HTMLElement ? node.closest('li') : node?.parentElement?.closest('li');
+
+          if (parentLi && editor.contains(parentLi)) {
+            e.preventDefault();
+            const liRawText = parentLi.textContent?.replace(/\u200B/g, '').trim() || '';
+
+            // If empty bullet: exit bullet list
+            if (!liRawText) {
+              const parentList = parentLi.parentElement; // <ul> or <ol>
+              parentLi.remove();
+              const newDiv = document.createElement('div');
+              newDiv.innerHTML = '<br>';
+              if (parentList && parentList.nextSibling) {
+                parentList.parentNode?.insertBefore(newDiv, parentList.nextSibling);
+              } else if (parentList && parentList.parentNode) {
+                parentList.parentNode.appendChild(newDiv);
+              } else {
+                editor.appendChild(newDiv);
+              }
+              const newRange = document.createRange();
+              newRange.setStart(newDiv, 0);
+              newRange.setEnd(newDiv, 0);
+              sel.removeAllRanges();
+              sel.addRange(newRange);
+            } else {
+              // Create next bullet <li>
+              const newLi = document.createElement('li');
+              const splitRange = document.createRange();
+              splitRange.selectNodeContents(parentLi);
+              splitRange.setStart(range.endContainer, range.endOffset);
+              const trailingFrag = splitRange.extractContents();
+
+              if (trailingFrag.textContent?.trim() || trailingFrag.childNodes.length > 0) {
+                newLi.appendChild(trailingFrag);
+              } else {
+                newLi.innerHTML = '<br>';
+              }
+
+              parentLi.parentNode?.insertBefore(newLi, parentLi.nextSibling);
+
+              const newRange = document.createRange();
+              newRange.setStart(newLi, 0);
+              newRange.setEnd(newLi, 0);
+              sel.removeAllRanges();
+              sel.addRange(newRange);
+            }
+
+            if (onTyping) onTyping(editor.innerText.replace(/\u200B/g, ''));
+            return;
+          }
+        }
+
+        // Outside list: Shift+Enter inserts newline, plain Enter submits
+        if (!e.shiftKey) {
+          e.preventDefault();
+          if (onSubmit) onSubmit();
+          return;
+        }
       }
 
       // Keyboard Formatting Shortcuts

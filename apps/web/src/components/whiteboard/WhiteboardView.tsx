@@ -1015,9 +1015,8 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
                 prevNode = textNode;
               }
               const newRange = document.createRange();
-              const prevLen = prevNode.textContent?.length || 0;
-              newRange.setStart(prevNode, prevLen);
-              newRange.setEnd(prevNode, prevLen);
+              newRange.setStart(prevNode, 0);
+              newRange.setEnd(prevNode, 0);
               sel.removeAllRanges();
               sel.addRange(newRange);
               return;
@@ -1046,8 +1045,75 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
               node.textContent = '';
             }
             document.execCommand('insertUnorderedList');
+            const md = htmlToMarkdown(editor.innerHTML);
+            setEditText(md);
+            updateSelectedFormatting({ text: md });
             return;
           }
+        }
+      }
+    }
+
+    // Enter key inside bullet list: automatically create next bullet or exit list
+    if (e.key === 'Enter') {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && editor) {
+        const range = sel.getRangeAt(0);
+        const node = sel.anchorNode;
+        const parentLi =
+          node instanceof HTMLElement
+            ? node.closest('li')
+            : node?.parentElement?.closest('li');
+
+        if (parentLi && editor.contains(parentLi)) {
+          e.preventDefault();
+          const liRawText = parentLi.textContent?.replace(/\u200B/g, '').trim() || '';
+
+          if (!liRawText) {
+            // Empty bullet: exit bullet list
+            const parentList = parentLi.parentElement;
+            parentLi.remove();
+            const newDiv = document.createElement('div');
+            newDiv.innerHTML = '<br>';
+            if (parentList && parentList.nextSibling) {
+              parentList.parentNode?.insertBefore(newDiv, parentList.nextSibling);
+            } else if (parentList && parentList.parentNode) {
+              parentList.parentNode.appendChild(newDiv);
+            } else {
+              editor.appendChild(newDiv);
+            }
+            const newRange = document.createRange();
+            newRange.setStart(newDiv, 0);
+            newRange.setEnd(newDiv, 0);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+          } else {
+            // Create next bullet <li>
+            const newLi = document.createElement('li');
+            const splitRange = document.createRange();
+            splitRange.selectNodeContents(parentLi);
+            splitRange.setStart(range.endContainer, range.endOffset);
+            const trailingFrag = splitRange.extractContents();
+
+            if (trailingFrag.textContent?.trim() || trailingFrag.childNodes.length > 0) {
+              newLi.appendChild(trailingFrag);
+            } else {
+              newLi.innerHTML = '<br>';
+            }
+
+            parentLi.parentNode?.insertBefore(newLi, parentLi.nextSibling);
+
+            const newRange = document.createRange();
+            newRange.setStart(newLi, 0);
+            newRange.setEnd(newLi, 0);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+          }
+
+          const md = htmlToMarkdown(editor.innerHTML);
+          setEditText(md);
+          updateSelectedFormatting({ text: md });
+          return;
         }
       }
     }
