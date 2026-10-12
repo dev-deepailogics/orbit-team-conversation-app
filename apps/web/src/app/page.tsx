@@ -26,6 +26,7 @@ import { BotPortalDialog } from '../components/bot/BotPortalDialog';
 import { SearchMessagesDialog } from '../components/chat/SearchMessagesDialog';
 import { ProjectBoardView } from '../components/project/ProjectBoardView';
 import { CreateProjectModal } from '../components/project/CreateProjectModal';
+import { CreateTicketFromMessageDialog } from '../components/project/CreateTicketFromMessageDialog';
 import {
   Layers,
   ShieldCheck,
@@ -70,6 +71,7 @@ export default function AppDashboard() {
     addProject,
     updateProject,
     removeProject,
+    addTicket,
   } = useProjectStore();
 
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -77,6 +79,7 @@ export default function AppDashboard() {
   const [showBotPortal, setShowBotPortal] = useState(false);
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
+  const [messageForTicket, setMessageForTicket] = useState<Message | null>(null);
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
@@ -734,6 +737,7 @@ export default function AppDashboard() {
           project={currentProject}
           currentUser={user}
           members={members}
+          channels={channels}
           onBackToChat={() => setCurrentProject(null)}
           onDeleteProject={(id) => removeProject(id)}
         />
@@ -748,6 +752,7 @@ export default function AppDashboard() {
           onLoadOlderMessages={handleLoadOlderMessages}
           onOpenThread={handleOpenThread}
           onStartHuddle={handleStartHuddle}
+          onCreateTicketFromMessage={(msg) => setMessageForTicket(msg)}
           onOpenAddMembers={() => setShowAddMembers(true)}
           onOpenSearch={() => setShowSearchModal(true)}
           onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
@@ -912,11 +917,29 @@ export default function AppDashboard() {
       {showCreateProjectModal && currentWorkspace && (
         <CreateProjectModal
           workspaceId={currentWorkspace.id}
+          channels={channels}
           onClose={() => setShowCreateProjectModal(false)}
           onProjectCreated={(newProj) => {
             addProject(newProj);
             setCurrentProject(newProj);
           }}
+        />
+      )}
+
+      {/* 11. Create Ticket from Message Dialog */}
+      {messageForTicket && currentWorkspace && (
+        <CreateTicketFromMessageDialog
+          isOpen={!!messageForTicket}
+          onClose={() => setMessageForTicket(null)}
+          message={messageForTicket}
+          projects={projects}
+          workspaceId={currentWorkspace.id}
+          members={members}
+          onTicketCreated={(ticket) => {
+            addTicket(ticket);
+            setMessageForTicket(null);
+          }}
+          onOpenCreateProject={() => setShowCreateProjectModal(true)}
         />
       )}
     </div>

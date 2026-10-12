@@ -8,6 +8,7 @@ import {
   TicketPriority,
   WorkspaceMember,
   UserProfile,
+  Channel,
   SOCKET_EVENTS,
 } from '@orbit/types';
 import { api } from '../../lib/api';
@@ -33,12 +34,17 @@ import {
   Columns3,
   Flame,
   Check,
+  ChevronLeft,
+  ChevronRight,
+  Bell,
+  GripVertical,
 } from 'lucide-react';
 
 interface ProjectBoardViewProps {
   project: Project;
   currentUser: UserProfile | null;
   members: WorkspaceMember[];
+  channels?: Channel[];
   onBackToChat: () => void;
   onDeleteProject?: (projectId: string) => void;
 }
@@ -68,12 +74,15 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
   project: initialProject,
   currentUser,
   members,
+  channels = [],
   onBackToChat,
   onDeleteProject,
 }) => {
   const {
     currentProject,
     setCurrentProject,
+    updateProject,
+    setColumns,
     addColumn,
     updateColumn,
     removeColumn,
@@ -104,7 +113,44 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
 
   // Drag and drop state
   const [draggedTicketId, setDraggedTicketId] = useState<string | null>(null);
+  const [draggedColId, setDraggedColId] = useState<string | null>(null);
   const [dragOverColId, setDragOverColId] = useState<string | null>(null);
+
+  // Column reordering helper (button click: left/right)
+  const handleMoveColumn = async (columnId: string, direction: 'left' | 'right') => {
+    const cols = [...(project.columns || [])];
+    const index = cols.findIndex((c) => c.id === columnId);
+    if (index === -1) return;
+    const targetIndex = direction === 'left' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= cols.length) return;
+
+    const temp = cols[index];
+    cols[index] = cols[targetIndex];
+    cols[targetIndex] = temp;
+
+    const updatedCols = cols.map((col, idx) => ({ ...col, orderIndex: idx }));
+    setColumns(updatedCols);
+
+    try {
+      await api.patch(`/api/projects/${project.id}/columns/reorder`, {
+        columnOrders: updatedCols.map((c) => ({ id: c.id, orderIndex: c.orderIndex })),
+      });
+    } catch (err) {
+      console.error('Failed to reorder columns', err);
+    }
+  };
+
+  // Notification channel update helper
+  const handleUpdateNotificationChannel = async (channelId: string) => {
+    try {
+      const res = await api.put(`/api/projects/${project.id}`, {
+        notificationChannelId: channelId || null,
+      });
+      updateProject(res.data);
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to update notification channel');
+    }
+  };
 
   // Load latest project details on mount or project switch
   useEffect(() => {
@@ -178,6 +224,12 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
       }
     };
 
+    const onColumnReorder = (payload: { projectId: string; columns: ProjectColumn[] }) => {
+      if (payload.projectId === project.id) {
+        setColumns(payload.columns);
+      }
+    };
+
     socket.on(SOCKET_EVENTS.TICKET_NEW, onTicketNew);
     socket.on(SOCKET_EVENTS.TICKET_UPDATE, onTicketUpdate);
     socket.on(SOCKET_EVENTS.TICKET_DELETE, onTicketDelete);
@@ -185,6 +237,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
     socket.on(SOCKET_EVENTS.COLUMN_NEW, onColumnNew);
     socket.on(SOCKET_EVENTS.COLUMN_UPDATE, onColumnUpdate);
     socket.on(SOCKET_EVENTS.COLUMN_DELETE, onColumnDelete);
+    socket.on(SOCKET_EVENTS.COLUMN_REORDER, onColumnReorder);
 
     return () => {
       socket.off(SOCKET_EVENTS.TICKET_NEW, onTicketNew);
@@ -194,15 +247,16 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
       socket.off(SOCKET_EVENTS.COLUMN_NEW, onColumnNew);
       socket.off(SOCKET_EVENTS.COLUMN_UPDATE, onColumnUpdate);
       socket.off(SOCKET_EVENTS.COLUMN_DELETE, onColumnDelete);
+      socket.off(SOCKET_EVENTS.COLUMN_REORDER, onColumnReorder);
     };
-  }, [project.id, addTicket, updateTicket, removeTicket, moveTicket, addColumn, updateColumn, removeColumn]);
+  }, [project.id, addTicket, updateTicket, removeTicket, moveTicket, addColumn, updateColumn, removeColumn, setColumns]);
 
   // Drag and drop handlers
   const handleDragStart = (e: React.DragEvent, ticket: Ticket) => {
     setDraggedTicketId(ticket.id);
     e.dataTransfer.setData(
       'text/plain',
-      JSON.stringify({ ticketId: ticket.id, fromColumnId: ticket.columnId })
+      JSON.stringify({ type: 'ticket', ticketId: ticket.id, fromColumnId: ticket.columnId })
     );
     e.dataTransfer.effectAllowed = 'move';
   };
@@ -223,12 +277,35 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
     e.preventDefault();
     setDragOverColId(null);
     setDraggedTicketId(null);
+    setDraggedColId(null);
 
     try {
       const dataStr = e.dataTransfer.getData('text/plain');
       if (!dataStr) return;
-      const { ticketId, fromColumnId } = JSON.parse(dataStr);
+      const parsed = JSON.parse(dataStr);
 
+      // 1. Column drag & drop reorder
+      if (parsed.type === 'column') {
+        const fromColId = parsed.columnId;
+        if (fromColId && fromColId !== toColumnId) {
+          const cols = [...(project.columns || [])];
+          const fromIdx = cols.findIndex((c) => c.id === fromColId);
+          const toIdx = cols.findIndex((c) => c.id === toColumnId);
+          if (fromIdx !== -1 && toIdx !== -1) {
+            const [movedCol] = cols.splice(fromIdx, 1);
+            cols.splice(toIdx, 0, movedCol);
+            const updatedCols = cols.map((c, i) => ({ ...c, orderIndex: i }));
+            setColumns(updatedCols);
+            await api.patch(`/api/projects/${project.id}/columns/reorder`, {
+              columnOrders: updatedCols.map((c) => ({ id: c.id, orderIndex: c.orderIndex })),
+            });
+          }
+        }
+        return;
+      }
+
+      // 2. Ticket move
+      const { ticketId, fromColumnId } = parsed;
       if (!ticketId || !fromColumnId) return;
 
       const columns = project.columns || [];
@@ -384,6 +461,30 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
 
         {/* Right Action Bar */}
         <div className="flex items-center gap-2">
+          {/* Notification Channel Selector */}
+          <div
+            className="flex items-center gap-1.5 bg-[#25282C] border border-gray-700/80 rounded-lg px-2.5 py-1 text-xs text-gray-300"
+            title="Channel where Orbit Bot broadcasts activity updates"
+          >
+            <Bell size={13} className="text-slack-green shrink-0" />
+            <span className="text-[11px] text-gray-400 hidden xl:inline">Notify:</span>
+            <select
+              value={project.notificationChannelId || ''}
+              onChange={(e) => handleUpdateNotificationChannel(e.target.value)}
+              className="bg-transparent text-white text-xs font-semibold focus:outline-hidden cursor-pointer max-w-[120px] sm:max-w-[150px] truncate"
+            >
+              {channels && channels.length > 0 ? (
+                channels.map((ch) => (
+                  <option key={ch.id} value={ch.id} className="bg-[#222529] text-white">
+                    #{ch.name}
+                  </option>
+                ))
+              ) : (
+                <option value="" className="bg-[#222529] text-white">#general</option>
+              )}
+            </select>
+          </div>
+
           {/* New Ticket Button */}
           <button
             onClick={() => {
@@ -483,7 +584,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
 
       {/* Kanban Board Horizontal Scroll Area */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden p-4 sm:p-6 flex items-start gap-4">
-        {columns.map((column) => {
+        {columns.map((column, colIndex) => {
           const colTickets = (column.tickets || []).filter(filterTicket);
           const isDragTarget = dragOverColId === column.id;
 
@@ -499,9 +600,24 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                   : 'border-gray-800'
               }`}
             >
-              {/* Column Header */}
-              <div className="p-3.5 border-b border-gray-800/80 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-2 flex-1 min-w-0 mr-2">
+              {/* Column Header (Draggable for reordering) */}
+              <div
+                draggable
+                onDragStart={(e) => {
+                  e.stopPropagation();
+                  setDraggedColId(column.id);
+                  e.dataTransfer.setData(
+                    'text/plain',
+                    JSON.stringify({ type: 'column', columnId: column.id })
+                  );
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                className={`p-3.5 border-b border-gray-800/80 flex items-center justify-between shrink-0 cursor-move ${
+                  draggedColId === column.id ? 'opacity-50' : ''
+                }`}
+              >
+                <div className="flex items-center gap-2 flex-1 min-w-0 mr-1.5">
+                  <GripVertical size={13} className="text-gray-500 hover:text-gray-300 shrink-0" />
                   <span
                     style={{ backgroundColor: column.color || '#3B82F6' }}
                     className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs"
@@ -536,10 +652,37 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                   </span>
                 </div>
 
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5">
+                  {/* Reorder Column Left */}
+                  <button
+                    disabled={colIndex === 0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMoveColumn(column.id, 'left');
+                    }}
+                    title="Move column left"
+                    className="p-1 hover:bg-gray-700/60 rounded text-gray-400 hover:text-white disabled:opacity-20 transition"
+                  >
+                    <ChevronLeft size={13} />
+                  </button>
+
+                  {/* Reorder Column Right */}
+                  <button
+                    disabled={colIndex === columns.length - 1}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMoveColumn(column.id, 'right');
+                    }}
+                    title="Move column right"
+                    className="p-1 hover:bg-gray-700/60 rounded text-gray-400 hover:text-white disabled:opacity-20 transition"
+                  >
+                    <ChevronRight size={13} />
+                  </button>
+
                   {/* Quick Add Ticket to this Column */}
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setEditingTicket(null);
                       setTargetColumnId(column.id);
                       setShowTicketModal(true);
@@ -552,7 +695,10 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
 
                   {/* Column Settings / Delete */}
                   <button
-                    onClick={() => handleDeleteColumn(column.id, column.name)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteColumn(column.id, column.name);
+                    }}
                     title="Delete column"
                     className="p-1 hover:bg-red-500/20 rounded text-gray-400 hover:text-red-400 transition"
                   >

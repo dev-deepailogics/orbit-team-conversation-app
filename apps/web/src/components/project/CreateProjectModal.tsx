@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Project } from '@orbit/types';
+import { Project, Channel } from '@orbit/types';
 import { api } from '../../lib/api';
-import { X, FolderKanban, Sparkles } from 'lucide-react';
+import { X, FolderKanban, Sparkles, Bell } from 'lucide-react';
 
 interface CreateProjectModalProps {
   workspaceId: string;
+  channels?: Channel[];
   onClose: () => void;
   onProjectCreated: (project: Project) => void;
 }
@@ -25,13 +26,16 @@ const COLORS = [
 
 export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   workspaceId,
+  channels = [],
   onClose,
   onProjectCreated,
 }) => {
+  const defaultCh = channels.find((c) => c.name.toLowerCase() === 'general') || channels[0];
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [icon, setIcon] = useState('📋');
   const [color, setColor] = useState('#007A5A');
+  const [notificationChannelId, setNotificationChannelId] = useState(defaultCh?.id || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -48,6 +52,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
         description: description.trim() || undefined,
         icon,
         color,
+        notificationChannelId: notificationChannelId || undefined,
       });
 
       onProjectCreated(res.data);
@@ -164,14 +169,40 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
             </div>
           </div>
 
+          {/* Activity Notifications Channel */}
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5 flex items-center gap-1.5">
+              <Bell size={13} className="text-slack-green" />
+              Activity Notifications Channel
+            </label>
+            <select
+              value={notificationChannelId}
+              onChange={(e) => setNotificationChannelId(e.target.value)}
+              className="w-full bg-[#222529] border border-gray-700/80 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-hidden focus:border-slack-green transition"
+            >
+              {channels.length > 0 ? (
+                channels.map((ch) => (
+                  <option key={ch.id} value={ch.id}>
+                    #{ch.name} {ch.name.toLowerCase() === 'general' ? '(Default)' : ''}
+                  </option>
+                ))
+              ) : (
+                <option value="">#general (Default)</option>
+              )}
+            </select>
+            <span className="text-[11px] text-gray-500 mt-1 block">
+              Orbit Bot will send notifications for new tickets and column movements here.
+            </span>
+          </div>
+
           {/* Default Columns Hint */}
           <div className="p-3 bg-[#222529]/60 border border-gray-800 rounded-xl text-xs text-gray-400 flex items-center gap-2">
             <Sparkles size={16} className="text-slack-green shrink-0" />
             <span>
-              Includes default columns: <strong className="text-gray-200">To Do</strong>,{' '}
-              <strong className="text-gray-200">In Progress</strong>,{' '}
-              <strong className="text-gray-200">Paused</strong>, and{' '}
-              <strong className="text-gray-200">Done</strong> (fully customizable!).
+              Includes default columns: <strong className="text-gray-200">Todo</strong>,{' '}
+              <strong className="text-gray-200">Inprogress</strong>,{' '}
+              <strong className="text-gray-200">In review</strong>, and{' '}
+              <strong className="text-gray-200">Done</strong> (fully reorderable & customizable!).
             </span>
           </div>
 

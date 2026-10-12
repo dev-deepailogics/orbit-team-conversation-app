@@ -245,10 +245,12 @@ export interface Project {
   description: string | null;
   icon: string | null;
   color: string | null;
+  notificationChannelId?: string | null;
   createdById: string;
   createdAt: string;
   updatedAt: string;
   creator?: UserProfile;
+  notificationChannel?: Channel | null;
   columns?: ProjectColumn[];
   tickets?: Ticket[];
   _count?: {
@@ -331,6 +333,7 @@ export const SOCKET_EVENTS = {
   COLUMN_NEW: 'column:new',
   COLUMN_UPDATE: 'column:update',
   COLUMN_DELETE: 'column:delete',
+  COLUMN_REORDER: 'column:reorder',
 
   // Presence & Notifications
   USER_STATUS_CHANGE: 'user:status_change',

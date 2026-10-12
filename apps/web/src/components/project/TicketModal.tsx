@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ProjectColumn, Ticket, TicketPriority, WorkspaceMember } from '@orbit/types';
 import { api } from '../../lib/api';
+import { RichTextEditor, RichTextEditorRef } from '../chat/RichTextEditor';
 import {
   X,
   Trash2,
@@ -21,6 +22,8 @@ interface TicketModalProps {
   columns: ProjectColumn[];
   defaultColumnId?: string;
   ticket?: Ticket | null;
+  initialTitle?: string;
+  initialDescription?: string;
   members: WorkspaceMember[];
   onClose: () => void;
   onTicketCreated?: (ticket: Ticket) => void;
@@ -40,6 +43,8 @@ export const TicketModal: React.FC<TicketModalProps> = ({
   columns,
   defaultColumnId,
   ticket,
+  initialTitle,
+  initialDescription,
   members,
   onClose,
   onTicketCreated,
@@ -47,9 +52,9 @@ export const TicketModal: React.FC<TicketModalProps> = ({
   onTicketDeleted,
 }) => {
   const isEditing = !!ticket;
+  const editorRef = useRef<RichTextEditorRef>(null);
 
-  const [title, setTitle] = useState(ticket?.title || '');
-  const [description, setDescription] = useState(ticket?.description || '');
+  const [title, setTitle] = useState(ticket?.title || initialTitle || '');
   const [columnId, setColumnId] = useState(ticket?.columnId || defaultColumnId || columns[0]?.id || '');
   const [priority, setPriority] = useState<TicketPriority>(ticket?.priority || 'MEDIUM');
   const [assigneeId, setAssigneeId] = useState<string | null>(ticket?.assigneeId || null);
@@ -68,11 +73,13 @@ export const TicketModal: React.FC<TicketModalProps> = ({
     setIsSubmitting(true);
     setError('');
 
+    const desc = editorRef.current?.getMarkdown()?.trim() || '';
+
     try {
       if (isEditing && ticket) {
         const res = await api.put(`/api/projects/${projectId}/tickets/${ticket.id}`, {
           title: title.trim(),
-          description: description.trim() || null,
+          description: desc || null,
           columnId,
           priority,
           assigneeId: assigneeId || null,
@@ -82,7 +89,7 @@ export const TicketModal: React.FC<TicketModalProps> = ({
       } else {
         const res = await api.post(`/api/projects/${projectId}/tickets`, {
           title: title.trim(),
-          description: description.trim() || null,
+          description: desc || null,
           columnId,
           priority,
           assigneeId: assigneeId || null,
@@ -160,16 +167,17 @@ export const TicketModal: React.FC<TicketModalProps> = ({
 
           {/* Description */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5">
-              Description <span className="text-gray-500 font-normal lowercase">(optional)</span>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5 flex items-center justify-between">
+              <span>Description <span className="text-gray-500 font-normal lowercase">(rich formatting)</span></span>
             </label>
-            <textarea
-              rows={3}
-              placeholder="Add more details, acceptance criteria, or context..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full bg-[#222529] border border-gray-700/80 rounded-xl px-3.5 py-2 text-sm text-white placeholder-gray-500 focus:outline-hidden focus:border-slack-green resize-none transition"
-            />
+            <div className="bg-[#222529] border border-gray-700/80 rounded-xl overflow-hidden focus-within:border-slack-green transition">
+              <RichTextEditor
+                ref={editorRef}
+                initialValue={ticket?.description || initialDescription || ''}
+                placeholder="Add formatted details, bullet lists, code blocks, or links..."
+                minHeight="80px"
+              />
+            </div>
           </div>
 
           {/* Column Status & Priority Grid */}

@@ -9,6 +9,7 @@ const createProjectSchema = z.object({
   description: z.string().optional().nullable(),
   icon: z.string().optional().default('📋'),
   color: z.string().optional().default('#007A5A'),
+  notificationChannelId: z.string().uuid().optional().nullable(),
 });
 
 const updateProjectSchema = z.object({
@@ -16,6 +17,14 @@ const updateProjectSchema = z.object({
   description: z.string().optional().nullable(),
   icon: z.string().optional(),
   color: z.string().optional(),
+  notificationChannelId: z.string().uuid().optional().nullable(),
+});
+
+const reorderColumnsSchema = z.object({
+  columnOrders: z.array(z.object({
+    id: z.string().uuid(),
+    orderIndex: z.number().int(),
+  })),
 });
 
 const createColumnSchema = z.object({
@@ -78,6 +87,13 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
             avatarUrl: true,
           },
         },
+        notificationChannel: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+          },
+        },
         _count: {
           select: {
             columns: true,
@@ -108,13 +124,22 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.status(400).send({ error: parseResult.error.errors[0].message });
     }
 
-    const { name, description, icon, color } = parseResult.data;
+    const { name, description, icon, color, notificationChannelId } = parseResult.data;
 
-    // Default Kanban columns: To Do, In Progress, Paused, Done
+    let targetNotifChannelId = notificationChannelId;
+    if (!targetNotifChannelId) {
+      const generalChannel = await prisma.channel.findFirst({
+        where: { workspaceId, name: 'general' },
+        select: { id: true },
+      });
+      targetNotifChannelId = generalChannel?.id || null;
+    }
+
+    // Default Kanban columns: Todo, Inprogress, In review, Done
     const defaultColumns = [
-      { name: 'To Do', color: '#3B82F6', orderIndex: 0 },
-      { name: 'In Progress', color: '#F59E0B', orderIndex: 1 },
-      { name: 'Paused', color: '#EC4899', orderIndex: 2 },
+      { name: 'Todo', color: '#3B82F6', orderIndex: 0 },
+      { name: 'Inprogress', color: '#F59E0B', orderIndex: 1 },
+      { name: 'In review', color: '#8B5CF6', orderIndex: 2 },
       { name: 'Done', color: '#10B981', orderIndex: 3 },
     ];
 
@@ -125,6 +150,7 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         description,
         icon,
         color,
+        notificationChannelId: targetNotifChannelId,
         createdById: userId,
         columns: {
           create: defaultColumns,
@@ -137,6 +163,13 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
             username: true,
             displayName: true,
             avatarUrl: true,
+          },
+        },
+        notificationChannel: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
           },
         },
         columns: {
@@ -170,6 +203,13 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
             username: true,
             displayName: true,
             avatarUrl: true,
+          },
+        },
+        notificationChannel: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
           },
         },
         columns: {
@@ -243,6 +283,13 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
             username: true,
             displayName: true,
             avatarUrl: true,
+          },
+        },
+        notificationChannel: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
           },
         },
       },
@@ -367,6 +414,57 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     return reply.send({ success: true, message: 'Column deleted' });
   });
 
+  // 8b. Reorder Columns
+  fastify.patch('/:projectId/columns/reorder', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { projectId } = request.params as { projectId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return reply.status(404).send({ error: 'Project not found' });
+
+    const membership = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: project.workspaceId, userId } },
+    });
+    if (!membership) return reply.status(403).send({ error: 'Unauthorized' });
+
+    const parseResult = reorderColumnsSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.errors[0].message });
+    }
+
+    const { columnOrders } = parseResult.data;
+
+    await prisma.$transaction(
+      columnOrders.map((item) =>
+        prisma.projectColumn.update({
+          where: { id: item.id },
+          data: { orderIndex: item.orderIndex },
+        })
+      )
+    );
+
+    const updatedColumns = await prisma.projectColumn.findMany({
+      where: { projectId },
+      orderBy: { orderIndex: 'asc' },
+      include: {
+        tickets: {
+          orderBy: { orderIndex: 'asc' },
+          include: {
+            creator: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+            assignee: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+          },
+        },
+      },
+    });
+
+    fastify.io.to(`workspace:${project.workspaceId}`).emit(SOCKET_EVENTS.COLUMN_REORDER, {
+      projectId,
+      columns: updatedColumns,
+    });
+
+    return reply.send({ success: true, columns: updatedColumns });
+  });
+
   // 9. Create Ticket
   fastify.post('/:projectId/tickets', { preHandler: [fastify.authenticate] }, async (request, reply) => {
     const { projectId } = request.params as { projectId: string };
@@ -429,24 +527,32 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       },
     });
 
-    // Notify assignee via Orbit Bot if assigned
+    // Notify assignee via Orbit Bot if assigned and send channel activity
     const actor = await prisma.user.findUnique({
       where: { id: userId },
       select: { displayName: true },
     });
     const actorName = actor?.displayName || 'A team member';
 
+    const targetUserIds: string[] = [];
     if (assigneeId && assigneeId !== userId) {
-      await sendTicketBotNotification({
-        workspaceId: project.workspaceId,
-        actorName,
-        ticketTitle: ticket.title,
-        projectName: project.name,
-        actionText: 'assigned you to ticket',
-        targetUserIds: [assigneeId],
-        io: fastify.io,
-      });
+      targetUserIds.push(assigneeId);
     }
+
+    const actionText = assigneeId && assigneeId !== userId && ticket.assignee
+      ? `created ticket and assigned to @${ticket.assignee.displayName}`
+      : 'created ticket';
+
+    await sendTicketBotNotification({
+      workspaceId: project.workspaceId,
+      actorName,
+      ticketTitle: ticket.title,
+      projectName: project.name,
+      actionText,
+      targetUserIds,
+      channelId: project.notificationChannelId,
+      io: fastify.io,
+    });
 
     fastify.io.to(`workspace:${project.workspaceId}`).emit(SOCKET_EVENTS.TICKET_NEW, ticket);
 
@@ -522,6 +628,7 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         projectName: project.name,
         actionText: 'assigned you to ticket',
         targetUserIds: [assigneeId],
+        channelId: project.notificationChannelId,
         io: fastify.io,
       });
     }
@@ -615,6 +722,7 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         projectName: project.name,
         actionText: `moved ticket to "${targetColumn.name}"`,
         targetUserIds: targetsToNotify,
+        channelId: project.notificationChannelId,
         io: fastify.io,
       });
     }

@@ -21,9 +21,11 @@ export interface RichTextEditorRef {
   getText: () => string;
   clear: () => void;
   focus: () => void;
+  setMarkdown: (md: string) => void;
 }
 
 interface RichTextEditorProps {
+  initialValue?: string;
   placeholder?: string;
   showToolbar?: boolean;
   onKeyDown?: (e: React.KeyboardEvent<HTMLDivElement>) => void;
@@ -145,9 +147,48 @@ export function htmlToMarkdown(html: string): string {
     .trim();
 }
 
+export function markdownToHtml(md: string): string {
+  if (!md) return '';
+  const lines = md.split('\n');
+  const htmlLines = lines.map((line) => {
+    let safe = line
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    if (safe.startsWith('### ')) {
+      return `<h3>${safe.slice(4)}</h3>`;
+    }
+    if (safe.startsWith('## ')) {
+      return `<h2>${safe.slice(3)}</h2>`;
+    }
+    if (safe.startsWith('# ')) {
+      return `<h1>${safe.slice(2)}</h1>`;
+    }
+    if (safe.startsWith('&gt; ') || safe.startsWith('> ')) {
+      return `<blockquote>${safe.replace(/^(&gt;|>)\s*/, '')}</blockquote>`;
+    }
+    if (safe.startsWith('- ') || safe.startsWith('* ')) {
+      return `<ul><li>${safe.slice(2)}</li></ul>`;
+    }
+    safe = safe.replace(/\*\*\*(.*?)\*\*\*/g, '<b><i>$1</i></b>');
+    safe = safe.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+    safe = safe.replace(/\*(.*?)\*/g, '<i>$1</i>');
+    safe = safe.replace(/~~(.*?)~~/g, '<del>$1</del>');
+    safe = safe.replace(/`([^`]+)`/g, '<code>$1</code>');
+    safe = safe.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+
+    if (!safe.trim()) return '<br>';
+    return `<div>${safe}</div>`;
+  });
+
+  return htmlLines.join('');
+}
+
 export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
   (
     {
+      initialValue,
       placeholder = 'Type a message...',
       showToolbar = true,
       onKeyDown,
@@ -159,6 +200,12 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
     ref
   ) => {
     const editorRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+      if (initialValue !== undefined && editorRef.current) {
+        editorRef.current.innerHTML = markdownToHtml(initialValue);
+      }
+    }, [initialValue]);
 
     useImperativeHandle(ref, () => ({
       insertEmoji: (emoji: string) => {
@@ -190,6 +237,11 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       },
       getText: () => {
         return (editorRef.current?.innerText || '').replace(/\u200B/g, '').trim();
+      },
+      setMarkdown: (md: string) => {
+        if (editorRef.current) {
+          editorRef.current.innerHTML = markdownToHtml(md);
+        }
       },
       clear: () => {
         if (editorRef.current) {

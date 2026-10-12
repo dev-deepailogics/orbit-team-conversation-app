@@ -28,6 +28,7 @@ import {
   Info,
   Pin,
   PinOff,
+  CheckSquare,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
@@ -52,6 +53,7 @@ interface ChatAreaProps {
   onLoadOlderMessages?: () => void;
   onOpenThread: (message: Message) => void;
   onStartHuddle: (channel: Channel) => void;
+  onCreateTicketFromMessage?: (message: Message) => void;
   onOpenAddMembers?: () => void;
   onOpenSearch?: () => void;
   onToggleMobileSidebar?: () => void;
@@ -67,6 +69,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onLoadOlderMessages,
   onOpenThread,
   onStartHuddle,
+  onCreateTicketFromMessage,
   onOpenAddMembers,
   onOpenSearch,
   onToggleMobileSidebar,
@@ -798,6 +801,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   >
                     <Pin size={14} className={msg.isPinned ? 'fill-amber-400' : ''} />
                   </button>
+                  {onCreateTicketFromMessage && (
+                    <button
+                      onClick={() => onCreateTicketFromMessage(msg)}
+                      title="Create Ticket from message"
+                      className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
+                    >
+                      <CheckSquare size={14} />
+                    </button>
+                  )}
                 </div>
 
                 {/* Anchored Mini Emoji Popover */}

@@ -105,6 +105,7 @@ export async function sendTicketBotNotification({
   projectName,
   actionText,
   targetUserIds = [],
+  channelId,
   io,
 }: {
   workspaceId: string;
@@ -113,13 +114,14 @@ export async function sendTicketBotNotification({
   projectName: string;
   actionText: string;
   targetUserIds?: string[];
+  channelId?: string | null;
   io?: any;
 }) {
   try {
     const title = `Project: ${projectName}`;
     const body = `${actorName} ${actionText} "${ticketTitle}"`;
 
-    // 1. Create in-app notifications for respective members
+    // 1. Create in-app notifications for respective members (e.g. assignee)
     const uniqueUserIds = Array.from(new Set(targetUserIds.filter(Boolean)));
     for (const uId of uniqueUserIds) {
       const notif = await prisma.notification.create({
@@ -137,20 +139,24 @@ export async function sendTicketBotNotification({
       }
     }
 
-    // 2. Also post activity message via Orbit Bot to general channel
-    const generalChannel = await prisma.channel.findFirst({
-      where: {
-        workspaceId,
-        name: 'general',
-      },
-      select: { id: true },
-    });
+    // 2. Post activity message via Orbit Bot to the project's selected notification channel (or fallback to general)
+    let targetChannelId = channelId;
+    if (!targetChannelId) {
+      const generalChannel = await prisma.channel.findFirst({
+        where: {
+          workspaceId,
+          name: 'general',
+        },
+        select: { id: true },
+      });
+      targetChannelId = generalChannel?.id || null;
+    }
 
-    if (generalChannel) {
+    if (targetChannelId) {
       const content = `🤖 **Orbit Bot** 📋 *${projectName}* • ${actorName} ${actionText} **"${ticketTitle}"**`;
       await sendSystemNotification({
         workspaceId,
-        channelId: generalChannel.id,
+        channelId: targetChannelId,
         content,
         io,
       });

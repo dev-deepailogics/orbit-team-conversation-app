@@ -139,6 +139,7 @@ model Channel {
   webhooks    Webhook[]
   huddles     Huddle[]
   attachments Attachment[]
+  projectNotifications Project[] @relation("ProjectNotificationChannel")
 
   @@index([workspaceId])
   @@index([type])
@@ -337,17 +338,20 @@ model Project {
   description String?
   icon        String?         @default("📋")
   color       String?         @default("#007A5A")
+  notificationChannelId String?
   createdById String
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
   workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   creator     User            @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  notificationChannel Channel?  @relation("ProjectNotificationChannel", fields: [notificationChannelId], references: [id], onDelete: SetNull)
   columns     ProjectColumn[]
   tickets     Ticket[]
 
   @@index([workspaceId])
   @@index([createdById])
+  @@index([notificationChannelId])
 }
 
 model ProjectColumn {

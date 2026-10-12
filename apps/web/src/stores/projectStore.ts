@@ -16,6 +16,7 @@ interface ProjectState {
   setIsLoadingProject: (loading: boolean) => void;
 
   // Real-time Column mutations on currentProject
+  setColumns: (columns: ProjectColumn[]) => void;
   addColumn: (column: ProjectColumn) => void;
   updateColumn: (column: ProjectColumn) => void;
   removeColumn: (columnId: string) => void;
@@ -75,6 +76,17 @@ export const useProjectStore = create<ProjectState>((set) => ({
   setActiveView: (view) => set({ activeView: view }),
 
   setIsLoadingProject: (loading) => set({ isLoadingProject: loading }),
+
+  setColumns: (columns) =>
+    set((state) => {
+      if (!state.currentProject) return state;
+      return {
+        currentProject: {
+          ...state.currentProject,
+          columns,
+        },
+      };
+    }),
 
   addColumn: (column) =>
     set((state) => {
