@@ -1,0 +1,16 @@
+    cd ~/projects/team-conversation-app
+    git pull origin main
+
+    # 1. Update database schema & Prisma client
+    npm run push --workspace=@orbit/db
+    npm run generate --workspace=@orbit/db
+
+    # 2. Build backend and frontend
+    npm run build --workspace=@orbit/types
+    npm run build --workspace=@orbit/db
+    npm run build --workspace=@orbit/server
+    npm run build --workspace=@orbit/web
+
+    # 3. Restart PM2 services
+    pm2 restart orbit-server --update-env
+    pm2 restart orbit-web --update-env
