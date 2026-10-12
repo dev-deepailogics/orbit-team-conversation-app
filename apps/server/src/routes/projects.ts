@@ -1,0 +1,660 @@
+import { FastifyInstance, FastifyPluginAsync } from 'fastify';
+import { prisma } from '@orbit/db';
+import { SOCKET_EVENTS } from '@orbit/types';
+import { z } from 'zod';
+import { sendTicketBotNotification } from '../services/systemBot.js';
+
+const createProjectSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().optional().nullable(),
+  icon: z.string().optional().default('📋'),
+  color: z.string().optional().default('#007A5A'),
+});
+
+const updateProjectSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  description: z.string().optional().nullable(),
+  icon: z.string().optional(),
+  color: z.string().optional(),
+});
+
+const createColumnSchema = z.object({
+  name: z.string().min(1).max(50),
+  color: z.string().optional().default('#6B7280'),
+  orderIndex: z.number().int().optional(),
+});
+
+const updateColumnSchema = z.object({
+  name: z.string().min(1).max(50).optional(),
+  color: z.string().optional(),
+  orderIndex: z.number().int().optional(),
+});
+
+const createTicketSchema = z.object({
+  columnId: z.string().uuid(),
+  title: z.string().min(1).max(255),
+  description: z.string().optional().nullable(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).default('MEDIUM'),
+  dueDate: z.string().optional().nullable(),
+  assigneeId: z.string().uuid().optional().nullable(),
+});
+
+const updateTicketSchema = z.object({
+  columnId: z.string().uuid().optional(),
+  title: z.string().min(1).max(255).optional(),
+  description: z.string().optional().nullable(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
+  dueDate: z.string().optional().nullable(),
+  assigneeId: z.string().uuid().optional().nullable(),
+  orderIndex: z.number().int().optional(),
+});
+
+const moveTicketSchema = z.object({
+  columnId: z.string().uuid(),
+  orderIndex: z.number().int().default(0),
+});
+
+export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
+  // 1. List all projects in a workspace
+  fastify.get('/workspaces/:workspaceId/projects', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const membership = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId, userId } },
+    });
+    if (!membership) {
+      return reply.status(403).send({ error: 'You are not a member of this workspace' });
+    }
+
+    const projects = await prisma.project.findMany({
+      where: { workspaceId },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+        _count: {
+          select: {
+            columns: true,
+            tickets: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return reply.send(projects);
+  });
+
+  // 2. Create a new project with default columns
+  fastify.post('/workspaces/:workspaceId/projects', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const membership = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId, userId } },
+    });
+    if (!membership) {
+      return reply.status(403).send({ error: 'You are not a member of this workspace' });
+    }
+
+    const parseResult = createProjectSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.errors[0].message });
+    }
+
+    const { name, description, icon, color } = parseResult.data;
+
+    // Default Kanban columns: To Do, In Progress, Paused, Done
+    const defaultColumns = [
+      { name: 'To Do', color: '#3B82F6', orderIndex: 0 },
+      { name: 'In Progress', color: '#F59E0B', orderIndex: 1 },
+      { name: 'Paused', color: '#EC4899', orderIndex: 2 },
+      { name: 'Done', color: '#10B981', orderIndex: 3 },
+    ];
+
+    const project = await prisma.project.create({
+      data: {
+        workspaceId,
+        name,
+        description,
+        icon,
+        color,
+        createdById: userId,
+        columns: {
+          create: defaultColumns,
+        },
+      },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+        columns: {
+          orderBy: { orderIndex: 'asc' },
+        },
+        _count: {
+          select: {
+            columns: true,
+            tickets: true,
+          },
+        },
+      },
+    });
+
+    fastify.io.to(`workspace:${workspaceId}`).emit(SOCKET_EVENTS.PROJECT_NEW, project);
+
+    return reply.status(201).send(project);
+  });
+
+  // 3. Get project details with full columns & tickets
+  fastify.get('/:projectId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { projectId } = request.params as { projectId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+        columns: {
+          orderBy: { orderIndex: 'asc' },
+          include: {
+            tickets: {
+              orderBy: { orderIndex: 'asc' },
+              include: {
+                creator: {
+                  select: {
+                    id: true,
+                    username: true,
+                    displayName: true,
+                    avatarUrl: true,
+                  },
+                },
+                assignee: {
+                  select: {
+                    id: true,
+                    username: true,
+                    displayName: true,
+                    avatarUrl: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!project) {
+      return reply.status(404).send({ error: 'Project not found' });
+    }
+
+    const membership = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: project.workspaceId, userId } },
+    });
+    if (!membership) {
+      return reply.status(403).send({ error: 'You are not a member of this workspace' });
+    }
+
+    return reply.send(project);
+  });
+
+  // 4. Update project details
+  fastify.put('/:projectId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { projectId } = request.params as { projectId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return reply.status(404).send({ error: 'Project not found' });
+
+    const membership = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: project.workspaceId, userId } },
+    });
+    if (!membership) return reply.status(403).send({ error: 'Unauthorized' });
+
+    const parseResult = updateProjectSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.errors[0].message });
+    }
+
+    const updated = await prisma.project.update({
+      where: { id: projectId },
+      data: parseResult.data,
+      include: {
+        creator: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+
+    fastify.io.to(`workspace:${project.workspaceId}`).emit(SOCKET_EVENTS.PROJECT_UPDATE, updated);
+
+    return reply.send(updated);
+  });
+
+  // 5. Delete project
+  fastify.delete('/:projectId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { projectId } = request.params as { projectId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return reply.status(404).send({ error: 'Project not found' });
+
+    const membership = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: project.workspaceId, userId } },
+    });
+    if (!membership) return reply.status(403).send({ error: 'Unauthorized' });
+
+    await prisma.project.delete({ where: { id: projectId } });
+
+    fastify.io.to(`workspace:${project.workspaceId}`).emit(SOCKET_EVENTS.PROJECT_DELETE, {
+      projectId,
+      workspaceId: project.workspaceId,
+    });
+
+    return reply.send({ success: true, message: 'Project deleted' });
+  });
+
+  // 6. Create Column in Project
+  fastify.post('/:projectId/columns', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { projectId } = request.params as { projectId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return reply.status(404).send({ error: 'Project not found' });
+
+    const membership = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: project.workspaceId, userId } },
+    });
+    if (!membership) return reply.status(403).send({ error: 'Unauthorized' });
+
+    const parseResult = createColumnSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.errors[0].message });
+    }
+
+    const { name, color, orderIndex } = parseResult.data;
+
+    const count = await prisma.projectColumn.count({ where: { projectId } });
+    const colOrder = orderIndex !== undefined ? orderIndex : count;
+
+    const column = await prisma.projectColumn.create({
+      data: {
+        projectId,
+        name,
+        color,
+        orderIndex: colOrder,
+      },
+      include: {
+        tickets: true,
+      },
+    });
+
+    fastify.io.to(`workspace:${project.workspaceId}`).emit(SOCKET_EVENTS.COLUMN_NEW, column);
+
+    return reply.status(201).send(column);
+  });
+
+  // 7. Update Column
+  fastify.put('/:projectId/columns/:columnId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { projectId, columnId } = request.params as { projectId: string; columnId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return reply.status(404).send({ error: 'Project not found' });
+
+    const membership = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: project.workspaceId, userId } },
+    });
+    if (!membership) return reply.status(403).send({ error: 'Unauthorized' });
+
+    const parseResult = updateColumnSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.errors[0].message });
+    }
+
+    const updated = await prisma.projectColumn.update({
+      where: { id: columnId },
+      data: parseResult.data,
+    });
+
+    fastify.io.to(`workspace:${project.workspaceId}`).emit(SOCKET_EVENTS.COLUMN_UPDATE, updated);
+
+    return reply.send(updated);
+  });
+
+  // 8. Delete Column
+  fastify.delete('/:projectId/columns/:columnId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { projectId, columnId } = request.params as { projectId: string; columnId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return reply.status(404).send({ error: 'Project not found' });
+
+    const membership = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: project.workspaceId, userId } },
+    });
+    if (!membership) return reply.status(403).send({ error: 'Unauthorized' });
+
+    await prisma.projectColumn.delete({ where: { id: columnId } });
+
+    fastify.io.to(`workspace:${project.workspaceId}`).emit(SOCKET_EVENTS.COLUMN_DELETE, {
+      columnId,
+      projectId,
+    });
+
+    return reply.send({ success: true, message: 'Column deleted' });
+  });
+
+  // 9. Create Ticket
+  fastify.post('/:projectId/tickets', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { projectId } = request.params as { projectId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return reply.status(404).send({ error: 'Project not found' });
+
+    const membership = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: project.workspaceId, userId } },
+    });
+    if (!membership) return reply.status(403).send({ error: 'Unauthorized' });
+
+    const parseResult = createTicketSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.errors[0].message });
+    }
+
+    const { columnId, title, description, priority, dueDate, assigneeId } = parseResult.data;
+
+    // Check column exists
+    const column = await prisma.projectColumn.findFirst({
+      where: { id: columnId, projectId },
+    });
+    if (!column) return reply.status(400).send({ error: 'Invalid column ID' });
+
+    // Order index at bottom of column
+    const ticketCount = await prisma.ticket.count({ where: { columnId } });
+
+    const ticket = await prisma.ticket.create({
+      data: {
+        projectId,
+        columnId,
+        title,
+        description,
+        priority,
+        orderIndex: ticketCount,
+        dueDate: dueDate ? new Date(dueDate) : null,
+        createdById: userId,
+        assigneeId: assigneeId || null,
+      },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+        assignee: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+        column: true,
+      },
+    });
+
+    // Notify assignee via Orbit Bot if assigned
+    const actor = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { displayName: true },
+    });
+    const actorName = actor?.displayName || 'A team member';
+
+    if (assigneeId && assigneeId !== userId) {
+      await sendTicketBotNotification({
+        workspaceId: project.workspaceId,
+        actorName,
+        ticketTitle: ticket.title,
+        projectName: project.name,
+        actionText: 'assigned you to ticket',
+        targetUserIds: [assigneeId],
+        io: fastify.io,
+      });
+    }
+
+    fastify.io.to(`workspace:${project.workspaceId}`).emit(SOCKET_EVENTS.TICKET_NEW, ticket);
+
+    return reply.status(201).send(ticket);
+  });
+
+  // 10. Update Ticket
+  fastify.put('/:projectId/tickets/:ticketId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { projectId, ticketId } = request.params as { projectId: string; ticketId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return reply.status(404).send({ error: 'Project not found' });
+
+    const membership = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: project.workspaceId, userId } },
+    });
+    if (!membership) return reply.status(403).send({ error: 'Unauthorized' });
+
+    const existingTicket = await prisma.ticket.findUnique({ where: { id: ticketId } });
+    if (!existingTicket) return reply.status(404).send({ error: 'Ticket not found' });
+
+    const parseResult = updateTicketSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.errors[0].message });
+    }
+
+    const { columnId, title, description, priority, dueDate, assigneeId, orderIndex } = parseResult.data;
+
+    const dataToUpdate: any = {};
+    if (columnId !== undefined) dataToUpdate.columnId = columnId;
+    if (title !== undefined) dataToUpdate.title = title;
+    if (description !== undefined) dataToUpdate.description = description;
+    if (priority !== undefined) dataToUpdate.priority = priority;
+    if (dueDate !== undefined) dataToUpdate.dueDate = dueDate ? new Date(dueDate) : null;
+    if (assigneeId !== undefined) dataToUpdate.assigneeId = assigneeId;
+    if (orderIndex !== undefined) dataToUpdate.orderIndex = orderIndex;
+
+    const updated = await prisma.ticket.update({
+      where: { id: ticketId },
+      data: dataToUpdate,
+      include: {
+        creator: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+        assignee: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+        column: true,
+      },
+    });
+
+    // Check if assignee changed
+    if (assigneeId && assigneeId !== existingTicket.assigneeId && assigneeId !== userId) {
+      const actor = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { displayName: true },
+      });
+      await sendTicketBotNotification({
+        workspaceId: project.workspaceId,
+        actorName: actor?.displayName || 'A team member',
+        ticketTitle: updated.title,
+        projectName: project.name,
+        actionText: 'assigned you to ticket',
+        targetUserIds: [assigneeId],
+        io: fastify.io,
+      });
+    }
+
+    fastify.io.to(`workspace:${project.workspaceId}`).emit(SOCKET_EVENTS.TICKET_UPDATE, updated);
+
+    return reply.send(updated);
+  });
+
+  // 11. Move Ticket (Drag & Drop column or reorder)
+  fastify.patch('/:projectId/tickets/:ticketId/move', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { projectId, ticketId } = request.params as { projectId: string; ticketId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return reply.status(404).send({ error: 'Project not found' });
+
+    const membership = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: project.workspaceId, userId } },
+    });
+    if (!membership) return reply.status(403).send({ error: 'Unauthorized' });
+
+    const existingTicket = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      include: { column: true },
+    });
+    if (!existingTicket) return reply.status(404).send({ error: 'Ticket not found' });
+
+    const parseResult = moveTicketSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.errors[0].message });
+    }
+
+    const { columnId: newColumnId, orderIndex: newOrderIndex } = parseResult.data;
+
+    const targetColumn = await prisma.projectColumn.findFirst({
+      where: { id: newColumnId, projectId },
+    });
+    if (!targetColumn) return reply.status(400).send({ error: 'Target column not found' });
+
+    const previousColumnId = existingTicket.columnId;
+    const isColumnChanged = previousColumnId !== newColumnId;
+
+    const updated = await prisma.ticket.update({
+      where: { id: ticketId },
+      data: {
+        columnId: newColumnId,
+        orderIndex: newOrderIndex,
+      },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+        assignee: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+        column: true,
+      },
+    });
+
+    // If moved to a new column, notify respective members via Orbit Bot!
+    if (isColumnChanged) {
+      const actor = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { displayName: true },
+      });
+      const actorName = actor?.displayName || 'A team member';
+
+      const targetsToNotify: string[] = [];
+      if (updated.assigneeId && updated.assigneeId !== userId) {
+        targetsToNotify.push(updated.assigneeId);
+      }
+      if (updated.createdById && updated.createdById !== userId && updated.createdById !== updated.assigneeId) {
+        targetsToNotify.push(updated.createdById);
+      }
+
+      await sendTicketBotNotification({
+        workspaceId: project.workspaceId,
+        actorName,
+        ticketTitle: updated.title,
+        projectName: project.name,
+        actionText: `moved ticket to "${targetColumn.name}"`,
+        targetUserIds: targetsToNotify,
+        io: fastify.io,
+      });
+    }
+
+    // Broadcast ticket move event to all workspace members
+    fastify.io.to(`workspace:${project.workspaceId}`).emit(SOCKET_EVENTS.TICKET_MOVE, {
+      ticket: updated,
+      fromColumnId: previousColumnId,
+      toColumnId: newColumnId,
+      orderIndex: newOrderIndex,
+      projectId,
+    });
+
+    return reply.send(updated);
+  });
+
+  // 12. Delete Ticket
+  fastify.delete('/:projectId/tickets/:ticketId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { projectId, ticketId } = request.params as { projectId: string; ticketId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return reply.status(404).send({ error: 'Project not found' });
+
+    const membership = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: project.workspaceId, userId } },
+    });
+    if (!membership) return reply.status(403).send({ error: 'Unauthorized' });
+
+    const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
+    if (!ticket) return reply.status(404).send({ error: 'Ticket not found' });
+
+    await prisma.ticket.delete({ where: { id: ticketId } });
+
+    fastify.io.to(`workspace:${project.workspaceId}`).emit(SOCKET_EVENTS.TICKET_DELETE, {
+      ticketId,
+      projectId,
+      columnId: ticket.columnId,
+    });
+
+    return reply.send({ success: true, message: 'Ticket deleted' });
+  });
+};

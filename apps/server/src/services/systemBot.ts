@@ -97,3 +97,65 @@ export async function sendSystemNotification({
     return null;
   }
 }
+
+export async function sendTicketBotNotification({
+  workspaceId,
+  actorName,
+  ticketTitle,
+  projectName,
+  actionText,
+  targetUserIds = [],
+  io,
+}: {
+  workspaceId: string;
+  actorName: string;
+  ticketTitle: string;
+  projectName: string;
+  actionText: string;
+  targetUserIds?: string[];
+  io?: any;
+}) {
+  try {
+    const title = `Project: ${projectName}`;
+    const body = `${actorName} ${actionText} "${ticketTitle}"`;
+
+    // 1. Create in-app notifications for respective members
+    const uniqueUserIds = Array.from(new Set(targetUserIds.filter(Boolean)));
+    for (const uId of uniqueUserIds) {
+      const notif = await prisma.notification.create({
+        data: {
+          userId: uId,
+          workspaceId,
+          type: 'SYSTEM',
+          title,
+          body,
+        },
+      });
+
+      if (io) {
+        io.to(`user:${uId}`).emit(SOCKET_EVENTS.NOTIFICATION_NEW, notif);
+      }
+    }
+
+    // 2. Also post activity message via Orbit Bot to general channel
+    const generalChannel = await prisma.channel.findFirst({
+      where: {
+        workspaceId,
+        name: 'general',
+      },
+      select: { id: true },
+    });
+
+    if (generalChannel) {
+      const content = `🤖 **Orbit Bot** 📋 *${projectName}* • ${actorName} ${actionText} **"${ticketTitle}"**`;
+      await sendSystemNotification({
+        workspaceId,
+        channelId: generalChannel.id,
+        content,
+        io,
+      });
+    }
+  } catch (err) {
+    console.error('Failed to send ticket bot notification:', err);
+  }
+}

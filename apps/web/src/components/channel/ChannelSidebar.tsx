@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Workspace, Channel, UserProfile } from '@orbit/types';
+import { Workspace, Channel, UserProfile, Project } from '@orbit/types';
 import {
   Hash,
   Lock,
@@ -16,6 +16,8 @@ import {
   HardDrive,
   X,
   Search,
+  FolderKanban,
+  Kanban,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useChatStore } from '../../stores/chatStore';
@@ -28,10 +30,14 @@ interface ChannelSidebarProps {
   currentChannel: Channel | null;
   currentUser: UserProfile | null;
   members: any[];
+  projects?: Project[];
+  currentProject?: Project | null;
   activeHuddleChannelId?: string | null;
   onSelectChannel: (channel: Channel) => void;
   onSelectUserDM: (targetUser: UserProfile) => void;
   onChannelCreated: (channel: Channel) => void;
+  onSelectProject?: (project: Project) => void;
+  onOpenCreateProject?: () => void;
   onOpenBotPortal: () => void;
   onStartHuddle: (channel: Channel) => void;
   onLogout: () => void;
@@ -46,10 +52,14 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   currentChannel,
   currentUser,
   members,
+  projects = [],
+  currentProject,
   activeHuddleChannelId,
   onSelectChannel,
   onSelectUserDM,
   onChannelCreated,
+  onSelectProject,
+  onOpenCreateProject,
   onOpenBotPortal,
   onStartHuddle,
   onLogout,
@@ -166,6 +176,63 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
             </button>
           </div>
         )}
+
+        {/* Projects & Boards Section (Trello-like) */}
+        <div>
+          <div className="flex items-center justify-between px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
+            <span className="flex items-center gap-1.5">
+              <FolderKanban size={13} className="text-slack-green" />
+              <span>Projects & Boards</span>
+            </span>
+            {onOpenCreateProject && (
+              <button
+                onClick={onOpenCreateProject}
+                title="Create Project Board"
+                className="p-1 hover:text-white hover:bg-gray-700/50 rounded transition"
+              >
+                <Plus size={14} />
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-0.5">
+            {projects.map((project) => {
+              const isActive = currentProject?.id === project.id;
+              const ticketCount = project._count?.tickets ?? project.tickets?.length ?? 0;
+
+              return (
+                <div
+                  key={project.id}
+                  onClick={() => onSelectProject?.(project)}
+                  className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
+                    isActive
+                      ? 'bg-slack-activeChannel text-white shadow font-semibold'
+                      : 'text-gray-300 hover:bg-[#2C3136] hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <span className="text-sm shrink-0">{project.icon || '📋'}</span>
+                    <span className="truncate">{project.name}</span>
+                  </div>
+
+                  <span className="text-[10px] text-gray-400 font-mono bg-black/20 group-hover:bg-black/40 px-1.5 py-0.5 rounded-full">
+                    {ticketCount}
+                  </span>
+                </div>
+              );
+            })}
+
+            {projects.length === 0 && onOpenCreateProject && (
+              <button
+                onClick={onOpenCreateProject}
+                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-gray-500 hover:text-gray-300 hover:bg-gray-800/40 transition flex items-center gap-2"
+              >
+                <Plus size={12} />
+                <span>Create a project board...</span>
+              </button>
+            )}
+          </div>
+        </div>
 
         {/* Channels Section */}
         <div>

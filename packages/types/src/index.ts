@@ -234,7 +234,60 @@ export interface SlashCommandPayload {
 }
 
 // ==========================================
-// 8. Real-time Socket Event Names & Payloads
+// 8. Projects & Kanban Boards (Trello-like)
+// ==========================================
+export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+
+export interface Project {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description: string | null;
+  icon: string | null;
+  color: string | null;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+  creator?: UserProfile;
+  columns?: ProjectColumn[];
+  tickets?: Ticket[];
+  _count?: {
+    columns?: number;
+    tickets?: number;
+  };
+}
+
+export interface ProjectColumn {
+  id: string;
+  projectId: string;
+  name: string;
+  color: string | null;
+  orderIndex: number;
+  createdAt: string;
+  updatedAt: string;
+  tickets?: Ticket[];
+}
+
+export interface Ticket {
+  id: string;
+  projectId: string;
+  columnId: string;
+  title: string;
+  description: string | null;
+  priority: TicketPriority;
+  orderIndex: number;
+  dueDate: string | null;
+  createdById: string;
+  assigneeId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  creator?: UserProfile;
+  assignee?: UserProfile | null;
+  column?: ProjectColumn;
+}
+
+// ==========================================
+// 9. Real-time Socket Event Names & Payloads
 // ==========================================
 export const SOCKET_EVENTS = {
   // Connection / Rooms
@@ -267,7 +320,20 @@ export const SOCKET_EVENTS = {
   WHITEBOARD_CURSOR: 'whiteboard:cursor',
   WHITEBOARD_CLEAR: 'whiteboard:clear',
 
+  // Projects & Kanban Boards (Trello-like)
+  PROJECT_NEW: 'project:new',
+  PROJECT_UPDATE: 'project:update',
+  PROJECT_DELETE: 'project:delete',
+  TICKET_NEW: 'ticket:new',
+  TICKET_UPDATE: 'ticket:update',
+  TICKET_DELETE: 'ticket:delete',
+  TICKET_MOVE: 'ticket:move',
+  COLUMN_NEW: 'column:new',
+  COLUMN_UPDATE: 'column:update',
+  COLUMN_DELETE: 'column:delete',
+
   // Presence & Notifications
   USER_STATUS_CHANGE: 'user:status_change',
   NOTIFICATION_NEW: 'notification:new',
 } as const;
+

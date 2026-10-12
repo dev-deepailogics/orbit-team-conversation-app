@@ -18,6 +18,7 @@ import { huddleRoutes } from './routes/huddles.js';
 import { botRoutes } from './routes/bots.js';
 import { fileRoutes } from './routes/files.js';
 import { adminRoutes } from './routes/admin.js';
+import { projectRoutes } from './routes/projects.js';
 import { setupSocketServer } from './socket/index.js';
 
 dotenv.config();
@@ -111,6 +112,7 @@ async function bootstrap() {
   await fastify.register(botRoutes, { prefix: '/api/bot' });
   await fastify.register(fileRoutes, { prefix: '/api/files' });
   await fastify.register(adminRoutes, { prefix: '/api/admin' });
+  await fastify.register(projectRoutes, { prefix: '/api/projects' });
 
   // Start Server
   try {

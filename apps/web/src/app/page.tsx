@@ -3,10 +3,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Workspace, Channel, Message } from '@orbit/types';
+import { Workspace, Channel, Message, Project, SOCKET_EVENTS } from '@orbit/types';
 import { useAuthStore } from '../stores/authStore';
 import { useChatStore } from '../stores/chatStore';
 import { useHuddleStore } from '../stores/huddleStore';
+import { useProjectStore } from '../stores/projectStore';
 import { api } from '../lib/api';
 import { getSocket } from '../lib/socket';
 
@@ -23,6 +24,8 @@ import { IncomingCallDialog } from '../components/huddle/IncomingCallDialog';
 import { AddMembersDialog } from '../components/channel/AddMembersDialog';
 import { BotPortalDialog } from '../components/bot/BotPortalDialog';
 import { SearchMessagesDialog } from '../components/chat/SearchMessagesDialog';
+import { ProjectBoardView } from '../components/project/ProjectBoardView';
+import { CreateProjectModal } from '../components/project/CreateProjectModal';
 import {
   Layers,
   ShieldCheck,
@@ -59,11 +62,21 @@ export default function AppDashboard() {
   } = useChatStore();
 
   const { startHuddle, setIncomingCall, channelId: activeHuddleChannelId } = useHuddleStore();
+  const {
+    projects,
+    currentProject,
+    setProjects,
+    setCurrentProject,
+    addProject,
+    updateProject,
+    removeProject,
+  } = useProjectStore();
 
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [showBotPortal, setShowBotPortal] = useState(false);
   const [showAddMembers, setShowAddMembers] = useState(false);
+  const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
@@ -144,10 +157,20 @@ export default function AppDashboard() {
   // 3. Handle Workspace Selection
   const handleSelectWorkspace = async (workspace: Workspace) => {
     setCurrentWorkspace(workspace);
+    setCurrentProject(null);
     try {
       const res = await api.get(`/api/workspaces/${workspace.id}`);
       setChannels(res.data.channels || []);
       setMembers(res.data.members || []);
+
+      // Load Workspace Projects
+      try {
+        const projRes = await api.get(`/api/projects/workspaces/${workspace.id}/projects`);
+        setProjects(projRes.data || []);
+      } catch (pErr) {
+        console.error('Failed to load projects', pErr);
+        setProjects([]);
+      }
 
       if (res.data.channels && res.data.channels.length > 0) {
         handleSelectChannel(res.data.channels[0]);
@@ -181,6 +204,7 @@ export default function AppDashboard() {
 
   // 4. Handle Channel Selection (Chunked Initial Load)
   const handleSelectChannel = async (channel: Channel) => {
+    setCurrentProject(null);
     setCurrentChannel(channel);
     setHasMoreMessages(false);
     setNextCursor(null);
@@ -198,8 +222,13 @@ export default function AppDashboard() {
       const socket = getSocket(user?.id, currentWorkspace?.id);
       socket.emit('channel:join', channel.id);
     } catch (err) {
-      console.error('Failed to fetch channel messages', err);
+      console.error('Failed to load channel messages', err);
     }
+  };
+
+  // 4b. Handle Project Selection
+  const handleSelectProject = (project: Project) => {
+    setCurrentProject(project);
   };
 
   // 4a. Load Older Messages (Cursor-based Pagination)
@@ -394,9 +423,24 @@ export default function AppDashboard() {
     socket.on('message:deleted', onMessageDeleted);
     socket.on('typing:start', onTypingStart);
     socket.on('typing:stop', onTypingStop);
+    const onProjectNew = (proj: Project) => {
+      addProject(proj);
+    };
+
+    const onProjectUpdate = (proj: Project) => {
+      updateProject(proj);
+    };
+
+    const onProjectDelete = (payload: { projectId: string }) => {
+      removeProject(payload.projectId);
+    };
+
     socket.on('huddle:started', onCallStarted);
     socket.on('channel:new', onChannelNew);
     socket.on('channel:updated', onChannelUpdated);
+    socket.on(SOCKET_EVENTS.PROJECT_NEW, onProjectNew);
+    socket.on(SOCKET_EVENTS.PROJECT_UPDATE, onProjectUpdate);
+    socket.on(SOCKET_EVENTS.PROJECT_DELETE, onProjectDelete);
 
     return () => {
       socket.off('message:new', onNewMessage);
@@ -409,6 +453,9 @@ export default function AppDashboard() {
       socket.off('huddle:started', onCallStarted);
       socket.off('channel:new', onChannelNew);
       socket.off('channel:updated', onChannelUpdated);
+      socket.off(SOCKET_EVENTS.PROJECT_NEW, onProjectNew);
+      socket.off(SOCKET_EVENTS.PROJECT_UPDATE, onProjectUpdate);
+      socket.off(SOCKET_EVENTS.PROJECT_DELETE, onProjectDelete);
     };
   }, [user, currentWorkspace]);
 
@@ -475,6 +522,8 @@ export default function AppDashboard() {
                 currentChannel={currentChannel}
                 currentUser={user}
                 members={members}
+                projects={projects}
+                currentProject={currentProject}
                 activeHuddleChannelId={activeHuddleChannelId}
                 onSelectChannel={(ch) => {
                   handleSelectChannel(ch);
@@ -488,6 +537,14 @@ export default function AppDashboard() {
                   setChannels([...channels, ch]);
                   handleSelectChannel(ch);
                   setIsMobileSidebarOpen(false);
+                }}
+                onSelectProject={(proj) => {
+                  handleSelectProject(proj);
+                  setIsMobileSidebarOpen(false);
+                }}
+                onOpenCreateProject={() => {
+                  setIsMobileSidebarOpen(false);
+                  setShowCreateProjectModal(true);
                 }}
                 onOpenBotPortal={() => {
                   setIsMobileSidebarOpen(false);
@@ -538,6 +595,8 @@ export default function AppDashboard() {
             currentChannel={currentChannel}
             currentUser={user}
             members={members}
+            projects={projects}
+            currentProject={currentProject}
             activeHuddleChannelId={activeHuddleChannelId}
             onSelectChannel={handleSelectChannel}
             onSelectUserDM={handleSelectUserDM}
@@ -545,6 +604,8 @@ export default function AppDashboard() {
               setChannels([...channels, ch]);
               handleSelectChannel(ch);
             }}
+            onSelectProject={handleSelectProject}
+            onOpenCreateProject={() => setShowCreateProjectModal(true)}
             onOpenBotPortal={() => setShowBotPortal(true)}
             onStartHuddle={handleStartHuddle}
             onLogout={logout}
@@ -668,6 +729,14 @@ export default function AppDashboard() {
             </div>
           </div>
         </div>
+      ) : currentProject ? (
+        <ProjectBoardView
+          project={currentProject}
+          currentUser={user}
+          members={members}
+          onBackToChat={() => setCurrentProject(null)}
+          onDeleteProject={(id) => removeProject(id)}
+        />
       ) : currentChannel ? (
         <ChatArea
           channel={currentChannel}
@@ -685,13 +754,13 @@ export default function AppDashboard() {
         />
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center text-gray-500 p-4 text-center">
-          <p className="text-base font-semibold text-gray-300">No channel selected</p>
-          <p className="text-xs text-gray-500 mt-1">Select or create a channel to begin chatting</p>
+          <p className="text-base font-semibold text-gray-300">No channel or project selected</p>
+          <p className="text-xs text-gray-500 mt-1">Select a channel, direct message, or project board to begin</p>
           <button
             onClick={() => setIsMobileSidebarOpen(true)}
             className="mt-4 md:hidden px-4 py-2 bg-slack-green hover:bg-[#008a65] text-white text-xs font-semibold rounded-lg shadow transition"
           >
-            Browse Channels
+            Browse Channels & Projects
           </button>
         </div>
       )}
@@ -838,6 +907,18 @@ export default function AppDashboard() {
         members={members}
         onSelectMessage={handleSelectSearchedMessage}
       />
+
+      {/* 10. Create Project Board Dialog */}
+      {showCreateProjectModal && currentWorkspace && (
+        <CreateProjectModal
+          workspaceId={currentWorkspace.id}
+          onClose={() => setShowCreateProjectModal(false)}
+          onProjectCreated={(newProj) => {
+            addProject(newProj);
+            setCurrentProject(newProj);
+          }}
+        />
+      )}
     </div>
   );
 }
