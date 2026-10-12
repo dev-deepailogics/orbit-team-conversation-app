@@ -271,7 +271,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
         </div>
 
         {/* Replies List */}
-        {replies.map((reply) => {
+        {replies.map((reply, idx) => {
           const replyAuthor = reply.user?.displayName || 'Unknown';
           const replyAvatar = reply.user?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${replyAuthor}`;
 
@@ -409,7 +409,11 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                   onClose={() => setActiveEmojiMessageId(null)}
                   onSelectEmoji={(emoji) => handleReaction(reply.id, emoji)}
                   title="React in Thread"
-                  positionClass="top-8 right-2"
+                  positionClass={
+                    idx >= Math.max(0, replies.length - 3)
+                      ? 'bottom-10 right-2'
+                      : 'top-8 right-2'
+                  }
                 />
               )}
             </div>
@@ -441,7 +445,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
           </div>
         )}
 
-        <form onSubmit={handleSendReply} className="bg-[#222529] border border-gray-700 rounded-lg overflow-hidden relative">
+        <form onSubmit={handleSendReply} className="bg-[#222529] border border-gray-700 rounded-lg relative">
           {/* Uploaded attachments preview */}
           {threadAttachments.length > 0 && (
             <div className="flex flex-wrap gap-1.5 p-2 bg-[#1C1F23]/80 border-b border-gray-800">
@@ -473,7 +477,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
             onTyping={(text) => setContent(text)}
             onSubmit={() => handleSendReply()}
           />
-          <div className="flex items-center justify-between px-2 py-1.5 bg-[#1C1F23]/60 border-t border-gray-800/40">
+          <div className="flex items-center justify-between px-2 py-1.5 bg-[#1C1F23]/60 border-t border-gray-800/40 rounded-b-lg">
             <div className="flex items-center gap-1">
               <input
                 type="file"
@@ -530,7 +534,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
               editorRef.current?.insertEmoji(emoji);
             }}
             title="Add Emoji"
-            positionClass="bottom-12 left-2"
+            positionClass="bottom-full mb-2 left-2 z-50"
           />
         </form>
       </div>

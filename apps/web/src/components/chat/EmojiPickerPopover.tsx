@@ -23,6 +23,7 @@ export const EmojiPickerPopover: React.FC<EmojiPickerPopoverProps> = ({
   const [topEmojis, setTopEmojis] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showFullPicker, setShowFullPicker] = useState(false);
+  const [adjustedStyle, setAdjustedStyle] = useState<React.CSSProperties>({});
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -32,6 +33,51 @@ export const EmojiPickerPopover: React.FC<EmojiPickerPopoverProps> = ({
       setSearchQuery('');
     }
   }, [isOpen]);
+
+  // Viewport Boundary Detection: Prevent popover from clipping at bottom or top of viewport
+  useEffect(() => {
+    if (!isOpen) {
+      setAdjustedStyle({});
+      return;
+    }
+
+    const checkPosition = () => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
+      const styles: React.CSSProperties = {};
+
+      // If bottom edge extends too close to or past bottom of viewport
+      if (rect.bottom > viewportHeight - 16) {
+        styles.bottom = '100%';
+        styles.top = 'auto';
+        styles.marginBottom = '8px';
+      }
+
+      // If top edge extends past top of viewport
+      if (rect.top < 60) {
+        styles.top = '100%';
+        styles.bottom = 'auto';
+        styles.marginTop = '8px';
+      }
+
+      // If right edge extends past viewport
+      if (rect.right > viewportWidth - 10) {
+        styles.right = '8px';
+        styles.left = 'auto';
+      }
+
+      setAdjustedStyle(styles);
+    };
+
+    const timer = setTimeout(checkPosition, 0);
+    window.addEventListener('resize', checkPosition);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', checkPosition);
+    };
+  }, [isOpen, showFullPicker]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -72,10 +118,11 @@ export const EmojiPickerPopover: React.FC<EmojiPickerPopoverProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`absolute z-50 bg-[#1F2326] border border-gray-700 rounded-2xl shadow-2xl overflow-hidden w-80 max-w-[calc(100vw-2rem)] animate-in fade-in zoom-in-95 duration-150 ${positionClass}`}
+      style={adjustedStyle}
+      className={`absolute z-50 bg-[#1F2326] border border-gray-700 rounded-2xl shadow-2xl overflow-hidden w-80 max-w-[calc(100vw-2rem)] max-h-[min(500px,calc(100vh-100px))] overflow-y-auto animate-in fade-in zoom-in-95 duration-150 ${positionClass}`}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-gray-800 bg-[#181B1E]">
+      <div className="sticky top-0 z-10 flex items-center justify-between px-3.5 py-2.5 border-b border-gray-800 bg-[#181B1E]">
         <div className="flex items-center gap-1.5 text-xs font-bold text-gray-200">
           <Sparkles size={14} className="text-slack-green" />
           <span>{title}</span>

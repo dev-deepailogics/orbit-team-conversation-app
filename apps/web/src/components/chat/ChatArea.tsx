@@ -614,7 +614,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               </div>
             )}
 
-            {messages.map((msg) => {
+            {messages.map((msg, idx) => {
             const isBot = !!msg.bot;
             const authorName = isBot ? msg.bot?.name : (msg.user?.displayName || 'Unknown');
             const avatarUrl = isBot
@@ -819,7 +819,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     onClose={() => setActiveEmojiMessageId(null)}
                     onSelectEmoji={(emoji) => handleReaction(msg.id, emoji)}
                     title="Add Reaction"
-                    positionClass="top-8 right-2 sm:right-4"
+                    positionClass={
+                      idx >= Math.max(0, messages.length - 4)
+                        ? 'bottom-10 right-2 sm:right-4'
+                        : 'top-8 right-2 sm:right-4'
+                    }
                   />
                 )}
               </div>
@@ -895,7 +899,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           }}
           onDragLeave={() => setIsDragOver(false)}
           onDrop={handleDrop}
-          className={`bg-[#222529] border rounded-xl focus-within:border-gray-500 shadow-lg relative overflow-hidden transition ${
+          className={`bg-[#222529] border rounded-xl focus-within:border-gray-500 shadow-lg relative transition ${
             isDragOver
               ? 'border-slack-green ring-2 ring-slack-green/50 bg-[#252C28]'
               : 'border-gray-700'
@@ -903,7 +907,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         >
           {/* File Attachments Preview & Upload Indicator */}
           {(attachments.length > 0 || isUploading) && (
-            <div className="px-3 pt-2.5 flex flex-wrap gap-2 border-b border-gray-800/80 pb-2.5 bg-[#1B1E22]/60">
+            <div className="px-3 pt-2.5 flex flex-wrap gap-2 border-b border-gray-800/80 pb-2.5 bg-[#1B1E22]/60 rounded-t-xl">
               {attachments.map((att, idx) => {
                 const isImage = getFileCategory(att.fileType, att.fileName) === 'image';
                 return (
@@ -963,7 +967,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           />
 
           {/* Action Bar */}
-          <div className="flex items-center justify-between px-3 py-2 bg-[#1C1F23]/60 border-t border-gray-800/40">
+          <div className="flex items-center justify-between px-3 py-2 bg-[#1C1F23]/60 border-t border-gray-800/40 rounded-b-xl">
             <div className="flex items-center gap-1">
               <input
                 type="file"
@@ -1011,7 +1015,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </button>
           </div>
 
-          {/* Emoji Picker Popover */}
+          {/* Emoji Picker Popover - sits completely above composer input without clipping */}
           <EmojiPickerPopover
             isOpen={showEmoji}
             onClose={() => setShowEmoji(false)}
@@ -1019,7 +1023,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               editorRef.current?.insertEmoji(emoji);
             }}
             title="Add Emoji"
-            positionClass="bottom-14 left-4"
+            positionClass="bottom-full mb-2 left-2 sm:left-4 z-50"
           />
         </form>
       </div>
