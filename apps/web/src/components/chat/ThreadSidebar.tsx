@@ -534,7 +534,12 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
           <div className="flex items-center justify-between bg-[#222529] border-l-4 border-slack-green rounded-t-lg px-3 py-1.5 mb-1 text-xs">
             <div className="min-w-0">
               <span className="text-slack-green font-semibold text-[11px] block">
-                Replying to {replyingToMessage.user?.displayName || 'Teammate'}
+                Replying to{' '}
+                {isParentAnon || replyingToMessage.isAnonymous
+                  ? replyingToMessage.anonName
+                    ? `${replyingToMessage.anonEmoji || '🎭'} ${replyingToMessage.anonName}`
+                    : 'Anonymous'
+                  : replyingToMessage.user?.displayName || 'Teammate'}
               </span>
               <span className="text-gray-400 text-[11px] truncate block max-w-xs">
                 {replyingToMessage.content}

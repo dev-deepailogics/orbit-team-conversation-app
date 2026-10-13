@@ -117,14 +117,37 @@ export function setupSocketServer(fastify: FastifyInstance, io: SocketIOServer) 
     socket.on(SOCKET_EVENTS.TYPING_START, async ({ channelId, username }) => {
       const hasAccess = await canUserAccessChannel(userId, channelId);
       if (hasAccess) {
-        socket.to(`channel:${channelId}`).emit(SOCKET_EVENTS.TYPING_START, { channelId, username, userId });
+        const channel = await prisma.channel.findUnique({
+          where: { id: channelId },
+          select: { isAnonymous: true },
+        });
+
+        if (channel?.isAnonymous) {
+          const member = await prisma.channelMember.findUnique({
+            where: { channelId_userId: { channelId, userId } },
+            select: { anonName: true, anonEmoji: true },
+          });
+          const safeName = member?.anonName ? `${member.anonEmoji || '🎭'} ${member.anonName}` : 'Someone';
+          socket.to(`channel:${channelId}`).emit(SOCKET_EVENTS.TYPING_START, {
+            channelId,
+            username: safeName,
+            userId: `anon-${userId.slice(0, 8)}`,
+          });
+        } else {
+          socket.to(`channel:${channelId}`).emit(SOCKET_EVENTS.TYPING_START, { channelId, username, userId });
+        }
       }
     });
 
     socket.on(SOCKET_EVENTS.TYPING_STOP, async ({ channelId }) => {
       const hasAccess = await canUserAccessChannel(userId, channelId);
       if (hasAccess) {
-        socket.to(`channel:${channelId}`).emit(SOCKET_EVENTS.TYPING_STOP, { channelId, userId });
+        const channel = await prisma.channel.findUnique({
+          where: { id: channelId },
+          select: { isAnonymous: true },
+        });
+        const safeUserId = channel?.isAnonymous ? `anon-${userId.slice(0, 8)}` : userId;
+        socket.to(`channel:${channelId}`).emit(SOCKET_EVENTS.TYPING_STOP, { channelId, userId: safeUserId });
       }
     });
 

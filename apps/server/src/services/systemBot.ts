@@ -45,6 +45,15 @@ export async function sendSystemNotification({
   io?: any;
 }) {
   try {
+    const channel = await prisma.channel.findUnique({
+      where: { id: channelId },
+      select: { isAnonymous: true },
+    });
+    if (channel?.isAnonymous) {
+      // Do not post bot notifications into anonymous channels to preserve privacy
+      return null;
+    }
+
     const bot = await getOrCreateSystemBot(workspaceId);
 
     const message = await prisma.message.create({

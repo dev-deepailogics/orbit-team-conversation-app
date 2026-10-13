@@ -520,20 +520,24 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     }
 
     // Add each verified user to channel
-    for (const userId of validUserIds) {
-      await prisma.channelMember.upsert({
-        where: {
-          channelId_userId: {
-            channelId,
-            userId,
+    for (const uId of validUserIds) {
+      if (channel.isAnonymous) {
+        await getOrCreateAnonProfile(channelId, uId);
+      } else {
+        await prisma.channelMember.upsert({
+          where: {
+            channelId_userId: {
+              channelId,
+              userId: uId,
+            },
           },
-        },
-        create: {
-          channelId,
-          userId,
-        },
-        update: {},
-      });
+          create: {
+            channelId,
+            userId: uId,
+          },
+          update: {},
+        });
+      }
     }
 
     const updatedChannel = await prisma.channel.findUnique({
@@ -559,28 +563,50 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       for (const uId of userIds) {
         fastify.io.to(`user:${uId}`).emit(SOCKET_EVENTS.CHANNEL_NEW, updatedChannel);
       }
-      fastify.io.to(`channel:${channelId}`).emit('channel:updated', updatedChannel);
 
-      // Post system notification from default Orbit Bot
-      try {
-        const inviter = await prisma.user.findUnique({
-          where: { id: currentUserId },
-          select: { displayName: true, username: true },
-        });
-        const addedUsers = await prisma.user.findMany({
-          where: { id: { in: userIds } },
-          select: { displayName: true, username: true },
-        });
-        const inviterName = inviter?.displayName || inviter?.username || 'Someone';
-        const addedNames = addedUsers.map((u) => u.displayName || u.username).join(', ');
-        await sendSystemNotification({
-          workspaceId: channel.workspaceId,
-          channelId,
-          content: `🎉 **${inviterName}** added **${addedNames}** to #${channel.name}.`,
-          io: fastify.io,
-        });
-      } catch (botErr) {
-        fastify.log.error(botErr, 'Failed to send channel member addition notification');
+      if (!channel.isAnonymous) {
+        fastify.io.to(`channel:${channelId}`).emit('channel:updated', updatedChannel);
+
+        // Post system notification from default Orbit Bot (strictly for non-anonymous channels)
+        try {
+          const inviter = await prisma.user.findUnique({
+            where: { id: currentUserId },
+            select: { displayName: true, username: true },
+          });
+          const addedUsers = await prisma.user.findMany({
+            where: { id: { in: userIds } },
+            select: { displayName: true, username: true },
+          });
+          const inviterName = inviter?.displayName || inviter?.username || 'Someone';
+          const addedNames = addedUsers.map((u) => u.displayName || u.username).join(', ');
+          await sendSystemNotification({
+            workspaceId: channel.workspaceId,
+            channelId,
+            content: `🎉 **${inviterName}** added **${addedNames}** to #${channel.name}.`,
+            io: fastify.io,
+          });
+        } catch (botErr) {
+          fastify.log.error(botErr, 'Failed to send channel member addition notification');
+        }
+      } else {
+        // Emit sanitized channel object for anonymous channel room
+        const sanitized = {
+          ...updatedChannel,
+          members: updatedChannel.members.map((m) => ({
+            id: m.id,
+            channelId: m.channelId,
+            anonName: m.anonName,
+            anonEmoji: m.anonEmoji,
+            user: {
+              id: `anon-${m.id.slice(0, 8)}`,
+              username: (m.anonName || 'anonymous').toLowerCase().replace(/\s+/g, '_'),
+              displayName: m.anonName || 'Anonymous Member',
+              avatarUrl: null,
+              status: 'ONLINE',
+            },
+          })),
+        };
+        fastify.io.to(`channel:${channelId}`).emit('channel:updated', sanitized);
       }
     }
 

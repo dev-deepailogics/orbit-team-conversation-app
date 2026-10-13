@@ -226,7 +226,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     const socket = getSocket();
 
     if (currentUser) {
-      socket.emit('typing:start', { channelId: channel.id, username: currentUser.displayName });
+      const typingName = channel.isAnonymous
+        ? (anonProfile ? `${anonProfile.anonEmoji} ${anonProfile.anonName}` : 'Someone')
+        : currentUser.displayName;
+      socket.emit('typing:start', { channelId: channel.id, username: typingName });
 
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => {
@@ -984,7 +987,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <div className="min-w-0 flex-1 mr-2">
               <span className="text-[11px] font-bold text-slack-green flex items-center gap-1.5">
                 <CornerUpLeft size={12} />
-                Replying to {replyingToMessage.user?.displayName || 'Teammate'}
+                Replying to{' '}
+                {channel.isAnonymous || replyingToMessage.isAnonymous
+                  ? replyingToMessage.anonName
+                    ? `${replyingToMessage.anonEmoji || '🎭'} ${replyingToMessage.anonName}`
+                    : 'Anonymous'
+                  : replyingToMessage.user?.displayName || 'Teammate'}
               </span>
               <p className="text-xs text-gray-300 truncate mt-0.5 max-w-2xl">
                 {replyingToMessage.content}
