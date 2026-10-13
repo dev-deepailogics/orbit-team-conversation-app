@@ -14,6 +14,8 @@ export interface UserProfile {
   status: UserStatus;
   customStatusText: string | null;
   customStatusEmoji: string | null;
+  anonEmoji?: string | null;
+  isAnonymous?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -66,12 +68,17 @@ export interface Channel {
   description: string | null;
   type: ChannelType;
   isArchived: boolean;
+  isAnonymous?: boolean;
   createdById: string;
   createdAt: string;
   updatedAt: string;
   members?: WorkspaceMember[];
   unreadCount?: number;
   whiteboardData?: any;
+  myAnonProfile?: {
+    anonName: string;
+    anonEmoji: string;
+  };
 }
 
 // ==========================================
@@ -126,6 +133,10 @@ export interface Message {
   parentMessageId: string | null; // For threads
   quotedMessageId?: string | null; // For quote replies
   quotedMessage?: Message | null;
+  anonName?: string | null;
+  anonEmoji?: string | null;
+  isAnonymous?: boolean;
+  isSelf?: boolean;
   content: string; // Markdown or rich text
   isEdited: boolean;
   isDeleted: boolean;

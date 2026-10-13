@@ -385,57 +385,75 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
                 ) : (
                   filteredMembers.map((m: any) => {
                     const u = m.user || {};
-                    const isCreator = details?.createdById === u.id;
+                    const isCreator = !channel.isAnonymous && details?.createdById === u.id;
+                    const isAnon = !!channel.isAnonymous;
                     return (
                       <div
                         key={m.id || u.id}
                         className="p-3 flex items-center justify-between hover:bg-gray-700/20 transition"
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="relative">
-                            <img
-                              src={
-                                u.avatarUrl ||
-                                `https://api.dicebear.com/7.x/bottts/svg?seed=${u.displayName || u.username}`
-                              }
-                              alt={u.displayName || u.username}
-                              className="w-8 h-8 rounded-lg object-cover"
-                            />
-                            <div
-                              className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#1F2326] ${
-                                u.status === 'ONLINE'
-                                  ? 'bg-slack-green'
-                                  : u.status === 'IN_HUDDLE'
-                                  ? 'bg-purple-500'
-                                  : 'bg-gray-500'
-                              }`}
-                            />
+                          <div className="relative shrink-0">
+                            {isAnon ? (
+                              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-900/70 to-indigo-900/70 border border-purple-500/40 flex items-center justify-center text-base select-none">
+                                {m.anonEmoji || '🎭'}
+                              </div>
+                            ) : (
+                              <img
+                                src={
+                                  u.avatarUrl ||
+                                  `https://api.dicebear.com/7.x/bottts/svg?seed=${u.displayName || u.username}`
+                                }
+                                alt={u.displayName || u.username}
+                                className="w-8 h-8 rounded-lg object-cover"
+                              />
+                            )}
+                            {!isAnon && (
+                              <div
+                                className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#1F2326] ${
+                                  u.status === 'ONLINE'
+                                    ? 'bg-slack-green'
+                                    : u.status === 'IN_HUDDLE'
+                                    ? 'bg-purple-500'
+                                    : 'bg-gray-500'
+                                }`}
+                              />
+                            )}
                           </div>
 
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5">
                               <span className="text-xs font-semibold text-white truncate">
-                                {u.displayName || u.username}
+                                {isAnon ? (m.anonName || u.displayName || 'Anonymous Member') : (u.displayName || u.username)}
                               </span>
+                              {isAnon && m.isSelf && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-900/60 text-purple-200 border border-purple-500/40 font-semibold">
+                                  YOU
+                                </span>
+                              )}
                               {isCreator && (
                                 <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-900/50 text-purple-300 border border-purple-700/60 font-semibold">
                                   CREATOR
                                 </span>
                               )}
-                              {u.systemRole === 'SUPER_ADMIN' && (
+                              {!isAnon && u.systemRole === 'SUPER_ADMIN' && (
                                 <span className="text-[9px] px-1.5 py-0.2 rounded bg-red-900/50 text-red-300 border border-red-700/60 font-semibold">
                                   SUPER ADMIN
                                 </span>
                               )}
                             </div>
                             <span className="text-[11px] text-gray-400 truncate block">
-                              @{u.username || 'user'} • {u.email}
+                              {isAnon
+                                ? m.isSelf
+                                  ? `@${u.username || 'user'} • You (Shielded from other members)`
+                                  : 'Anonymous Member • Identity Shielded'
+                                : `@${u.username || 'user'} • ${u.email}`}
                             </span>
                           </div>
                         </div>
 
                         <span className="text-[11px] text-gray-400 capitalize shrink-0">
-                          {u.status?.toLowerCase().replace('_', ' ') || 'offline'}
+                          {isAnon ? 'anonymous' : (u.status?.toLowerCase().replace('_', ' ') || 'offline')}
                         </span>
                       </div>
                     );

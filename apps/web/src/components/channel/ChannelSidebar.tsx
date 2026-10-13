@@ -73,6 +73,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   const [channelName, setChannelName] = useState('');
   const [channelTopic, setChannelTopic] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
+  const [isAnonymous, setIsAnonymous] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
   const unreadCounts = useChatStore((s) => s.unreadCounts);
 
@@ -84,12 +85,14 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
         name: channelName.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
         topic: channelTopic,
         type: isPrivate ? 'PRIVATE' : 'PUBLIC',
+        isAnonymous,
       });
       onChannelCreated(res.data);
       setShowCreateChannel(false);
       setChannelName('');
       setChannelTopic('');
       setIsPrivate(false);
+      setIsAnonymous(false);
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to create channel');
     }
@@ -265,12 +268,19 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                   }`}
                 >
                   <div className="flex items-center gap-2 truncate">
-                    {channel.type === 'PRIVATE' ? (
+                    {channel.isAnonymous ? (
+                      <span className="text-sm shrink-0 leading-none" title="Anonymous Channel">🎭</span>
+                    ) : channel.type === 'PRIVATE' ? (
                       <Lock size={15} className={unread > 0 ? 'text-white' : 'text-gray-400'} />
                     ) : (
                       <Hash size={16} className={unread > 0 ? 'text-white' : 'text-gray-400'} />
                     )}
                     <span className="truncate">{channel.name}</span>
+                    {channel.isAnonymous && (
+                      <span className="text-[9px] px-1 py-0.2 rounded bg-purple-950/80 border border-purple-700/50 text-purple-300 font-semibold shrink-0">
+                        anon
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-1.5">
@@ -487,6 +497,40 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                     <span className="text-[11px] text-gray-400 leading-snug">
                       Only invited people can view &amp; join
                     </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Anonymous Discussion Mode Option */}
+              <div className="space-y-1.5 pt-1">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300">
+                  Discussion Mode
+                </label>
+                <div
+                  onClick={() => setIsAnonymous(!isAnonymous)}
+                  className={`p-3 rounded-xl border cursor-pointer transition flex items-start gap-3 ${
+                    isAnonymous
+                      ? 'border-purple-500 bg-purple-950/30 text-white shadow'
+                      : 'border-gray-700 bg-[#222529] text-gray-300 hover:border-gray-600'
+                  }`}
+                >
+                  <span className="text-2xl shrink-0 select-none">🎭</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xs text-white">Anonymous Channel</span>
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase transition ${
+                          isAnonymous
+                            ? 'bg-purple-600 text-white shadow-xs'
+                            : 'bg-gray-700 text-gray-400'
+                        }`}
+                      >
+                        {isAnonymous ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 leading-snug mt-1">
+                      Ideal for critical discussions and open-ended feedback. Real names, avatars, and IDs are hidden. Each member gets a customizable pseudonym and emoji icon.
+                    </p>
                   </div>
                 </div>
               </div>

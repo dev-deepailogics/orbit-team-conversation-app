@@ -42,6 +42,7 @@ import { FileAttachmentList, formatFileSize, getFileCategory } from './FileAttac
 import { ChannelStorageModal } from './ChannelStorageModal';
 import { ChannelDetailsModal } from '../channel/ChannelDetailsModal';
 import { PinnedMessagesModal } from './PinnedMessagesModal';
+import { AnonymousPersonaModal } from '../channel/AnonymousPersonaModal';
 
 interface ChatAreaProps {
   channel: Channel;
@@ -92,7 +93,27 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [showStorageModal, setShowStorageModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showPinsModal, setShowPinsModal] = useState(false);
+  const [showAnonPersonaModal, setShowAnonPersonaModal] = useState(false);
+  const [anonProfile, setAnonProfile] = useState<{ anonName: string; anonEmoji: string } | null>(
+    channel.myAnonProfile || null
+  );
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+
+  useEffect(() => {
+    if (channel.isAnonymous) {
+      if (channel.myAnonProfile) {
+        setAnonProfile(channel.myAnonProfile);
+      } else {
+        api.get(`/api/channels/${channel.id}`).then((res) => {
+          if (res.data?.myAnonProfile) {
+            setAnonProfile(res.data.myAnonProfile);
+          }
+        }).catch(() => {});
+      }
+    } else {
+      setAnonProfile(null);
+    }
+  }, [channel.id, channel.isAnonymous, channel.myAnonProfile]);
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const [activeView, setActiveView] = useState<'messages' | 'whiteboard'>('messages');
   const [copiedChannelId, setCopiedChannelId] = useState(false);
@@ -106,6 +127,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const mentionUsers = React.useMemo(() => {
+    if (channel.isAnonymous) return [];
     if (!members) return [];
     return members
       .map((m) => m.user)
@@ -117,9 +139,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         avatarUrl: u.avatarUrl,
         status: u.status,
       }));
-  }, [members]);
+  }, [members, channel.isAnonymous]);
 
   const handleMentionClick = (username: string) => {
+    if (channel.isAnonymous) return;
     const targetMember = members?.find(
       (m) => m.user?.username?.toLowerCase() === username.toLowerCase()
     );
@@ -413,7 +436,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             title="Click to view channel details"
             className="flex items-center gap-1.5 hover:bg-white/5 px-2 py-1 rounded-lg transition group min-w-0"
           >
-            {channel.type === 'DIRECT' ? (
+            {channel.isAnonymous ? (
+              <span className="text-lg leading-none shrink-0" title="Anonymous Channel">🎭</span>
+            ) : channel.type === 'DIRECT' ? (
               <span className="font-bold text-slack-green text-base shrink-0">@</span>
             ) : channel.type === 'PRIVATE' ? (
               <Lock size={18} className="text-gray-400 group-hover:text-white shrink-0" />
@@ -423,6 +448,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <span className="font-bold text-white text-sm sm:text-base truncate group-hover:underline">
               {getDirectChannelTitle()}
             </span>
+            {channel.isAnonymous && (
+              <span className="text-[10px] font-semibold uppercase bg-purple-900/60 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded ml-1 shrink-0">
+                Anonymous
+              </span>
+            )}
           </button>
 
           {/* Chat vs Canvas Mode Switch */}
@@ -454,6 +484,19 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
         {/* Actions in Header */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Anonymous Persona Badge / Edit Button */}
+          {channel.isAnonymous && anonProfile && (
+            <button
+              onClick={() => setShowAnonPersonaModal(true)}
+              title="Change your Anonymous Persona"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-950/70 hover:bg-purple-900/80 border border-purple-500/50 text-purple-200 text-xs font-medium transition shrink-0 group shadow-sm"
+            >
+              <span className="text-sm">{anonProfile.anonEmoji}</span>
+              <span className="hidden sm:inline font-semibold">{anonProfile.anonName}</span>
+              <span className="text-[10px] text-purple-400 group-hover:text-purple-200 ml-0.5">Edit</span>
+            </button>
+          )}
+
           {/* Search Messages Button */}
           {onOpenSearch && (
             <button
@@ -584,6 +627,26 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       </div>
 
+      {/* Anonymous Discussion Info Banner */}
+      {channel.isAnonymous && (
+        <div className="bg-gradient-to-r from-purple-950/80 via-indigo-950/60 to-purple-950/80 border-b border-purple-500/30 px-3 sm:px-6 py-2 flex items-center justify-between text-xs text-purple-200 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-base shrink-0">🎭</span>
+            <span className="truncate">
+              <strong>Anonymous Discussion Mode:</strong> Real identities, avatars, and user IDs are strictly hidden.
+            </span>
+          </div>
+          {anonProfile && (
+            <button
+              onClick={() => setShowAnonPersonaModal(true)}
+              className="ml-3 text-xs font-semibold underline text-purple-300 hover:text-white shrink-0"
+            >
+              Change Persona ({anonProfile.anonEmoji} {anonProfile.anonName})
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Main Content: Whiteboard View or Messages View */}
       {activeView === 'whiteboard' ? (
         <div className="flex-1 w-full h-full relative">
@@ -652,7 +715,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
             {messages.map((msg, idx) => {
             const isBot = !!msg.bot;
-            const authorName = isBot ? msg.bot?.name : (msg.user?.displayName || 'Unknown');
+            const isAnon = channel.isAnonymous || msg.isAnonymous;
+            const isSelf = msg.isSelf || (!isAnon && msg.userId === currentUser.id);
+            const authorName = isAnon
+              ? (msg.anonName || 'Anonymous')
+              : isBot
+              ? msg.bot?.name
+              : (msg.user?.displayName || 'Unknown');
+            const anonEmoji = msg.anonEmoji || '🎭';
             const avatarUrl = isBot
               ? (msg.bot?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${msg.bot?.name}`)
               : (msg.user?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${authorName}`);
@@ -665,7 +735,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   msg.isPinned ? 'bg-amber-500/5 border-l-2 border-amber-400/80 pl-2 sm:pl-5' : ''
                 }`}
               >
-                <img src={avatarUrl} alt={authorName} className="w-9 h-9 rounded-lg object-cover shrink-0 mt-0.5" />
+                {isAnon ? (
+                  <div
+                    className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-900/70 to-indigo-900/70 border border-purple-500/40 flex items-center justify-center text-lg shrink-0 mt-0.5 shadow-sm select-none"
+                    title={authorName}
+                  >
+                    {anonEmoji}
+                  </div>
+                ) : (
+                  <img src={avatarUrl} alt={authorName} className="w-9 h-9 rounded-lg object-cover shrink-0 mt-0.5" />
+                )}
 
                 <div className="flex-1 min-w-0">
                   {msg.isPinned && (
@@ -677,11 +756,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-sm text-white hover:underline cursor-pointer flex items-center gap-1.5">
                       {authorName}
-                      {isBot && (
+                      {isAnon ? (
+                        <span
+                          className={`text-[10px] font-semibold px-1.5 py-0.2 rounded uppercase ${
+                            isSelf
+                              ? 'bg-purple-900/70 text-purple-200 border border-purple-500/40'
+                              : 'bg-gray-800 text-gray-300 border border-gray-700'
+                          }`}
+                        >
+                          {isSelf ? 'You (Anon)' : 'Anonymous'}
+                        </span>
+                      ) : isBot ? (
                         <span className="text-[10px] font-semibold bg-[#2C3136] text-gray-300 px-1.5 py-0.2 rounded uppercase">
                           APP
                         </span>
-                      )}
+                      ) : null}
                     </span>
                     <span className="text-[11px] text-gray-500">
                       {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -705,7 +794,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     >
                       <div className="min-w-0">
                         <span className="font-bold text-slack-green text-[11px] block">
-                          {msg.quotedMessage.user?.displayName || 'Teammate'}
+                          {channel.isAnonymous || msg.quotedMessage.isAnonymous
+                            ? (msg.quotedMessage.anonName ? `${msg.quotedMessage.anonEmoji || '🎭'} ${msg.quotedMessage.anonName}` : 'Anonymous')
+                            : (msg.quotedMessage.user?.displayName || 'Teammate')}
                         </span>
                         <span className="text-gray-300 text-[11px] truncate block max-w-md">
                           {msg.quotedMessage.content}
@@ -743,7 +834,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           acc[r.emoji] = { count: 0, users: [], hasReacted: false };
                         }
                         acc[r.emoji].count += 1;
-                        if (r.user?.displayName) acc[r.emoji].users.push(r.user.displayName);
+                        if (r.user?.displayName) {
+                          acc[r.emoji].users.push(channel.isAnonymous ? 'Anonymous' : r.user.displayName);
+                        }
                         if (r.userId === currentUser?.id) acc[r.emoji].hasReacted = true;
                         return acc;
                       },
@@ -1000,6 +1093,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             placeholder={
               isDragOver
                 ? 'Drop file here to upload to channel...'
+                : channel.isAnonymous
+                ? `Message as ${anonProfile?.anonEmoji || '🎭'} ${anonProfile?.anonName || 'Anonymous'}...`
                 : `Message #${channel.name}`
             }
             showToolbar={showFormatting}
@@ -1116,6 +1211,28 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               setTimeout(() => {
                 el.classList.remove('bg-slack-activeChannel/25', 'ring-2', 'ring-slack-activeChannel');
               }, 3000);
+            }
+          }}
+        />
+      )}
+
+      {/* Anonymous Persona Modal */}
+      {showAnonPersonaModal && (
+        <AnonymousPersonaModal
+          isOpen={showAnonPersonaModal}
+          onClose={() => setShowAnonPersonaModal(false)}
+          channelId={channel.id}
+          channelName={channel.name}
+          currentName={anonProfile?.anonName}
+          currentEmoji={anonProfile?.anonEmoji}
+          onPersonaUpdated={(newProfile) => {
+            setAnonProfile(newProfile);
+            const currentCh = useChatStore.getState().channels.find((c) => c.id === channel.id);
+            if (currentCh) {
+              useChatStore.getState().updateChannel({
+                ...currentCh,
+                myAnonProfile: newProfile,
+              });
             }
           }}
         />

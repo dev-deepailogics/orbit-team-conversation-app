@@ -4,6 +4,7 @@ import { SOCKET_EVENTS } from '@orbit/types';
 import { z } from 'zod';
 import { verifyMessageAccess, verifyWorkspaceMember } from '../utils/security.js';
 import { handleMessageMentions } from '../services/mentionService.js';
+import { getOrCreateAnonProfile, sanitizeMessageForViewer } from '../services/anonymousService.js';
 
 const searchQuerySchema = z.object({
   workspaceId: z.string().min(1, 'workspaceId is required'),
@@ -234,9 +235,13 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       },
     });
 
+    const isAnon = access.channel.isAnonymous;
+    const sanitizedParent = sanitizeMessageForViewer(parentMessage, userId, isAnon);
+    const sanitizedReplies = replies.map((r) => sanitizeMessageForViewer(r, userId, isAnon));
+
     return reply.send({
-      parent: parentMessage,
-      replies,
+      parent: sanitizedParent,
+      replies: sanitizedReplies,
     });
   });
 
@@ -257,6 +262,14 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
     const { content, attachments, quotedMessageId } = parseResult.data;
 
+    let anonName: string | undefined;
+    let anonEmoji: string | undefined;
+    if (access.channel.isAnonymous) {
+      const anonProfile = await getOrCreateAnonProfile(parent.channelId, userId);
+      anonName = anonProfile.anonName;
+      anonEmoji = anonProfile.anonEmoji;
+    }
+
     const replyMessage = await prisma.message.create({
       data: {
         channelId: parent.channelId,
@@ -264,6 +277,8 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         userId,
         content: content || '',
         quotedMessageId: quotedMessageId || undefined,
+        anonName,
+        anonEmoji,
       },
     });
 
@@ -317,26 +332,42 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.status(500).send({ error: 'Failed to retrieve reply message' });
     }
 
+    const selfReply = sanitizeMessageForViewer(fullReplyMessage, userId, access.channel.isAnonymous);
+    const publicReply = sanitizeMessageForViewer(fullReplyMessage, 'public', access.channel.isAnonymous);
+
     // Realtime notification to channel & thread
     if (fastify.io) {
-      fastify.io.to(`channel:${parent.channelId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, {
-        ...fullReplyMessage,
-        isThreadReply: true,
-      });
+      if (access.channel.isAnonymous) {
+        fastify.io.to(`channel:${parent.channelId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, {
+          ...publicReply,
+          isThreadReply: true,
+        });
+        fastify.io.to(`user:${userId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, {
+          ...selfReply,
+          isThreadReply: true,
+        });
+      } else {
+        fastify.io.to(`channel:${parent.channelId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, {
+          ...fullReplyMessage,
+          isThreadReply: true,
+        });
+      }
     }
 
-    // Process mentions in thread reply & trigger DM notifications
-    handleMessageMentions({
-      workspaceId: access.channel.workspaceId,
-      channelId: parent.channelId,
-      authorId: userId,
-      content: content || '',
-      messageId: replyMessage.id,
-      isThreadReply: true,
-      io: fastify.io,
-    }).catch((err) => fastify.log.error(err, 'Failed to process thread reply mentions'));
+    // Process mentions in thread reply & trigger DM notifications (skip if anonymous channel)
+    if (!access.channel.isAnonymous) {
+      handleMessageMentions({
+        workspaceId: access.channel.workspaceId,
+        channelId: parent.channelId,
+        authorId: userId,
+        content: content || '',
+        messageId: replyMessage.id,
+        isThreadReply: true,
+        io: fastify.io,
+      }).catch((err) => fastify.log.error(err, 'Failed to process thread reply mentions'));
+    }
 
-    return reply.status(201).send(fullReplyMessage);
+    return reply.status(201).send(selfReply);
   });
 
   // Toggle emoji reaction

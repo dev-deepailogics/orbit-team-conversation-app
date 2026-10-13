@@ -4,6 +4,7 @@ import { SOCKET_EVENTS } from '@orbit/types';
 import { z } from 'zod';
 import { sendSystemNotification } from '../services/systemBot.js';
 import { handleMessageMentions } from '../services/mentionService.js';
+import { generateRandomPersona, getOrCreateAnonProfile, sanitizeMessageForViewer } from '../services/anonymousService.js';
 import { verifyChannelAccess } from '../utils/security.js';
 
 const createChannelSchema = z.object({
@@ -11,6 +12,7 @@ const createChannelSchema = z.object({
   topic: z.string().optional(),
   description: z.string().optional(),
   type: z.enum(['PUBLIC', 'PRIVATE', 'DIRECT', 'GROUP_DIRECT']).default('PUBLIC'),
+  isAnonymous: z.boolean().optional().default(false),
 });
 
 const postMessageSchema = z.object({
@@ -40,7 +42,7 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.status(400).send({ error: parseResult.error.errors[0].message });
     }
 
-    const { name, topic, description, type } = parseResult.data;
+    const { name, topic, description, type, isAnonymous } = parseResult.data;
 
     // Verify workspace membership
     const member = await prisma.workspaceMember.findUnique({
@@ -51,6 +53,8 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.status(403).send({ error: 'You are not a member of this workspace' });
     }
 
+    const initialPersona = isAnonymous ? generateRandomPersona() : null;
+
     const channel = await prisma.channel.create({
       data: {
         workspaceId,
@@ -58,10 +62,13 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         topic,
         description,
         type,
+        isAnonymous: isAnonymous || false,
         createdById: userId,
         members: {
           create: {
             userId,
+            anonName: initialPersona?.anonName,
+            anonEmoji: initialPersona?.anonEmoji,
           },
         },
       },
@@ -270,15 +277,100 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.status(404).send({ error: 'Channel not found' });
     }
 
-    const creator = await prisma.user.findUnique({
-      where: { id: channel.createdById },
-      select: { id: true, username: true, displayName: true, email: true },
-    });
+    let myAnonProfile: { anonName: string; anonEmoji: string } | undefined;
+    let sanitizedMembers = channel.members;
+    let creator = null;
+
+    if (channel.isAnonymous) {
+      myAnonProfile = await getOrCreateAnonProfile(channelId, userId);
+      sanitizedMembers = channel.members.map((m) => {
+        const isSelf = m.userId === userId;
+        const anonName = m.anonName || 'Anonymous Member';
+        const anonEmoji = m.anonEmoji || '🎭';
+        return {
+          ...m,
+          userId: isSelf ? userId : 'anonymous',
+          anonName,
+          anonEmoji,
+          user: {
+            id: isSelf ? userId : 'anonymous',
+            username: isSelf ? (m.user?.username || 'you') : 'anonymous',
+            displayName: anonName,
+            avatarUrl: null,
+            anonEmoji,
+            isAnonymous: true,
+            status: 'ONLINE' as const,
+            systemRole: 'USER' as const,
+            email: '',
+          },
+        };
+      });
+      // In anonymous channels, creator is also anonymous
+      creator = { id: 'anonymous', username: 'anonymous', displayName: 'Anonymous Creator', email: '' };
+    } else {
+      creator = await prisma.user.findUnique({
+        where: { id: channel.createdById },
+        select: { id: true, username: true, displayName: true, email: true },
+      });
+    }
 
     return reply.send({
       ...channel,
+      members: sanitizedMembers,
       creator,
+      myAnonProfile,
     });
+  });
+
+  // Update user's anonymous profile (name and emoji) in an anonymous channel
+  fastify.patch('/:channelId/anonymous-profile', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { channelId } = request.params as { channelId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const access = await verifyChannelAccess(userId, channelId, reply);
+    if (!access) return;
+
+    if (!access.channel.isAnonymous) {
+      return reply.status(400).send({ error: 'This channel is not an anonymous channel' });
+    }
+
+    const schema = z.object({
+      anonName: z.string().trim().min(2, 'Name must be at least 2 characters').max(40, 'Name cannot exceed 40 characters'),
+      anonEmoji: z.string().trim().min(1, 'Emoji is required').max(10),
+    });
+
+    const parseResult = schema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.errors[0].message });
+    }
+
+    const { anonName, anonEmoji } = parseResult.data;
+
+    // Upsert the persona on ChannelMember
+    await prisma.channelMember.upsert({
+      where: { channelId_userId: { channelId, userId } },
+      create: {
+        channelId,
+        userId,
+        anonName,
+        anonEmoji,
+      },
+      update: {
+        anonName,
+        anonEmoji,
+      },
+    });
+
+    // Update the author's previous messages in this anonymous channel to the new persona
+    await prisma.message.updateMany({
+      where: { channelId, userId },
+      data: {
+        anonName,
+        anonEmoji,
+      },
+    });
+
+    return reply.send({ anonName, anonEmoji });
   });
 
   // Get pinned messages for a channel
@@ -383,10 +475,14 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     const nextCursor = hasMore && chunk.length > 0 ? chunk[chunk.length - 1].id : null;
 
     // Format response and reverse to chronological order (oldest to newest)
-    const formatted = chunk.map((m) => ({
-      ...m,
-      replyCount: m._count.replies,
-    })).reverse();
+    const isAnon = access.channel.isAnonymous;
+    const formatted = chunk.map((m) => {
+      const withCount = {
+        ...m,
+        replyCount: m._count.replies,
+      };
+      return sanitizeMessageForViewer(withCount, userId, isAnon);
+    }).reverse();
 
     return reply.send({
       messages: formatted,
@@ -507,12 +603,22 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     if (!access) return;
     const channel = access.channel;
 
+    let anonName: string | undefined;
+    let anonEmoji: string | undefined;
+    if (channel.isAnonymous) {
+      const anonProfile = await getOrCreateAnonProfile(channel.id, userId);
+      anonName = anonProfile.anonName;
+      anonEmoji = anonProfile.anonEmoji;
+    }
+
     const message = await prisma.message.create({
       data: {
         channelId,
         userId,
         content: content || '',
         quotedMessageId: quotedMessageId || undefined,
+        anonName,
+        anonEmoji,
       },
     });
 
@@ -582,9 +688,16 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       workspaceId: channel.workspaceId,
     };
 
+    const selfPayload = sanitizeMessageForViewer(payload, userId, channel.isAnonymous);
+    const publicPayload = sanitizeMessageForViewer(payload, 'public', channel.isAnonymous);
+
     // Scoped realtime broadcast via Socket.IO
     if (fastify.io) {
-      if (channel.type === 'PUBLIC') {
+      if (channel.isAnonymous) {
+        // In anonymous channels, broadcast masked payload to room and self-payload to author
+        fastify.io.to(`channel:${channel.id}`).emit(SOCKET_EVENTS.MESSAGE_NEW, publicPayload);
+        fastify.io.to(`user:${userId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, selfPayload);
+      } else if (channel.type === 'PUBLIC') {
         fastify.io.to(`workspace:${channel.workspaceId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
       } else {
         // Emit only to members of this private / direct channel
@@ -595,18 +708,20 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       }
     }
 
-    // Process mentions & trigger DM notifications
-    handleMessageMentions({
-      workspaceId: channel.workspaceId,
-      channelId: channel.id,
-      authorId: userId,
-      content: content || '',
-      messageId: message.id,
-      isThreadReply: false,
-      io: fastify.io,
-    }).catch((err) => fastify.log.error(err, 'Failed to process message mentions'));
+    // Process mentions & trigger DM notifications (skip in anonymous channels to preserve total anonymity)
+    if (!channel.isAnonymous) {
+      handleMessageMentions({
+        workspaceId: channel.workspaceId,
+        channelId: channel.id,
+        authorId: userId,
+        content: content || '',
+        messageId: message.id,
+        isThreadReply: false,
+        io: fastify.io,
+      }).catch((err) => fastify.log.error(err, 'Failed to process message mentions'));
+    }
 
-    return reply.status(201).send(payload);
+    return reply.status(201).send(selfPayload);
   });
 
   // Get Whiteboard Data for Channel/DM

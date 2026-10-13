@@ -128,6 +128,7 @@ model Channel {
   description String?
   type        ChannelType @default(PUBLIC)
   isArchived  Boolean     @default(false)
+  isAnonymous Boolean     @default(false)
   whiteboardData Json?
   createdById String
   createdAt   DateTime    @default(now())
@@ -149,6 +150,8 @@ model ChannelMember {
   id         String    @id @default(uuid())
   channelId  String
   userId     String
+  anonName   String?
+  anonEmoji  String?
   joinedAt   DateTime  @default(now())
   lastReadAt DateTime  @default(now())
 
@@ -167,6 +170,8 @@ model Message {
   botAppId        String?
   parentMessageId String?
   quotedMessageId String?
+  anonName        String?
+  anonEmoji       String?
   content         String      @db.Text
   isEdited        Boolean     @default(false)
   isDeleted       Boolean     @default(false)

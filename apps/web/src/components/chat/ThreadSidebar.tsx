@@ -45,7 +45,10 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   const editorRef = useRef<RichTextEditorRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const isParentAnon = !!parentMessage.isAnonymous;
+
   const mentionUsers = React.useMemo(() => {
+    if (isParentAnon) return [];
     if (!members) return [];
     return members
       .map((m) => m.user)
@@ -57,9 +60,10 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
         avatarUrl: u.avatarUrl,
         status: u.status,
       }));
-  }, [members]);
+  }, [members, isParentAnon]);
 
   const handleMentionClick = (username: string) => {
+    if (isParentAnon) return;
     const targetMember = members?.find(
       (m) => m.user?.username?.toLowerCase() === username.toLowerCase()
     );
@@ -160,7 +164,11 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
     }
   };
 
-  const authorName = parentMessage.user?.displayName || parentMessage.bot?.name || 'Unknown';
+  const isParentSelf = parentMessage.isSelf || (!isParentAnon && parentMessage.userId === currentUser?.id);
+  const authorName = isParentAnon
+    ? (parentMessage.anonName || 'Anonymous')
+    : (parentMessage.user?.displayName || parentMessage.bot?.name || 'Unknown');
+  const parentAnonEmoji = parentMessage.anonEmoji || '🎭';
   const avatarUrl = parentMessage.user?.avatarUrl || parentMessage.bot?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${authorName}`;
 
   return (
@@ -183,10 +191,30 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
           id={`thread-msg-${parentMessage.id}`}
           className="group relative flex gap-3 pb-3 border-b border-[#383F45]/40 p-2 rounded-lg transition-all duration-300"
         >
-          <img src={avatarUrl} alt={authorName} className="w-8 h-8 rounded-lg shrink-0 mt-0.5" />
+          {isParentAnon ? (
+            <div
+              className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-900/70 to-indigo-900/70 border border-purple-500/40 flex items-center justify-center text-base shrink-0 mt-0.5 select-none"
+              title={authorName}
+            >
+              {parentAnonEmoji}
+            </div>
+          ) : (
+            <img src={avatarUrl} alt={authorName} className="w-8 h-8 rounded-lg shrink-0 mt-0.5" />
+          )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <span className="font-bold text-xs text-white">{authorName}</span>
+              {isParentAnon && (
+                <span
+                  className={`text-[9px] font-semibold px-1 py-0.2 rounded uppercase ${
+                    isParentSelf
+                      ? 'bg-purple-900/70 text-purple-200 border border-purple-500/40'
+                      : 'bg-gray-800 text-gray-300 border border-gray-700'
+                  }`}
+                >
+                  {isParentSelf ? 'You (Anon)' : 'Anonymous'}
+                </span>
+              )}
               <span className="text-[10px] text-gray-500">
                 {new Date(parentMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
@@ -220,7 +248,9 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                     acc[r.emoji] = { count: 0, users: [], hasReacted: false };
                   }
                   acc[r.emoji].count += 1;
-                  if (r.user?.displayName) acc[r.emoji].users.push(r.user.displayName);
+                  if (r.user?.displayName) {
+                    acc[r.emoji].users.push(isParentAnon ? 'Anonymous' : r.user.displayName);
+                  }
                   if (r.userId === currentUser?.id) acc[r.emoji].hasReacted = true;
                   return acc;
                 },
@@ -313,7 +343,12 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
 
         {/* Replies List */}
         {replies.map((reply, idx) => {
-          const replyAuthor = reply.user?.displayName || 'Unknown';
+          const isReplyAnon = !!reply.isAnonymous || isParentAnon;
+          const isReplySelf = reply.isSelf || (!isReplyAnon && reply.userId === currentUser?.id);
+          const replyAuthor = isReplyAnon
+            ? (reply.anonName || 'Anonymous')
+            : (reply.user?.displayName || 'Unknown');
+          const replyEmoji = reply.anonEmoji || '🎭';
           const replyAvatar = reply.user?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${replyAuthor}`;
 
           return (
@@ -322,10 +357,30 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
               id={`thread-msg-${reply.id}`}
               className="group relative flex gap-3 p-2 rounded-lg hover:bg-[#222529]/60 transition-all duration-300"
             >
-              <img src={replyAvatar} alt={replyAuthor} className="w-7 h-7 rounded-lg shrink-0 mt-0.5" />
+              {isReplyAnon ? (
+                <div
+                  className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-900/70 to-indigo-900/70 border border-purple-500/40 flex items-center justify-center text-sm shrink-0 mt-0.5 select-none"
+                  title={replyAuthor}
+                >
+                  {replyEmoji}
+                </div>
+              ) : (
+                <img src={replyAvatar} alt={replyAuthor} className="w-7 h-7 rounded-lg shrink-0 mt-0.5" />
+              )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-xs text-white">{replyAuthor}</span>
+                  {isReplyAnon && (
+                    <span
+                      className={`text-[9px] font-semibold px-1 py-0.2 rounded uppercase ${
+                        isReplySelf
+                          ? 'bg-purple-900/70 text-purple-200 border border-purple-500/40'
+                          : 'bg-gray-800 text-gray-300 border border-gray-700'
+                      }`}
+                    >
+                      {isReplySelf ? 'You (Anon)' : 'Anonymous'}
+                    </span>
+                  )}
                   <span className="text-[10px] text-gray-500">
                     {new Date(reply.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
@@ -339,7 +394,9 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                   >
                     <div className="min-w-0">
                       <span className="font-bold text-slack-green text-[10px] block">
-                        {reply.quotedMessage.user?.displayName || 'Teammate'}
+                        {isReplyAnon || reply.quotedMessage.isAnonymous
+                          ? (reply.quotedMessage.anonName ? `${reply.quotedMessage.anonEmoji || '🎭'} ${reply.quotedMessage.anonName}` : 'Anonymous')
+                          : (reply.quotedMessage.user?.displayName || 'Teammate')}
                       </span>
                       <span className="text-gray-300 text-[10px] truncate block max-w-xs">
                         {reply.quotedMessage.content}
@@ -377,7 +434,9 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                         acc[r.emoji] = { count: 0, users: [], hasReacted: false };
                       }
                       acc[r.emoji].count += 1;
-                      if (r.user?.displayName) acc[r.emoji].users.push(r.user.displayName);
+                      if (r.user?.displayName) {
+                        acc[r.emoji].users.push(isReplyAnon ? 'Anonymous' : r.user.displayName);
+                      }
                       if (r.userId === currentUser?.id) acc[r.emoji].hasReacted = true;
                       return acc;
                     },
@@ -517,7 +576,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
 
           <RichTextEditor
             ref={editorRef}
-            placeholder="Reply..."
+            placeholder={isParentAnon ? 'Reply anonymously...' : 'Reply...'}
             showToolbar={showFormatting}
             mentionUsers={mentionUsers}
             minHeight="44px"
