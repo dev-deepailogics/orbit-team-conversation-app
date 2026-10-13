@@ -44,7 +44,13 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   };
 
   return (
-    <div className="w-[68px] bg-[#19171D] border-r border-[#383F45]/30 flex flex-col items-center py-3 gap-3 select-none z-20">
+    <div
+      className="w-[68px] border-r flex flex-col items-center py-3 gap-3 select-none z-20"
+      style={{
+        backgroundColor: 'var(--theme-bg-workspace)',
+        borderColor: 'var(--theme-border)',
+      }}
+    >
       {/* Workspace Icons */}
       <div className="flex-1 flex flex-col items-center gap-3 overflow-y-auto w-full px-2">
         {workspaces.map((ws) => {
@@ -56,9 +62,13 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
               title={ws.name}
               className={`relative group w-11 h-11 rounded-xl flex items-center justify-center font-bold text-base transition-all duration-200 ${
                 isActive
-                  ? 'bg-slack-activeChannel text-white rounded-2xl shadow-lg ring-2 ring-white/20'
-                  : 'bg-[#2C3136] text-gray-300 hover:bg-[#3E4348] hover:rounded-2xl hover:text-white'
+                  ? 'text-white rounded-2xl shadow-lg ring-2 ring-white/20'
+                  : 'text-gray-300 hover:rounded-2xl hover:text-white'
               }`}
+              style={{
+                backgroundColor: isActive ? 'var(--theme-primary)' : 'var(--theme-bg-surface)',
+                color: isActive ? 'var(--theme-primary-text)' : 'var(--theme-text-primary)',
+              }}
             >
               {/* Active Indicator bar */}
               {isActive && (

@@ -35,46 +35,91 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
 
   return (
     <div
-      className={`prose prose-invert max-w-none break-words text-gray-200 text-sm leading-relaxed prose-code:before:content-none prose-code:after:content-none ${className}`}
+      style={{ color: 'var(--theme-text-primary)' }}
+      className={`max-w-none break-words text-sm leading-relaxed prose-code:before:content-none prose-code:after:content-none ${className}`}
     >
       <ReactMarkdown
         components={{
           h1: ({ children }) => (
-            <h1 className="text-base md:text-lg font-bold text-white mt-2 mb-1 border-b border-gray-700/50 pb-0.5">
+            <h1
+              className="text-base md:text-lg font-bold mt-2 mb-1 border-b pb-0.5"
+              style={{ color: 'var(--theme-text-primary)', borderColor: 'var(--theme-border)' }}
+            >
               {children}
             </h1>
           ),
           h2: ({ children }) => (
-            <h2 className="text-sm md:text-base font-bold text-white mt-1.5 mb-1">
+            <h2
+              className="text-sm md:text-base font-bold mt-1.5 mb-1"
+              style={{ color: 'var(--theme-text-primary)' }}
+            >
               {children}
             </h2>
           ),
           h3: ({ children }) => (
-            <h3 className="text-xs md:text-sm font-bold text-gray-200 mt-1 mb-0.5">
+            <h3
+              className="text-xs md:text-sm font-bold mt-1 mb-0.5"
+              style={{ color: 'var(--theme-text-primary)' }}
+            >
               {children}
             </h3>
           ),
-          p: ({ children }) => <p className="leading-relaxed mb-1 last:mb-0">{children}</p>,
-          strong: ({ children }) => <strong className="font-bold text-white">{children}</strong>,
-          em: ({ children }) => <em className="italic text-gray-200">{children}</em>,
-          del: ({ children }) => <del className="line-through text-gray-400">{children}</del>,
+          p: ({ children }) => (
+            <p className="leading-relaxed mb-1 last:mb-0" style={{ color: 'var(--theme-text-primary)' }}>
+              {children}
+            </p>
+          ),
+          strong: ({ children }) => (
+            <strong className="font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+              {children}
+            </strong>
+          ),
+          em: ({ children }) => (
+            <em className="italic" style={{ color: 'var(--theme-text-primary)' }}>
+              {children}
+            </em>
+          ),
+          del: ({ children }) => (
+            <del className="line-through" style={{ color: 'var(--theme-text-muted)' }}>
+              {children}
+            </del>
+          ),
           ul: ({ children }) => <ul className="list-disc list-inside space-y-0.5 my-1">{children}</ul>,
           ol: ({ children }) => <ol className="list-decimal list-inside space-y-0.5 my-1">{children}</ol>,
           li: ({ children }) => <li className="leading-relaxed">{children}</li>,
           blockquote: ({ children }) => (
-            <blockquote className="border-l-4 border-slack-green bg-[#222529]/70 px-3 py-1 my-1.5 rounded-r text-gray-300 italic">
+            <blockquote
+              className="border-l-4 px-3 py-1 my-1.5 rounded-r italic"
+              style={{
+                borderColor: 'var(--theme-primary)',
+                backgroundColor: 'var(--theme-bg-surface)',
+                color: 'var(--theme-text-muted)',
+              }}
+            >
               {children}
             </blockquote>
           ),
           pre: ({ children }) => (
-            <pre className="bg-[#141618] border border-gray-700/70 rounded-xl p-3 my-2 font-mono text-xs text-gray-200 overflow-x-auto shadow-inner leading-relaxed block [&_code]:bg-transparent [&_code]:text-gray-200 [&_code]:border-0 [&_code]:p-0 [&_code]:font-mono [&_code]:text-xs [&_code]:font-normal">
+            <pre
+              className="border rounded-xl p-3 my-2 font-mono text-xs overflow-x-auto shadow-inner leading-relaxed block [&_code]:bg-transparent [&_code]:border-0 [&_code]:p-0 [&_code]:font-mono [&_code]:text-xs [&_code]:font-normal"
+              style={{
+                backgroundColor: 'var(--theme-bg-surface)',
+                borderColor: 'var(--theme-border)',
+                color: 'var(--theme-text-primary)',
+              }}
+            >
               {children}
             </pre>
           ),
           code: ({ children, ...props }: any) => {
             return (
               <code
-                className="bg-[#2C3136] text-[#ECB22E] px-1.5 py-0.5 rounded font-mono text-[12px] border border-gray-700/60 font-medium inline leading-none align-baseline"
+                className="px-1.5 py-0.5 rounded font-mono text-[12px] border font-medium inline leading-none align-baseline"
+                style={{
+                  backgroundColor: 'var(--theme-bg-surface-hover)',
+                  borderColor: 'var(--theme-border)',
+                  color: 'var(--theme-primary)',
+                }}
                 {...props}
               >
                 {children}

@@ -31,12 +31,41 @@ export interface AuthTokens {
 // ==========================================
 export type WorkspaceRole = 'OWNER' | 'ADMIN' | 'MEMBER' | 'GUEST';
 
+export interface ThemeConfig {
+  id?: string;
+  name: string;
+  sidebarColor: string;
+  workspaceColor: string;
+  backgroundColor: string;
+  surfaceColor: string;
+  surfaceHoverColor?: string;
+  textColor: string;
+  textMutedColor: string;
+  primaryColor: string;
+  primaryHoverColor?: string;
+  primaryTextColor?: string;
+  secondaryColor: string;
+  borderColor: string;
+}
+
+export interface WorkspaceSettings {
+  defaultTheme?: ThemeConfig;
+  allowMemberThemeCustomization?: boolean;
+  [key: string]: any;
+}
+
+export interface WorkspaceMemberSettings {
+  theme?: ThemeConfig;
+  [key: string]: any;
+}
+
 export interface Workspace {
   id: string;
   name: string;
   slug: string;
   iconUrl: string | null;
   ownerId: string;
+  settings?: WorkspaceSettings | null;
   createdAt: string;
   updatedAt: string;
   _count?: {
@@ -51,6 +80,7 @@ export interface WorkspaceMember {
   userId: string;
   role: WorkspaceRole;
   nickname: string | null;
+  settings?: WorkspaceMemberSettings | null;
   joinedAt: string;
   user?: UserProfile;
 }

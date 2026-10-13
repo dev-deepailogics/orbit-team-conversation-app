@@ -493,4 +493,180 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
 
     return reply.send(updated);
   });
+
+  // Get theme & appearance settings for workspace & member
+  fastify.get('/:workspaceId/theme', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const member = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId, userId } },
+    });
+
+    if (!member) {
+      return reply.status(403).send({ error: 'You are not a member of this workspace' });
+    }
+
+    const workspace = await prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { settings: true },
+    });
+
+    const memberSettings = (member.settings as any) || {};
+    const workspaceSettings = (workspace?.settings as any) || {};
+
+    const activeTheme = memberSettings.theme || workspaceSettings.defaultTheme || null;
+
+    return reply.send({
+      theme: activeTheme,
+      memberSettings,
+      workspaceSettings,
+    });
+  });
+
+  // Update theme settings (member's custom theme & optionally workspace default)
+  fastify.patch('/:workspaceId/theme', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const member = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId, userId } },
+    });
+
+    if (!member) {
+      return reply.status(403).send({ error: 'You are not a member of this workspace' });
+    }
+
+    const themeSchema = z.object({
+      id: z.string().optional(),
+      name: z.string().min(1).max(50),
+      sidebarColor: z.string().min(3).max(30),
+      workspaceColor: z.string().min(3).max(30),
+      backgroundColor: z.string().min(3).max(30),
+      surfaceColor: z.string().min(3).max(30),
+      surfaceHoverColor: z.string().min(3).max(30).optional(),
+      textColor: z.string().min(3).max(30),
+      textMutedColor: z.string().min(3).max(30),
+      primaryColor: z.string().min(3).max(30),
+      primaryHoverColor: z.string().min(3).max(30).optional(),
+      primaryTextColor: z.string().min(3).max(30).optional(),
+      secondaryColor: z.string().min(3).max(30),
+      borderColor: z.string().min(3).max(30),
+    });
+
+    const bodySchema = z.object({
+      theme: themeSchema,
+      setAsWorkspaceDefault: z.boolean().optional().default(false),
+    });
+
+    const parseResult = bodySchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.errors[0].message });
+    }
+
+    const { theme, setAsWorkspaceDefault } = parseResult.data;
+
+    // Update member's settings
+    const existingMemberSettings = (member.settings as any) || {};
+    const updatedMemberSettings = {
+      ...existingMemberSettings,
+      theme,
+    };
+
+    await prisma.workspaceMember.update({
+      where: { id: member.id },
+      data: { settings: updatedMemberSettings },
+    });
+
+    let updatedWorkspaceSettings = null;
+
+    // If caller wants to set as workspace default, verify admin/owner rights
+    if (setAsWorkspaceDefault) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { systemRole: true },
+      });
+
+      const isAuthorized =
+        user?.systemRole === 'SUPER_ADMIN' ||
+        member.role === 'OWNER' ||
+        member.role === 'ADMIN';
+
+      if (isAuthorized) {
+        const workspace = await prisma.workspace.findUnique({
+          where: { id: workspaceId },
+          select: { settings: true },
+        });
+
+        const existingWsSettings = (workspace?.settings as any) || {};
+        updatedWorkspaceSettings = {
+          ...existingWsSettings,
+          defaultTheme: theme,
+        };
+
+        await prisma.workspace.update({
+          where: { id: workspaceId },
+          data: { settings: updatedWorkspaceSettings },
+        });
+      }
+    }
+
+    return reply.send({
+      success: true,
+      theme,
+      memberSettings: updatedMemberSettings,
+      workspaceSettings: updatedWorkspaceSettings,
+    });
+  });
+
+  // General Workspace Settings (Extensible for all future workspace settings)
+  fastify.patch('/:workspaceId/settings', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const callerUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { systemRole: true },
+    });
+
+    const callerMember = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId, userId } },
+    });
+
+    const isAuthorized =
+      callerUser?.systemRole === 'SUPER_ADMIN' ||
+      callerMember?.role === 'OWNER' ||
+      callerMember?.role === 'ADMIN';
+
+    if (!isAuthorized) {
+      return reply.status(403).send({ error: 'Only workspace administrators can update workspace settings' });
+    }
+
+    const settingsSchema = z.record(z.any());
+    const parseResult = settingsSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: 'Invalid settings format' });
+    }
+
+    const workspace = await prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { settings: true },
+    });
+
+    const existingSettings = (workspace?.settings as any) || {};
+    const mergedSettings = {
+      ...existingSettings,
+      ...parseResult.data,
+    };
+
+    const updated = await prisma.workspace.update({
+      where: { id: workspaceId },
+      data: { settings: mergedSettings },
+    });
+
+    return reply.send({
+      success: true,
+      settings: updated.settings,
+    });
+  });
 };

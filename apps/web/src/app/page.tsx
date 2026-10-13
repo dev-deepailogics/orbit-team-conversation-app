@@ -13,6 +13,7 @@ import { getSocket } from '../lib/socket';
 
 import { sounds } from '../lib/sound';
 import { DesktopNotifier } from '../lib/notifications';
+import { useThemeStore } from '../stores/themeStore';
 
 // Components
 import { WorkspaceSidebar } from '../components/workspace/WorkspaceSidebar';
@@ -156,6 +157,11 @@ export default function AppDashboard() {
     if (!user || !token) return;
     loadWorkspaces();
   }, [user, token]);
+
+  // Synchronize workspace theme (cached in localStorage, synced with DB)
+  useEffect(() => {
+    useThemeStore.getState().initTheme(currentWorkspace?.id);
+  }, [currentWorkspace?.id]);
 
   // 3. Handle Workspace Selection
   const handleSelectWorkspace = async (workspace: Workspace) => {
@@ -487,17 +493,28 @@ export default function AppDashboard() {
 
   if (isLoading || isDataLoading) {
     return (
-      <div className="h-screen w-screen bg-[#1A1D21] flex flex-col items-center justify-center gap-3">
-        <div className="w-12 h-12 bg-slack-activeChannel rounded-2xl flex items-center justify-center text-white shadow-xl animate-pulse">
+      <div
+        className="h-screen w-screen flex flex-col items-center justify-center gap-3"
+        style={{ backgroundColor: 'var(--theme-bg-app)' }}
+      >
+        <div
+          className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-xl animate-pulse"
+          style={{ backgroundColor: 'var(--theme-primary)' }}
+        >
           <Layers size={28} />
         </div>
-        <span className="text-sm font-semibold text-gray-400">Loading Orbit...</span>
+        <span className="text-sm font-semibold" style={{ color: 'var(--theme-text-muted)' }}>
+          Loading Orbit...
+        </span>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#1A1D21] relative">
+    <div
+      className="flex h-screen w-screen overflow-hidden relative"
+      style={{ backgroundColor: 'var(--theme-bg-app)' }}
+    >
       {/* Mobile Navigation Drawer (Backdrop + Slide-over Sidebars) */}
       {isMobileSidebarOpen && (
         <div className="fixed inset-0 z-50 flex md:hidden animate-in fade-in duration-200">
@@ -625,7 +642,10 @@ export default function AppDashboard() {
 
       {/* 3. Main Chat View or Empty Workspace State */}
       {workspaces.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-[#1A1D21] relative overflow-y-auto">
+        <div
+          className="flex-1 flex flex-col items-center justify-center p-6 text-center relative overflow-y-auto"
+          style={{ backgroundColor: 'var(--theme-bg-app)' }}
+        >
           <div className="max-w-md w-full flex flex-col items-center animate-in fade-in zoom-in-95 duration-200">
             {user?.systemRole === 'SUPER_ADMIN' ? (
               <>

@@ -973,9 +973,9 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
             onInput={handleInput}
             onKeyUp={checkMentionTrigger}
             onClick={checkMentionTrigger}
-            style={{ minHeight }}
+            style={{ minHeight, color: 'var(--theme-text-primary)' }}
             data-placeholder={placeholder}
-            className="w-full bg-transparent px-4 py-3 text-sm text-white focus:outline-none overflow-y-auto max-h-60 leading-relaxed font-sans empty:before:content-[attr(data-placeholder)] empty:before:text-gray-500 empty:before:pointer-events-none [&_h1]:text-lg [&_h1]:font-bold [&_h1]:text-white [&_h1]:my-1 [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-white [&_h2]:my-1 [&_b]:font-bold [&_b]:text-white [&_strong]:font-bold [&_strong]:text-white [&_i]:italic [&_i]:text-gray-200 [&_ul]:list-disc [&_ul]:list-inside [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:list-inside [&_ol]:my-1 [&_blockquote]:border-l-4 [&_blockquote]:border-slack-green [&_blockquote]:bg-[#222529]/60 [&_blockquote]:px-2.5 [&_blockquote]:py-1 [&_blockquote]:my-1 [&_blockquote]:rounded-r [&_blockquote]:italic [&_blockquote]:text-gray-300 [&_a]:text-blue-400 [&_a]:underline"
+            className="w-full bg-transparent px-4 py-3 text-sm focus:outline-none overflow-y-auto max-h-60 leading-relaxed font-sans empty:before:content-[attr(data-placeholder)] empty:before:text-gray-500 empty:before:pointer-events-none [&_h1]:text-lg [&_h1]:font-bold [&_h1]:my-1 [&_h2]:text-base [&_h2]:font-bold [&_h2]:my-1 [&_b]:font-bold [&_strong]:font-bold [&_i]:italic [&_ul]:list-disc [&_ul]:list-inside [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:list-inside [&_ol]:my-1 [&_blockquote]:border-l-4 [&_blockquote]:border-slack-green [&_blockquote]:px-2.5 [&_blockquote]:py-1 [&_blockquote]:my-1 [&_blockquote]:rounded-r [&_blockquote]:italic [&_a]:text-blue-500 [&_a]:underline"
           />
         </div>
       </div>

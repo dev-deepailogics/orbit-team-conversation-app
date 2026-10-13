@@ -418,9 +418,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#1A1D21] relative min-w-0">
+    <div
+      className="flex-1 flex flex-col h-full relative min-w-0"
+      style={{
+        backgroundColor: 'var(--theme-bg-app)',
+        color: 'var(--theme-text)',
+      }}
+    >
       {/* Channel Header */}
-      <div className="h-14 border-b border-[#383F45]/40 px-3 sm:px-6 flex items-center justify-between bg-[#1A1D21]/90 backdrop-blur z-10 gap-2">
+      <div
+        className="h-14 border-b px-3 sm:px-6 flex items-center justify-between backdrop-blur z-10 gap-2"
+        style={{
+          backgroundColor: 'var(--theme-bg-surface)',
+          borderColor: 'var(--theme-border)',
+        }}
+      >
         <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
           {/* Mobile hamburger menu toggle */}
           {onToggleMobileSidebar && (
@@ -448,7 +460,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             ) : (
               <Hash size={20} className="text-gray-400 group-hover:text-white shrink-0" />
             )}
-            <span className="font-bold text-white text-sm sm:text-base truncate group-hover:underline">
+            <span
+              className="font-bold text-sm sm:text-base truncate group-hover:underline"
+              style={{ color: 'var(--theme-text-primary)' }}
+            >
               {getDirectChannelTitle()}
             </span>
             {channel.isAnonymous && (
@@ -505,11 +520,23 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <button
               onClick={onOpenSearch}
               title="Search messages (Cmd+K / Ctrl+K)"
-              className="flex items-center gap-1.5 p-1.5 sm:px-3 sm:py-1.5 rounded-lg bg-[#2C3136] hover:bg-[#3E4348] text-gray-300 hover:text-white border border-gray-700 text-xs font-medium transition"
+              style={{
+                backgroundColor: 'var(--theme-bg-surface)',
+                borderColor: 'var(--theme-border)',
+                color: 'var(--theme-text-primary)',
+              }}
+              className="flex items-center gap-1.5 p-1.5 sm:px-3 sm:py-1.5 rounded-lg border text-xs font-medium transition hover:opacity-85"
             >
-              <Search size={14} className="text-slack-green" />
+              <Search size={14} style={{ color: 'var(--theme-primary)' }} />
               <span className="hidden sm:inline">Search</span>
-              <kbd className="hidden lg:inline text-[10px] bg-[#1F2326] px-1 py-0.2 rounded text-gray-400 font-mono border border-gray-700 ml-0.5">
+              <kbd
+                className="hidden lg:inline text-[10px] px-1 py-0.2 rounded font-mono border ml-0.5"
+                style={{
+                  backgroundColor: 'var(--theme-bg-app)',
+                  borderColor: 'var(--theme-border)',
+                  color: 'var(--theme-text-muted)',
+                }}
+              >
                 ⌘K
               </kbd>
             </button>
@@ -519,7 +546,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           <button
             onClick={() => setShowPinsModal(true)}
             title="View Pinned Messages"
-            className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg bg-[#2C3136] hover:bg-[#3E4348] text-gray-300 hover:text-white border border-gray-700 text-xs font-medium transition"
+            style={{
+              backgroundColor: 'var(--theme-bg-surface)',
+              borderColor: 'var(--theme-border)',
+              color: 'var(--theme-text-primary)',
+            }}
+            className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border text-xs font-medium transition hover:opacity-85"
           >
             <Pin size={14} className="text-amber-400 fill-amber-400/30" />
             <span className="hidden sm:inline">Pins</span>
@@ -540,10 +572,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <button
               onClick={() => setShowMoreMenu(!showMoreMenu)}
               title="More options"
-              className={`p-1.5 sm:p-2 rounded-lg border text-gray-300 hover:text-white transition ${
+              style={{
+                backgroundColor: 'var(--theme-bg-surface)',
+                borderColor: 'var(--theme-border)',
+                color: 'var(--theme-text-primary)',
+              }}
+              className={`p-1.5 sm:p-2 rounded-lg border transition hover:opacity-85 ${
                 showMoreMenu
-                  ? 'bg-slack-green/20 border-slack-green text-slack-green'
-                  : 'bg-[#2C3136] hover:bg-[#3E4348] border-gray-700'
+                  ? 'ring-2 ring-slack-green'
+                  : ''
               }`}
             >
               <MoreVertical size={16} />
@@ -668,12 +705,19 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-4"
       >
         {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center text-gray-500">
-            <div className="w-12 h-12 rounded-full bg-[#2C3136] flex items-center justify-center mb-3 text-gray-400">
+          <div className="h-full flex flex-col items-center justify-center text-center">
+            <div
+              className="w-12 h-12 rounded-full flex items-center justify-center mb-3"
+              style={{ backgroundColor: 'var(--theme-bg-surface)', color: 'var(--theme-text-muted)' }}
+            >
               <Hash size={24} />
             </div>
-            <h3 className="font-bold text-lg text-white">This is the start of #{channel.name}</h3>
-            <p className="text-sm max-w-xs mt-1">This channel was created for your team. Send a message to get started!</p>
+            <h3 className="font-bold text-lg" style={{ color: 'var(--theme-text-primary)' }}>
+              This is the start of #{channel.name}
+            </h3>
+            <p className="text-sm max-w-xs mt-1" style={{ color: 'var(--theme-text-muted)' }}>
+              This channel was created for your team. Send a message to get started!
+            </p>
           </div>
         ) : (
           <>
@@ -689,7 +733,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     onLoadOlderMessages?.();
                   }}
                   disabled={isLoadingOlder}
-                  className="px-4 py-1.5 bg-[#2C3136] hover:bg-[#383F45] text-xs font-medium text-gray-300 hover:text-white rounded-full transition flex items-center gap-2 border border-gray-700/60 shadow-xs disabled:opacity-50 cursor-pointer"
+                  style={{
+                    backgroundColor: 'var(--theme-bg-surface)',
+                    borderColor: 'var(--theme-border)',
+                    color: 'var(--theme-text-primary)',
+                  }}
+                  className="px-4 py-1.5 text-xs font-medium rounded-full transition flex items-center gap-2 border shadow-xs disabled:opacity-50 cursor-pointer hover:opacity-85"
                 >
                   {isLoadingOlder ? (
                     <>
@@ -705,12 +754,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
             {/* Start of channel header (only shown when user has scrolled all the way to the beginning) */}
             {!hasMoreMessages && (
-              <div className="py-6 border-b border-gray-800/60 mb-2">
-                <div className="w-12 h-12 rounded-2xl bg-[#2C3136] flex items-center justify-center mb-3 text-gray-300 shadow">
+              <div className="py-6 border-b mb-2" style={{ borderColor: 'var(--theme-border)' }}>
+                <div
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3 shadow"
+                  style={{ backgroundColor: 'var(--theme-bg-surface)', color: 'var(--theme-text-muted)' }}
+                >
                   <Hash size={24} />
                 </div>
-                <h3 className="font-bold text-lg text-white">This is the start of #{channel.name}</h3>
-                <p className="text-xs text-gray-400 mt-1 max-w-md">
+                <h3 className="font-bold text-lg" style={{ color: 'var(--theme-text-primary)' }}>
+                  This is the start of #{channel.name}
+                </h3>
+                <p className="text-xs mt-1 max-w-md" style={{ color: 'var(--theme-text-muted)' }}>
                   {channel.description || channel.topic || 'This is the very beginning of the channel history.'}
                 </p>
               </div>
@@ -734,7 +788,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               <div
                 key={msg.id}
                 id={`msg-${msg.id}`}
-                className={`group flex gap-2.5 sm:gap-3 hover:bg-[#222529]/60 -mx-3 sm:-mx-6 px-3 sm:px-6 py-2 rounded-lg transition-all duration-300 relative ${
+                className={`group flex gap-2.5 sm:gap-3 hover:bg-black/5 dark:hover:bg-white/5 -mx-3 sm:-mx-6 px-3 sm:px-6 py-2 rounded-lg transition-all duration-300 relative ${
                   msg.isPinned ? 'bg-amber-500/5 border-l-2 border-amber-400/80 pl-2 sm:pl-5' : ''
                 }`}
               >
@@ -757,7 +811,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     </div>
                   )}
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-white hover:underline cursor-pointer flex items-center gap-1.5">
+                    <span
+                      className="font-bold text-sm hover:underline cursor-pointer flex items-center gap-1.5"
+                      style={{ color: 'var(--theme-text-primary)' }}
+                    >
                       {authorName}
                       {isAnon ? (
                         <span
@@ -770,12 +827,19 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           {isSelf ? 'You (Anon)' : 'Anonymous'}
                         </span>
                       ) : isBot ? (
-                        <span className="text-[10px] font-semibold bg-[#2C3136] text-gray-300 px-1.5 py-0.2 rounded uppercase">
+                        <span
+                          className="text-[10px] font-semibold px-1.5 py-0.2 rounded uppercase border"
+                          style={{
+                            backgroundColor: 'var(--theme-bg-surface-hover)',
+                            borderColor: 'var(--theme-border)',
+                            color: 'var(--theme-text-muted)',
+                          }}
+                        >
                           APP
                         </span>
                       ) : null}
                     </span>
-                    <span className="text-[11px] text-gray-500">
+                    <span className="text-[11px]" style={{ color: 'var(--theme-text-muted)' }}>
                       {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
@@ -793,7 +857,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           }, 2000);
                         }
                       }}
-                      className="mt-1 mb-1.5 flex items-center gap-2 bg-[#25292D] hover:bg-[#2F3439] border-l-4 border-slack-green rounded-r-lg px-3 py-1.5 cursor-pointer text-xs transition max-w-lg shadow-sm"
+                      style={{
+                        backgroundColor: 'var(--theme-bg-surface)',
+                        borderColor: 'var(--theme-border)',
+                      }}
+                      className="mt-1 mb-1.5 flex items-center gap-2 border-l-4 border-slack-green rounded-r-lg px-3 py-1.5 cursor-pointer text-xs transition max-w-lg shadow-sm"
                     >
                       <div className="min-w-0">
                         <span className="font-bold text-slack-green text-[11px] block">
@@ -801,7 +869,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                             ? (msg.quotedMessage.anonName ? `${msg.quotedMessage.anonEmoji || '🎭'} ${msg.quotedMessage.anonName}` : 'Anonymous')
                             : (msg.quotedMessage.user?.displayName || 'Teammate')}
                         </span>
-                        <span className="text-gray-300 text-[11px] truncate block max-w-md">
+                        <span className="text-[11px] truncate block max-w-md" style={{ color: 'var(--theme-text-muted)' }}>
                           {msg.quotedMessage.content}
                         </span>
                       </div>
@@ -809,7 +877,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   )}
 
                   {/* Message Content */}
-                  <div className="text-sm text-gray-200 mt-1 max-w-none break-words">
+                  <div className="text-sm mt-1 max-w-none break-words" style={{ color: 'var(--theme-text-primary)' }}>
                     <MarkdownRenderer
                       content={msg.content}
                       currentUsername={currentUser?.username}
@@ -1041,10 +1109,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           }}
           onDragLeave={() => setIsDragOver(false)}
           onDrop={handleDrop}
-          className={`bg-[#222529] border rounded-xl focus-within:border-gray-500 shadow-lg relative transition ${
+          style={{
+            backgroundColor: 'var(--theme-bg-surface)',
+            borderColor: 'var(--theme-border)',
+          }}
+          className={`border rounded-xl focus-within:border-gray-500 shadow-lg relative transition ${
             isDragOver
-              ? 'border-slack-green ring-2 ring-slack-green/50 bg-[#252C28]'
-              : 'border-gray-700'
+              ? 'ring-2 ring-slack-green/50'
+              : ''
           }`}
         >
           {/* File Attachments Preview & Upload Indicator */}
@@ -1154,7 +1226,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <button
               type="submit"
               disabled={(!content.trim() && attachments.length === 0) || isUploading}
-              className="p-1.5 bg-slack-green hover:bg-[#008a65] text-white rounded-lg transition disabled:opacity-30 flex items-center justify-center"
+              style={{
+                backgroundColor: 'var(--theme-primary)',
+              }}
+              className="p-1.5 hover:opacity-90 text-white rounded-lg transition disabled:opacity-30 flex items-center justify-center"
             >
               {isUploading ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
             </button>

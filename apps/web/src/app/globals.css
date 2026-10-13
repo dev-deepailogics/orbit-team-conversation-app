@@ -24,6 +24,20 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 262 52% 47%;
     --radius: 0.5rem;
+
+    /* Orbit Theme Dynamic Variables */
+    --theme-bg-sidebar: #1F2326;
+    --theme-bg-workspace: #19171D;
+    --theme-bg-app: #1A1D21;
+    --theme-bg-surface: #222529;
+    --theme-bg-surface-hover: #2C3136;
+    --theme-text-primary: #FFFFFF;
+    --theme-text-muted: #9CA3AF;
+    --theme-primary: #007A5A;
+    --theme-primary-hover: #00664B;
+    --theme-primary-text: #FFFFFF;
+    --theme-secondary: #1164A3;
+    --theme-border: #383F45;
   }
 
   .dark {

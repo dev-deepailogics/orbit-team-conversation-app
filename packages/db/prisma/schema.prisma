@@ -85,6 +85,7 @@ model Workspace {
   iconUrl     String?
   inviteCode  String   @unique @default(uuid())
   ownerId     String
+  settings    Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -110,6 +111,7 @@ model WorkspaceMember {
   userId      String
   role        WorkspaceRole @default(MEMBER)
   nickname    String?
+  settings    Json?
   joinedAt    DateTime      @default(now())
 
   workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

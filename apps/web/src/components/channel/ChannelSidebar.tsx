@@ -18,11 +18,13 @@ import {
   Search,
   FolderKanban,
   Kanban,
+  Palette,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useChatStore } from '../../stores/chatStore';
 import { WorkspaceStorageModal } from '../workspace/WorkspaceStorageModal';
 import { AddWorkspaceMemberDialog } from '../workspace/AddWorkspaceMemberDialog';
+import { ThemeModal } from '../theme/ThemeModal';
 
 interface ChannelSidebarProps {
   workspace: Workspace;
@@ -70,12 +72,22 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [showStorageModal, setShowStorageModal] = useState(false);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [showThemeModal, setShowThemeModal] = useState(false);
   const [channelName, setChannelName] = useState('');
   const [channelTopic, setChannelTopic] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
   const unreadCounts = useChatStore((s) => s.unreadCounts);
+
+  const currentUserMember = members?.find(
+    (m: any) => m.userId === currentUser?.id || m.user?.id === currentUser?.id
+  );
+  const isAdminOrOwner =
+    currentUser?.systemRole === 'SUPER_ADMIN' ||
+    currentUserMember?.role === 'OWNER' ||
+    currentUserMember?.role === 'ADMIN' ||
+    workspace.ownerId === currentUser?.id;
 
   const handleCreateChannel = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,10 +118,26 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   };
 
   return (
-    <div className="w-64 bg-[#1F2326] border-r border-[#383F45]/40 flex flex-col h-full select-none">
+    <div
+      className="w-64 border-r flex flex-col h-full select-none"
+      style={{
+        backgroundColor: 'var(--theme-bg-sidebar)',
+        borderColor: 'var(--theme-border)',
+      }}
+    >
       {/* Workspace Header */}
-      <div className="h-14 border-b border-[#383F45]/40 px-4 flex items-center justify-between text-white font-bold hover:bg-white/5 transition cursor-pointer group">
-        <div className="flex items-center gap-2 truncate">
+      <div
+        className="h-14 border-b px-4 flex items-center justify-between font-bold hover:bg-white/5 transition cursor-pointer group"
+        style={{
+          borderColor: 'var(--theme-border)',
+          color: 'var(--theme-text-primary)',
+        }}
+      >
+        <div
+          onClick={() => setShowThemeModal(true)}
+          title="Click to customize workspace theme"
+          className="flex items-center gap-2 truncate"
+        >
           <span className="truncate">{workspace.name}</span>
           <ChevronDown size={16} className="text-gray-400 group-hover:text-white" />
         </div>
@@ -117,10 +145,20 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           <button
             onClick={(e) => {
               e.stopPropagation();
+              setShowThemeModal(true);
+            }}
+            title="Customize Theme & Appearance"
+            className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition"
+          >
+            <Palette size={18} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
               setShowStorageModal(true);
             }}
             title="Workspace Storage & Files"
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition"
+            className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition"
           >
             <HardDrive size={18} />
           </button>
@@ -130,7 +168,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
               onOpenBotPortal();
             }}
             title="Integrations & Bot Developer Portal"
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition"
+            className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition"
           >
             <Bot size={18} />
           </button>
@@ -140,7 +178,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
               setShowAddMemberModal(true);
             }}
             title="Invite & Add Members"
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition"
+            className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition"
           >
             <UserPlus size={18} />
           </button>
@@ -167,13 +205,24 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
             <button
               onClick={onOpenSearch}
               title="Search messages (Cmd+K / Ctrl+K)"
-              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-[#272B30] hover:bg-[#2F343A] text-gray-400 hover:text-gray-200 border border-gray-700/60 text-xs transition group"
+              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs transition group"
+              style={{
+                backgroundColor: 'var(--theme-bg-surface)',
+                borderColor: 'var(--theme-border)',
+                color: 'var(--theme-text-muted)',
+              }}
             >
               <div className="flex items-center gap-2">
-                <Search size={14} className="text-gray-400 group-hover:text-slack-green transition" />
+                <Search size={14} className="text-gray-400 group-hover:text-white transition" />
                 <span>Search messages...</span>
               </div>
-              <kbd className="text-[10px] bg-[#1A1D21] px-1.5 py-0.5 rounded text-gray-400 font-mono border border-gray-700">
+              <kbd
+                className="text-[10px] px-1.5 py-0.5 rounded font-mono border"
+                style={{
+                  backgroundColor: 'var(--theme-bg-app)',
+                  borderColor: 'var(--theme-border)',
+                }}
+              >
                 ⌘K
               </kbd>
             </button>
@@ -182,16 +231,19 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 
         {/* Projects & Boards Section (Trello-like) */}
         <div>
-          <div className="flex items-center justify-between px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
+          <div
+            className="flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-wider mb-1"
+            style={{ color: 'var(--theme-text-muted)' }}
+          >
             <span className="flex items-center gap-1.5">
-              <FolderKanban size={13} className="text-slack-green" />
+              <FolderKanban size={13} style={{ color: 'var(--theme-primary)' }} />
               <span>Projects & Boards</span>
             </span>
             {onOpenCreateProject && (
               <button
                 onClick={onOpenCreateProject}
                 title="Create Project Board"
-                className="p-1 hover:text-white hover:bg-gray-700/50 rounded transition"
+                className="p-1 hover:opacity-80 rounded transition"
               >
                 <Plus size={14} />
               </button>
@@ -209,9 +261,19 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                   onClick={() => onSelectProject?.(project)}
                   className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
                     isActive
-                      ? 'bg-slack-activeChannel text-white shadow font-semibold'
-                      : 'text-gray-300 hover:bg-[#2C3136] hover:text-white'
+                      ? 'shadow font-semibold'
+                      : 'hover:bg-black/5 dark:hover:bg-white/10'
                   }`}
+                  style={
+                    isActive
+                      ? {
+                          backgroundColor: 'var(--theme-primary)',
+                          color: 'var(--theme-primary-text)',
+                        }
+                      : {
+                          color: 'var(--theme-text-primary)',
+                        }
+                  }
                 >
                   <div className="flex items-center gap-2 truncate">
                     <span className="text-sm shrink-0">{project.icon || '📋'}</span>
@@ -239,11 +301,14 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 
         {/* Channels Section */}
         <div>
-          <div className="flex items-center justify-between px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
+          <div
+            className="flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-wider mb-1"
+            style={{ color: 'var(--theme-text-muted)' }}
+          >
             <span>Channels</span>
             <button
               onClick={() => setShowCreateChannel(true)}
-              className="p-1 hover:text-white hover:bg-gray-700/50 rounded transition"
+              className="p-1 hover:opacity-80 rounded transition"
             >
               <Plus size={14} />
             </button>
@@ -261,19 +326,29 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                   onClick={() => onSelectChannel(channel)}
                   className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
                     isActive
-                      ? 'bg-slack-activeChannel text-white shadow font-semibold'
+                      ? 'shadow font-semibold'
                       : unread > 0
-                      ? 'text-white font-bold bg-[#282C30]'
-                      : 'text-gray-300 hover:bg-[#2C3136] hover:text-white'
+                      ? 'font-bold bg-black/5 dark:bg-white/10'
+                      : 'hover:bg-black/5 dark:hover:bg-white/10'
                   }`}
+                  style={
+                    isActive
+                      ? {
+                          backgroundColor: 'var(--theme-primary)',
+                          color: 'var(--theme-primary-text)',
+                        }
+                      : {
+                          color: 'var(--theme-text-primary)',
+                        }
+                  }
                 >
                   <div className="flex items-center gap-2 truncate">
                     {channel.isAnonymous ? (
                       <span className="text-sm shrink-0 leading-none" title="Anonymous Channel">🎭</span>
                     ) : channel.type === 'PRIVATE' ? (
-                      <Lock size={15} className={unread > 0 ? 'text-white' : 'text-gray-400'} />
+                      <Lock size={15} className={`shrink-0 ${unread > 0 ? '' : 'opacity-70'}`} />
                     ) : (
-                      <Hash size={16} className={unread > 0 ? 'text-white' : 'text-gray-400'} />
+                      <Hash size={16} className={`shrink-0 ${unread > 0 ? '' : 'opacity-70'}`} />
                     )}
                     <span className="truncate">{channel.name}</span>
                     {channel.isAnonymous && (
@@ -314,7 +389,10 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 
         {/* Direct Messages Section */}
         <div>
-          <div className="flex items-center justify-between px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
+          <div
+            className="flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-wider mb-1"
+            style={{ color: 'var(--theme-text-muted)' }}
+          >
             <span>Direct Messages</span>
           </div>
 
@@ -349,11 +427,21 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                   onClick={() => onSelectUserDM(user)}
                   className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
                     isSelectedDM
-                      ? 'bg-slack-activeChannel text-white shadow font-semibold'
+                      ? 'shadow font-semibold'
                       : unread > 0
-                      ? 'text-white font-bold bg-[#282C30]'
-                      : 'text-gray-300 hover:bg-[#2C3136] hover:text-white'
+                      ? 'font-bold bg-black/5 dark:bg-white/10'
+                      : 'hover:bg-black/5 dark:hover:bg-white/10'
                   }`}
+                  style={
+                    isSelectedDM
+                      ? {
+                          backgroundColor: 'var(--theme-primary)',
+                          color: 'var(--theme-primary-text)',
+                        }
+                      : {
+                          color: 'var(--theme-text-primary)',
+                        }
+                  }
                 >
                   <div className="flex items-center gap-2.5 truncate min-w-0">
                     <div className="relative shrink-0">
@@ -363,14 +451,14 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                         className="w-5 h-5 rounded-md object-cover"
                       />
                       <span
-                        className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-1 ring-[#1F2326] ${
+                        className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-1 ring-black/40 ${
                           isOnline ? 'bg-slack-green' : 'bg-gray-500'
                         }`}
                       />
                     </div>
                     <span className="truncate">{user.displayName}</span>
                     {isSelf && (
-                      <span className="text-[10px] text-gray-500 shrink-0">you</span>
+                      <span className="text-[10px] shrink-0" style={{ color: 'var(--theme-text-muted)' }}>you</span>
                     )}
                   </div>
 
@@ -388,7 +476,13 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 
       {/* User Bottom Bar */}
       {currentUser && (
-        <div className="h-14 bg-[#181B1E] border-t border-[#383F45]/40 px-3 flex items-center justify-between">
+        <div
+          className="h-14 border-t px-3 flex items-center justify-between"
+          style={{
+            backgroundColor: 'var(--theme-bg-surface)',
+            borderColor: 'var(--theme-border)',
+          }}
+        >
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="relative">
               <img
@@ -396,20 +490,26 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 alt={currentUser.displayName}
                 className="w-8 h-8 rounded-lg object-cover"
               />
-              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-slack-green rounded-full ring-2 ring-[#181B1E]" />
+              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-slack-green rounded-full ring-2 ring-black/30" />
             </div>
             <div className="truncate">
-              <p className="text-sm font-semibold text-white truncate leading-tight">
+              <p
+                className="text-sm font-semibold truncate leading-tight"
+                style={{ color: 'var(--theme-text-primary)' }}
+              >
                 {currentUser.displayName}
               </p>
-              <p className="text-xs text-gray-400 truncate">@{currentUser.username}</p>
+              <p className="text-xs truncate" style={{ color: 'var(--theme-text-muted)' }}>
+                @{currentUser.username}
+              </p>
             </div>
           </div>
 
           <button
             onClick={onLogout}
             title="Log out"
-            className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-gray-800 rounded-lg transition"
+            style={{ color: 'var(--theme-text-muted)' }}
+            className="p-1.5 hover:text-red-400 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition"
           >
             <LogOut size={16} />
           </button>
@@ -572,6 +672,16 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           currentUser={currentUser}
           onClose={() => setShowAddMemberModal(false)}
           onMemberAdded={onMemberAdded}
+        />
+      )}
+
+      {/* Theme Customizer Modal */}
+      {showThemeModal && (
+        <ThemeModal
+          isOpen={showThemeModal}
+          onClose={() => setShowThemeModal(false)}
+          workspace={workspace}
+          isAdminOrOwner={isAdminOrOwner}
         />
       )}
     </div>
