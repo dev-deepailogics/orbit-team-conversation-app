@@ -3,6 +3,7 @@ import { prisma } from '@orbit/db';
 import { SOCKET_EVENTS } from '@orbit/types';
 import { z } from 'zod';
 import { sendSystemNotification } from '../services/systemBot.js';
+import { handleMessageMentions } from '../services/mentionService.js';
 import { verifyChannelAccess } from '../utils/security.js';
 
 const createChannelSchema = z.object({
@@ -593,6 +594,17 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         fastify.io.to(`channel:${channel.id}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
       }
     }
+
+    // Process mentions & trigger DM notifications
+    handleMessageMentions({
+      workspaceId: channel.workspaceId,
+      channelId: channel.id,
+      authorId: userId,
+      content: content || '',
+      messageId: message.id,
+      isThreadReply: false,
+      io: fastify.io,
+    }).catch((err) => fastify.log.error(err, 'Failed to process message mentions'));
 
     return reply.status(201).send(payload);
   });

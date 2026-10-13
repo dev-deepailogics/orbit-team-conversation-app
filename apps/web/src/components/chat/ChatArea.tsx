@@ -57,6 +57,9 @@ interface ChatAreaProps {
   onOpenAddMembers?: () => void;
   onOpenSearch?: () => void;
   onToggleMobileSidebar?: () => void;
+  members?: any[];
+  onSelectUserDM?: (user: UserProfile) => void;
+  onSelectChannel?: (channel: Channel) => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -73,6 +76,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onOpenAddMembers,
   onOpenSearch,
   onToggleMobileSidebar,
+  members,
+  onSelectUserDM,
+  onSelectChannel,
 }) => {
   const [content, setContent] = useState('');
   const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
@@ -98,6 +104,36 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const editorRef = useRef<RichTextEditorRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const mentionUsers = React.useMemo(() => {
+    if (!members) return [];
+    return members
+      .map((m) => m.user)
+      .filter(Boolean)
+      .map((u) => ({
+        id: u.id,
+        username: u.username,
+        displayName: u.displayName,
+        avatarUrl: u.avatarUrl,
+        status: u.status,
+      }));
+  }, [members]);
+
+  const handleMentionClick = (username: string) => {
+    const targetMember = members?.find(
+      (m) => m.user?.username?.toLowerCase() === username.toLowerCase()
+    );
+    if (targetMember?.user && onSelectUserDM) {
+      onSelectUserDM(targetMember.user);
+    }
+  };
+
+  const handleChannelClick = (channelId: string) => {
+    const ch = useChatStore.getState().channels.find((c) => c.id === channelId);
+    if (ch && onSelectChannel) {
+      onSelectChannel(ch);
+    }
+  };
 
   // Close more menu when clicking outside
   useEffect(() => {
@@ -680,7 +716,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
                   {/* Message Content */}
                   <div className="text-sm text-gray-200 mt-1 max-w-none break-words">
-                    <MarkdownRenderer content={msg.content} />
+                    <MarkdownRenderer
+                      content={msg.content}
+                      currentUsername={currentUser?.username}
+                      onMentionClick={handleMentionClick}
+                      onChannelClick={handleChannelClick}
+                    />
                   </div>
 
                   {/* Attachments */}
@@ -962,6 +1003,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 : `Message #${channel.name}`
             }
             showToolbar={showFormatting}
+            mentionUsers={mentionUsers}
             onTyping={(text) => handleTyping(text)}
             onSubmit={() => handleSendMessage()}
           />

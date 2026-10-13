@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
+import React, { useRef, useEffect, useState, useImperativeHandle, forwardRef } from 'react';
 import {
   Bold,
   Italic,
@@ -13,7 +13,16 @@ import {
   Code,
   FileCode,
   Link as LinkIcon,
+  AtSign,
 } from 'lucide-react';
+
+export interface MentionUser {
+  id: string;
+  username: string;
+  displayName: string;
+  avatarUrl?: string | null;
+  status?: string;
+}
 
 export interface RichTextEditorRef {
   insertEmoji: (emoji: string) => void;
@@ -33,6 +42,7 @@ interface RichTextEditorProps {
   onSubmit?: () => void;
   minHeight?: string;
   className?: string;
+  mentionUsers?: MentionUser[];
 }
 
 function getInlineFormattingParent(node: Node | null, rootEl: HTMLElement): HTMLElement | null {
@@ -196,10 +206,118 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       onSubmit,
       minHeight = '60px',
       className = '',
+      mentionUsers = [],
     },
     ref
   ) => {
     const editorRef = useRef<HTMLDivElement | null>(null);
+
+    // Mention Autocomplete State
+    const [mentionState, setMentionState] = useState<{
+      isOpen: boolean;
+      query: string;
+      atIndex: number;
+      node: Node | null;
+      offset: number;
+    }>({
+      isOpen: false,
+      query: '',
+      atIndex: -1,
+      node: null,
+      offset: 0,
+    });
+    const [selectedMentionIdx, setSelectedMentionIdx] = useState(0);
+
+    const filteredMentionUsers = React.useMemo(() => {
+      if (!mentionUsers || !mentionState.isOpen) return [];
+      const q = mentionState.query.toLowerCase();
+      return mentionUsers
+        .filter(
+          (u) =>
+            u.username.toLowerCase().includes(q) ||
+            u.displayName.toLowerCase().includes(q)
+        )
+        .slice(0, 8);
+    }, [mentionUsers, mentionState.isOpen, mentionState.query]);
+
+    useEffect(() => {
+      setSelectedMentionIdx(0);
+    }, [filteredMentionUsers.length, mentionState.query]);
+
+    const checkMentionTrigger = () => {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) {
+        setMentionState((prev) => (prev.isOpen ? { ...prev, isOpen: false } : prev));
+        return;
+      }
+      const range = sel.getRangeAt(0);
+      const node = range.startContainer;
+      if (node.nodeType !== Node.TEXT_NODE) {
+        setMentionState((prev) => (prev.isOpen ? { ...prev, isOpen: false } : prev));
+        return;
+      }
+      const text = node.textContent || '';
+      const offset = range.startOffset;
+      const textBeforeCursor = text.slice(0, offset);
+
+      // Trigger on @ preceded by start of line or whitespace
+      const match = textBeforeCursor.match(/(?:^|\s)@([a-zA-Z0-9_\.\-]*)$/);
+      if (match) {
+        const query = match[1];
+        const atIndex = textBeforeCursor.lastIndexOf('@');
+        setMentionState({
+          isOpen: true,
+          query,
+          atIndex,
+          node,
+          offset,
+        });
+      } else {
+        setMentionState((prev) => (prev.isOpen ? { ...prev, isOpen: false } : prev));
+      }
+    };
+
+    const handleSelectMention = (user: MentionUser) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      const sel = window.getSelection();
+      if (!sel) return;
+
+      const node = mentionState.node;
+      const atIndex = mentionState.atIndex;
+      const offset = mentionState.offset;
+
+      if (node && editor.contains(node) && node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent || '';
+        const before = text.slice(0, atIndex);
+        const after = text.slice(offset);
+        const mentionText = `@${user.username} `;
+        node.textContent = before + mentionText + after;
+
+        const newOffset = before.length + mentionText.length;
+        const newRange = document.createRange();
+        newRange.setStart(node, newOffset);
+        newRange.setEnd(node, newOffset);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+      } else {
+        document.execCommand('insertText', false, `@${user.username} `);
+      }
+
+      setMentionState({
+        isOpen: false,
+        query: '',
+        atIndex: -1,
+        node: null,
+        offset: 0,
+      });
+
+      if (onTyping) {
+        onTyping(editor.innerText.replace(/\u200B/g, ''));
+      }
+      editor.focus();
+    };
 
     useEffect(() => {
       if (initialValue !== undefined && editorRef.current) {
@@ -540,6 +658,33 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         }
       }
 
+      // Mention Autocomplete Keyboard Navigation
+      if (mentionState.isOpen && filteredMentionUsers.length > 0) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setSelectedMentionIdx((prev) => (prev + 1) % filteredMentionUsers.length);
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setSelectedMentionIdx((prev) => (prev - 1 + filteredMentionUsers.length) % filteredMentionUsers.length);
+          return;
+        }
+        if (e.key === 'Enter' || e.key === 'Tab') {
+          e.preventDefault();
+          const target = filteredMentionUsers[selectedMentionIdx];
+          if (target) {
+            handleSelectMention(target);
+          }
+          return;
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setMentionState((prev) => ({ ...prev, isOpen: false }));
+          return;
+        }
+      }
+
       // 5. Enter key handling: Continue bullet lists on next line OR submit message
       if (e.key === 'Enter') {
         const sel = window.getSelection();
@@ -639,10 +784,11 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       if (editorRef.current && onTyping) {
         onTyping(editorRef.current.innerText.replace(/\u200B/g, ''));
       }
+      checkMentionTrigger();
     };
 
     return (
-      <div className={`flex flex-col w-full ${className}`}>
+      <div className={`relative flex flex-col w-full ${className}`}>
         {/* Live Format Toolbar */}
         {showToolbar && (
           <div className="flex items-center gap-0.5 px-2.5 py-1.5 bg-[#1C1F23]/90 border-b border-gray-800/60 overflow-x-auto select-none">
@@ -766,11 +912,67 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
 
         {/* Live ContentEditable Typing Area */}
         <div className="relative w-full">
+          {/* Floating Mention Autocomplete Popover */}
+          {mentionState.isOpen && filteredMentionUsers.length > 0 && (
+            <div className="absolute bottom-full mb-2 left-2 sm:left-4 z-50 w-72 max-h-56 bg-[#1F2326] border border-gray-700/80 rounded-xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100">
+              <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-800 bg-[#181B1E] flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-slack-green">
+                  <AtSign size={12} />
+                  Members
+                </span>
+                <span className="text-[9px] text-gray-500 font-normal">
+                  ↑↓ to navigate • ↵ to select
+                </span>
+              </div>
+              <div className="flex-1 overflow-y-auto max-h-48 py-1 divide-y divide-gray-800/40">
+                {filteredMentionUsers.map((u, idx) => (
+                  <div
+                    key={u.id}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelectMention(u);
+                    }}
+                    className={`flex items-center gap-2.5 px-3 py-1.5 cursor-pointer text-xs transition ${
+                      idx === selectedMentionIdx
+                        ? 'bg-slack-activeChannel text-white font-semibold'
+                        : 'text-gray-200 hover:bg-[#2C3136]'
+                    }`}
+                  >
+                    <div className="relative shrink-0">
+                      <img
+                        src={u.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${u.username}`}
+                        alt={u.displayName}
+                        className="w-5 h-5 rounded-md object-cover"
+                      />
+                      <span
+                        className={`absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full ring-1 ring-[#1F2326] ${
+                          u.status === 'ONLINE' ? 'bg-slack-green' : 'bg-gray-500'
+                        }`}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                      <span className="truncate font-medium">{u.displayName}</span>
+                      <span
+                        className={`text-[10px] truncate ${
+                          idx === selectedMentionIdx ? 'text-gray-200' : 'text-gray-400'
+                        }`}
+                      >
+                        @{u.username}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div
             ref={editorRef}
             contentEditable
             onKeyDown={handleEditorKeyDown}
             onInput={handleInput}
+            onKeyUp={checkMentionTrigger}
+            onClick={checkMentionTrigger}
             style={{ minHeight }}
             data-placeholder={placeholder}
             className="w-full bg-transparent px-4 py-3 text-sm text-white focus:outline-none overflow-y-auto max-h-60 leading-relaxed font-sans empty:before:content-[attr(data-placeholder)] empty:before:text-gray-500 empty:before:pointer-events-none [&_h1]:text-lg [&_h1]:font-bold [&_h1]:text-white [&_h1]:my-1 [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-white [&_h2]:my-1 [&_b]:font-bold [&_b]:text-white [&_strong]:font-bold [&_strong]:text-white [&_i]:italic [&_i]:text-gray-200 [&_ul]:list-disc [&_ul]:list-inside [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:list-inside [&_ol]:my-1 [&_blockquote]:border-l-4 [&_blockquote]:border-slack-green [&_blockquote]:bg-[#222529]/60 [&_blockquote]:px-2.5 [&_blockquote]:py-1 [&_blockquote]:my-1 [&_blockquote]:rounded-r [&_blockquote]:italic [&_blockquote]:text-gray-300 [&_a]:text-blue-400 [&_a]:underline"

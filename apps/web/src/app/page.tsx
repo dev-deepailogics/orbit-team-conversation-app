@@ -756,6 +756,9 @@ export default function AppDashboard() {
           onOpenAddMembers={() => setShowAddMembers(true)}
           onOpenSearch={() => setShowSearchModal(true)}
           onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+          members={members}
+          onSelectUserDM={handleSelectUserDM}
+          onSelectChannel={handleSelectChannel}
         />
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center text-gray-500 p-4 text-center">
@@ -851,6 +854,9 @@ export default function AppDashboard() {
               currentUser={user}
               onClose={() => setActiveThread(null)}
               onReplyAdded={addThreadReply}
+              members={members}
+              onSelectUserDM={handleSelectUserDM}
+              onSelectChannel={handleSelectChannel}
             />
           </div>
         </div>

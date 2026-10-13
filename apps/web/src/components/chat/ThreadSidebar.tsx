@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Message, UserProfile } from '@orbit/types';
+import { Message, UserProfile, Channel } from '@orbit/types';
 import { X, Send, CornerUpLeft, Smile, SmilePlus, Type, Paperclip, FileText, Loader2 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useChatStore } from '../../stores/chatStore';
@@ -17,6 +17,9 @@ interface ThreadSidebarProps {
   currentUser: UserProfile | null;
   onClose: () => void;
   onReplyAdded: (reply: Message) => void;
+  members?: any[];
+  onSelectUserDM?: (user: UserProfile) => void;
+  onSelectChannel?: (channel: Channel) => void;
 }
 
 export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
@@ -25,6 +28,9 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   currentUser,
   onClose,
   onReplyAdded,
+  members,
+  onSelectUserDM,
+  onSelectChannel,
 }) => {
   const [content, setContent] = useState('');
   const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
@@ -38,6 +44,36 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   const repliesEndRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<RichTextEditorRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const mentionUsers = React.useMemo(() => {
+    if (!members) return [];
+    return members
+      .map((m) => m.user)
+      .filter(Boolean)
+      .map((u) => ({
+        id: u.id,
+        username: u.username,
+        displayName: u.displayName,
+        avatarUrl: u.avatarUrl,
+        status: u.status,
+      }));
+  }, [members]);
+
+  const handleMentionClick = (username: string) => {
+    const targetMember = members?.find(
+      (m) => m.user?.username?.toLowerCase() === username.toLowerCase()
+    );
+    if (targetMember?.user && onSelectUserDM) {
+      onSelectUserDM(targetMember.user);
+    }
+  };
+
+  const handleChannelClick = (channelId: string) => {
+    const ch = useChatStore.getState().channels.find((c) => c.id === channelId);
+    if (ch && onSelectChannel) {
+      onSelectChannel(ch);
+    }
+  };
 
   useEffect(() => {
     setTopEmojis(getTopEmojis(5));
@@ -156,7 +192,12 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
               </span>
             </div>
             <div className="text-xs text-gray-200 mt-1 max-w-none break-words">
-              <MarkdownRenderer content={parentMessage.content} />
+              <MarkdownRenderer
+                content={parentMessage.content}
+                currentUsername={currentUser?.username}
+                onMentionClick={handleMentionClick}
+                onChannelClick={handleChannelClick}
+              />
             </div>
 
             {/* Parent Message Attachments */}
@@ -308,7 +349,12 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                 )}
 
                 <div className="text-xs text-gray-200 mt-0.5 max-w-none break-words">
-                  <MarkdownRenderer content={reply.content} />
+                  <MarkdownRenderer
+                    content={reply.content}
+                    currentUsername={currentUser?.username}
+                    onMentionClick={handleMentionClick}
+                    onChannelClick={handleChannelClick}
+                  />
                 </div>
 
                 {/* Reply Attachments */}
@@ -473,6 +519,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
             ref={editorRef}
             placeholder="Reply..."
             showToolbar={showFormatting}
+            mentionUsers={mentionUsers}
             minHeight="44px"
             onTyping={(text) => setContent(text)}
             onSubmit={() => handleSendReply()}

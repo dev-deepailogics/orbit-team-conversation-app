@@ -3,6 +3,7 @@ import { prisma } from '@orbit/db';
 import { SOCKET_EVENTS } from '@orbit/types';
 import { z } from 'zod';
 import { verifyMessageAccess, verifyWorkspaceMember } from '../utils/security.js';
+import { handleMessageMentions } from '../services/mentionService.js';
 
 const searchQuerySchema = z.object({
   workspaceId: z.string().min(1, 'workspaceId is required'),
@@ -323,6 +324,17 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         isThreadReply: true,
       });
     }
+
+    // Process mentions in thread reply & trigger DM notifications
+    handleMessageMentions({
+      workspaceId: access.channel.workspaceId,
+      channelId: parent.channelId,
+      authorId: userId,
+      content: content || '',
+      messageId: replyMessage.id,
+      isThreadReply: true,
+      io: fastify.io,
+    }).catch((err) => fastify.log.error(err, 'Failed to process thread reply mentions'));
 
     return reply.status(201).send(fullReplyMessage);
   });
