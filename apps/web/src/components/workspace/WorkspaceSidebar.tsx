@@ -62,8 +62,8 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
               title={ws.name}
               className={`relative group w-11 h-11 rounded-xl flex items-center justify-center font-bold text-base transition-all duration-200 ${
                 isActive
-                  ? 'text-white rounded-2xl shadow-lg ring-2 ring-white/20'
-                  : 'text-gray-300 hover:rounded-2xl hover:text-white'
+                  ? 'rounded-2xl shadow-lg ring-2 ring-white/20'
+                  : 'hover:rounded-2xl hover:opacity-90'
               }`}
               style={{
                 backgroundColor: isActive ? 'var(--theme-primary)' : 'var(--theme-bg-surface)',
@@ -88,7 +88,12 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           <button
             onClick={() => setShowCreateModal(true)}
             title="Create a Workspace"
-            className="w-11 h-11 rounded-xl bg-[#2C3136]/60 border border-dashed border-gray-600 text-gray-400 hover:text-white hover:bg-[#2C3136] hover:border-gray-400 flex items-center justify-center transition-all duration-200"
+            style={{
+              borderColor: 'var(--theme-border)',
+              color: 'var(--theme-text-muted)',
+              backgroundColor: 'var(--theme-bg-surface)',
+            }}
+            className="w-11 h-11 rounded-xl border border-dashed hover:opacity-100 hover:border-gray-400 flex items-center justify-center transition-all duration-200"
           >
             <Plus size={20} />
           </button>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Workspace, Channel, UserProfile, Project } from '@orbit/types';
 import {
   Hash,
@@ -19,6 +19,7 @@ import {
   FolderKanban,
   Kanban,
   Palette,
+  Check,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useChatStore } from '../../stores/chatStore';
@@ -78,7 +79,23 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   const [isPrivate, setIsPrivate] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
+  const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
+  const workspaceMenuRef = useRef<HTMLDivElement>(null);
   const unreadCounts = useChatStore((s) => s.unreadCounts);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (workspaceMenuRef.current && !workspaceMenuRef.current.contains(e.target as Node)) {
+        setShowWorkspaceMenu(false);
+      }
+    };
+    if (showWorkspaceMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showWorkspaceMenu]);
 
   const currentUserMember = members?.find(
     (m: any) => m.userId === currentUser?.id || m.user?.id === currentUser?.id
@@ -125,76 +142,124 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
         borderColor: 'var(--theme-border)',
       }}
     >
-      {/* Workspace Header */}
+      {/* Workspace Header with Dropdown */}
       <div
-        className="h-14 border-b px-4 flex items-center justify-between font-bold hover:bg-white/5 transition cursor-pointer group"
+        ref={workspaceMenuRef}
+        className="relative h-14 border-b px-3 sm:px-4 flex items-center justify-between font-bold select-none z-30"
         style={{
           borderColor: 'var(--theme-border)',
           color: 'var(--theme-text-primary)',
         }}
       >
-        <div
-          onClick={() => setShowThemeModal(true)}
-          title="Click to customize workspace theme"
-          className="flex items-center gap-2 truncate"
+        <button
+          onClick={() => setShowWorkspaceMenu((prev) => !prev)}
+          title="Workspace options"
+          className="flex items-center gap-1.5 truncate rounded-lg px-2 py-1.5 -ml-1.5 transition hover:bg-black/5 dark:hover:bg-white/10 group text-left min-w-0"
         >
-          <span className="truncate">{workspace.name}</span>
-          <ChevronDown size={16} className="text-gray-400 group-hover:text-white" />
-        </div>
-        <div className="flex items-center gap-1">
+          <span className="truncate font-bold text-sm sm:text-base">{workspace.name}</span>
+          <ChevronDown
+            size={16}
+            className={`shrink-0 transition-transform duration-200 ${
+              showWorkspaceMenu ? 'rotate-180' : ''
+            }`}
+            style={{ color: 'var(--theme-text-muted)' }}
+          />
+        </button>
+
+        <div className="flex items-center gap-1 shrink-0">
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowThemeModal(true);
-            }}
-            title="Customize Theme & Appearance"
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition"
-          >
-            <Palette size={18} />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowStorageModal(true);
-            }}
-            title="Workspace Storage & Files"
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition"
-          >
-            <HardDrive size={18} />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenBotPortal();
-            }}
-            title="Integrations & Bot Developer Portal"
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition"
-          >
-            <Bot size={18} />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowAddMemberModal(true);
-            }}
+            onClick={() => setShowAddMemberModal(true)}
             title="Invite & Add Members"
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition"
+            style={{ color: 'var(--theme-text-muted)' }}
+            className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
           >
             <UserPlus size={18} />
           </button>
           {onCloseMobile && (
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onCloseMobile();
-              }}
+              onClick={onCloseMobile}
               title="Close Menu"
-              className="md:hidden p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition"
+              style={{ color: 'var(--theme-text-muted)' }}
+              className="md:hidden p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
             >
               <X size={18} />
             </button>
           )}
         </div>
+
+        {/* Workspace Dropdown Menu */}
+        {showWorkspaceMenu && (
+          <div
+            className="absolute top-full left-3 mt-1.5 w-64 rounded-xl border shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150"
+            style={{
+              backgroundColor: 'var(--theme-bg-surface)',
+              borderColor: 'var(--theme-border)',
+              color: 'var(--theme-text-primary)',
+            }}
+          >
+            {/* Header info */}
+            <div className="px-3.5 py-2 border-b" style={{ borderColor: 'var(--theme-border)' }}>
+              <p className="text-xs font-bold truncate">{workspace.name}</p>
+              <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--theme-text-muted)' }}>
+                {isAdminOrOwner ? 'Workspace Administrator' : 'Workspace Member'}
+              </p>
+            </div>
+
+            <div className="py-1">
+              {/* Theme & Appearance */}
+              <button
+                onClick={() => {
+                  setShowWorkspaceMenu(false);
+                  setShowThemeModal(true);
+                }}
+                className="w-full px-3.5 py-2 text-left text-xs flex items-center gap-2.5 transition hover:bg-black/5 dark:hover:bg-white/10"
+              >
+                <Palette size={15} style={{ color: 'var(--theme-primary)' }} />
+                <span>Customize Theme & Colors</span>
+              </button>
+
+              {/* Chatbot Integrations & Bots */}
+              <button
+                onClick={() => {
+                  setShowWorkspaceMenu(false);
+                  onOpenBotPortal();
+                }}
+                className="w-full px-3.5 py-2 text-left text-xs flex items-center gap-2.5 transition hover:bg-black/5 dark:hover:bg-white/10"
+              >
+                <Bot size={15} style={{ color: 'var(--theme-primary)' }} />
+                <span>Chatbot Integrations & Bots</span>
+              </button>
+
+              {/* Workspace Files & Storage */}
+              <button
+                onClick={() => {
+                  setShowWorkspaceMenu(false);
+                  setShowStorageModal(true);
+                }}
+                className="w-full px-3.5 py-2 text-left text-xs flex items-center gap-2.5 transition hover:bg-black/5 dark:hover:bg-white/10"
+              >
+                <HardDrive size={15} style={{ color: 'var(--theme-primary)' }} />
+                <span>Workspace Files & Storage</span>
+              </button>
+
+              <div className="h-px my-1" style={{ backgroundColor: 'var(--theme-border)' }} />
+
+              {/* Copy Invite Link */}
+              <button
+                onClick={() => {
+                  copyInviteLink();
+                }}
+                className="w-full px-3.5 py-2 text-left text-xs flex items-center justify-between transition hover:bg-black/5 dark:hover:bg-white/10"
+              >
+                <span className="flex items-center gap-2.5">
+                  <UserPlus size={15} style={{ color: 'var(--theme-primary)' }} />
+                  <span>{copiedInvite ? 'Invite Link Copied!' : 'Copy Workspace Invite Link'}</span>
+                </span>
+                {copiedInvite && <Check size={13} className="text-green-500" />}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Channel & DMs List */}
@@ -205,7 +270,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
             <button
               onClick={onOpenSearch}
               title="Search messages (Cmd+K / Ctrl+K)"
-              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs transition group"
+              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs transition group hover:opacity-85"
               style={{
                 backgroundColor: 'var(--theme-bg-surface)',
                 borderColor: 'var(--theme-border)',
@@ -213,7 +278,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
               }}
             >
               <div className="flex items-center gap-2">
-                <Search size={14} className="text-gray-400 group-hover:text-white transition" />
+                <Search size={14} style={{ color: 'var(--theme-primary)' }} className="transition" />
                 <span>Search messages...</span>
               </div>
               <kbd
@@ -372,10 +437,11 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                         onStartHuddle(channel);
                       }}
                       title={hasHuddle ? 'Active Call - Click to join' : 'Start Call'}
+                      style={hasHuddle ? undefined : { color: 'var(--theme-text-muted)' }}
                       className={`p-1 rounded transition ${
                         hasHuddle
                           ? 'bg-slack-green text-white animate-pulse'
-                          : 'opacity-0 group-hover:opacity-100 hover:bg-black/20 text-gray-400 hover:text-white'
+                          : 'opacity-0 group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10'
                       }`}
                     >
                       <PhoneCall size={13} />
