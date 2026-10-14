@@ -48,14 +48,6 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
 
   const currentWorkspace = useChatStore((state) => state.currentWorkspace);
-  const isWsAdmin =
-    currentWorkspace?.ownerId === currentUser?.id ||
-    members?.some(
-      (m) =>
-        m.userId === currentUser?.id &&
-        (m.role === 'ADMIN' || m.role === 'OWNER')
-    );
-  const isSuperAdmin = currentUser?.systemRole === 'SUPER_ADMIN';
 
   const handleSaveEdit = async (messageId: string) => {
     if (!editContent.trim()) return;
@@ -236,9 +228,12 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
     }
   };
 
-  const isParentSelf = parentMessage.isSelf || (!isParentAnon && parentMessage.userId === currentUser?.id);
-  const canEditParent = !parentMessage.isDeleted && (isParentSelf || isSuperAdmin);
-  const canDeleteParent = !parentMessage.isDeleted && (isParentSelf || isWsAdmin || isSuperAdmin);
+  const isParentBot = Boolean(parentMessage.bot);
+  const isParentSelf = !isParentBot && Boolean(
+    parentMessage.isSelf ?? (currentUser?.id && (parentMessage.userId === currentUser.id || parentMessage.user?.id === currentUser.id))
+  );
+  const canEditParent = !parentMessage.isDeleted && isParentSelf;
+  const canDeleteParent = !parentMessage.isDeleted && isParentSelf;
   const authorName = isParentAnon
     ? (parentMessage.anonName || 'Anonymous')
     : (parentMessage.user?.displayName || parentMessage.bot?.name || 'Unknown');
@@ -497,9 +492,12 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
         {/* Replies List */}
         {replies.map((reply, idx) => {
           const isReplyAnon = !!reply.isAnonymous || isParentAnon;
-          const isReplySelf = reply.isSelf || (!isReplyAnon && reply.userId === currentUser?.id);
-          const canEditReply = !reply.isDeleted && (isReplySelf || isSuperAdmin);
-          const canDeleteReply = !reply.isDeleted && (isReplySelf || isWsAdmin || isSuperAdmin);
+          const isReplyBot = Boolean(reply.bot);
+          const isReplySelf = !isReplyBot && Boolean(
+            reply.isSelf ?? (currentUser?.id && (reply.userId === currentUser.id || reply.user?.id === currentUser.id))
+          );
+          const canEditReply = !reply.isDeleted && isReplySelf;
+          const canDeleteReply = !reply.isDeleted && isReplySelf;
           const replyAuthor = isReplyAnon
             ? (reply.anonName || 'Anonymous')
             : (reply.user?.displayName || 'Unknown');

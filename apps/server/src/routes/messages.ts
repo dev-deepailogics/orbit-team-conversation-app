@@ -450,7 +450,7 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.status(400).send({ error: 'Cannot edit a deleted message' });
     }
 
-    if (access.message.userId !== userId && !access.isSuperAdmin) {
+    if (access.message.userId !== userId) {
       return reply.status(403).send({ error: 'You can only edit your own messages' });
     }
 
@@ -504,7 +504,7 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     return reply.send(sanitizedUpdated);
   });
 
-  // Delete message (Author, Workspace Admin/Owner, or Super Admin)
+  // Delete message (Author only)
   fastify.delete('/:messageId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
     const { messageId } = request.params as { messageId: string };
     const userId = (request.user as { id: string }).id;
@@ -516,20 +516,10 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.status(400).send({ error: 'Message is already deleted' });
     }
 
-    const wsMember = await prisma.workspaceMember.findUnique({
-      where: {
-        workspaceId_userId: {
-          workspaceId: access.channel.workspaceId,
-          userId,
-        },
-      },
-    });
-
     const isAuthor = access.message.userId === userId;
-    const isWsAdmin = wsMember?.role === 'OWNER' || wsMember?.role === 'ADMIN';
 
-    if (!isAuthor && !isWsAdmin && !access.isSuperAdmin) {
-      return reply.status(403).send({ error: 'You do not have permission to delete this message' });
+    if (!isAuthor) {
+      return reply.status(403).send({ error: 'You can only delete your own messages' });
     }
 
     // Soft delete: set isDeleted to true, clear content, and unpin

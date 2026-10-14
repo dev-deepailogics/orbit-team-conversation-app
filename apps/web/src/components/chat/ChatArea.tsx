@@ -107,14 +107,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
 
   const currentWorkspace = useChatStore((state) => state.currentWorkspace);
-  const isWsAdmin =
-    currentWorkspace?.ownerId === currentUser?.id ||
-    members?.some(
-      (m) =>
-        m.userId === currentUser?.id &&
-        (m.role === 'ADMIN' || m.role === 'OWNER')
-    );
-  const isSuperAdmin = currentUser?.systemRole === 'SUPER_ADMIN';
 
   useEffect(() => {
     if (channel.isAnonymous) {
@@ -851,11 +843,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             )}
 
             {messages.map((msg, idx) => {
-            const isBot = !!msg.bot;
+            const isBot = Boolean(msg.bot);
             const isAnon = channel.isAnonymous || msg.isAnonymous;
-            const isSelf = msg.isSelf || (!isAnon && msg.userId === currentUser.id);
-            const canEdit = !msg.isDeleted && (isSelf || isSuperAdmin);
-            const canDelete = !msg.isDeleted && (isSelf || isWsAdmin || isSuperAdmin);
+            const isSelf = !isBot && Boolean(
+              msg.isSelf ?? (currentUser?.id && (msg.userId === currentUser.id || msg.user?.id === currentUser.id))
+            );
+            const canEdit = !msg.isDeleted && isSelf;
+            const canDelete = !msg.isDeleted && isSelf;
             const authorName = isAnon
               ? (msg.anonName || 'Anonymous')
               : isBot
