@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Message, UserProfile, Channel } from '@orbit/types';
-import { X, Send, CornerUpLeft, Smile, SmilePlus, Type, Paperclip, FileText, Loader2 } from 'lucide-react';
+import { X, Send, CornerUpLeft, Smile, SmilePlus, Type, Paperclip, FileText, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useChatStore } from '../../stores/chatStore';
 import { EmojiPickerPopover } from './EmojiPickerPopover';
@@ -41,6 +41,60 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   const [showComposerEmoji, setShowComposerEmoji] = useState(false);
   const [topEmojis, setTopEmojis] = useState<string[]>(['👍', '❤️', '🔥', '🎉', '🚀']);
   const [showFormatting, setShowFormatting] = useState(true);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [deleteConfirmMessage, setDeleteConfirmMessage] = useState<Message | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const currentWorkspace = useChatStore((state) => state.currentWorkspace);
+  const isWsAdmin =
+    currentWorkspace?.ownerId === currentUser?.id ||
+    members?.some(
+      (m) =>
+        m.userId === currentUser?.id &&
+        (m.role === 'ADMIN' || m.role === 'OWNER')
+    );
+  const isSuperAdmin = currentUser?.systemRole === 'SUPER_ADMIN';
+
+  const handleSaveEdit = async (messageId: string) => {
+    if (!editContent.trim()) return;
+    setIsSavingEdit(true);
+    try {
+      const res = await api.patch(`/api/messages/${messageId}`, {
+        content: editContent.trim(),
+      });
+      useChatStore.getState().updateMessage(res.data);
+      setEditingMessageId(null);
+      setEditContent('');
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to edit message');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setEditContent('');
+  };
+
+  const handleDeleteMessage = async () => {
+    if (!deleteConfirmMessage) return;
+    setIsDeleting(true);
+    try {
+      const res = await api.delete(`/api/messages/${deleteConfirmMessage.id}`);
+      if (res.data?.message) {
+        useChatStore.getState().updateMessage(res.data.message);
+      }
+      setDeleteConfirmMessage(null);
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to delete message');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const repliesEndRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<RichTextEditorRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -165,6 +219,8 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   };
 
   const isParentSelf = parentMessage.isSelf || (!isParentAnon && parentMessage.userId === currentUser?.id);
+  const canEditParent = !parentMessage.isDeleted && (isParentSelf || isSuperAdmin);
+  const canDeleteParent = !parentMessage.isDeleted && (isParentSelf || isWsAdmin || isSuperAdmin);
   const authorName = isParentAnon
     ? (parentMessage.anonName || 'Anonymous')
     : (parentMessage.user?.displayName || parentMessage.bot?.name || 'Unknown');
@@ -218,111 +274,190 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
               <span className="text-[10px] text-gray-500">
                 {new Date(parentMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
-            </div>
-            <div className="text-xs text-gray-200 mt-1 max-w-none break-words">
-              <MarkdownRenderer
-                content={parentMessage.content}
-                currentUsername={currentUser?.username}
-                onMentionClick={handleMentionClick}
-                onChannelClick={handleChannelClick}
-              />
+              {parentMessage.isEdited && !parentMessage.isDeleted && (
+                <span className="text-[9px] italic select-none text-gray-400 font-medium">
+                  (edited)
+                </span>
+              )}
             </div>
 
-            {/* Parent Message Attachments */}
-            {parentMessage.attachments && parentMessage.attachments.length > 0 && (
-              <div className="mt-2">
-                <FileAttachmentList
-                  attachments={parentMessage.attachments}
-                  currentUser={currentUser}
-                  onFileDeleted={(id) => useChatStore.getState().removeAttachment(id)}
-                  isThreadView
-                />
+            {parentMessage.isDeleted ? (
+              <div className="flex items-center gap-1.5 py-1 text-xs italic select-none text-gray-400">
+                <Trash2 size={12} className="opacity-60 shrink-0" />
+                <span>This message was deleted</span>
               </div>
-            )}
-
-            {/* Parent Message Reactions - ONLY rendered if reactions exist */}
-            {(() => {
-              const reactionCounts = (parentMessage.reactions || []).reduce(
-                (acc: { [emoji: string]: { count: number; users: string[]; hasReacted: boolean } }, r) => {
-                  if (!acc[r.emoji]) {
-                    acc[r.emoji] = { count: 0, users: [], hasReacted: false };
-                  }
-                  acc[r.emoji].count += 1;
-                  if (r.user?.displayName) {
-                    acc[r.emoji].users.push(isParentAnon ? 'Anonymous' : r.user.displayName);
-                  }
-                  if (r.userId === currentUser?.id) acc[r.emoji].hasReacted = true;
-                  return acc;
-                },
-                {}
-              );
-
-              const entries = Object.entries(reactionCounts);
-              if (entries.length === 0) return null;
-
-              return (
-                <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-                  {entries.map(([emoji, data]) => (
+            ) : editingMessageId === parentMessage.id ? (
+              <div className="mt-2 space-y-2">
+                <textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSaveEdit(parentMessage.id);
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault();
+                      handleCancelEdit();
+                    }
+                  }}
+                  rows={2}
+                  autoFocus
+                  className="w-full text-xs p-2 rounded-lg bg-[#25292D] border border-gray-700 text-white focus:outline-none focus:ring-1 focus:ring-slack-activeChannel resize-y"
+                  placeholder="Edit message..."
+                />
+                <div className="flex items-center justify-between text-[10px] text-gray-400">
+                  <span>escape to cancel • enter to save</span>
+                  <div className="flex items-center gap-1.5">
                     <button
-                      key={emoji}
-                      onClick={() => handleReaction(parentMessage.id, emoji)}
-                      title={data.users.join(', ')}
-                      className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] transition border ${
-                        data.hasReacted
-                          ? 'bg-slack-activeChannel/20 border-slack-activeChannel text-slack-activeChannel font-bold'
-                          : 'bg-[#2C3136]/80 hover:bg-[#3E4348] border-gray-700/60 text-gray-300'
-                      }`}
+                      type="button"
+                      onClick={handleCancelEdit}
+                      disabled={isSavingEdit}
+                      className="px-2 py-0.5 rounded text-[10px] border border-gray-600 text-gray-300 hover:bg-gray-700 transition"
                     >
-                      <span>{emoji}</span>
-                      <span>{data.count}</span>
+                      Cancel
                     </button>
-                  ))}
-
-                  <button
-                    onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === parentMessage.id ? null : parentMessage.id)}
-                    className="flex items-center justify-center w-5 h-5 rounded-full bg-[#2C3136]/60 hover:bg-[#3E4348] border border-gray-700/50 text-gray-400 hover:text-white transition"
-                    title="Add reaction"
-                  >
-                    <SmilePlus size={10} />
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveEdit(parentMessage.id)}
+                      disabled={isSavingEdit || !editContent.trim()}
+                      className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slack-green text-white transition flex items-center gap-1"
+                    >
+                      {isSavingEdit ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
                 </div>
-              );
-            })()}
+              </div>
+            ) : (
+              <>
+                <div className="text-xs text-gray-200 mt-1 max-w-none break-words">
+                  <MarkdownRenderer
+                    content={parentMessage.content}
+                    currentUsername={currentUser?.username}
+                    onMentionClick={handleMentionClick}
+                    onChannelClick={handleChannelClick}
+                  />
+                </div>
+
+                {/* Parent Message Attachments */}
+                {parentMessage.attachments && parentMessage.attachments.length > 0 && (
+                  <div className="mt-2">
+                    <FileAttachmentList
+                      attachments={parentMessage.attachments}
+                      currentUser={currentUser}
+                      onFileDeleted={(id) => useChatStore.getState().removeAttachment(id)}
+                      isThreadView
+                    />
+                  </div>
+                )}
+
+                {/* Parent Message Reactions - ONLY rendered if reactions exist */}
+                {(() => {
+                  const reactionCounts = (parentMessage.reactions || []).reduce(
+                    (acc: { [emoji: string]: { count: number; users: string[]; hasReacted: boolean } }, r) => {
+                      if (!acc[r.emoji]) {
+                        acc[r.emoji] = { count: 0, users: [], hasReacted: false };
+                      }
+                      acc[r.emoji].count += 1;
+                      if (r.user?.displayName) {
+                        acc[r.emoji].users.push(isParentAnon ? 'Anonymous' : r.user.displayName);
+                      }
+                      if (r.userId === currentUser?.id) acc[r.emoji].hasReacted = true;
+                      return acc;
+                    },
+                    {}
+                  );
+
+                  const entries = Object.entries(reactionCounts);
+                  if (entries.length === 0) return null;
+
+                  return (
+                    <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                      {entries.map(([emoji, data]) => (
+                        <button
+                          key={emoji}
+                          onClick={() => handleReaction(parentMessage.id, emoji)}
+                          title={data.users.join(', ')}
+                          className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] transition border ${
+                            data.hasReacted
+                              ? 'bg-slack-activeChannel/20 border-slack-activeChannel text-slack-activeChannel font-bold'
+                              : 'bg-[#2C3136]/80 hover:bg-[#3E4348] border-gray-700/60 text-gray-300'
+                          }`}
+                        >
+                          <span>{emoji}</span>
+                          <span>{data.count}</span>
+                        </button>
+                      ))}
+
+                      <button
+                        onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === parentMessage.id ? null : parentMessage.id)}
+                        className="flex items-center justify-center w-5 h-5 rounded-full bg-[#2C3136]/60 hover:bg-[#3E4348] border border-gray-700/50 text-gray-400 hover:text-white transition"
+                        title="Add reaction"
+                      >
+                        <SmilePlus size={10} />
+                      </button>
+                    </div>
+                  );
+                })()}
+              </>
+            )}
           </div>
 
           {/* Floating Hover Bubble for parent message */}
-          <div className="absolute right-2 -top-2.5 hidden group-hover:flex items-center bg-[#222529] border border-gray-700/90 rounded-xl shadow-xl px-1.5 py-0.5 gap-0.5 z-20 backdrop-blur-sm">
-            {/* Top 3 Quick Reactions */}
-            <div className="flex items-center gap-0.5 pr-1 border-r border-gray-700/80 mr-0.5">
-              {topEmojis.slice(0, 3).map((em) => (
+          {!parentMessage.isDeleted && (
+            <div className="absolute right-2 -top-2.5 hidden group-hover:flex items-center bg-[#222529] border border-gray-700/90 rounded-xl shadow-xl px-1.5 py-0.5 gap-0.5 z-20 backdrop-blur-sm">
+              {/* Top 3 Quick Reactions */}
+              <div className="flex items-center gap-0.5 pr-1 border-r border-gray-700/80 mr-0.5">
+                {topEmojis.slice(0, 3).map((em) => (
+                  <button
+                    key={em}
+                    onClick={() => handleReaction(parentMessage.id, em)}
+                    className="hover:scale-125 transition text-[11px] p-0.5 rounded hover:bg-gray-700/50"
+                    title={`React with ${em}`}
+                  >
+                    {em}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === parentMessage.id ? null : parentMessage.id)}
+                title="More emojis..."
+                className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
+              >
+                <SmilePlus size={12} />
+              </button>
+              <button
+                onClick={() => setReplyingToMessage(parentMessage)}
+                title="Quote Reply"
+                className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
+              >
+                <CornerUpLeft size={12} />
+              </button>
+              {canEditParent && (
                 <button
-                  key={em}
-                  onClick={() => handleReaction(parentMessage.id, em)}
-                  className="hover:scale-125 transition text-[11px] p-0.5 rounded hover:bg-gray-700/50"
-                  title={`React with ${em}`}
+                  onClick={() => {
+                    setEditingMessageId(parentMessage.id);
+                    setEditContent(parentMessage.content);
+                  }}
+                  title="Edit message"
+                  className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
                 >
-                  {em}
+                  <Pencil size={12} />
                 </button>
-              ))}
+              )}
+              {canDeleteParent && (
+                <button
+                  onClick={() => setDeleteConfirmMessage(parentMessage)}
+                  title="Delete message"
+                  className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded transition"
+                >
+                  <Trash2 size={12} />
+                </button>
+              )}
             </div>
-            <button
-              onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === parentMessage.id ? null : parentMessage.id)}
-              title="More emojis..."
-              className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
-            >
-              <SmilePlus size={12} />
-            </button>
-            <button
-              onClick={() => setReplyingToMessage(parentMessage)}
-              title="Quote Reply"
-              className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
-            >
-              <CornerUpLeft size={12} />
-            </button>
-          </div>
+          )}
 
           {/* Anchored Mini Emoji Popover */}
-          {activeEmojiMessageId === parentMessage.id && (
+          {!parentMessage.isDeleted && activeEmojiMessageId === parentMessage.id && (
             <EmojiPickerPopover
               isOpen={true}
               onClose={() => setActiveEmojiMessageId(null)}
@@ -345,6 +480,8 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
         {replies.map((reply, idx) => {
           const isReplyAnon = !!reply.isAnonymous || isParentAnon;
           const isReplySelf = reply.isSelf || (!isReplyAnon && reply.userId === currentUser?.id);
+          const canEditReply = !reply.isDeleted && (isReplySelf || isSuperAdmin);
+          const canDeleteReply = !reply.isDeleted && (isReplySelf || isWsAdmin || isSuperAdmin);
           const replyAuthor = isReplyAnon
             ? (reply.anonName || 'Anonymous')
             : (reply.user?.displayName || 'Unknown');
@@ -384,131 +521,209 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                   <span className="text-[10px] text-gray-500">
                     {new Date(reply.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
+                  {reply.isEdited && !reply.isDeleted && (
+                    <span className="text-[9px] italic select-none text-gray-400 font-medium">
+                      (edited)
+                    </span>
+                  )}
                 </div>
 
-                {/* Quoted Message in Thread */}
-                {reply.quotedMessage && (
-                  <div
-                    onClick={() => scrollToMessage(reply.quotedMessage!.id)}
-                    className="mt-1 mb-1 flex items-center gap-2 bg-[#25292D] hover:bg-[#2F3439] border-l-4 border-slack-green rounded-r-lg px-2.5 py-1 cursor-pointer text-xs transition max-w-full shadow-sm"
-                  >
-                    <div className="min-w-0">
-                      <span className="font-bold text-slack-green text-[10px] block">
-                        {isReplyAnon || reply.quotedMessage.isAnonymous
-                          ? (reply.quotedMessage.anonName ? `${reply.quotedMessage.anonEmoji || '🎭'} ${reply.quotedMessage.anonName}` : 'Anonymous')
-                          : (reply.quotedMessage.user?.displayName || 'Teammate')}
-                      </span>
-                      <span className="text-gray-300 text-[10px] truncate block max-w-xs">
-                        {reply.quotedMessage.content}
-                      </span>
-                    </div>
+                {reply.isDeleted ? (
+                  <div className="flex items-center gap-1.5 py-1 text-xs italic select-none text-gray-400">
+                    <Trash2 size={12} className="opacity-60 shrink-0" />
+                    <span>This message was deleted</span>
                   </div>
-                )}
-
-                <div className="text-xs text-gray-200 mt-0.5 max-w-none break-words">
-                  <MarkdownRenderer
-                    content={reply.content}
-                    currentUsername={currentUser?.username}
-                    onMentionClick={handleMentionClick}
-                    onChannelClick={handleChannelClick}
-                  />
-                </div>
-
-                {/* Reply Attachments */}
-                {reply.attachments && reply.attachments.length > 0 && (
-                  <div className="mt-2">
-                    <FileAttachmentList
-                      attachments={reply.attachments}
-                      currentUser={currentUser}
-                      onFileDeleted={(id) => useChatStore.getState().removeAttachment(id)}
-                      isThreadView
+                ) : editingMessageId === reply.id ? (
+                  <div className="mt-2 space-y-2">
+                    <textarea
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSaveEdit(reply.id);
+                        } else if (e.key === 'Escape') {
+                          e.preventDefault();
+                          handleCancelEdit();
+                        }
+                      }}
+                      rows={2}
+                      autoFocus
+                      className="w-full text-xs p-2 rounded-lg bg-[#25292D] border border-gray-700 text-white focus:outline-none focus:ring-1 focus:ring-slack-activeChannel resize-y"
+                      placeholder="Edit reply..."
                     />
-                  </div>
-                )}
-
-                {/* Reply Reactions - ONLY rendered when reactions exist */}
-                {(() => {
-                  const reactionCounts = (reply.reactions || []).reduce(
-                    (acc: { [emoji: string]: { count: number; users: string[]; hasReacted: boolean } }, r) => {
-                      if (!acc[r.emoji]) {
-                        acc[r.emoji] = { count: 0, users: [], hasReacted: false };
-                      }
-                      acc[r.emoji].count += 1;
-                      if (r.user?.displayName) {
-                        acc[r.emoji].users.push(isReplyAnon ? 'Anonymous' : r.user.displayName);
-                      }
-                      if (r.userId === currentUser?.id) acc[r.emoji].hasReacted = true;
-                      return acc;
-                    },
-                    {}
-                  );
-
-                  const entries = Object.entries(reactionCounts);
-                  if (entries.length === 0) return null;
-
-                  return (
-                    <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-                      {entries.map(([emoji, data]) => (
+                    <div className="flex items-center justify-between text-[10px] text-gray-400">
+                      <span>escape to cancel • enter to save</span>
+                      <div className="flex items-center gap-1.5">
                         <button
-                          key={emoji}
-                          onClick={() => handleReaction(reply.id, emoji)}
-                          title={data.users.join(', ')}
-                          className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] transition border ${
-                            data.hasReacted
-                              ? 'bg-slack-activeChannel/20 border-slack-activeChannel text-slack-activeChannel font-bold'
-                              : 'bg-[#2C3136]/80 hover:bg-[#3E4348] border-gray-700/60 text-gray-300'
-                          }`}
+                          type="button"
+                          onClick={handleCancelEdit}
+                          disabled={isSavingEdit}
+                          className="px-2 py-0.5 rounded text-[10px] border border-gray-600 text-gray-300 hover:bg-gray-700 transition"
                         >
-                          <span>{emoji}</span>
-                          <span>{data.count}</span>
+                          Cancel
                         </button>
-                      ))}
-
-                      <button
-                        onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === reply.id ? null : reply.id)}
-                        className="flex items-center justify-center w-5 h-5 rounded-full bg-[#2C3136]/60 hover:bg-[#3E4348] border border-gray-700/50 text-gray-400 hover:text-white transition"
-                        title="Add reaction"
-                      >
-                        <SmilePlus size={10} />
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSaveEdit(reply.id)}
+                          disabled={isSavingEdit || !editContent.trim()}
+                          className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slack-green text-white transition flex items-center gap-1"
+                        >
+                          {isSavingEdit ? 'Saving...' : 'Save'}
+                        </button>
+                      </div>
                     </div>
-                  );
-                })()}
+                  </div>
+                ) : (
+                  <>
+                    {/* Quoted Message in Thread */}
+                    {reply.quotedMessage && (
+                      <div
+                        onClick={() => scrollToMessage(reply.quotedMessage!.id)}
+                        className="mt-1 mb-1 flex items-center gap-2 bg-[#25292D] hover:bg-[#2F3439] border-l-4 border-slack-green rounded-r-lg px-2.5 py-1 cursor-pointer text-xs transition max-w-full shadow-sm"
+                      >
+                        <div className="min-w-0">
+                          <span className="font-bold text-slack-green text-[10px] block">
+                            {isReplyAnon || reply.quotedMessage.isAnonymous
+                              ? (reply.quotedMessage.anonName ? `${reply.quotedMessage.anonEmoji || '🎭'} ${reply.quotedMessage.anonName}` : 'Anonymous')
+                              : (reply.quotedMessage.user?.displayName || 'Teammate')}
+                          </span>
+                          <span className="text-gray-300 text-[10px] truncate block max-w-xs">
+                            {reply.quotedMessage.content}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="text-xs text-gray-200 mt-0.5 max-w-none break-words">
+                      <MarkdownRenderer
+                        content={reply.content}
+                        currentUsername={currentUser?.username}
+                        onMentionClick={handleMentionClick}
+                        onChannelClick={handleChannelClick}
+                      />
+                    </div>
+
+                    {/* Reply Attachments */}
+                    {reply.attachments && reply.attachments.length > 0 && (
+                      <div className="mt-2">
+                        <FileAttachmentList
+                          attachments={reply.attachments}
+                          currentUser={currentUser}
+                          onFileDeleted={(id) => useChatStore.getState().removeAttachment(id)}
+                          isThreadView
+                        />
+                      </div>
+                    )}
+
+                    {/* Reply Reactions - ONLY rendered when reactions exist */}
+                    {(() => {
+                      const reactionCounts = (reply.reactions || []).reduce(
+                        (acc: { [emoji: string]: { count: number; users: string[]; hasReacted: boolean } }, r) => {
+                          if (!acc[r.emoji]) {
+                            acc[r.emoji] = { count: 0, users: [], hasReacted: false };
+                          }
+                          acc[r.emoji].count += 1;
+                          if (r.user?.displayName) {
+                            acc[r.emoji].users.push(isReplyAnon ? 'Anonymous' : r.user.displayName);
+                          }
+                          if (r.userId === currentUser?.id) acc[r.emoji].hasReacted = true;
+                          return acc;
+                        },
+                        {}
+                      );
+
+                      const entries = Object.entries(reactionCounts);
+                      if (entries.length === 0) return null;
+
+                      return (
+                        <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                          {entries.map(([emoji, data]) => (
+                            <button
+                              key={emoji}
+                              onClick={() => handleReaction(reply.id, emoji)}
+                              title={data.users.join(', ')}
+                              className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] transition border ${
+                                data.hasReacted
+                                  ? 'bg-slack-activeChannel/20 border-slack-activeChannel text-slack-activeChannel font-bold'
+                                  : 'bg-[#2C3136]/80 hover:bg-[#3E4348] border-gray-700/60 text-gray-300'
+                              }`}
+                            >
+                              <span>{emoji}</span>
+                              <span>{data.count}</span>
+                            </button>
+                          ))}
+
+                          <button
+                            onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === reply.id ? null : reply.id)}
+                            className="flex items-center justify-center w-5 h-5 rounded-full bg-[#2C3136]/60 hover:bg-[#3E4348] border border-gray-700/50 text-gray-400 hover:text-white transition"
+                            title="Add reaction"
+                          >
+                            <SmilePlus size={10} />
+                          </button>
+                        </div>
+                      );
+                    })()}
+                  </>
+                )}
               </div>
 
               {/* Floating Hover Bubble for reply */}
-              <div className="absolute right-2 -top-2 hidden group-hover:flex items-center bg-[#222529] border border-gray-700/90 rounded-xl shadow-xl px-1.5 py-0.5 gap-0.5 z-20 backdrop-blur-sm">
-                {/* Top 3 Quick Reactions */}
-                <div className="flex items-center gap-0.5 pr-1 border-r border-gray-700/80 mr-0.5">
-                  {topEmojis.slice(0, 3).map((em) => (
+              {!reply.isDeleted && (
+                <div className="absolute right-2 -top-2 hidden group-hover:flex items-center bg-[#222529] border border-gray-700/90 rounded-xl shadow-xl px-1.5 py-0.5 gap-0.5 z-20 backdrop-blur-sm">
+                  {/* Top 3 Quick Reactions */}
+                  <div className="flex items-center gap-0.5 pr-1 border-r border-gray-700/80 mr-0.5">
+                    {topEmojis.slice(0, 3).map((em) => (
+                      <button
+                        key={em}
+                        onClick={() => handleReaction(reply.id, em)}
+                        className="hover:scale-125 transition text-[11px] p-0.5 rounded hover:bg-gray-700/50"
+                        title={`React with ${em}`}
+                      >
+                        {em}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === reply.id ? null : reply.id)}
+                    title="More emojis..."
+                    className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
+                  >
+                    <SmilePlus size={12} />
+                  </button>
+                  <button
+                    onClick={() => setReplyingToMessage(reply)}
+                    title="Quote Reply"
+                    className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
+                  >
+                    <CornerUpLeft size={12} />
+                  </button>
+                  {canEditReply && (
                     <button
-                      key={em}
-                      onClick={() => handleReaction(reply.id, em)}
-                      className="hover:scale-125 transition text-[11px] p-0.5 rounded hover:bg-gray-700/50"
-                      title={`React with ${em}`}
+                      onClick={() => {
+                        setEditingMessageId(reply.id);
+                        setEditContent(reply.content);
+                      }}
+                      title="Edit reply"
+                      className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
                     >
-                      {em}
+                      <Pencil size={12} />
                     </button>
-                  ))}
+                  )}
+                  {canDeleteReply && (
+                    <button
+                      onClick={() => setDeleteConfirmMessage(reply)}
+                      title="Delete reply"
+                      className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded transition"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  )}
                 </div>
-                <button
-                  onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === reply.id ? null : reply.id)}
-                  title="More emojis..."
-                  className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
-                >
-                  <SmilePlus size={12} />
-                </button>
-                <button
-                  onClick={() => setReplyingToMessage(reply)}
-                  title="Quote Reply"
-                  className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
-                >
-                  <CornerUpLeft size={12} />
-                </button>
-              </div>
+              )}
 
               {/* Anchored Mini Emoji Popover */}
-              {activeEmojiMessageId === reply.id && (
+              {!reply.isDeleted && activeEmojiMessageId === reply.id && (
                 <EmojiPickerPopover
                   isOpen={true}
                   onClose={() => setActiveEmojiMessageId(null)}
@@ -649,6 +864,57 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
           />
         </form>
       </div>
+
+      {/* Delete Message Confirmation Modal */}
+      {deleteConfirmMessage && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-[#222529] border border-gray-700 shadow-2xl p-5 space-y-4 text-white">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-xl bg-red-500/10 text-red-400 shrink-0 mt-0.5">
+                <Trash2 size={18} />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-bold">Delete message</h3>
+                <p className="text-xs text-gray-400 mt-1">
+                  Are you sure you want to delete this message? This message will be marked as deleted.
+                </p>
+              </div>
+            </div>
+
+            {deleteConfirmMessage.content && (
+              <div className="p-2.5 rounded-lg bg-[#181B1E] border border-gray-700 text-xs text-gray-400 max-h-20 overflow-y-auto italic line-clamp-3">
+                &ldquo;{deleteConfirmMessage.content}&rdquo;
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmMessage(null)}
+                disabled={isDeleting}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium border border-gray-600 text-gray-300 hover:bg-gray-700 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteMessage}
+                disabled={isDeleting}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 hover:bg-red-700 text-white transition flex items-center gap-1.5"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 size={12} className="animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  'Delete'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -446,6 +446,10 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     const access = await verifyMessageAccess(userId, messageId, reply);
     if (!access) return;
 
+    if (access.message.isDeleted) {
+      return reply.status(400).send({ error: 'Cannot edit a deleted message' });
+    }
+
     if (access.message.userId !== userId && !access.isSuperAdmin) {
       return reply.status(403).send({ error: 'You can only edit your own messages' });
     }
@@ -459,6 +463,7 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       where: { id: messageId },
       data: {
         content: parseResult.data.content,
+        isEdited: true,
       },
       include: {
         user: {
@@ -469,20 +474,34 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
             user: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
           },
         },
-        attachments: true,
+        attachments: {
+          where: { isDeleted: false },
+        },
         reactions: {
           include: {
             user: { select: { id: true, username: true, displayName: true } },
           },
         },
+        _count: {
+          select: { replies: true },
+        },
       },
     });
 
+    const isAnon = access.channel.isAnonymous;
+    const sanitizedUpdated = sanitizeMessageForViewer(updated, userId, isAnon);
+    const publicUpdated = sanitizeMessageForViewer(updated, 'public', isAnon);
+
     if (fastify.io) {
-      fastify.io.to(`channel:${updated.channelId}`).emit('message:updated', updated);
+      if (isAnon) {
+        fastify.io.to(`channel:${updated.channelId}`).emit('message:updated', publicUpdated);
+        fastify.io.to(`user:${userId}`).emit('message:updated', sanitizedUpdated);
+      } else {
+        fastify.io.to(`channel:${updated.channelId}`).emit('message:updated', updated);
+      }
     }
 
-    return reply.send(updated);
+    return reply.send(sanitizedUpdated);
   });
 
   // Delete message (Author, Workspace Admin/Owner, or Super Admin)
@@ -492,6 +511,10 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
     const access = await verifyMessageAccess(userId, messageId, reply);
     if (!access) return;
+
+    if (access.message.isDeleted) {
+      return reply.status(400).send({ error: 'Message is already deleted' });
+    }
 
     const wsMember = await prisma.workspaceMember.findUnique({
       where: {
@@ -509,18 +532,56 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.status(403).send({ error: 'You do not have permission to delete this message' });
     }
 
-    await prisma.message.delete({
+    // Soft delete: set isDeleted to true, clear content, and unpin
+    const updated = await prisma.message.update({
       where: { id: messageId },
+      data: {
+        isDeleted: true,
+        content: '',
+        isPinned: false,
+      },
+      include: {
+        user: {
+          select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
+        },
+        quotedMessage: {
+          include: {
+            user: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+          },
+        },
+        attachments: true,
+        reactions: {
+          include: {
+            user: { select: { id: true, username: true, displayName: true } },
+          },
+        },
+        _count: {
+          select: { replies: true },
+        },
+      },
     });
 
+    // Also mark attachments as deleted
+    await prisma.attachment.updateMany({
+      where: { messageId },
+      data: { isDeleted: true },
+    });
+
+    const isAnon = access.channel.isAnonymous;
+    const sanitizedUpdated = sanitizeMessageForViewer(updated, userId, isAnon);
+    const publicUpdated = sanitizeMessageForViewer(updated, 'public', isAnon);
+
     if (fastify.io) {
+      const payload = isAnon ? publicUpdated : updated;
       fastify.io.to(`channel:${access.message.channelId}`).emit('message:deleted', {
         messageId,
         channelId: access.message.channelId,
+        message: payload,
       });
+      fastify.io.to(`channel:${access.message.channelId}`).emit('message:updated', payload);
     }
 
-    return reply.send({ success: true, messageId });
+    return reply.send({ success: true, messageId, message: sanitizedUpdated });
   });
 
   // Pin or unpin a message

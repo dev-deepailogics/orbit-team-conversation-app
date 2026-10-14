@@ -419,9 +419,24 @@ export default function AppDashboard() {
       }
     };
 
-    const onMessageDeleted = (payload: { messageId: string; channelId: string }) => {
-      if (payload?.messageId) {
-        setMessages(useChatStore.getState().messages.filter((m) => m.id !== payload.messageId));
+    const onMessageDeleted = (payload: { messageId: string; channelId: string; message?: Message }) => {
+      if (payload?.message) {
+        useChatStore.getState().updateMessage(payload.message);
+      } else if (payload?.messageId) {
+        const state = useChatStore.getState();
+        const existing =
+          state.messages.find((m) => m.id === payload.messageId) ||
+          state.threadReplies.find((m) => m.id === payload.messageId) ||
+          (state.activeThread?.id === payload.messageId ? state.activeThread : null);
+        if (existing) {
+          useChatStore.getState().updateMessage({
+            ...existing,
+            isDeleted: true,
+            content: '',
+            isPinned: false,
+            attachments: [],
+          });
+        }
       }
     };
 

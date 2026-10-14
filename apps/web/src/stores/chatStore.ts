@@ -87,6 +87,8 @@ export const useChatStore = create<ChatState>((set) => ({
   updateMessage: (message) =>
     set((state) => ({
       messages: state.messages.map((m) => (m.id === message.id ? message : m)),
+      threadReplies: state.threadReplies.map((r) => (r.id === message.id ? message : r)),
+      activeThread: state.activeThread?.id === message.id ? { ...state.activeThread, ...message } : state.activeThread,
     })),
 
   removeAttachment: (fileId) =>
