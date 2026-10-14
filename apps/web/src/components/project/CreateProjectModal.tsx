@@ -66,24 +66,48 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in">
-      <div className="bg-[#1A1D21] border border-gray-700/80 rounded-2xl w-full max-w-lg p-6 shadow-2xl overflow-hidden relative">
+      <div
+        className="rounded-2xl w-full max-w-lg p-6 shadow-2xl overflow-hidden relative border"
+        style={{
+          backgroundColor: 'var(--theme-bg-surface)',
+          borderColor: 'var(--theme-border)',
+          color: 'var(--theme-text-primary)',
+        }}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-gray-800">
+        <div
+          className="flex items-center justify-between pb-4 border-b"
+          style={{ borderColor: 'var(--theme-border)' }}
+        >
           <div className="flex items-center gap-2.5">
             <div
-              style={{ backgroundColor: color + '20', color }}
+              style={{ backgroundColor: color + '25', color }}
               className="p-2 rounded-xl text-xl"
             >
               {icon}
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white leading-tight">Create Project Board</h2>
-              <p className="text-xs text-gray-400">Kanban workflow with custom columns & tickets</p>
+              <h2
+                className="text-lg font-bold leading-tight"
+                style={{ color: 'var(--theme-text-primary)' }}
+              >
+                Create Project Board
+              </h2>
+              <p
+                className="text-xs"
+                style={{ color: 'var(--theme-text-muted)' }}
+              >
+                Kanban workflow with custom columns & tickets
+              </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-gray-800 transition"
+            className="p-1.5 rounded-lg hover:opacity-80 transition cursor-pointer"
+            style={{
+              color: 'var(--theme-text-muted)',
+              backgroundColor: 'var(--theme-bg-surface-hover)',
+            }}
           >
             <X size={18} />
           </button>
@@ -98,7 +122,10 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
           {/* Project Name */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5">
+            <label
+              className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
+              style={{ color: 'var(--theme-text-muted)' }}
+            >
               Project Name <span className="text-red-400">*</span>
             </label>
             <input
@@ -108,27 +135,43 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
               placeholder="e.g. Q4 Product Launch, Mobile App, Marketing Sprint"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full bg-[#222529] border border-gray-700/80 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-hidden focus:border-slack-green transition"
+              className="w-full rounded-xl px-3.5 py-2.5 text-sm transition border focus:outline-none"
+              style={{
+                backgroundColor: 'var(--theme-bg-surface-hover)',
+                borderColor: 'var(--theme-border)',
+                color: 'var(--theme-text-primary)',
+              }}
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5">
-              Description <span className="text-gray-500 font-normal lowercase">(optional)</span>
+            <label
+              className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
+              style={{ color: 'var(--theme-text-muted)' }}
+            >
+              Description <span className="font-normal lowercase opacity-75">(optional)</span>
             </label>
             <textarea
               rows={2}
               placeholder="Brief overview of goals, scope or deliverables..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full bg-[#222529] border border-gray-700/80 rounded-xl px-3.5 py-2 text-sm text-white placeholder-gray-500 focus:outline-hidden focus:border-slack-green resize-none transition"
+              className="w-full rounded-xl px-3.5 py-2 text-sm resize-none transition border focus:outline-none"
+              style={{
+                backgroundColor: 'var(--theme-bg-surface-hover)',
+                borderColor: 'var(--theme-border)',
+                color: 'var(--theme-text-primary)',
+              }}
             />
           </div>
 
           {/* Icon Selector */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5">
+            <label
+              className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
+              style={{ color: 'var(--theme-text-muted)' }}
+            >
               Board Icon
             </label>
             <div className="flex items-center gap-2 flex-wrap">
@@ -137,11 +180,15 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                   key={ic}
                   type="button"
                   onClick={() => setIcon(ic)}
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg transition ${
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg transition cursor-pointer ${
                     icon === ic
-                      ? 'bg-slack-green/20 ring-2 ring-slack-green scale-110'
-                      : 'bg-[#222529] hover:bg-gray-700/60'
+                      ? 'ring-2 scale-110 shadow'
+                      : 'hover:opacity-80'
                   }`}
+                  style={{
+                    backgroundColor: icon === ic ? 'rgba(var(--theme-primary-rgb, 0, 122, 90), 0.2)' : 'var(--theme-bg-surface-hover)',
+                    outlineColor: 'var(--theme-primary)',
+                  }}
                 >
                   {ic}
                 </button>
@@ -151,7 +198,10 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
 
           {/* Color Selector */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5">
+            <label
+              className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
+              style={{ color: 'var(--theme-text-muted)' }}
+            >
               Theme Color
             </label>
             <div className="flex items-center gap-2">
@@ -161,8 +211,8 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                   type="button"
                   onClick={() => setColor(c)}
                   style={{ backgroundColor: c }}
-                  className={`w-7 h-7 rounded-full transition transform hover:scale-110 ${
-                    color === c ? 'ring-2 ring-white ring-offset-2 ring-offset-[#1A1D21] scale-110' : ''
+                  className={`w-7 h-7 rounded-full transition transform hover:scale-110 cursor-pointer ${
+                    color === c ? 'ring-2 ring-white ring-offset-2 scale-110' : ''
                   }`}
                 />
               ))}
@@ -171,55 +221,96 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
 
           {/* Activity Notifications Channel */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5 flex items-center gap-1.5">
-              <Bell size={13} className="text-slack-green" />
+            <label
+              className="block text-xs font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5"
+              style={{ color: 'var(--theme-text-muted)' }}
+            >
+              <Bell size={13} style={{ color: 'var(--theme-primary)' }} />
               Activity Notifications Channel
             </label>
             <select
               value={notificationChannelId}
               onChange={(e) => setNotificationChannelId(e.target.value)}
-              className="w-full bg-[#222529] border border-gray-700/80 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-hidden focus:border-slack-green transition"
+              className="w-full rounded-xl px-3.5 py-2.5 text-sm transition border focus:outline-none cursor-pointer"
+              style={{
+                backgroundColor: 'var(--theme-bg-surface-hover)',
+                borderColor: 'var(--theme-border)',
+                color: 'var(--theme-text-primary)',
+              }}
             >
               {channels.length > 0 ? (
                 channels.map((ch) => (
-                  <option key={ch.id} value={ch.id}>
+                  <option
+                    key={ch.id}
+                    value={ch.id}
+                    style={{
+                      backgroundColor: 'var(--theme-bg-surface)',
+                      color: 'var(--theme-text-primary)',
+                    }}
+                  >
                     #{ch.name} {ch.name.toLowerCase() === 'general' ? '(Default)' : ''}
                   </option>
                 ))
               ) : (
-                <option value="">#general (Default)</option>
+                <option
+                  value=""
+                  style={{
+                    backgroundColor: 'var(--theme-bg-surface)',
+                    color: 'var(--theme-text-primary)',
+                  }}
+                >
+                  #general (Default)
+                </option>
               )}
             </select>
-            <span className="text-[11px] text-gray-500 mt-1 block">
+            <span
+              className="text-[11px] mt-1 block"
+              style={{ color: 'var(--theme-text-muted)' }}
+            >
               Orbit Bot will send notifications for new tickets and column movements here.
             </span>
           </div>
 
           {/* Default Columns Hint */}
-          <div className="p-3 bg-[#222529]/60 border border-gray-800 rounded-xl text-xs text-gray-400 flex items-center gap-2">
-            <Sparkles size={16} className="text-slack-green shrink-0" />
+          <div
+            className="p-3 rounded-xl text-xs flex items-center gap-2 border"
+            style={{
+              backgroundColor: 'var(--theme-bg-surface-hover)',
+              borderColor: 'var(--theme-border)',
+              color: 'var(--theme-text-muted)',
+            }}
+          >
+            <Sparkles size={16} className="shrink-0" style={{ color: 'var(--theme-primary)' }} />
             <span>
-              Includes default columns: <strong className="text-gray-200">Todo</strong>,{' '}
-              <strong className="text-gray-200">Inprogress</strong>,{' '}
-              <strong className="text-gray-200">In review</strong>, and{' '}
-              <strong className="text-gray-200">Done</strong> (fully reorderable & customizable!).
+              Includes default columns: <strong style={{ color: 'var(--theme-text-primary)' }}>Todo</strong>,{' '}
+              <strong style={{ color: 'var(--theme-text-primary)' }}>Inprogress</strong>,{' '}
+              <strong style={{ color: 'var(--theme-text-primary)' }}>In review</strong>, and{' '}
+              <strong style={{ color: 'var(--theme-text-primary)' }}>Done</strong> (fully reorderable & customizable!).
             </span>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-800">
+          <div
+            className="flex items-center justify-end gap-3 pt-3 border-t"
+            style={{ borderColor: 'var(--theme-border)' }}
+          >
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4 py-2 text-sm text-gray-400 hover:text-white transition"
+              className="px-4 py-2 text-sm hover:opacity-80 transition cursor-pointer"
+              style={{ color: 'var(--theme-text-muted)' }}
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || !name.trim()}
-              className="px-5 py-2.5 bg-slack-green hover:bg-[#008a65] disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-lg transition flex items-center gap-2"
+              className="px-5 py-2.5 disabled:opacity-50 text-sm font-semibold rounded-xl shadow-lg transition flex items-center gap-2 cursor-pointer active:scale-95"
+              style={{
+                backgroundColor: 'var(--theme-primary)',
+                color: 'var(--theme-primary-text)',
+              }}
             >
               <FolderKanban size={16} />
               {isSubmitting ? 'Creating...' : 'Create Project Board'}

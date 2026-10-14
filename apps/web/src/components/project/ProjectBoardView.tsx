@@ -420,20 +420,33 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
   const totalTickets = columns.reduce((acc, c) => acc + (c.tickets?.length || 0), 0);
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#1A1D21] text-gray-200 overflow-hidden select-none">
+    <div
+      className="flex-1 flex flex-col h-full overflow-hidden select-none"
+      style={{
+        backgroundColor: 'var(--theme-bg-app)',
+        color: 'var(--theme-text-primary)',
+      }}
+    >
       {/* Top Project Header */}
-      <div className="h-14 border-b border-[#383F45]/40 px-4 sm:px-6 flex items-center justify-between bg-[#1F2326] shrink-0">
+      <div
+        className="h-14 border-b px-4 sm:px-6 flex items-center justify-between shrink-0"
+        style={{
+          backgroundColor: 'var(--theme-bg-surface)',
+          borderColor: 'var(--theme-border)',
+        }}
+      >
         <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={onBackToChat}
             title="Back to Channel Chat"
-            className="p-1.5 hover:bg-gray-700/60 rounded-lg text-gray-400 hover:text-white transition flex items-center gap-1 text-xs"
+            className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition flex items-center gap-1 text-xs"
+            style={{ color: 'var(--theme-text-muted)' }}
           >
             <ArrowLeft size={16} />
             <span className="hidden sm:inline">Back</span>
           </button>
 
-          <span className="w-px h-5 bg-gray-700" />
+          <span className="w-px h-5" style={{ backgroundColor: 'var(--theme-border)' }} />
 
           {/* Project Identity */}
           <div className="flex items-center gap-2 truncate">
@@ -444,14 +457,20 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
               {project.icon || '📋'}
             </span>
             <div className="truncate">
-              <h1 className="text-sm font-bold text-white truncate flex items-center gap-2">
+              <h1 className="text-sm font-bold truncate flex items-center gap-2" style={{ color: 'var(--theme-text-primary)' }}>
                 {project.name}
-                <span className="text-[11px] font-normal text-gray-400 bg-gray-800 px-2 py-0.5 rounded-full">
+                <span
+                  className="text-[11px] font-normal px-2 py-0.5 rounded-full"
+                  style={{
+                    backgroundColor: 'var(--theme-bg-surface-hover)',
+                    color: 'var(--theme-text-muted)',
+                  }}
+                >
                   {totalTickets} {totalTickets === 1 ? 'ticket' : 'tickets'}
                 </span>
               </h1>
               {project.description && (
-                <p className="text-[11px] text-gray-400 truncate hidden md:block">
+                <p className="text-[11px] truncate hidden md:block" style={{ color: 'var(--theme-text-muted)' }}>
                   {project.description}
                 </p>
               )}
@@ -463,24 +482,45 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
         <div className="flex items-center gap-2">
           {/* Notification Channel Selector */}
           <div
-            className="flex items-center gap-1.5 bg-[#25282C] border border-gray-700/80 rounded-lg px-2.5 py-1 text-xs text-gray-300"
+            className="flex items-center gap-1.5 border rounded-lg px-2.5 py-1 text-xs"
+            style={{
+              backgroundColor: 'var(--theme-bg-surface-hover)',
+              borderColor: 'var(--theme-border)',
+              color: 'var(--theme-text-primary)',
+            }}
             title="Channel where Orbit Bot broadcasts activity updates"
           >
-            <Bell size={13} className="text-slack-green shrink-0" />
-            <span className="text-[11px] text-gray-400 hidden xl:inline">Notify:</span>
+            <Bell size={13} className="shrink-0" style={{ color: 'var(--theme-primary)' }} />
+            <span className="text-[11px] hidden xl:inline" style={{ color: 'var(--theme-text-muted)' }}>Notify:</span>
             <select
               value={project.notificationChannelId || ''}
               onChange={(e) => handleUpdateNotificationChannel(e.target.value)}
-              className="bg-transparent text-white text-xs font-semibold focus:outline-hidden cursor-pointer max-w-[120px] sm:max-w-[150px] truncate"
+              className="bg-transparent text-xs font-semibold focus:outline-none cursor-pointer max-w-[120px] sm:max-w-[150px] truncate"
+              style={{ color: 'var(--theme-text-primary)' }}
             >
               {channels && channels.length > 0 ? (
                 channels.map((ch) => (
-                  <option key={ch.id} value={ch.id} className="bg-[#222529] text-white">
+                  <option
+                    key={ch.id}
+                    value={ch.id}
+                    style={{
+                      backgroundColor: 'var(--theme-bg-surface)',
+                      color: 'var(--theme-text-primary)',
+                    }}
+                  >
                     #{ch.name}
                   </option>
                 ))
               ) : (
-                <option value="" className="bg-[#222529] text-white">#general</option>
+                <option
+                  value=""
+                  style={{
+                    backgroundColor: 'var(--theme-bg-surface)',
+                    color: 'var(--theme-text-primary)',
+                  }}
+                >
+                  #general
+                </option>
               )}
             </select>
           </div>
@@ -492,7 +532,11 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
               setTargetColumnId(columns[0]?.id);
               setShowTicketModal(true);
             }}
-            className="px-3 py-1.5 bg-slack-green hover:bg-[#008a65] text-white text-xs font-semibold rounded-lg shadow transition flex items-center gap-1.5 active:scale-95"
+            className="px-3 py-1.5 text-xs font-semibold rounded-lg shadow transition flex items-center gap-1.5 active:scale-95"
+            style={{
+              backgroundColor: 'var(--theme-primary)',
+              color: 'var(--theme-primary-text)',
+            }}
           >
             <Plus size={15} />
             <span>New Ticket</span>
@@ -501,7 +545,12 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
           {/* Add Column Button */}
           <button
             onClick={() => setShowAddColumn(true)}
-            className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 hover:text-white text-xs font-semibold rounded-lg border border-gray-700 transition flex items-center gap-1.5 active:scale-95 hidden sm:flex"
+            className="px-3 py-1.5 text-xs font-semibold rounded-lg border transition flex items-center gap-1.5 active:scale-95 hidden sm:flex hover:bg-black/5 dark:hover:bg-white/10"
+            style={{
+              backgroundColor: 'var(--theme-bg-surface-hover)',
+              borderColor: 'var(--theme-border)',
+              color: 'var(--theme-text-primary)',
+            }}
           >
             <Columns3 size={15} />
             <span>Add Column</span>
@@ -511,7 +560,8 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
           <button
             onClick={handleDeleteProject}
             title="Delete Project Board"
-            className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition"
+            className="p-1.5 hover:bg-red-500/10 rounded-lg transition"
+            style={{ color: 'var(--theme-text-muted)' }}
           >
             <Trash2 size={16} />
           </button>
@@ -519,21 +569,33 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="h-11 border-b border-[#383F45]/30 px-4 sm:px-6 flex items-center justify-between gap-3 bg-[#19171D] text-xs shrink-0 overflow-x-auto scrollbar-none">
+      <div
+        className="h-11 border-b px-4 sm:px-6 flex items-center justify-between gap-3 text-xs shrink-0 overflow-x-auto scrollbar-none"
+        style={{
+          backgroundColor: 'var(--theme-bg-surface)',
+          borderColor: 'var(--theme-border)',
+        }}
+      >
         <div className="flex items-center gap-2.5 flex-1 min-w-[200px] max-w-md">
           <div className="relative w-full">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 opacity-50" style={{ color: 'var(--theme-text-muted)' }} />
             <input
               type="text"
               placeholder="Filter tickets by title or description..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#222529] border border-gray-700/60 rounded-lg pl-8 pr-3 py-1 text-xs text-white placeholder-gray-500 focus:outline-hidden focus:border-slack-green"
+              className="w-full border rounded-lg pl-8 pr-3 py-1 text-xs focus:outline-none"
+              style={{
+                backgroundColor: 'var(--theme-bg-surface-hover)',
+                borderColor: 'var(--theme-border)',
+                color: 'var(--theme-text-primary)',
+              }}
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                className="absolute right-2 top-1/2 -translate-y-1/2 hover:opacity-100 opacity-60"
+                style={{ color: 'var(--theme-text-muted)' }}
               >
                 <X size={12} />
               </button>
@@ -544,11 +606,16 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
         {/* Priority & Assignee Filters */}
         <div className="flex items-center gap-2 shrink-0">
           <div className="flex items-center gap-1">
-            <Filter size={13} className="text-gray-500" />
+            <Filter size={13} style={{ color: 'var(--theme-text-muted)' }} />
             <select
               value={filterPriority}
               onChange={(e) => setFilterPriority(e.target.value)}
-              className="bg-[#222529] border border-gray-700/60 rounded-lg px-2 py-1 text-xs text-gray-300 focus:outline-hidden"
+              className="border rounded-lg px-2 py-1 text-xs focus:outline-none"
+              style={{
+                backgroundColor: 'var(--theme-bg-surface-hover)',
+                borderColor: 'var(--theme-border)',
+                color: 'var(--theme-text-primary)',
+              }}
             >
               <option value="ALL">All Priorities</option>
               <option value="URGENT">🔥 Urgent</option>
@@ -559,11 +626,16 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
           </div>
 
           <div className="flex items-center gap-1">
-            <User size={13} className="text-gray-500" />
+            <User size={13} style={{ color: 'var(--theme-text-muted)' }} />
             <select
               value={filterAssignee}
               onChange={(e) => setFilterAssignee(e.target.value)}
-              className="bg-[#222529] border border-gray-700/60 rounded-lg px-2 py-1 text-xs text-gray-300 focus:outline-hidden"
+              className="border rounded-lg px-2 py-1 text-xs focus:outline-none"
+              style={{
+                backgroundColor: 'var(--theme-bg-surface-hover)',
+                borderColor: 'var(--theme-border)',
+                color: 'var(--theme-text-primary)',
+              }}
             >
               <option value="ALL">All Assignees</option>
               <option value="ME">Assigned to Me</option>
@@ -594,11 +666,15 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
               onDragOver={(e) => handleDragOver(e, column.id)}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, column.id)}
-              className={`w-72 sm:w-80 shrink-0 bg-[#1F2326] border rounded-2xl flex flex-col max-h-full transition-all duration-200 ${
+              className={`w-72 sm:w-80 shrink-0 border rounded-2xl flex flex-col max-h-full transition-all duration-200 ${
                 isDragTarget
-                  ? 'border-slack-green bg-[#24292E] ring-2 ring-slack-green/40 shadow-xl'
-                  : 'border-gray-800'
+                  ? 'ring-2 ring-slack-green/40 shadow-xl'
+                  : ''
               }`}
+              style={{
+                backgroundColor: 'var(--theme-bg-surface)',
+                borderColor: isDragTarget ? 'var(--theme-primary)' : 'var(--theme-border)',
+              }}
             >
               {/* Column Header (Draggable for reordering) */}
               <div
@@ -612,12 +688,15 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                   );
                   e.dataTransfer.effectAllowed = 'move';
                 }}
-                className={`p-3.5 border-b border-gray-800/80 flex items-center justify-between shrink-0 cursor-move ${
+                className={`p-3.5 border-b flex items-center justify-between shrink-0 cursor-move ${
                   draggedColId === column.id ? 'opacity-50' : ''
                 }`}
+                style={{
+                  borderColor: 'var(--theme-border)',
+                }}
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0 mr-1.5">
-                  <GripVertical size={13} className="text-gray-500 hover:text-gray-300 shrink-0" />
+                  <GripVertical size={13} className="shrink-0" style={{ color: 'var(--theme-text-muted)' }} />
                   <span
                     style={{ backgroundColor: column.color || '#3B82F6' }}
                     className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs"
@@ -633,7 +712,12 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                         if (e.key === 'Enter') handleUpdateColumnName(column.id);
                         if (e.key === 'Escape') setEditingColId(null);
                       }}
-                      className="bg-[#2A2E33] border border-gray-700 rounded px-2 py-0.5 text-xs text-white font-bold w-full"
+                      className="border rounded px-2 py-0.5 text-xs font-bold w-full"
+                      style={{
+                        backgroundColor: 'var(--theme-bg-surface-hover)',
+                        borderColor: 'var(--theme-border)',
+                        color: 'var(--theme-text-primary)',
+                      }}
                     />
                   ) : (
                     <h3
@@ -642,12 +726,19 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                         setEditingColName(column.name);
                       }}
                       title="Double-click to rename column"
-                      className="text-xs font-bold text-white truncate cursor-pointer hover:text-gray-300"
+                      className="text-xs font-bold truncate cursor-pointer hover:opacity-80"
+                      style={{ color: 'var(--theme-text-primary)' }}
                     >
                       {column.name}
                     </h3>
                   )}
-                  <span className="text-[11px] font-semibold text-gray-400 bg-gray-800 px-2 py-0.5 rounded-full shrink-0">
+                  <span
+                    className="text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0"
+                    style={{
+                      backgroundColor: 'var(--theme-bg-surface-hover)',
+                      color: 'var(--theme-text-muted)',
+                    }}
+                  >
                     {colTickets.length}
                   </span>
                 </div>
@@ -661,7 +752,8 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                       handleMoveColumn(column.id, 'left');
                     }}
                     title="Move column left"
-                    className="p-1 hover:bg-gray-700/60 rounded text-gray-400 hover:text-white disabled:opacity-20 transition"
+                    className="p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded disabled:opacity-20 transition"
+                    style={{ color: 'var(--theme-text-muted)' }}
                   >
                     <ChevronLeft size={13} />
                   </button>
@@ -674,7 +766,8 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                       handleMoveColumn(column.id, 'right');
                     }}
                     title="Move column right"
-                    className="p-1 hover:bg-gray-700/60 rounded text-gray-400 hover:text-white disabled:opacity-20 transition"
+                    className="p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded disabled:opacity-20 transition"
+                    style={{ color: 'var(--theme-text-muted)' }}
                   >
                     <ChevronRight size={13} />
                   </button>
@@ -688,7 +781,8 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                       setShowTicketModal(true);
                     }}
                     title="Add ticket to this column"
-                    className="p-1 hover:bg-gray-700/60 rounded text-gray-400 hover:text-white transition"
+                    className="p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded transition"
+                    style={{ color: 'var(--theme-text-muted)' }}
                   >
                     <Plus size={15} />
                   </button>
@@ -700,7 +794,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                       handleDeleteColumn(column.id, column.name);
                     }}
                     title="Delete column"
-                    className="p-1 hover:bg-red-500/20 rounded text-gray-400 hover:text-red-400 transition"
+                    className="p-1 hover:bg-red-500/20 rounded text-red-400 transition"
                   >
                     <Trash2 size={13} />
                   </button>
@@ -730,9 +824,13 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                         setTargetColumnId(column.id);
                         setShowTicketModal(true);
                       }}
-                      className={`bg-[#272B30] hover:bg-[#2E3339] border border-gray-700/70 hover:border-gray-600 rounded-xl p-3 shadow-sm transition-all duration-150 cursor-grab active:cursor-grabbing hover:shadow-md ${
-                        isBeingDragged ? 'opacity-40 scale-95 border-dashed border-slack-green' : ''
+                      className={`border rounded-xl p-3 shadow-sm transition-all duration-150 cursor-grab active:cursor-grabbing hover:shadow-md ${
+                        isBeingDragged ? 'opacity-40 scale-95 border-dashed ring-2 ring-slack-green' : ''
                       }`}
+                      style={{
+                        backgroundColor: 'var(--theme-bg-surface-hover)',
+                        borderColor: 'var(--theme-border)',
+                      }}
                     >
                       {/* Priority Badge & ID */}
                       <div className="flex items-center justify-between gap-2 mb-2">
@@ -743,31 +841,35 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                           {priorityMeta.label}
                         </span>
 
-                        <span className="text-[10px] text-gray-500 font-mono">
+                        <span className="text-[10px] font-mono" style={{ color: 'var(--theme-text-muted)' }}>
                           #{ticket.id.slice(0, 6)}
                         </span>
                       </div>
 
                       {/* Ticket Title */}
-                      <h4 className="text-xs font-semibold text-white leading-snug mb-1.5 break-words">
+                      <h4 className="text-xs font-semibold leading-snug mb-1.5 break-words" style={{ color: 'var(--theme-text-primary)' }}>
                         {ticket.title}
                       </h4>
 
                       {/* Description Preview */}
                       {ticket.description && (
-                        <p className="text-[11px] text-gray-400 line-clamp-2 mb-2.5 leading-relaxed">
+                        <p className="text-[11px] line-clamp-2 mb-2.5 leading-relaxed" style={{ color: 'var(--theme-text-muted)' }}>
                           {ticket.description}
                         </p>
                       )}
 
                       {/* Footer: Due Date & Assignee Avatar */}
-                      <div className="flex items-center justify-between pt-2 border-t border-gray-700/40 text-[11px]">
+                      <div
+                        className="flex items-center justify-between pt-2 border-t text-[11px]"
+                        style={{ borderColor: 'var(--theme-border)' }}
+                      >
                         {/* Due Date */}
                         {ticket.dueDate ? (
                           <div
                             className={`flex items-center gap-1 font-medium ${
-                              isOverdue ? 'text-red-400 font-bold' : 'text-gray-400'
+                              isOverdue ? 'text-red-400 font-bold' : ''
                             }`}
+                            style={!isOverdue ? { color: 'var(--theme-text-muted)' } : undefined}
                           >
                             <Calendar size={12} />
                             <span>
@@ -793,14 +895,14 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                                 `https://api.dicebear.com/7.x/bottts/svg?seed=${ticket.assignee.username}`
                               }
                               alt={ticket.assignee.displayName}
-                              className="w-5 h-5 rounded-full object-cover ring-1 ring-gray-600"
+                              className="w-5 h-5 rounded-full object-cover ring-1 ring-black/20 dark:ring-white/20"
                             />
-                            <span className="text-[10px] text-gray-300 font-medium hidden sm:inline max-w-[80px] truncate">
+                            <span className="text-[10px] font-medium hidden sm:inline max-w-[80px] truncate" style={{ color: 'var(--theme-text-primary)' }}>
                               {ticket.assignee.displayName}
                             </span>
                           </div>
                         ) : (
-                          <span className="text-[10px] text-gray-500 flex items-center gap-1">
+                          <span className="text-[10px] flex items-center gap-1" style={{ color: 'var(--theme-text-muted)' }}>
                             <User size={11} />
                             Unassigned
                           </span>
@@ -811,21 +913,25 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                 })}
 
                 {colTickets.length === 0 && (
-                  <div className="h-24 border border-dashed border-gray-800 rounded-xl flex items-center justify-center text-[11px] text-gray-500">
+                  <div
+                    className="h-24 border border-dashed rounded-xl flex items-center justify-center text-[11px]"
+                    style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text-muted)' }}
+                  >
                     No tickets
                   </div>
                 )}
               </div>
 
               {/* Add Ticket Shortcut at column bottom */}
-              <div className="p-2 border-t border-gray-800/60 shrink-0">
+              <div className="p-2 border-t shrink-0" style={{ borderColor: 'var(--theme-border)' }}>
                 <button
                   onClick={() => {
                     setEditingTicket(null);
                     setTargetColumnId(column.id);
                     setShowTicketModal(true);
                   }}
-                  className="w-full py-1.5 px-2 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-gray-700/40 transition flex items-center justify-center gap-1.5"
+                  className="w-full py-1.5 px-2 rounded-lg text-xs hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center justify-center gap-1.5"
+                  style={{ color: 'var(--theme-text-muted)' }}
                 >
                   <Plus size={14} />
                   <span>Add ticket</span>
@@ -837,8 +943,14 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
 
         {/* Add Column Button Card */}
         {showAddColumn ? (
-          <div className="w-72 sm:w-80 shrink-0 bg-[#1F2326] border border-slack-green rounded-2xl p-4 shadow-xl">
-            <h4 className="text-xs font-bold text-white mb-2">Create New Column</h4>
+          <div
+            className="w-72 sm:w-80 shrink-0 border rounded-2xl p-4 shadow-xl"
+            style={{
+              backgroundColor: 'var(--theme-bg-surface)',
+              borderColor: 'var(--theme-primary)',
+            }}
+          >
+            <h4 className="text-xs font-bold mb-2" style={{ color: 'var(--theme-text-primary)' }}>Create New Column</h4>
             <form onSubmit={handleCreateColumn} className="space-y-3">
               <input
                 type="text"
@@ -847,11 +959,16 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                 placeholder="Column Name (e.g. QA, Review, Staging)"
                 value={newColumnName}
                 onChange={(e) => setNewColumnName(e.target.value)}
-                className="w-full bg-[#2A2E33] border border-gray-700 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-hidden focus:border-slack-green"
+                className="w-full border rounded-xl px-3 py-2 text-xs focus:outline-none"
+                style={{
+                  backgroundColor: 'var(--theme-bg-surface-hover)',
+                  borderColor: 'var(--theme-border)',
+                  color: 'var(--theme-text-primary)',
+                }}
               />
 
               <div>
-                <label className="block text-[10px] uppercase font-semibold text-gray-400 mb-1">
+                <label className="block text-[10px] uppercase font-semibold mb-1" style={{ color: 'var(--theme-text-muted)' }}>
                   Header Color
                 </label>
                 <div className="flex items-center gap-1.5">
@@ -862,7 +979,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                       onClick={() => setNewColumnColor(c)}
                       style={{ backgroundColor: c }}
                       className={`w-5 h-5 rounded-full transition transform hover:scale-110 ${
-                        newColumnColor === c ? 'ring-2 ring-white scale-110' : ''
+                        newColumnColor === c ? 'ring-2 ring-offset-1 scale-110' : ''
                       }`}
                     />
                   ))}
@@ -873,14 +990,19 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowAddColumn(false)}
-                  className="px-3 py-1.5 text-xs text-gray-400 hover:text-white transition"
+                  className="px-3 py-1.5 text-xs hover:opacity-80 transition"
+                  style={{ color: 'var(--theme-text-muted)' }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={!newColumnName.trim()}
-                  className="px-3.5 py-1.5 bg-slack-green hover:bg-[#008a65] disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow transition"
+                  className="px-3.5 py-1.5 disabled:opacity-50 text-xs font-semibold rounded-lg shadow transition"
+                  style={{
+                    backgroundColor: 'var(--theme-primary)',
+                    color: 'var(--theme-primary-text)',
+                  }}
                 >
                   Add Column
                 </button>
@@ -890,7 +1012,12 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
         ) : (
           <button
             onClick={() => setShowAddColumn(true)}
-            className="w-72 sm:w-80 shrink-0 h-16 rounded-2xl border-2 border-dashed border-gray-800 hover:border-gray-600 bg-[#1F2326]/40 hover:bg-[#1F2326] text-gray-400 hover:text-white transition flex items-center justify-center gap-2 text-xs font-semibold"
+            className="w-72 sm:w-80 shrink-0 h-16 rounded-2xl border-2 border-dashed transition flex items-center justify-center gap-2 text-xs font-semibold hover:opacity-80"
+            style={{
+              borderColor: 'var(--theme-border)',
+              backgroundColor: 'var(--theme-bg-surface)',
+              color: 'var(--theme-text-muted)',
+            }}
           >
             <Plus size={16} />
             <span>Add another column</span>

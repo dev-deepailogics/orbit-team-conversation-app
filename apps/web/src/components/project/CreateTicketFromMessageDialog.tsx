@@ -148,18 +148,39 @@ export const CreateTicketFromMessageDialog: React.FC<CreateTicketFromMessageDial
 
   return (
     <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in">
-      <div className="bg-[#1A1D21] border border-gray-700/80 rounded-2xl w-full max-w-xl p-6 shadow-2xl overflow-hidden relative">
+      <div
+        className="rounded-2xl w-full max-w-xl p-6 shadow-2xl overflow-hidden relative border"
+        style={{
+          backgroundColor: 'var(--theme-bg-surface)',
+          borderColor: 'var(--theme-border)',
+          color: 'var(--theme-text-primary)',
+        }}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-gray-800">
+        <div
+          className="flex items-center justify-between pb-4 border-b"
+          style={{ borderColor: 'var(--theme-border)' }}
+        >
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono font-bold uppercase tracking-wider text-slack-green bg-slack-green/10 px-2 py-0.5 rounded-md border border-slack-green/30 flex items-center gap-1.5">
+            <span
+              className="text-xs font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border flex items-center gap-1.5"
+              style={{
+                color: 'var(--theme-primary)',
+                backgroundColor: 'rgba(var(--theme-primary-rgb, 0, 122, 90), 0.1)',
+                borderColor: 'var(--theme-primary)',
+              }}
+            >
               <CheckSquare size={13} />
               Create Ticket from Message
             </span>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-gray-800 transition"
+            className="p-1.5 rounded-lg hover:opacity-80 transition"
+            style={{
+              color: 'var(--theme-text-muted)',
+              backgroundColor: 'var(--theme-bg-surface-hover)',
+            }}
           >
             <X size={18} />
           </button>
@@ -173,11 +194,25 @@ export const CreateTicketFromMessageDialog: React.FC<CreateTicketFromMessageDial
 
         {projects.length === 0 ? (
           <div className="py-8 text-center space-y-3">
-            <div className="w-12 h-12 rounded-xl bg-gray-800 flex items-center justify-center mx-auto text-gray-400">
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto"
+              style={{
+                backgroundColor: 'var(--theme-bg-surface-hover)',
+                color: 'var(--theme-text-muted)',
+              }}
+            >
               <FolderKanban size={24} />
             </div>
-            <h4 className="text-sm font-semibold text-white">No Project Boards in Workspace</h4>
-            <p className="text-xs text-gray-400 max-w-sm mx-auto">
+            <h4
+              className="text-sm font-semibold"
+              style={{ color: 'var(--theme-text-primary)' }}
+            >
+              No Project Boards in Workspace
+            </h4>
+            <p
+              className="text-xs max-w-sm mx-auto"
+              style={{ color: 'var(--theme-text-muted)' }}
+            >
               You need at least one project board to convert messages into Kanban tickets.
             </p>
             <button
@@ -186,7 +221,11 @@ export const CreateTicketFromMessageDialog: React.FC<CreateTicketFromMessageDial
                 onClose();
                 onOpenCreateProject?.();
               }}
-              className="px-4 py-2 bg-slack-green hover:bg-[#008a65] text-white text-xs font-semibold rounded-xl shadow transition inline-flex items-center gap-1.5"
+              className="px-4 py-2 text-xs font-semibold rounded-xl shadow transition inline-flex items-center gap-1.5 cursor-pointer"
+              style={{
+                backgroundColor: 'var(--theme-primary)',
+                color: 'var(--theme-primary-text)',
+              }}
             >
               <Plus size={15} />
               Create Project Board
@@ -196,16 +235,31 @@ export const CreateTicketFromMessageDialog: React.FC<CreateTicketFromMessageDial
           <form onSubmit={handleSubmit} className="mt-4 space-y-4">
             {/* Project Selection */}
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5">
+              <label
+                className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
+                style={{ color: 'var(--theme-text-muted)' }}
+              >
                 Target Project Board <span className="text-red-400">*</span>
               </label>
               <select
                 value={selectedProjectId}
                 onChange={(e) => handleSelectProject(e.target.value)}
-                className="w-full bg-[#222529] border border-gray-700/80 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-hidden focus:border-slack-green transition font-medium"
+                className="w-full rounded-xl px-3.5 py-2.5 text-sm transition font-medium border focus:outline-none cursor-pointer"
+                style={{
+                  backgroundColor: 'var(--theme-bg-surface-hover)',
+                  borderColor: 'var(--theme-border)',
+                  color: 'var(--theme-text-primary)',
+                }}
               >
                 {projects.map((p) => (
-                  <option key={p.id} value={p.id}>
+                  <option
+                    key={p.id}
+                    value={p.id}
+                    style={{
+                      backgroundColor: 'var(--theme-bg-surface)',
+                      color: 'var(--theme-text-primary)',
+                    }}
+                  >
                     {p.icon || '📋'} {p.name}
                   </option>
                 ))}
@@ -214,7 +268,10 @@ export const CreateTicketFromMessageDialog: React.FC<CreateTicketFromMessageDial
 
             {/* Title */}
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5">
+              <label
+                className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
+                style={{ color: 'var(--theme-text-muted)' }}
+              >
                 Title <span className="text-red-400">*</span>
               </label>
               <input
@@ -223,16 +280,30 @@ export const CreateTicketFromMessageDialog: React.FC<CreateTicketFromMessageDial
                 placeholder="Ticket title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full bg-[#222529] border border-gray-700/80 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-hidden focus:border-slack-green transition font-medium"
+                className="w-full rounded-xl px-3.5 py-2.5 text-sm transition font-medium border focus:outline-none"
+                style={{
+                  backgroundColor: 'var(--theme-bg-surface-hover)',
+                  borderColor: 'var(--theme-border)',
+                  color: 'var(--theme-text-primary)',
+                }}
               />
             </div>
 
             {/* Description (Rich Text Editor pre-filled with message markdown) */}
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5 flex items-center justify-between">
-                <span>Description <span className="text-gray-500 font-normal lowercase">(rich formatting)</span></span>
+              <label
+                className="block text-xs font-semibold uppercase tracking-wider mb-1.5 flex items-center justify-between"
+                style={{ color: 'var(--theme-text-muted)' }}
+              >
+                <span>Description <span className="font-normal lowercase opacity-75">(rich formatting)</span></span>
               </label>
-              <div className="bg-[#222529] border border-gray-700/80 rounded-xl overflow-hidden focus-within:border-slack-green transition">
+              <div
+                className="rounded-xl overflow-hidden transition border"
+                style={{
+                  backgroundColor: 'var(--theme-bg-surface-hover)',
+                  borderColor: 'var(--theme-border)',
+                }}
+              >
                 <RichTextEditor
                   ref={editorRef}
                   initialValue={message.content || ''}
@@ -246,17 +317,32 @@ export const CreateTicketFromMessageDialog: React.FC<CreateTicketFromMessageDial
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Column Status */}
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5 flex items-center gap-1.5">
-                  <Columns3 size={14} className="text-gray-400" />
+                <label
+                  className="block text-xs font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5"
+                  style={{ color: 'var(--theme-text-muted)' }}
+                >
+                  <Columns3 size={14} style={{ color: 'var(--theme-text-muted)' }} />
                   Column / Status
                 </label>
                 <select
                   value={columnId}
                   onChange={(e) => setColumnId(e.target.value)}
-                  className="w-full bg-[#222529] border border-gray-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden focus:border-slack-green transition"
+                  className="w-full rounded-xl px-3 py-2 text-xs border focus:outline-none transition cursor-pointer"
+                  style={{
+                    backgroundColor: 'var(--theme-bg-surface-hover)',
+                    borderColor: 'var(--theme-border)',
+                    color: 'var(--theme-text-primary)',
+                  }}
                 >
                   {columns.map((c) => (
-                    <option key={c.id} value={c.id}>
+                    <option
+                      key={c.id}
+                      value={c.id}
+                      style={{
+                        backgroundColor: 'var(--theme-bg-surface)',
+                        color: 'var(--theme-text-primary)',
+                      }}
+                    >
                       {c.name}
                     </option>
                   ))}
@@ -265,17 +351,32 @@ export const CreateTicketFromMessageDialog: React.FC<CreateTicketFromMessageDial
 
               {/* Priority */}
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5 flex items-center gap-1.5">
-                  <Clock size={14} className="text-gray-400" />
+                <label
+                  className="block text-xs font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5"
+                  style={{ color: 'var(--theme-text-muted)' }}
+                >
+                  <Clock size={14} style={{ color: 'var(--theme-text-muted)' }} />
                   Priority
                 </label>
                 <select
                   value={priority}
                   onChange={(e) => setPriority(e.target.value as TicketPriority)}
-                  className="w-full bg-[#222529] border border-gray-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden focus:border-slack-green transition"
+                  className="w-full rounded-xl px-3 py-2 text-xs border focus:outline-none transition cursor-pointer"
+                  style={{
+                    backgroundColor: 'var(--theme-bg-surface-hover)',
+                    borderColor: 'var(--theme-border)',
+                    color: 'var(--theme-text-primary)',
+                  }}
                 >
                   {PRIORITIES.map((p) => (
-                    <option key={p.value} value={p.value}>
+                    <option
+                      key={p.value}
+                      value={p.value}
+                      style={{
+                        backgroundColor: 'var(--theme-bg-surface)',
+                        color: 'var(--theme-text-primary)',
+                      }}
+                    >
                       {p.label}
                     </option>
                   ))}
@@ -287,21 +388,44 @@ export const CreateTicketFromMessageDialog: React.FC<CreateTicketFromMessageDial
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Assignee */}
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5 flex items-center gap-1.5">
-                  <User size={14} className="text-gray-400" />
+                <label
+                  className="block text-xs font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5"
+                  style={{ color: 'var(--theme-text-muted)' }}
+                >
+                  <User size={14} style={{ color: 'var(--theme-text-muted)' }} />
                   Assignee
                 </label>
                 <select
                   value={assigneeId || ''}
                   onChange={(e) => setAssigneeId(e.target.value || null)}
-                  className="w-full bg-[#222529] border border-gray-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden focus:border-slack-green transition"
+                  className="w-full rounded-xl px-3 py-2 text-xs border focus:outline-none transition cursor-pointer"
+                  style={{
+                    backgroundColor: 'var(--theme-bg-surface-hover)',
+                    borderColor: 'var(--theme-border)',
+                    color: 'var(--theme-text-primary)',
+                  }}
                 >
-                  <option value="">Unassigned</option>
+                  <option
+                    value=""
+                    style={{
+                      backgroundColor: 'var(--theme-bg-surface)',
+                      color: 'var(--theme-text-primary)',
+                    }}
+                  >
+                    Unassigned
+                  </option>
                   {members.map((m) => {
                     const u = m.user;
                     if (!u) return null;
                     return (
-                      <option key={u.id} value={u.id}>
+                      <option
+                        key={u.id}
+                        value={u.id}
+                        style={{
+                          backgroundColor: 'var(--theme-bg-surface)',
+                          color: 'var(--theme-text-primary)',
+                        }}
+                      >
                         {u.displayName}
                       </option>
                     );
@@ -311,33 +435,49 @@ export const CreateTicketFromMessageDialog: React.FC<CreateTicketFromMessageDial
 
               {/* Due Date */}
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5 flex items-center gap-1.5">
-                  <Calendar size={14} className="text-gray-400" />
+                <label
+                  className="block text-xs font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5"
+                  style={{ color: 'var(--theme-text-muted)' }}
+                >
+                  <Calendar size={14} style={{ color: 'var(--theme-text-muted)' }} />
                   Due Date
                 </label>
                 <input
                   type="date"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
-                  className="w-full bg-[#222529] border border-gray-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden focus:border-slack-green transition"
+                  className="w-full rounded-xl px-3 py-2 text-xs border focus:outline-none transition"
+                  style={{
+                    backgroundColor: 'var(--theme-bg-surface-hover)',
+                    borderColor: 'var(--theme-border)',
+                    color: 'var(--theme-text-primary)',
+                  }}
                 />
               </div>
             </div>
 
             {/* Footer Buttons */}
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-800">
+            <div
+              className="flex items-center justify-end gap-3 pt-3 border-t"
+              style={{ borderColor: 'var(--theme-border)' }}
+            >
               <button
                 type="button"
                 onClick={onClose}
                 disabled={isSubmitting}
-                className="px-4 py-2 text-xs text-gray-400 hover:text-white transition"
+                className="px-4 py-2 text-xs hover:opacity-80 transition cursor-pointer"
+                style={{ color: 'var(--theme-text-muted)' }}
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting || !title.trim() || !columnId}
-                className="px-5 py-2.5 bg-slack-green hover:bg-[#008a65] disabled:opacity-50 text-white text-xs font-semibold rounded-xl shadow-lg transition flex items-center gap-2"
+                className="px-5 py-2.5 disabled:opacity-50 text-xs font-semibold rounded-xl shadow-lg transition flex items-center gap-2 cursor-pointer active:scale-95"
+                style={{
+                  backgroundColor: 'var(--theme-primary)',
+                  color: 'var(--theme-primary-text)',
+                }}
               >
                 <CheckSquare size={14} />
                 {isSubmitting ? 'Creating...' : 'Create Ticket'}

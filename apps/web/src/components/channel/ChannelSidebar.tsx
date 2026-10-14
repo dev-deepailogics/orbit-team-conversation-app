@@ -345,7 +345,20 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                     <span className="truncate">{project.name}</span>
                   </div>
 
-                  <span className="text-[10px] text-gray-400 font-mono bg-black/20 group-hover:bg-black/40 px-1.5 py-0.5 rounded-full">
+                  <span
+                    className="text-[10px] font-mono px-1.5 py-0.5 rounded-full transition"
+                    style={
+                      isActive
+                        ? {
+                            backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                            color: 'inherit',
+                          }
+                        : {
+                            backgroundColor: 'var(--theme-bg-surface-hover)',
+                            color: 'var(--theme-text-muted)',
+                          }
+                    }
+                  >
                     {ticketCount}
                   </span>
                 </div>
@@ -355,7 +368,8 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
             {projects.length === 0 && onOpenCreateProject && (
               <button
                 onClick={onOpenCreateProject}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-gray-500 hover:text-gray-300 hover:bg-gray-800/40 transition flex items-center gap-2"
+                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-2 cursor-pointer"
+                style={{ color: 'var(--theme-text-muted)' }}
               >
                 <Plus size={12} />
                 <span>Create a project board...</span>

@@ -121,22 +121,43 @@ export const TicketModal: React.FC<TicketModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in">
-      <div className="bg-[#1A1D21] border border-gray-700/80 rounded-2xl w-full max-w-xl p-6 shadow-2xl overflow-hidden relative">
+      <div
+        className="rounded-2xl w-full max-w-xl p-6 shadow-2xl overflow-hidden relative border"
+        style={{
+          backgroundColor: 'var(--theme-bg-surface)',
+          borderColor: 'var(--theme-border)',
+          color: 'var(--theme-text-primary)',
+        }}
+      >
         {/* Modal Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-gray-800">
+        <div
+          className="flex items-center justify-between pb-4 border-b"
+          style={{ borderColor: 'var(--theme-border)' }}
+        >
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono font-bold uppercase tracking-wider text-slack-green bg-slack-green/10 px-2 py-0.5 rounded-md border border-slack-green/30">
+            <span
+              className="text-xs font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border"
+              style={{
+                color: 'var(--theme-primary)',
+                backgroundColor: 'rgba(var(--theme-primary-rgb, 0, 122, 90), 0.1)',
+                borderColor: 'var(--theme-primary)',
+              }}
+            >
               {isEditing ? 'Edit Ticket' : 'New Ticket'}
             </span>
             {ticket && (
-              <span className="text-xs text-gray-400 font-mono">
+              <span className="text-xs font-mono" style={{ color: 'var(--theme-text-muted)' }}>
                 #{ticket.id.slice(0, 8)}
               </span>
             )}
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-gray-800 transition"
+            className="p-1.5 rounded-lg hover:opacity-80 transition"
+            style={{
+              color: 'var(--theme-text-muted)',
+              backgroundColor: 'var(--theme-bg-surface-hover)',
+            }}
           >
             <X size={18} />
           </button>
@@ -151,7 +172,10 @@ export const TicketModal: React.FC<TicketModalProps> = ({
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           {/* Title */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5">
+            <label
+              className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
+              style={{ color: 'var(--theme-text-muted)' }}
+            >
               Title <span className="text-red-400">*</span>
             </label>
             <input
@@ -161,16 +185,30 @@ export const TicketModal: React.FC<TicketModalProps> = ({
               placeholder="e.g. Design auth screens, Fix database indexing, Write unit tests"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-[#222529] border border-gray-700/80 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-hidden focus:border-slack-green transition font-medium"
+              className="w-full rounded-xl px-3.5 py-2.5 text-sm transition font-medium border focus:outline-none"
+              style={{
+                backgroundColor: 'var(--theme-bg-surface-hover)',
+                borderColor: 'var(--theme-border)',
+                color: 'var(--theme-text-primary)',
+              }}
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5 flex items-center justify-between">
-              <span>Description <span className="text-gray-500 font-normal lowercase">(rich formatting)</span></span>
+            <label
+              className="block text-xs font-semibold uppercase tracking-wider mb-1.5 flex items-center justify-between"
+              style={{ color: 'var(--theme-text-muted)' }}
+            >
+              <span>Description <span className="font-normal lowercase opacity-75">(rich formatting)</span></span>
             </label>
-            <div className="bg-[#222529] border border-gray-700/80 rounded-xl overflow-hidden focus-within:border-slack-green transition">
+            <div
+              className="rounded-xl overflow-hidden transition border"
+              style={{
+                backgroundColor: 'var(--theme-bg-surface-hover)',
+                borderColor: 'var(--theme-border)',
+              }}
+            >
               <RichTextEditor
                 ref={editorRef}
                 initialValue={ticket?.description || initialDescription || ''}
@@ -184,17 +222,32 @@ export const TicketModal: React.FC<TicketModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Status Column */}
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5 flex items-center gap-1.5">
-                <Columns3 size={14} className="text-gray-400" />
+              <label
+                className="block text-xs font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5"
+                style={{ color: 'var(--theme-text-muted)' }}
+              >
+                <Columns3 size={14} style={{ color: 'var(--theme-text-muted)' }} />
                 Column / Status
               </label>
               <select
                 value={columnId}
                 onChange={(e) => setColumnId(e.target.value)}
-                className="w-full bg-[#222529] border border-gray-700/80 rounded-xl px-3 py-2 text-sm text-white focus:outline-hidden focus:border-slack-green transition"
+                className="w-full rounded-xl px-3 py-2 text-sm border focus:outline-none transition cursor-pointer"
+                style={{
+                  backgroundColor: 'var(--theme-bg-surface-hover)',
+                  borderColor: 'var(--theme-border)',
+                  color: 'var(--theme-text-primary)',
+                }}
               >
                 {columns.map((col) => (
-                  <option key={col.id} value={col.id}>
+                  <option
+                    key={col.id}
+                    value={col.id}
+                    style={{
+                      backgroundColor: 'var(--theme-bg-surface)',
+                      color: 'var(--theme-text-primary)',
+                    }}
+                  >
                     {col.name}
                   </option>
                 ))}
@@ -203,11 +256,20 @@ export const TicketModal: React.FC<TicketModalProps> = ({
 
             {/* Priority Selector */}
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5 flex items-center gap-1.5">
-                <Flag size={14} className="text-gray-400" />
+              <label
+                className="block text-xs font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5"
+                style={{ color: 'var(--theme-text-muted)' }}
+              >
+                <Flag size={14} style={{ color: 'var(--theme-text-muted)' }} />
                 Priority
               </label>
-              <div className="flex items-center gap-1 bg-[#222529] border border-gray-700/80 p-1 rounded-xl">
+              <div
+                className="flex items-center gap-1 border p-1 rounded-xl"
+                style={{
+                  backgroundColor: 'var(--theme-bg-surface-hover)',
+                  borderColor: 'var(--theme-border)',
+                }}
+              >
                 {PRIORITIES.map(({ value, label, color }) => {
                   const isSelected = priority === value;
                   return (
@@ -216,12 +278,11 @@ export const TicketModal: React.FC<TicketModalProps> = ({
                       type="button"
                       onClick={() => setPriority(value)}
                       className={`flex-1 py-1 px-2 rounded-lg text-xs font-semibold transition ${
-                        isSelected
-                          ? 'text-white shadow'
-                          : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                        isSelected ? 'shadow' : 'hover:opacity-80'
                       }`}
                       style={{
                         backgroundColor: isSelected ? color : 'transparent',
+                        color: isSelected ? '#FFFFFF' : 'var(--theme-text-muted)',
                       }}
                     >
                       {label}
@@ -236,21 +297,44 @@ export const TicketModal: React.FC<TicketModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Assignee */}
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5 flex items-center gap-1.5">
-                <User size={14} className="text-gray-400" />
+              <label
+                className="block text-xs font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5"
+                style={{ color: 'var(--theme-text-muted)' }}
+              >
+                <User size={14} style={{ color: 'var(--theme-text-muted)' }} />
                 Assignee
               </label>
               <select
                 value={assigneeId || ''}
                 onChange={(e) => setAssigneeId(e.target.value || null)}
-                className="w-full bg-[#222529] border border-gray-700/80 rounded-xl px-3 py-2 text-sm text-white focus:outline-hidden focus:border-slack-green transition"
+                className="w-full rounded-xl px-3 py-2 text-sm border focus:outline-none transition cursor-pointer"
+                style={{
+                  backgroundColor: 'var(--theme-bg-surface-hover)',
+                  borderColor: 'var(--theme-border)',
+                  color: 'var(--theme-text-primary)',
+                }}
               >
-                <option value="">Unassigned</option>
+                <option
+                  value=""
+                  style={{
+                    backgroundColor: 'var(--theme-bg-surface)',
+                    color: 'var(--theme-text-primary)',
+                  }}
+                >
+                  Unassigned
+                </option>
                 {members.map((m) => {
                   const u = m.user;
                   if (!u) return null;
                   return (
-                    <option key={u.id} value={u.id}>
+                    <option
+                      key={u.id}
+                      value={u.id}
+                      style={{
+                        backgroundColor: 'var(--theme-bg-surface)',
+                        color: 'var(--theme-text-primary)',
+                      }}
+                    >
                       {u.displayName} (@{u.username})
                     </option>
                   );
@@ -260,27 +344,38 @@ export const TicketModal: React.FC<TicketModalProps> = ({
 
             {/* Due Date */}
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5 flex items-center gap-1.5">
-                <Calendar size={14} className="text-gray-400" />
+              <label
+                className="block text-xs font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5"
+                style={{ color: 'var(--theme-text-muted)' }}
+              >
+                <Calendar size={14} style={{ color: 'var(--theme-text-muted)' }} />
                 Due Date
               </label>
               <input
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full bg-[#222529] border border-gray-700/80 rounded-xl px-3 py-2 text-sm text-white focus:outline-hidden focus:border-slack-green transition"
+                className="w-full rounded-xl px-3 py-2 text-sm border focus:outline-none transition"
+                style={{
+                  backgroundColor: 'var(--theme-bg-surface-hover)',
+                  borderColor: 'var(--theme-border)',
+                  color: 'var(--theme-text-primary)',
+                }}
               />
             </div>
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-between pt-3 border-t border-gray-800">
+          <div
+            className="flex items-center justify-between pt-3 border-t"
+            style={{ borderColor: 'var(--theme-border)' }}
+          >
             {isEditing ? (
               <button
                 type="button"
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="px-3.5 py-2 text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition flex items-center gap-1.5"
+                className="px-3.5 py-2 text-xs font-medium text-red-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition flex items-center gap-1.5"
               >
                 <Trash2 size={15} />
                 {isDeleting ? 'Deleting...' : 'Delete Ticket'}
@@ -294,14 +389,19 @@ export const TicketModal: React.FC<TicketModalProps> = ({
                 type="button"
                 onClick={onClose}
                 disabled={isSubmitting}
-                className="px-4 py-2 text-sm text-gray-400 hover:text-white transition"
+                className="px-4 py-2 text-sm hover:opacity-80 transition"
+                style={{ color: 'var(--theme-text-muted)' }}
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting || !title.trim()}
-                className="px-5 py-2.5 bg-slack-green hover:bg-[#008a65] disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-lg transition flex items-center gap-2"
+                className="px-5 py-2.5 disabled:opacity-50 text-sm font-semibold rounded-xl shadow-lg transition flex items-center gap-2 cursor-pointer active:scale-95"
+                style={{
+                  backgroundColor: 'var(--theme-primary)',
+                  color: 'var(--theme-primary-text)',
+                }}
               >
                 {isSubmitting ? 'Saving...' : isEditing ? 'Save Changes' : 'Create Ticket'}
               </button>
