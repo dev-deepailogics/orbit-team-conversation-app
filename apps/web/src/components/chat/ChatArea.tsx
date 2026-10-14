@@ -190,12 +190,37 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     };
   }, [showMoreMenu]);
 
-  // Reset scroll and load state when channel changes
+  // Reset scroll and load state when channel changes & auto-focus message input
   useEffect(() => {
     isInitialLoadRef.current = true;
     previousMessagesCountRef.current = 0;
     previousScrollHeightRef.current = 0;
+
+    const timer = setTimeout(() => {
+      editorRef.current?.focus();
+    }, 100);
+    return () => clearTimeout(timer);
   }, [channel.id]);
+
+  // Auto-focus message input when switching to messages view
+  useEffect(() => {
+    if (activeView === 'messages') {
+      const timer = setTimeout(() => {
+        editorRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [activeView]);
+
+  // Auto-focus message input when quoting a message
+  useEffect(() => {
+    if (replyingToMessage) {
+      const timer = setTimeout(() => {
+        editorRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [replyingToMessage]);
 
   useEffect(() => {
     // 1. Initial load of channel messages: jump straight to bottom
@@ -1332,7 +1357,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
           {/* Live WYSIWYG In-Place Rich Text Editor */}
           <RichTextEditor
+            key={channel.id}
             ref={editorRef}
+            autoFocus={true}
             placeholder={
               isDragOver
                 ? 'Drop file here to upload to channel...'

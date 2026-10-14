@@ -43,6 +43,7 @@ interface RichTextEditorProps {
   minHeight?: string;
   className?: string;
   mentionUsers?: MentionUser[];
+  autoFocus?: boolean;
 }
 
 function getInlineFormattingParent(node: Node | null, rootEl: HTMLElement): HTMLElement | null {
@@ -207,6 +208,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       minHeight = '60px',
       className = '',
       mentionUsers = [],
+      autoFocus = false,
     },
     ref
   ) => {
@@ -367,9 +369,42 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         }
       },
       focus: () => {
-        editorRef.current?.focus();
+        const editor = editorRef.current;
+        if (!editor) return;
+        editor.focus();
+        try {
+          const sel = window.getSelection();
+          if (sel) {
+            const range = document.createRange();
+            range.selectNodeContents(editor);
+            range.collapse(false);
+            sel.removeAllRanges();
+            sel.addRange(range);
+          }
+        } catch (_) {}
       },
     }));
+
+    useEffect(() => {
+      if (autoFocus && editorRef.current) {
+        const timer = setTimeout(() => {
+          const editor = editorRef.current;
+          if (!editor) return;
+          editor.focus();
+          try {
+            const sel = window.getSelection();
+            if (sel) {
+              const range = document.createRange();
+              range.selectNodeContents(editor);
+              range.collapse(false);
+              sel.removeAllRanges();
+              sel.addRange(range);
+            }
+          } catch (_) {}
+        }, 50);
+        return () => clearTimeout(timer);
+      }
+    }, [autoFocus]);
 
     // Live Formatting Handlers
     const executeCommand = (command: string, value: string | undefined = undefined) => {

@@ -141,6 +141,24 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
     repliesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [replies]);
 
+  // Default to the reply input field when thread is opened or parent message changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      editorRef.current?.focus();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [parentMessage.id]);
+
+  // Focus reply input when quoting a message in thread
+  useEffect(() => {
+    if (replyingToMessage) {
+      const timer = setTimeout(() => {
+        editorRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [replyingToMessage]);
+
   const handleReaction = async (messageId: string, emoji: string) => {
     recordEmojiUsage(emoji);
     setTopEmojis(getTopEmojis(5));
@@ -795,7 +813,9 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
           )}
 
           <RichTextEditor
+            key={parentMessage.id}
             ref={editorRef}
+            autoFocus={true}
             placeholder={isParentAnon ? 'Reply anonymously...' : 'Reply...'}
             showToolbar={showFormatting}
             mentionUsers={mentionUsers}
