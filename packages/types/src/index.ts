@@ -294,9 +294,11 @@ export interface Project {
   notificationChannel?: Channel | null;
   columns?: ProjectColumn[];
   tickets?: Ticket[];
+  documents?: ProjectDocument[];
   _count?: {
     columns?: number;
     tickets?: number;
+    documents?: number;
   };
 }
 
@@ -327,6 +329,35 @@ export interface Ticket {
   creator?: UserProfile;
   assignee?: UserProfile | null;
   column?: ProjectColumn;
+}
+
+export interface ProjectDocumentShare {
+  id: string;
+  documentId: string;
+  userId: string;
+  permission: 'VIEW' | 'EDIT';
+  createdAt: string;
+  updatedAt: string;
+  user?: UserProfile;
+}
+
+export interface ProjectDocument {
+  id: string;
+  projectId: string;
+  workspaceId: string;
+  title: string;
+  content: string;
+  icon?: string | null;
+  coverImage?: string | null;
+  isPublicInProject: boolean;
+  createdById: string;
+  shareToken?: string | null;
+  isPublicLinkEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  creator?: UserProfile;
+  shares?: ProjectDocumentShare[];
+  project?: Project;
 }
 
 // ==========================================
@@ -376,8 +407,14 @@ export const SOCKET_EVENTS = {
   COLUMN_DELETE: 'column:delete',
   COLUMN_REORDER: 'column:reorder',
 
+  // Documents (Docs)
+  DOCUMENT_NEW: 'document:new',
+  DOCUMENT_UPDATE: 'document:update',
+  DOCUMENT_DELETE: 'document:delete',
+
   // Presence & Notifications
   USER_STATUS_CHANGE: 'user:status_change',
   NOTIFICATION_NEW: 'notification:new',
 } as const;
+
 

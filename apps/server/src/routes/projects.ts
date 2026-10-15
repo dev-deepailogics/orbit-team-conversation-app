@@ -63,6 +63,29 @@ const moveTicketSchema = z.object({
   orderIndex: z.number().int().default(0),
 });
 
+const createDocumentSchema = z.object({
+  title: z.string().min(1).max(255).default('Untitled Document'),
+  content: z.string().default(''),
+  icon: z.string().optional().default('📄'),
+  coverImage: z.string().optional().nullable(),
+  isPublicInProject: z.boolean().optional().default(false),
+});
+
+const updateDocumentSchema = z.object({
+  title: z.string().min(1).max(255).optional(),
+  content: z.string().optional(),
+  icon: z.string().optional().nullable(),
+  coverImage: z.string().optional().nullable(),
+  isPublicInProject: z.boolean().optional(),
+  isPublicLinkEnabled: z.boolean().optional(),
+});
+
+const shareDocumentSchema = z.object({
+  userId: z.string().uuid(),
+  permission: z.enum(['VIEW', 'EDIT']).default('EDIT'),
+});
+
+
 export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   // 1. List all projects in a workspace
   fastify.get('/workspaces/:workspaceId/projects', { preHandler: [fastify.authenticate] }, async (request, reply) => {
@@ -98,6 +121,7 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           select: {
             columns: true,
             tickets: true,
+            documents: true,
           },
         },
       },
@@ -179,6 +203,7 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           select: {
             columns: true,
             tickets: true,
+            documents: true,
           },
         },
       },
@@ -236,6 +261,13 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
                 },
               },
             },
+          },
+        },
+        _count: {
+          select: {
+            columns: true,
+            tickets: true,
+            documents: true,
           },
         },
       },
@@ -765,4 +797,480 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
     return reply.send({ success: true, message: 'Ticket deleted' });
   });
+
+  // ==========================================
+  // Document (Docs) Routes
+  // ==========================================
+
+  // 13. Public shareable document link endpoint
+  fastify.get('/documents/share/:shareToken', async (request, reply) => {
+    const { shareToken } = request.params as { shareToken: string };
+
+    const doc = await prisma.projectDocument.findUnique({
+      where: { shareToken },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+        project: {
+          select: {
+            id: true,
+            name: true,
+            icon: true,
+            color: true,
+          },
+        },
+      },
+    });
+
+    if (!doc || !doc.isPublicLinkEnabled) {
+      return reply.status(404).send({ error: 'Shared document not found or link is disabled' });
+    }
+
+    return reply.send(doc);
+  });
+
+  // 14. List documents in project (respects visibility rules)
+  fastify.get('/:projectId/documents', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { projectId } = request.params as { projectId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return reply.status(404).send({ error: 'Project not found' });
+
+    const membership = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: project.workspaceId, userId } },
+    });
+    if (!membership) return reply.status(403).send({ error: 'Unauthorized: not a workspace member' });
+
+    // Documents are visible if:
+    // 1. isPublicInProject is true
+    // 2. Or current user is the document creator
+    // 3. Or document has been shared with current user
+    const documents = await prisma.projectDocument.findMany({
+      where: {
+        projectId,
+        OR: [
+          { isPublicInProject: true },
+          { createdById: userId },
+          { shares: { some: { userId } } },
+        ],
+      },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+        shares: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                displayName: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    return reply.send(documents);
+  });
+
+  // 15. Create document in project
+  fastify.post('/:projectId/documents', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { projectId } = request.params as { projectId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return reply.status(404).send({ error: 'Project not found' });
+
+    const membership = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: project.workspaceId, userId } },
+    });
+    if (!membership) return reply.status(403).send({ error: 'Unauthorized: not a workspace member' });
+
+    const parseResult = createDocumentSchema.safeParse(request.body || {});
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.errors[0].message });
+    }
+
+    const { title, content, icon, coverImage, isPublicInProject } = parseResult.data;
+
+    const newDoc = await prisma.projectDocument.create({
+      data: {
+        projectId,
+        workspaceId: project.workspaceId,
+        title: title || 'Untitled Document',
+        content: content || '',
+        icon: icon || '📄',
+        coverImage: coverImage || null,
+        isPublicInProject: isPublicInProject ?? false,
+        createdById: userId,
+      },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+        shares: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                displayName: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    fastify.io.to(`workspace:${project.workspaceId}`).emit(SOCKET_EVENTS.DOCUMENT_NEW, newDoc);
+
+    return reply.status(201).send(newDoc);
+  });
+
+  // 16. Get single document by ID
+  fastify.get('/:projectId/documents/:documentId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { projectId, documentId } = request.params as { projectId: string; documentId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return reply.status(404).send({ error: 'Project not found' });
+
+    const doc = await prisma.projectDocument.findUnique({
+      where: { id: documentId },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+        shares: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                displayName: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!doc || doc.projectId !== projectId) {
+      return reply.status(404).send({ error: 'Document not found' });
+    }
+
+    // Permission check
+    const isCreator = doc.createdById === userId;
+    const isPublic = doc.isPublicInProject;
+    const isShared = doc.shares.some((s) => s.userId === userId);
+
+    if (!isCreator && !isPublic && !isShared) {
+      return reply.status(403).send({ error: 'You do not have permission to view this document' });
+    }
+
+    return reply.send(doc);
+  });
+
+  // 17. Update document
+  fastify.patch('/:projectId/documents/:documentId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { projectId, documentId } = request.params as { projectId: string; documentId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return reply.status(404).send({ error: 'Project not found' });
+
+    const membership = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: project.workspaceId, userId } },
+    });
+    if (!membership) return reply.status(403).send({ error: 'Unauthorized' });
+
+    const doc = await prisma.projectDocument.findUnique({
+      where: { id: documentId },
+      include: {
+        shares: true,
+      },
+    });
+
+    if (!doc || doc.projectId !== projectId) {
+      return reply.status(404).send({ error: 'Document not found' });
+    }
+
+    const isCreator = doc.createdById === userId;
+    const isWorkspaceAdmin = membership.role === 'OWNER' || membership.role === 'ADMIN';
+    const hasEditShare = doc.shares.some((s) => s.userId === userId && s.permission === 'EDIT');
+    const isPublicInProject = doc.isPublicInProject;
+
+    const canEditContent = isCreator || isWorkspaceAdmin || hasEditShare || isPublicInProject;
+    if (!canEditContent) {
+      return reply.status(403).send({ error: 'You do not have permission to edit this document' });
+    }
+
+    const parseResult = updateDocumentSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.errors[0].message });
+    }
+
+    const { title, content, icon, coverImage, isPublicInProject: nextPublic, isPublicLinkEnabled } = parseResult.data;
+
+    // Only creator or admin can change public project visibility or public link status
+    if ((nextPublic !== undefined || isPublicLinkEnabled !== undefined) && !isCreator && !isWorkspaceAdmin) {
+      return reply.status(403).send({ error: 'Only the document creator or admin can change sharing settings' });
+    }
+
+    const dataToUpdate: any = {};
+    if (title !== undefined) dataToUpdate.title = title;
+    if (content !== undefined) dataToUpdate.content = content;
+    if (icon !== undefined) dataToUpdate.icon = icon;
+    if (coverImage !== undefined) dataToUpdate.coverImage = coverImage;
+    if (nextPublic !== undefined) dataToUpdate.isPublicInProject = nextPublic;
+    if (isPublicLinkEnabled !== undefined) dataToUpdate.isPublicLinkEnabled = isPublicLinkEnabled;
+
+    const updated = await prisma.projectDocument.update({
+      where: { id: documentId },
+      data: dataToUpdate,
+      include: {
+        creator: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+        shares: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                displayName: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    fastify.io.to(`workspace:${project.workspaceId}`).emit(SOCKET_EVENTS.DOCUMENT_UPDATE, updated);
+
+    return reply.send(updated);
+  });
+
+  // 18. Delete document
+  fastify.delete('/:projectId/documents/:documentId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { projectId, documentId } = request.params as { projectId: string; documentId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return reply.status(404).send({ error: 'Project not found' });
+
+    const membership = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: project.workspaceId, userId } },
+    });
+    if (!membership) return reply.status(403).send({ error: 'Unauthorized' });
+
+    const doc = await prisma.projectDocument.findUnique({ where: { id: documentId } });
+    if (!doc || doc.projectId !== projectId) {
+      return reply.status(404).send({ error: 'Document not found' });
+    }
+
+    const isCreator = doc.createdById === userId;
+    const isWorkspaceAdmin = membership.role === 'OWNER' || membership.role === 'ADMIN';
+
+    if (!isCreator && !isWorkspaceAdmin) {
+      return reply.status(403).send({ error: 'Only the creator or workspace admin can delete this document' });
+    }
+
+    await prisma.projectDocument.delete({ where: { id: documentId } });
+
+    fastify.io.to(`workspace:${project.workspaceId}`).emit(SOCKET_EVENTS.DOCUMENT_DELETE, {
+      documentId,
+      projectId,
+    });
+
+    return reply.send({ success: true, message: 'Document deleted' });
+  });
+
+  // 19. Add or update user share on document
+  fastify.post('/:projectId/documents/:documentId/shares', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { projectId, documentId } = request.params as { projectId: string; documentId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return reply.status(404).send({ error: 'Project not found' });
+
+    const membership = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: project.workspaceId, userId } },
+    });
+    if (!membership) return reply.status(403).send({ error: 'Unauthorized' });
+
+    const doc = await prisma.projectDocument.findUnique({ where: { id: documentId } });
+    if (!doc || doc.projectId !== projectId) {
+      return reply.status(404).send({ error: 'Document not found' });
+    }
+
+    const isCreator = doc.createdById === userId;
+    const isWorkspaceAdmin = membership.role === 'OWNER' || membership.role === 'ADMIN';
+    if (!isCreator && !isWorkspaceAdmin) {
+      return reply.status(403).send({ error: 'Only the creator or admin can manage document sharing' });
+    }
+
+    const parseResult = shareDocumentSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.errors[0].message });
+    }
+
+    const { userId: targetUserId, permission } = parseResult.data;
+
+    // Verify target user is in the same workspace
+    const targetMember = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: project.workspaceId, userId: targetUserId } },
+    });
+    if (!targetMember) {
+      return reply.status(400).send({ error: 'Selected user is not a member of this workspace' });
+    }
+
+    await prisma.projectDocumentShare.upsert({
+      where: {
+        documentId_userId: {
+          documentId,
+          userId: targetUserId,
+        },
+      },
+      update: {
+        permission,
+      },
+      create: {
+        documentId,
+        userId: targetUserId,
+        permission,
+      },
+    });
+
+    const updatedDoc = await prisma.projectDocument.findUnique({
+      where: { id: documentId },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+        shares: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                displayName: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    fastify.io.to(`workspace:${project.workspaceId}`).emit(SOCKET_EVENTS.DOCUMENT_UPDATE, updatedDoc);
+
+    return reply.send(updatedDoc);
+  });
+
+  // 20. Remove user share from document
+  fastify.delete('/:projectId/documents/:documentId/shares/:targetUserId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { projectId, documentId, targetUserId } = request.params as {
+      projectId: string;
+      documentId: string;
+      targetUserId: string;
+    };
+    const userId = (request.user as { id: string }).id;
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return reply.status(404).send({ error: 'Project not found' });
+
+    const membership = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: project.workspaceId, userId } },
+    });
+    if (!membership) return reply.status(403).send({ error: 'Unauthorized' });
+
+    const doc = await prisma.projectDocument.findUnique({ where: { id: documentId } });
+    if (!doc || doc.projectId !== projectId) {
+      return reply.status(404).send({ error: 'Document not found' });
+    }
+
+    const isCreator = doc.createdById === userId;
+    const isWorkspaceAdmin = membership.role === 'OWNER' || membership.role === 'ADMIN';
+    if (!isCreator && !isWorkspaceAdmin && userId !== targetUserId) {
+      return reply.status(403).send({ error: 'Unauthorized to remove this share' });
+    }
+
+    await prisma.projectDocumentShare.deleteMany({
+      where: {
+        documentId,
+        userId: targetUserId,
+      },
+    });
+
+    const updatedDoc = await prisma.projectDocument.findUnique({
+      where: { id: documentId },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+        shares: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                displayName: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    fastify.io.to(`workspace:${project.workspaceId}`).emit(SOCKET_EVENTS.DOCUMENT_UPDATE, updatedDoc);
+
+    return reply.send(updatedDoc);
+  });
 };
+

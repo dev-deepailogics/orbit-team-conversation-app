@@ -1,11 +1,18 @@
 import { create } from 'zustand';
-import { Project, ProjectColumn, Ticket } from '@orbit/types';
+import { Project, ProjectColumn, Ticket, ProjectDocument } from '@orbit/types';
+
+export type ProjectSection = 'board' | 'docs' | string;
 
 interface ProjectState {
   projects: Project[];
   currentProject: Project | null;
   activeView: 'channel' | 'project';
+  activeSection: ProjectSection;
   isLoadingProject: boolean;
+
+  // Documents
+  documents: ProjectDocument[];
+  currentDocument: ProjectDocument | null;
 
   setProjects: (projects: Project[]) => void;
   addProject: (project: Project) => void;
@@ -13,7 +20,15 @@ interface ProjectState {
   removeProject: (projectId: string) => void;
   setCurrentProject: (project: Project | null) => void;
   setActiveView: (view: 'channel' | 'project') => void;
+  setActiveSection: (section: ProjectSection) => void;
   setIsLoadingProject: (loading: boolean) => void;
+
+  // Document actions
+  setDocuments: (documents: ProjectDocument[]) => void;
+  setCurrentDocument: (doc: ProjectDocument | null) => void;
+  addDocument: (doc: ProjectDocument) => void;
+  updateDocument: (doc: ProjectDocument) => void;
+  removeDocument: (docId: string) => void;
 
   // Real-time Column mutations on currentProject
   setColumns: (columns: ProjectColumn[]) => void;
@@ -34,14 +49,20 @@ export const useProjectStore = create<ProjectState>((set) => ({
   projects: [],
   currentProject: null,
   activeView: 'channel',
+  activeSection: 'board',
   isLoadingProject: false,
+  documents: [],
+  currentDocument: null,
 
   reset: () =>
     set({
       projects: [],
       currentProject: null,
       activeView: 'channel',
+      activeSection: 'board',
       isLoadingProject: false,
+      documents: [],
+      currentDocument: null,
     }),
 
   setProjects: (projects) => set({ projects }),
@@ -75,7 +96,31 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
   setActiveView: (view) => set({ activeView: view }),
 
+  setActiveSection: (section) => set({ activeSection: section }),
+
   setIsLoadingProject: (loading) => set({ isLoadingProject: loading }),
+
+  setDocuments: (documents) => set({ documents }),
+
+  setCurrentDocument: (doc) => set({ currentDocument: doc }),
+
+  addDocument: (doc) =>
+    set((state) => ({
+      documents: [doc, ...state.documents.filter((d) => d.id !== doc.id)],
+      currentDocument: state.currentDocument?.id === doc.id ? doc : state.currentDocument,
+    })),
+
+  updateDocument: (doc) =>
+    set((state) => ({
+      documents: state.documents.map((d) => (d.id === doc.id ? { ...d, ...doc } : d)),
+      currentDocument: state.currentDocument?.id === doc.id ? { ...state.currentDocument, ...doc } : state.currentDocument,
+    })),
+
+  removeDocument: (docId) =>
+    set((state) => ({
+      documents: state.documents.filter((d) => d.id !== docId),
+      currentDocument: state.currentDocument?.id === docId ? null : state.currentDocument,
+    })),
 
   setColumns: (columns) =>
     set((state) => {

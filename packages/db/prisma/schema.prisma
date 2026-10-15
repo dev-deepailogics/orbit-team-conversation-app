@@ -73,6 +73,8 @@ model User {
   createdProjects   Project[]         @relation("ProjectCreator")
   createdTickets    Ticket[]          @relation("TicketCreator")
   assignedTickets   Ticket[]          @relation("TicketAssignee")
+  createdDocuments  ProjectDocument[] @relation("DocumentCreator")
+  documentShares    ProjectDocumentShare[]
 
   @@index([email])
   @@index([username])
@@ -94,6 +96,7 @@ model Workspace {
   members     WorkspaceMember[]
   channels    Channel[]
   projects    Project[]
+  documents   ProjectDocument[]
   bots        BotApp[]
   webhooks    Webhook[]
   commands    SlashCommand[]
@@ -355,6 +358,7 @@ model Project {
   notificationChannel Channel?  @relation("ProjectNotificationChannel", fields: [notificationChannelId], references: [id], onDelete: SetNull)
   columns     ProjectColumn[]
   tickets     Ticket[]
+  documents   ProjectDocument[]
 
   @@index([workspaceId])
   @@index([createdById])
@@ -399,3 +403,46 @@ model Ticket {
   @@index([columnId, orderIndex])
   @@index([assigneeId])
 }
+
+model ProjectDocument {
+  id                  String                 @id @default(uuid())
+  projectId           String
+  workspaceId         String
+  title               String                 @default("Untitled")
+  content             String                 @db.Text
+  icon                String?                @default("📄")
+  coverImage          String?
+  isPublicInProject   Boolean                @default(false)
+  createdById         String
+  shareToken          String?                @unique @default(uuid())
+  isPublicLinkEnabled Boolean                @default(false)
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  project             Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workspace           Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  creator             User                   @relation("DocumentCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  shares              ProjectDocumentShare[]
+
+  @@index([projectId])
+  @@index([workspaceId])
+  @@index([createdById])
+  @@index([shareToken])
+}
+
+model ProjectDocumentShare {
+  id          String          @id @default(uuid())
+  documentId  String
+  userId      String
+  permission  String          @default("EDIT") // "VIEW" | "EDIT"
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  document    ProjectDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, userId])
+  @@index([documentId])
+  @@index([userId])
+}
+

@@ -15,6 +15,8 @@ import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
 import { useProjectStore } from '../../stores/projectStore';
 import { TicketModal } from './TicketModal';
+import { ProjectViewSwitcher } from './ProjectViewSwitcher';
+import { ProjectDocsView } from './ProjectDocsView';
 import {
   Plus,
   Search,
@@ -90,6 +92,9 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
     updateTicket,
     removeTicket,
     moveTicket,
+    activeSection,
+    setActiveSection,
+    documents,
   } = useProjectStore();
 
   const project = currentProject || initialProject;
@@ -459,15 +464,6 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
             <div className="truncate">
               <h1 className="text-sm font-bold truncate flex items-center gap-2" style={{ color: 'var(--theme-text-primary)' }}>
                 {project.name}
-                <span
-                  className="text-[11px] font-normal px-2 py-0.5 rounded-full"
-                  style={{
-                    backgroundColor: 'var(--theme-bg-surface-hover)',
-                    color: 'var(--theme-text-muted)',
-                  }}
-                >
-                  {totalTickets} {totalTickets === 1 ? 'ticket' : 'tickets'}
-                </span>
               </h1>
               {project.description && (
                 <p className="text-[11px] truncate hidden md:block" style={{ color: 'var(--theme-text-muted)' }}>
@@ -476,85 +472,101 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
               )}
             </div>
           </div>
+
+          <span className="w-px h-5 hidden sm:inline" style={{ backgroundColor: 'var(--theme-border)' }} />
+
+          {/* View Switcher: Board vs Docs */}
+          <div className="flex items-center">
+            <ProjectViewSwitcher
+              activeSection={activeSection}
+              onSectionChange={(sec) => setActiveSection(sec as any)}
+              ticketCount={totalTickets}
+              docCount={documents.length}
+            />
+          </div>
         </div>
 
         {/* Right Action Bar */}
         <div className="flex items-center gap-2">
-          {/* Notification Channel Selector */}
-          <div
-            className="flex items-center gap-1.5 border rounded-lg px-2.5 py-1 text-xs"
-            style={{
-              backgroundColor: 'var(--theme-bg-surface-hover)',
-              borderColor: 'var(--theme-border)',
-              color: 'var(--theme-text-primary)',
-            }}
-            title="Channel where Orbit Bot broadcasts activity updates"
-          >
-            <Bell size={13} className="shrink-0" style={{ color: 'var(--theme-primary)' }} />
-            <span className="text-[11px] hidden xl:inline" style={{ color: 'var(--theme-text-muted)' }}>Notify:</span>
-            <select
-              value={project.notificationChannelId || ''}
-              onChange={(e) => handleUpdateNotificationChannel(e.target.value)}
-              className="bg-transparent text-xs font-semibold focus:outline-none cursor-pointer max-w-[120px] sm:max-w-[150px] truncate"
-              style={{ color: 'var(--theme-text-primary)' }}
-            >
-              {channels && channels.length > 0 ? (
-                channels.map((ch) => (
-                  <option
-                    key={ch.id}
-                    value={ch.id}
-                    style={{
-                      backgroundColor: 'var(--theme-bg-surface)',
-                      color: 'var(--theme-text-primary)',
-                    }}
-                  >
-                    #{ch.name}
-                  </option>
-                ))
-              ) : (
-                <option
-                  value=""
-                  style={{
-                    backgroundColor: 'var(--theme-bg-surface)',
-                    color: 'var(--theme-text-primary)',
-                  }}
+          {activeSection === 'board' && (
+            <>
+              {/* Notification Channel Selector */}
+              <div
+                className="flex items-center gap-1.5 border rounded-lg px-2.5 py-1 text-xs"
+                style={{
+                  backgroundColor: 'var(--theme-bg-surface-hover)',
+                  borderColor: 'var(--theme-border)',
+                  color: 'var(--theme-text-primary)',
+                }}
+                title="Channel where Orbit Bot broadcasts activity updates"
+              >
+                <Bell size={13} className="shrink-0" style={{ color: 'var(--theme-primary)' }} />
+                <span className="text-[11px] hidden xl:inline" style={{ color: 'var(--theme-text-muted)' }}>Notify:</span>
+                <select
+                  value={project.notificationChannelId || ''}
+                  onChange={(e) => handleUpdateNotificationChannel(e.target.value)}
+                  className="bg-transparent text-xs font-semibold focus:outline-none cursor-pointer max-w-[120px] sm:max-w-[150px] truncate"
+                  style={{ color: 'var(--theme-text-primary)' }}
                 >
-                  #general
-                </option>
-              )}
-            </select>
-          </div>
+                  {channels && channels.length > 0 ? (
+                    channels.map((ch) => (
+                      <option
+                        key={ch.id}
+                        value={ch.id}
+                        style={{
+                          backgroundColor: 'var(--theme-bg-surface)',
+                          color: 'var(--theme-text-primary)',
+                        }}
+                      >
+                        #{ch.name}
+                      </option>
+                    ))
+                  ) : (
+                    <option
+                      value=""
+                      style={{
+                        backgroundColor: 'var(--theme-bg-surface)',
+                        color: 'var(--theme-text-primary)',
+                      }}
+                    >
+                      #general
+                    </option>
+                  )}
+                </select>
+              </div>
 
-          {/* New Ticket Button */}
-          <button
-            onClick={() => {
-              setEditingTicket(null);
-              setTargetColumnId(columns[0]?.id);
-              setShowTicketModal(true);
-            }}
-            className="px-3 py-1.5 text-xs font-semibold rounded-lg shadow transition flex items-center gap-1.5 active:scale-95"
-            style={{
-              backgroundColor: 'var(--theme-primary)',
-              color: 'var(--theme-primary-text)',
-            }}
-          >
-            <Plus size={15} />
-            <span>New Ticket</span>
-          </button>
+              {/* New Ticket Button */}
+              <button
+                onClick={() => {
+                  setEditingTicket(null);
+                  setTargetColumnId(columns[0]?.id);
+                  setShowTicketModal(true);
+                }}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg shadow transition flex items-center gap-1.5 active:scale-95"
+                style={{
+                  backgroundColor: 'var(--theme-primary)',
+                  color: 'var(--theme-primary-text)',
+                }}
+              >
+                <Plus size={15} />
+                <span>New Ticket</span>
+              </button>
 
-          {/* Add Column Button */}
-          <button
-            onClick={() => setShowAddColumn(true)}
-            className="px-3 py-1.5 text-xs font-semibold rounded-lg border transition flex items-center gap-1.5 active:scale-95 hidden sm:flex hover:bg-black/5 dark:hover:bg-white/10"
-            style={{
-              backgroundColor: 'var(--theme-bg-surface-hover)',
-              borderColor: 'var(--theme-border)',
-              color: 'var(--theme-text-primary)',
-            }}
-          >
-            <Columns3 size={15} />
-            <span>Add Column</span>
-          </button>
+              {/* Add Column Button */}
+              <button
+                onClick={() => setShowAddColumn(true)}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg border transition flex items-center gap-1.5 active:scale-95 hidden sm:flex hover:bg-black/5 dark:hover:bg-white/10"
+                style={{
+                  backgroundColor: 'var(--theme-bg-surface-hover)',
+                  borderColor: 'var(--theme-border)',
+                  color: 'var(--theme-text-primary)',
+                }}
+              >
+                <Columns3 size={15} />
+                <span>Add Column</span>
+              </button>
+            </>
+          )}
 
           {/* Delete Project */}
           <button
@@ -568,7 +580,9 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
         </div>
       </div>
 
-      {/* Filter & Search Bar */}
+      {activeSection === 'board' ? (
+        <>
+          {/* Filter & Search Bar */}
       <div
         className="h-11 border-b px-4 sm:px-6 flex items-center justify-between gap-3 text-xs shrink-0 overflow-x-auto scrollbar-none"
         style={{
@@ -1024,6 +1038,14 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
           </button>
         )}
       </div>
+      </>
+      ) : (
+        <ProjectDocsView
+          project={project}
+          currentUser={currentUser}
+          members={members}
+        />
+      )}
 
       {/* Ticket Create / Edit Modal */}
       {showTicketModal && (
