@@ -173,15 +173,35 @@ export default function AppDashboard() {
       setMembers(res.data.members || []);
 
       // Load Workspace Projects
+      let projectsData: Project[] = [];
       try {
         const projRes = await api.get(`/api/projects/workspaces/${workspace.id}/projects`);
-        setProjects(projRes.data || []);
+        projectsData = projRes.data || [];
+        setProjects(projectsData);
       } catch (pErr) {
         console.error('Failed to load projects', pErr);
         setProjects([]);
       }
 
-      if (res.data.channels && res.data.channels.length > 0) {
+      let targetChannel: Channel | null = null;
+      let targetProject: Project | null = null;
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlChId = urlParams.get('channelId');
+        const urlProjId = urlParams.get('projectId');
+        if (urlChId && res.data.channels) {
+          targetChannel = res.data.channels.find((c: Channel) => c.id === urlChId) || null;
+        }
+        if (urlProjId && projectsData.length > 0) {
+          targetProject = projectsData.find((p: Project) => p.id === urlProjId) || null;
+        }
+      }
+
+      if (targetProject) {
+        handleSelectProject(targetProject);
+      } else if (targetChannel) {
+        handleSelectChannel(targetChannel);
+      } else if (res.data.channels && res.data.channels.length > 0) {
         handleSelectChannel(res.data.channels[0]);
       }
     } catch (err) {
@@ -217,6 +237,9 @@ export default function AppDashboard() {
     setCurrentChannel(channel);
     setHasMoreMessages(false);
     setNextCursor(null);
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', `?channelId=${channel.id}`);
+    }
     try {
       const res = await api.get(`/api/channels/${channel.id}/messages?limit=30`);
       if (Array.isArray(res.data)) {
@@ -238,6 +261,9 @@ export default function AppDashboard() {
   // 4b. Handle Project Selection
   const handleSelectProject = (project: Project) => {
     setCurrentProject(project);
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', `?projectId=${project.id}`);
+    }
   };
 
   // 4a. Load Older Messages (Cursor-based Pagination)
@@ -352,7 +378,15 @@ export default function AppDashboard() {
         DesktopNotifier.send(
           msg.user?.displayName || msg.bot?.name || 'New Message',
           msg.content,
-          msg.user?.avatarUrl || msg.bot?.avatarUrl
+          msg.user?.avatarUrl || msg.bot?.avatarUrl,
+          () => {
+            window.focus();
+            const allChannels = useChatStore.getState().channels;
+            const targetChannel = allChannels.find((c) => c.id === msg.channelId);
+            if (targetChannel) {
+              handleSelectChannel(targetChannel);
+            }
+          }
         );
       }
 
