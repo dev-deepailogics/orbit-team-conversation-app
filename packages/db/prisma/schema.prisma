@@ -65,6 +65,7 @@ model User {
   messages          Message[]
   reactions         Reaction[]
   notifications     Notification[]
+  pushSubscriptions PushSubscription[]
   huddlesHosted     Huddle[]          @relation("HuddleHost")
   createdBots       BotApp[]          @relation("BotCreator")
   createdWebhooks   Webhook[]         @relation("WebhookCreator")
@@ -446,3 +447,17 @@ model ProjectDocumentShare {
   @@index([userId])
 }
 
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}

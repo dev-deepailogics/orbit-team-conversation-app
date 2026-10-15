@@ -2,6 +2,8 @@ import './globals.css';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
+  manifest: '/manifest.webmanifest',
+  icons: { icon: '/icon-192.png', apple: '/icon-192.png' },
   title: 'Orbit - Team Communication Platform',
   description: 'Self-hosted Slack alternative with channels, direct messages, huddle audio/video calls, and bot integrations.',
 };

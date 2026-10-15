@@ -44,6 +44,9 @@ services:
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-API_KEY_ORBIT}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-orbit_livekit_secret_key_change_in_production}
       LIVEKIT_URL: http://livekit:7880
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@example.com}
     depends_on:
       postgres:
         condition: service_healthy

@@ -13,6 +13,7 @@ import { getSocket } from '../lib/socket';
 
 import { sounds } from '../lib/sound';
 import { DesktopNotifier } from '../lib/notifications';
+import { registerPush } from '../lib/push';
 import { useThemeStore } from '../stores/themeStore';
 
 // Components
@@ -366,7 +367,9 @@ export default function AppDashboard() {
     socket.emit('user:join', user.id);
 
     // Request desktop notification permission
-    DesktopNotifier.requestPermission();
+    DesktopNotifier.requestPermission().then((granted) => {
+      if (granted) registerPush();
+    });
 
     const onNewMessage = (msg: any) => {
       const activeChannel = currentChannelRef.current;
