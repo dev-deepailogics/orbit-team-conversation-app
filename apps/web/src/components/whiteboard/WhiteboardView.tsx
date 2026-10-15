@@ -215,6 +215,7 @@ const STICKY_COLORS = [
   { bg: '#BBF7D0', text: '#14532D', border: '#4ADE80', label: 'Green' },
   { bg: '#FBCFE8', text: '#831843', border: '#F472B6', label: 'Pink' },
   { bg: '#DDD6FE', text: '#4C1D95', border: '#A78BFA', label: 'Purple' },
+  { bg: '#FED7AA', text: '#7C2D12', border: '#FB923C', label: 'Orange' },
 ];
 
 const FONT_SIZES = [
@@ -237,6 +238,16 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
   const [activeColor, setActiveColor] = useState<string>('#007A5A');
   const [strokeWidth, setStrokeWidth] = useState<number>(3);
   const [stickyColorIdx, setStickyColorIdx] = useState<number>(0);
+  const [fontLoaded, setFontLoaded] = useState<boolean>(false);
+
+  // Detect when custom handwriting fonts (Caveat, etc.) finish loading to redraw canvas
+  useEffect(() => {
+    if (typeof document !== 'undefined' && document.fonts) {
+      document.fonts.ready.then(() => {
+        setFontLoaded(true);
+      });
+    }
+  }, []);
 
   const [elements, setElements] = useState<CanvasElement[]>([]);
   const [history, setHistory] = useState<CanvasElement[][]>([]);
@@ -333,6 +344,24 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       channelId: channel.id,
       data: { elements: newElements },
     });
+  };
+
+  // Remove / Delete Element (Sticky Note, Text, Shape)
+  const handleDeleteElement = (idToDelete: string) => {
+    if (editingIdRef.current === idToDelete || editingId === idToDelete) {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+      editingIdRef.current = null;
+      setEditingId(null);
+      setEditText('');
+    }
+    if (selectedElementId === idToDelete) {
+      setSelectedElementId(null);
+    }
+    const next = elements.filter((el) => el.id !== idToDelete);
+    commitElements(next);
   };
 
   // Start in-place editing
@@ -553,8 +582,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         setIsSpacePressed(true);
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedElementId) {
-          commitElements(elements.filter((el) => el.id !== selectedElementId));
-          setSelectedElementId(null);
+          handleDeleteElement(selectedElementId);
         }
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
         if (e.shiftKey) handleRedo();
@@ -714,26 +742,25 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     if (activeTool === 'eraser') {
       const clicked = findElementAtCoords(coords);
       if (clicked) {
-        commitElements(elements.filter((el) => el.id !== clicked.id));
-        if (selectedElementId === clicked.id) setSelectedElementId(null);
+        handleDeleteElement(clicked.id);
       }
       return;
     }
 
     // Direct in-place Sticky Note Creation
     if (activeTool === 'sticky') {
-      const stickyColor = STICKY_COLORS[stickyColorIdx];
+      const stickyColor = STICKY_COLORS[stickyColorIdx] || STICKY_COLORS[0];
       const newSticky: CanvasElement = {
         id: `sticky-${Date.now()}`,
         type: 'sticky',
-        x: coords.x - 85,
-        y: coords.y - 85,
-        width: 170,
-        height: 170,
+        x: coords.x - 90,
+        y: coords.y - 90,
+        width: 180,
+        height: 180,
         color: stickyColor.text,
         fillColor: stickyColor.bg,
         strokeWidth: 2,
-        fontSize: 14,
+        fontSize: 20,
         text: '',
       };
       commitElements([...elements, newSticky]);
@@ -913,7 +940,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     }
   };
 
-  // Double Click directly activates In-Place text editing
+  // Double Click directly activates In-Place text editing or creates a new sticky note
   const handleDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const coords = getCanvasCoords(e);
     const clicked = findElementAtCoords(coords);
@@ -923,6 +950,25 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       }
       setSelectedElementId(clicked.id);
       startEditing(clicked.id, clicked.text || '');
+    } else if (!clicked) {
+      // Double click on empty space drops a pinned sticky note
+      const stickyColor = STICKY_COLORS[stickyColorIdx] || STICKY_COLORS[0];
+      const newSticky: CanvasElement = {
+        id: `sticky-${Date.now()}`,
+        type: 'sticky',
+        x: coords.x - 90,
+        y: coords.y - 90,
+        width: 180,
+        height: 180,
+        color: stickyColor.text,
+        fillColor: stickyColor.bg,
+        strokeWidth: 2,
+        fontSize: 20,
+        text: '',
+      };
+      commitElements([...elements, newSticky]);
+      setSelectedElementId(newSticky.id);
+      startEditing(newSticky.id, '');
     }
   };
 
@@ -985,6 +1031,14 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     e.stopPropagation();
     if (e.key === 'Escape') {
       finishEditing();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'Backspace' || e.key === 'Delete')) {
+      e.preventDefault();
+      const targetId = editingIdRef.current || editingId;
+      if (targetId) {
+        handleDeleteElement(targetId);
+      }
       return;
     }
     if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
@@ -1227,7 +1281,8 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       startY: number,
       defaultColor: string,
       baseSize: number,
-      isGlobalBold?: boolean
+      isGlobalBold?: boolean,
+      isHandwriting?: boolean
     ) => {
       const rawLines = (fullText || '').split('\n');
       let currentY = startY;
@@ -1295,8 +1350,11 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           }
 
           const fontStyle = isItalic ? 'italic' : 'normal';
-          const fontWeight = isBold ? 'bold' : '500';
-          ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px sans-serif`;
+          const fontWeight = isBold ? 'bold' : (isHandwriting ? '600' : '500');
+          const fontFamily = isHandwriting
+            ? "'Caveat', 'Kalam', 'Patrick Hand', 'Comic Sans MS', cursive, sans-serif"
+            : 'sans-serif';
+          ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
 
           const textWidth = ctx.measureText(text).width;
 
@@ -1334,7 +1392,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           currentX += textWidth + (isCode ? 4 : 0);
         });
 
-        currentY += fontSize * 1.35;
+        currentY += fontSize * (isHandwriting ? 1.25 : 1.35);
       });
     };
 
@@ -1398,30 +1456,76 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           ctx.stroke();
         }
       } else if (el.type === 'sticky') {
-        const w = el.width || 170;
-        const h = el.height || 170;
+        const w = el.width || 180;
+        const h = el.height || 180;
 
-        ctx.shadowColor = 'rgba(0,0,0,0.4)';
-        ctx.shadowBlur = 12;
-        ctx.shadowOffsetY = 5;
+        // Realistic paper drop shadow
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.32)';
+        ctx.shadowBlur = 14;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 6;
         ctx.fillStyle = el.fillColor || '#FEF08A';
         ctx.beginPath();
         ctx.roundRect(el.x, el.y, w, h, 8);
         ctx.fill();
+        ctx.restore();
 
-        ctx.shadowColor = 'transparent';
-        ctx.strokeStyle = el.color + '25';
+        // Subtle paper border
+        ctx.save();
+        ctx.strokeStyle = el.color + '22';
         ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(el.x, el.y, w, h, 8);
         ctx.stroke();
+
+        // Subtle top highlight strip for realistic paper look
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+        ctx.beginPath();
+        ctx.roundRect(el.x + 1, el.y + 1, w - 2, 18, [7, 7, 0, 0]);
+        ctx.fill();
+
+        // REALISTIC PUSH PIN (📌) AT TOP CENTER
+        const pinX = el.x + w / 2;
+        const pinY = el.y + 10;
+
+        // Pin shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+        ctx.beginPath();
+        ctx.ellipse(pinX + 2, pinY + 3, 5, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Pushpin Head - glossy red / coral gradient
+        const pinGrad = ctx.createRadialGradient(pinX - 1.5, pinY - 1.5, 1, pinX, pinY, 6.5);
+        pinGrad.addColorStop(0, '#FCA5A5');
+        pinGrad.addColorStop(0.35, '#EF4444');
+        pinGrad.addColorStop(1, '#991B1B');
+        ctx.fillStyle = pinGrad;
+        ctx.beginPath();
+        ctx.arc(pinX, pinY, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Metallic rim
+        ctx.strokeStyle = '#7F1D1D';
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+
+        // Specular white dot highlight on pin
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.beginPath();
+        ctx.arc(pinX - 1.8, pinY - 1.8, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
 
         if (!isCurrentlyEditing) {
           renderFormattedLines(
             el.text || '',
             el.x + 14,
-            el.y + 26,
+            el.y + 34,
             el.color || '#713F12',
-            el.fontSize || 14,
-            el.isBold
+            el.fontSize || 20,
+            el.isBold,
+            true
           );
         }
       } else if (el.type === 'text') {
@@ -1466,7 +1570,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     });
 
     ctx.restore();
-  }, [elements, currentElement, zoom, pan, selectedElementId, editingId]);
+  }, [elements, currentElement, zoom, pan, selectedElementId, editingId, fontLoaded]);
 
   // Export to PNG Image
   const handleExportImage = () => {
@@ -1697,14 +1801,28 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
                     updateSelectedFormatting({ fillColor: sc.bg, color: sc.text })
                   }
                   style={{ backgroundColor: sc.bg }}
-                  title={sc.label}
-                  className={`w-4 h-4 rounded-full border transition hover:scale-125 ${
-                    selectedElement.fillColor === sc.bg ? 'ring-2 ring-slack-green' : 'border-gray-600'
+                  title={`${sc.label} Note`}
+                  className={`w-4 h-4 rounded-md border transition hover:scale-125 relative ${
+                    selectedElement.fillColor === sc.bg ? 'ring-2 ring-slack-green' : 'border-gray-500/50'
                   }`}
-                />
+                >
+                  <span className="absolute top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-red-500" />
+                </button>
               ))}
             </>
           )}
+
+          {/* Delete Element / Sticky Note Button */}
+          <span className="w-px h-4 bg-gray-700 mx-0.5" />
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => handleDeleteElement(selectedElement.id)}
+            title="Delete (Delete / Backspace)"
+            className="flex items-center gap-1 px-1.5 py-1 rounded-lg text-xs font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/20 transition active:scale-95"
+          >
+            <Trash2 size={13} />
+            <span className="text-[11px] hidden sm:inline">Delete</span>
+          </button>
         </div>
       )}
 
@@ -1741,38 +1859,62 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
 
         <span className="w-px h-5 sm:h-6 bg-gray-700 mx-0.5 sm:mx-1 shrink-0" />
 
-        {/* Color Palette */}
-        <div className="flex items-center gap-1 sm:gap-1.5 px-0.5 sm:px-1 shrink-0">
-          {COLOR_PALETTE.map((c) => (
-            <button
-              key={c}
-              onClick={() => setActiveColor(c)}
-              style={{ backgroundColor: c }}
-              className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full transition transform hover:scale-125 border shrink-0 ${
-                activeColor === c ? 'ring-2 ring-slack-green ring-offset-2 ring-offset-[#1F2326]' : 'border-gray-700'
-              }`}
-            />
-          ))}
-        </div>
+        {/* Color Palette / Note Color Picker */}
+        {activeTool === 'sticky' ? (
+          <div className="flex items-center gap-1 sm:gap-1.5 px-0.5 sm:px-1 shrink-0">
+            {STICKY_COLORS.map((sc, idx) => (
+              <button
+                key={sc.label}
+                onClick={() => setStickyColorIdx(idx)}
+                style={{ backgroundColor: sc.bg }}
+                title={`${sc.label} Pinned Note`}
+                className={`w-5 h-5 sm:w-6 sm:h-6 rounded-md transition transform hover:scale-125 border shrink-0 relative ${
+                  stickyColorIdx === idx
+                    ? 'ring-2 ring-slack-green ring-offset-2 ring-offset-[#1F2326] scale-110'
+                    : 'border-gray-500/50'
+                }`}
+              >
+                <span className="absolute top-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-red-500 shadow-sm" />
+              </button>
+            ))}
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-1 sm:gap-1.5 px-0.5 sm:px-1 shrink-0">
+              {COLOR_PALETTE.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setActiveColor(c)}
+                  style={{ backgroundColor: c }}
+                  className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full transition transform hover:scale-125 border shrink-0 ${
+                    activeColor === c
+                      ? 'ring-2 ring-slack-green ring-offset-2 ring-offset-[#1F2326]'
+                      : 'border-gray-700'
+                  }`}
+                />
+              ))}
+            </div>
 
-        <span className="w-px h-5 sm:h-6 bg-gray-700 mx-0.5 sm:mx-1 shrink-0" />
+            <span className="w-px h-5 sm:h-6 bg-gray-700 mx-0.5 sm:mx-1 shrink-0" />
 
-        {/* Stroke Width Selector */}
-        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
-          {[2, 4, 8].map((w) => (
-            <button
-              key={w}
-              onClick={() => setStrokeWidth(w)}
-              className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-mono font-bold transition shrink-0 ${
-                strokeWidth === w
-                  ? 'bg-[#383F45] text-white border border-slack-green'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              {w}px
-            </button>
-          ))}
-        </div>
+            {/* Stroke Width Selector */}
+            <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+              {[2, 4, 8].map((w) => (
+                <button
+                  key={w}
+                  onClick={() => setStrokeWidth(w)}
+                  className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-mono font-bold transition shrink-0 ${
+                    strokeWidth === w
+                      ? 'bg-[#383F45] text-white border border-slack-green'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  {w}px
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Main Interactive Canvas */}
@@ -1799,13 +1941,46 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
         >
+          {/* Pinned pushpin indicator */}
+          {editingElement.type === 'sticky' && (
+            <div
+              className="absolute -top-2 left-1/2 -translate-x-1/2 pointer-events-none z-20 flex items-center justify-center"
+              style={{
+                width: `${16 * zoom}px`,
+                height: `${16 * zoom}px`,
+              }}
+            >
+              <div
+                className="w-4 h-4 rounded-full bg-gradient-to-br from-red-400 via-red-600 to-red-900 border border-red-950 shadow-md flex items-center justify-center relative"
+                style={{
+                  boxShadow: '1px 2px 5px rgba(0,0,0,0.4)',
+                }}
+              >
+                <div className="w-1.5 h-1.5 rounded-full bg-white/90 -translate-x-0.5 -translate-y-0.5" />
+              </div>
+            </div>
+          )}
+
+          {/* Delete Button on Note / Text */}
+          <button
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteElement(editingElement.id);
+            }}
+            title="Delete Note"
+            className="absolute -top-2.5 -right-2.5 z-30 w-6 h-6 rounded-full bg-red-600 hover:bg-red-500 text-white shadow-lg flex items-center justify-center transition transform hover:scale-110 active:scale-95 border border-red-800 cursor-pointer"
+          >
+            <Trash2 size={12} />
+          </button>
+
           <div
             ref={inlineContentEditableRef}
             contentEditable
             suppressContentEditableWarning
             data-placeholder={
               editingElement.type === 'sticky'
-                ? 'Brainstorm idea...'
+                ? 'Write note...'
                 : 'Type note or heading...'
             }
             onInput={() => {
@@ -1839,10 +2014,14 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
             onBlur={() => finishEditing()}
             onKeyDown={handleInlineKeyDown}
             style={{
-              width: `${(editingElement.width || (editingElement.type === 'sticky' ? 170 : 240)) * zoom}px`,
-              minHeight: `${(editingElement.height || (editingElement.type === 'sticky' ? 170 : 44)) * zoom}px`,
-              fontSize: `${(editingElement.fontSize || (editingElement.type === 'sticky' ? 14 : 18)) * zoom}px`,
+              width: `${(editingElement.width || (editingElement.type === 'sticky' ? 180 : 240)) * zoom}px`,
+              minHeight: `${(editingElement.height || (editingElement.type === 'sticky' ? 180 : 44)) * zoom}px`,
+              fontSize: `${(editingElement.fontSize || (editingElement.type === 'sticky' ? 20 : 18)) * zoom}px`,
               fontWeight: editingElement.isBold ? 'bold' : '500',
+              fontFamily:
+                editingElement.type === 'sticky'
+                  ? "'Caveat', 'Kalam', 'Patrick Hand', 'Comic Sans MS', cursive, sans-serif"
+                  : 'inherit',
               color:
                 editingElement.type === 'sticky'
                   ? editingElement.color
@@ -1856,17 +2035,62 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
                   ? `2px dashed ${editingElement.color}40`
                   : '1.5px dashed #007A5A',
               borderRadius: editingElement.type === 'sticky' ? '8px' : '6px',
-              padding: `${(editingElement.type === 'sticky' ? 12 : 8) * zoom}px`,
+              padding:
+                editingElement.type === 'sticky'
+                  ? `${28 * zoom}px ${14 * zoom}px ${14 * zoom}px ${14 * zoom}px`
+                  : `${8 * zoom}px`,
               outline: 'none',
-              lineHeight: 1.35,
+              lineHeight: editingElement.type === 'sticky' ? 1.25 : 1.35,
               display: 'block',
               overflowWrap: 'break-word',
               wordBreak: 'break-word',
             }}
-            className="font-sans shadow-2xl focus:ring-2 focus:ring-slack-green selection:bg-slack-green selection:text-white empty:before:content-[attr(data-placeholder)] empty:before:text-gray-500 [&_h1]:text-lg [&_h1]:font-bold [&_h2]:text-base [&_h2]:font-bold [&_b]:font-bold [&_strong]:font-bold [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_li]:leading-normal [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1"
+            className={`${
+              editingElement.type === 'sticky' ? 'font-handwriting' : 'font-sans'
+            } shadow-2xl focus:ring-2 focus:ring-slack-green selection:bg-slack-green selection:text-white empty:before:content-[attr(data-placeholder)] empty:before:text-gray-500 [&_h1]:text-lg [&_h1]:font-bold [&_h2]:text-base [&_h2]:font-bold [&_b]:font-bold [&_strong]:font-bold [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_li]:leading-normal [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1`}
           />
         </div>
       )}
+
+      {/* Quick Action Delete Badge on Selected Element */}
+      {selectedElement && !editingElement && (() => {
+        let rightX = selectedElement.x + (selectedElement.width || 180);
+        let topY = selectedElement.y;
+        if (selectedElement.type === 'pen' && selectedElement.points && selectedElement.points.length > 0) {
+          const xs = selectedElement.points.map((p) => p.x);
+          const ys = selectedElement.points.map((p) => p.y);
+          rightX = Math.max(...xs);
+          topY = Math.min(...ys);
+        } else if ((selectedElement.type === 'line' || selectedElement.type === 'arrow') && selectedElement.points && selectedElement.points.length > 0) {
+          const xs = selectedElement.points.map((p) => p.x);
+          const ys = selectedElement.points.map((p) => p.y);
+          rightX = Math.max(...xs);
+          topY = Math.min(...ys);
+        }
+
+        return (
+          <div
+            style={{
+              position: 'absolute',
+              left: `${rightX * zoom + pan.x - 10}px`,
+              top: `${topY * zoom + pan.y - 10}px`,
+              zIndex: 45,
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteElement(selectedElement.id);
+            }}
+          >
+            <button
+              title="Delete (Delete / Backspace)"
+              className="w-6 h-6 rounded-full bg-red-600 hover:bg-red-500 text-white shadow-lg flex items-center justify-center transition transform hover:scale-110 active:scale-95 border border-red-800 cursor-pointer"
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
+        );
+      })()}
 
       {/* Real-time Teammates' Cursors Overlay */}
       {Object.values(peerCursors).map((cursor) => (

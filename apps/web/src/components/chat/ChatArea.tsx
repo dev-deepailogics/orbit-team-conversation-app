@@ -554,27 +554,78 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           </button>
 
           {/* Chat vs Canvas Mode Switch */}
-          <div className="flex items-center bg-[#222529] border border-gray-700/80 rounded-lg p-0.5 ml-1 sm:ml-2 shrink-0">
+          <div
+            className="flex items-center gap-1 py-1 px-1 rounded-xl border bg-black/5 dark:bg-white/[0.04] ml-1 sm:ml-2 shrink-0"
+            style={{
+              borderColor: 'var(--theme-border)',
+            }}
+          >
             <button
               onClick={() => setActiveView('messages')}
-              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-xs font-medium transition ${
+              className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-xs transition-all duration-150 shrink-0 ${
                 activeView === 'messages'
-                  ? 'bg-[#383F45] text-white shadow font-semibold'
-                  : 'text-gray-400 hover:text-white'
+                  ? 'shadow-sm font-bold'
+                  : 'opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'
               }`}
+              style={{
+                backgroundColor:
+                  activeView === 'messages'
+                    ? 'var(--theme-bg-surface)'
+                    : 'transparent',
+                color:
+                  activeView === 'messages'
+                    ? 'var(--theme-text-primary)'
+                    : 'var(--theme-text-muted)',
+                borderWidth: activeView === 'messages' ? '1px' : '0px',
+                borderColor:
+                  activeView === 'messages'
+                    ? 'var(--theme-border)'
+                    : 'transparent',
+              }}
             >
-              <MessageSquare size={13} />
+              <MessageSquare
+                size={13}
+                style={{
+                  color:
+                    activeView === 'messages'
+                      ? 'var(--theme-primary)'
+                      : 'inherit',
+                }}
+              />
               <span>Chat</span>
             </button>
             <button
               onClick={() => setActiveView('whiteboard')}
-              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-xs font-medium transition ${
+              className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-xs transition-all duration-150 shrink-0 ${
                 activeView === 'whiteboard'
-                  ? 'bg-slack-green text-white shadow font-semibold'
-                  : 'text-gray-400 hover:text-white'
+                  ? 'shadow-sm font-bold'
+                  : 'opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'
               }`}
+              style={{
+                backgroundColor:
+                  activeView === 'whiteboard'
+                    ? 'var(--theme-bg-surface)'
+                    : 'transparent',
+                color:
+                  activeView === 'whiteboard'
+                    ? 'var(--theme-text-primary)'
+                    : 'var(--theme-text-muted)',
+                borderWidth: activeView === 'whiteboard' ? '1px' : '0px',
+                borderColor:
+                  activeView === 'whiteboard'
+                    ? 'var(--theme-border)'
+                    : 'transparent',
+              }}
             >
-              <PenTool size={13} />
+              <PenTool
+                size={13}
+                style={{
+                  color:
+                    activeView === 'whiteboard'
+                      ? 'var(--theme-primary)'
+                      : 'inherit',
+                }}
+              />
               <span>Canvas</span>
             </button>
           </div>
