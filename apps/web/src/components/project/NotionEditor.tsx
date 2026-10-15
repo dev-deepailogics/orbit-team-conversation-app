@@ -620,14 +620,14 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
       {/* ========================================== */}
       {!readOnly && (
         <div
-          className="border-b px-4 py-2 flex items-center justify-between gap-2 overflow-x-auto shrink-0 select-none shadow-sm"
+          className="border-b px-2 sm:px-4 py-1.5 sm:py-2 flex items-center justify-between gap-1 sm:gap-2 overflow-x-auto shrink-0 select-none shadow-sm scrollbar-none"
           style={{
             backgroundColor: 'var(--theme-bg-surface)',
             borderColor: 'var(--theme-border)',
           }}
         >
           {/* Quick Insert Blocks */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
             <span className="text-[10px] font-bold uppercase tracking-wider opacity-50 mr-1 hidden sm:inline"
               style={{ color: 'var(--theme-text-muted)' }}
             >
@@ -731,7 +731,7 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
             </button>
           </div>
 
-          <div className="text-[11px] opacity-60 font-medium hidden lg:flex items-center gap-1"
+          <div className="text-[11px] opacity-60 font-medium hidden lg:flex items-center gap-1 shrink-0"
             style={{ color: 'var(--theme-text-muted)' }}
           >
             <span>Type</span>
@@ -745,7 +745,7 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
       {/* 2. WYSIWYG Document Canvas Sheet           */}
       {/* ========================================== */}
       <div
-        className="flex-1 overflow-y-auto px-4 sm:px-8 md:px-12 py-6 space-y-1 relative"
+        className="flex-1 overflow-y-auto px-3 sm:px-8 md:px-12 py-4 sm:py-6 space-y-1 relative"
         onClick={() => {
           if (blocks.length === 0) {
             insertBlockAfter('', 'p');
@@ -755,7 +755,7 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
         {blocks.map((block, index) => (
           <div
             key={block.id}
-            className="group relative flex items-start gap-2 -ml-6 pl-6 py-0.5 rounded-lg transition-all"
+            className="group relative flex items-start gap-1.5 sm:gap-2 -ml-1 sm:-ml-6 pl-1 sm:pl-6 py-0.5 rounded-lg transition-all"
             onClick={() => {
               lastFocusedBlockRef.current = block.id;
               setActiveBlockId(block.id);

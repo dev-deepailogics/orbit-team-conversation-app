@@ -108,6 +108,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
   const [targetColumnId, setTargetColumnId] = useState<string | undefined>(undefined);
+  const [showProjectMenu, setShowProjectMenu] = useState(false);
 
   // Column creation & editing state
   const [showAddColumn, setShowAddColumn] = useState(false);
@@ -432,80 +433,246 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
         color: 'var(--theme-text-primary)',
       }}
     >
-      {/* Top Project Header */}
+      {/* Top Project Header (Focused on Project Identity & View Navigation) */}
       <div
-        className="h-14 border-b px-4 sm:px-6 flex items-center justify-between shrink-0"
+        className="h-14 border-b px-3 sm:px-6 flex items-center justify-between gap-2 shrink-0"
         style={{
           backgroundColor: 'var(--theme-bg-surface)',
           borderColor: 'var(--theme-border)',
         }}
       >
-        <div className="flex items-center gap-3 min-w-0">
+        {/* Left: Back Button + Project Identity */}
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
           <button
             onClick={onBackToChat}
             title="Back to Channel Chat"
-            className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition flex items-center gap-1 text-xs"
+            className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition flex items-center gap-1 text-xs shrink-0"
             style={{ color: 'var(--theme-text-muted)' }}
           >
             <ArrowLeft size={16} />
-            <span className="hidden sm:inline">Back</span>
+            <span className="hidden md:inline">Back</span>
           </button>
 
-          <span className="w-px h-5" style={{ backgroundColor: 'var(--theme-border)' }} />
+          <span className="w-px h-5 shrink-0" style={{ backgroundColor: 'var(--theme-border)' }} />
 
-          {/* Project Identity */}
-          <div className="flex items-center gap-2 truncate">
+          {/* Project Identity: Icon, Title & Description (Always visible on mobile) */}
+          <div className="flex items-center gap-2 min-w-0">
             <span
               style={{ backgroundColor: (project.color || '#007A5A') + '25' }}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-lg shrink-0"
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-sm sm:text-base shrink-0 shadow-sm"
             >
               {project.icon || '📋'}
             </span>
-            <div className="truncate">
-              <h1 className="text-sm font-bold truncate flex items-center gap-2" style={{ color: 'var(--theme-text-primary)' }}>
+            <div className="min-w-0">
+              <h1
+                className="text-xs sm:text-sm font-bold truncate leading-tight"
+                style={{ color: 'var(--theme-text-primary)' }}
+                title={project.name}
+              >
                 {project.name}
               </h1>
               {project.description && (
-                <p className="text-[11px] truncate hidden md:block" style={{ color: 'var(--theme-text-muted)' }}>
+                <p className="text-[10px] sm:text-[11px] truncate opacity-60 hidden md:block" style={{ color: 'var(--theme-text-muted)' }}>
                   {project.description}
                 </p>
               )}
             </div>
           </div>
-
-          <span className="w-px h-5 hidden sm:inline" style={{ backgroundColor: 'var(--theme-border)' }} />
-
-          {/* View Switcher: Board vs Docs */}
-          <div className="flex items-center">
-            <ProjectViewSwitcher
-              activeSection={activeSection}
-              onSectionChange={(sec) => setActiveSection(sec as any)}
-              ticketCount={totalTickets}
-              docCount={documents.length}
-            />
-          </div>
         </div>
 
-        {/* Right Action Bar */}
-        <div className="flex items-center gap-2">
-          {activeSection === 'board' && (
-            <>
+        {/* Right: View Switcher (Moved to right) + Project Options Menu */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <ProjectViewSwitcher
+            activeSection={activeSection}
+            onSectionChange={(sec) => setActiveSection(sec as any)}
+            ticketCount={totalTickets}
+            docCount={documents.length}
+          />
+
+          {/* Subtle kebab menu for project settings */}
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setShowProjectMenu(!showProjectMenu)}
+              title="Project Options"
+              className="p-1.5 sm:p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition"
+              style={{ color: 'var(--theme-text-muted)' }}
+            >
+              <MoreVertical size={16} />
+            </button>
+
+            {showProjectMenu && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowProjectMenu(false)}
+                />
+                <div
+                  className="absolute right-0 top-full mt-1.5 w-48 rounded-xl border shadow-xl z-50 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+                  style={{
+                    backgroundColor: 'var(--theme-bg-surface)',
+                    borderColor: 'var(--theme-border)',
+                  }}
+                >
+                  <div
+                    className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider opacity-50 border-b mb-1"
+                    style={{
+                      borderColor: 'var(--theme-border)',
+                      color: 'var(--theme-text-muted)',
+                    }}
+                  >
+                    Project Settings
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowProjectMenu(false);
+                      handleDeleteProject();
+                    }}
+                    className="w-full px-3 py-2 text-xs text-left flex items-center gap-2 text-red-500 hover:bg-red-500/10 transition"
+                  >
+                    <Trash2 size={14} />
+                    <span>Delete Project</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {activeSection === 'board' ? (
+        <>
+          {/* Dedicated Board Action & Filter Toolbar */}
+          <div
+            className="border-b px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2 sm:gap-3 text-xs shrink-0"
+            style={{
+              backgroundColor: 'var(--theme-bg-surface)',
+              borderColor: 'var(--theme-border)',
+            }}
+          >
+            {/* Left: Search & Filter Controls */}
+            <div className="flex items-center gap-2 flex-wrap flex-1 min-w-[200px]">
+              {/* Search input */}
+              <div className="relative flex-1 sm:flex-initial sm:w-60 min-w-[140px]">
+                <Search
+                  size={14}
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 opacity-50"
+                  style={{ color: 'var(--theme-text-muted)' }}
+                />
+                <input
+                  type="text"
+                  placeholder="Filter tickets..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full border rounded-lg pl-8 pr-7 py-1.5 text-xs focus:outline-none transition shadow-sm"
+                  style={{
+                    backgroundColor: 'var(--theme-bg-app)',
+                    borderColor: 'var(--theme-border)',
+                    color: 'var(--theme-text-primary)',
+                  }}
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 hover:opacity-100 opacity-60"
+                    style={{ color: 'var(--theme-text-muted)' }}
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+
+              {/* Priority Filter */}
+              <div
+                className="flex items-center gap-1 border rounded-lg px-2 py-1 shadow-sm"
+                style={{
+                  backgroundColor: 'var(--theme-bg-app)',
+                  borderColor: 'var(--theme-border)',
+                }}
+              >
+                <Filter size={12} className="opacity-60" style={{ color: 'var(--theme-text-muted)' }} />
+                <select
+                  value={filterPriority}
+                  onChange={(e) => setFilterPriority(e.target.value)}
+                  className="bg-transparent text-xs focus:outline-none cursor-pointer"
+                  style={{ color: 'var(--theme-text-primary)' }}
+                >
+                  <option value="ALL">All Priorities</option>
+                  <option value="URGENT">🔥 Urgent</option>
+                  <option value="HIGH">High</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="LOW">Low</option>
+                </select>
+              </div>
+
+              {/* Assignee Filter */}
+              <div
+                className="flex items-center gap-1 border rounded-lg px-2 py-1 shadow-sm"
+                style={{
+                  backgroundColor: 'var(--theme-bg-app)',
+                  borderColor: 'var(--theme-border)',
+                }}
+              >
+                <User size={12} className="opacity-60" style={{ color: 'var(--theme-text-muted)' }} />
+                <select
+                  value={filterAssignee}
+                  onChange={(e) => setFilterAssignee(e.target.value)}
+                  className="bg-transparent text-xs focus:outline-none cursor-pointer max-w-[100px] sm:max-w-[130px] truncate"
+                  style={{ color: 'var(--theme-text-primary)' }}
+                >
+                  <option value="ALL">All Assignees</option>
+                  <option value="ME">Assigned to Me</option>
+                  <option value="UNASSIGNED">Unassigned</option>
+                  {members.map((m) => {
+                    const u = m.user;
+                    if (!u) return null;
+                    return (
+                      <option key={u.id} value={u.id}>
+                        {u.displayName}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {/* Reset filter pill if active */}
+              {(searchQuery || filterPriority !== 'ALL' || filterAssignee !== 'ALL') && (
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setFilterPriority('ALL');
+                    setFilterAssignee('ALL');
+                  }}
+                  className="text-[11px] font-medium px-2 py-0.5 rounded-md hover:opacity-80 transition"
+                  style={{
+                    backgroundColor: 'var(--theme-bg-surface-hover)',
+                    color: 'var(--theme-text-muted)',
+                  }}
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+
+            {/* Right: Board Specific Actions (Channel broadcast, Add Column, New Ticket) */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
               {/* Notification Channel Selector */}
               <div
-                className="flex items-center gap-1.5 border rounded-lg px-2.5 py-1 text-xs"
+                className="flex items-center gap-1 border rounded-lg px-2 sm:px-2.5 py-1.5 text-xs shadow-sm"
                 style={{
-                  backgroundColor: 'var(--theme-bg-surface-hover)',
+                  backgroundColor: 'var(--theme-bg-app)',
                   borderColor: 'var(--theme-border)',
                   color: 'var(--theme-text-primary)',
                 }}
-                title="Channel where Orbit Bot broadcasts activity updates"
+                title="Channel where Orbit Bot broadcasts board activities"
               >
                 <Bell size={13} className="shrink-0" style={{ color: 'var(--theme-primary)' }} />
-                <span className="text-[11px] hidden xl:inline" style={{ color: 'var(--theme-text-muted)' }}>Notify:</span>
+                <span className="text-[11px] hidden xl:inline opacity-70" style={{ color: 'var(--theme-text-muted)' }}>
+                  Notify:
+                </span>
                 <select
                   value={project.notificationChannelId || ''}
                   onChange={(e) => handleUpdateNotificationChannel(e.target.value)}
-                  className="bg-transparent text-xs font-semibold focus:outline-none cursor-pointer max-w-[120px] sm:max-w-[150px] truncate"
+                  className="bg-transparent text-xs font-semibold focus:outline-none cursor-pointer max-w-[90px] sm:max-w-[140px] truncate"
                   style={{ color: 'var(--theme-text-primary)' }}
                 >
                   {channels && channels.length > 0 ? (
@@ -535,6 +702,20 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                 </select>
               </div>
 
+              {/* Add Column Button */}
+              <button
+                onClick={() => setShowAddColumn(true)}
+                className="px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg border transition flex items-center gap-1.5 active:scale-95 hover:bg-black/5 dark:hover:bg-white/10 shadow-sm"
+                style={{
+                  backgroundColor: 'var(--theme-bg-app)',
+                  borderColor: 'var(--theme-border)',
+                  color: 'var(--theme-text-primary)',
+                }}
+              >
+                <Columns3 size={14} />
+                <span className="hidden sm:inline">Add Column</span>
+              </button>
+
               {/* New Ticket Button */}
               <button
                 onClick={() => {
@@ -542,7 +723,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                   setTargetColumnId(columns[0]?.id);
                   setShowTicketModal(true);
                 }}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg shadow transition flex items-center gap-1.5 active:scale-95"
+                className="px-3 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg shadow-sm transition flex items-center gap-1.5 active:scale-95"
                 style={{
                   backgroundColor: 'var(--theme-primary)',
                   color: 'var(--theme-primary-text)',
@@ -551,122 +732,8 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                 <Plus size={15} />
                 <span>New Ticket</span>
               </button>
-
-              {/* Add Column Button */}
-              <button
-                onClick={() => setShowAddColumn(true)}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg border transition flex items-center gap-1.5 active:scale-95 hidden sm:flex hover:bg-black/5 dark:hover:bg-white/10"
-                style={{
-                  backgroundColor: 'var(--theme-bg-surface-hover)',
-                  borderColor: 'var(--theme-border)',
-                  color: 'var(--theme-text-primary)',
-                }}
-              >
-                <Columns3 size={15} />
-                <span>Add Column</span>
-              </button>
-            </>
-          )}
-
-          {/* Delete Project */}
-          <button
-            onClick={handleDeleteProject}
-            title="Delete Project Board"
-            className="p-1.5 hover:bg-red-500/10 rounded-lg transition"
-            style={{ color: 'var(--theme-text-muted)' }}
-          >
-            <Trash2 size={16} />
-          </button>
-        </div>
-      </div>
-
-      {activeSection === 'board' ? (
-        <>
-          {/* Filter & Search Bar */}
-      <div
-        className="h-11 border-b px-4 sm:px-6 flex items-center justify-between gap-3 text-xs shrink-0 overflow-x-auto scrollbar-none"
-        style={{
-          backgroundColor: 'var(--theme-bg-surface)',
-          borderColor: 'var(--theme-border)',
-        }}
-      >
-        <div className="flex items-center gap-2.5 flex-1 min-w-[200px] max-w-md">
-          <div className="relative w-full">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 opacity-50" style={{ color: 'var(--theme-text-muted)' }} />
-            <input
-              type="text"
-              placeholder="Filter tickets by title or description..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full border rounded-lg pl-8 pr-3 py-1 text-xs focus:outline-none"
-              style={{
-                backgroundColor: 'var(--theme-bg-surface-hover)',
-                borderColor: 'var(--theme-border)',
-                color: 'var(--theme-text-primary)',
-              }}
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 hover:opacity-100 opacity-60"
-                style={{ color: 'var(--theme-text-muted)' }}
-              >
-                <X size={12} />
-              </button>
-            )}
+            </div>
           </div>
-        </div>
-
-        {/* Priority & Assignee Filters */}
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="flex items-center gap-1">
-            <Filter size={13} style={{ color: 'var(--theme-text-muted)' }} />
-            <select
-              value={filterPriority}
-              onChange={(e) => setFilterPriority(e.target.value)}
-              className="border rounded-lg px-2 py-1 text-xs focus:outline-none"
-              style={{
-                backgroundColor: 'var(--theme-bg-surface-hover)',
-                borderColor: 'var(--theme-border)',
-                color: 'var(--theme-text-primary)',
-              }}
-            >
-              <option value="ALL">All Priorities</option>
-              <option value="URGENT">🔥 Urgent</option>
-              <option value="HIGH">High</option>
-              <option value="MEDIUM">Medium</option>
-              <option value="LOW">Low</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-1">
-            <User size={13} style={{ color: 'var(--theme-text-muted)' }} />
-            <select
-              value={filterAssignee}
-              onChange={(e) => setFilterAssignee(e.target.value)}
-              className="border rounded-lg px-2 py-1 text-xs focus:outline-none"
-              style={{
-                backgroundColor: 'var(--theme-bg-surface-hover)',
-                borderColor: 'var(--theme-border)',
-                color: 'var(--theme-text-primary)',
-              }}
-            >
-              <option value="ALL">All Assignees</option>
-              <option value="ME">Assigned to Me</option>
-              <option value="UNASSIGNED">Unassigned</option>
-              {members.map((m) => {
-                const u = m.user;
-                if (!u) return null;
-                return (
-                  <option key={u.id} value={u.id}>
-                    {u.displayName}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-        </div>
-      </div>
 
       {/* Kanban Board Horizontal Scroll Area */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden p-4 sm:p-6 flex items-start gap-4">

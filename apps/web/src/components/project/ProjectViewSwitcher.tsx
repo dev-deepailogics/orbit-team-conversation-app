@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Columns3,
   FileText,
@@ -11,7 +11,7 @@ import {
   Sparkles,
   ChevronDown,
   LayoutGrid,
-} from 'lucide-react';
+} from "lucide-react";
 
 export interface ViewOption {
   id: string;
@@ -39,15 +39,15 @@ export const ProjectViewSwitcher: React.FC<ProjectViewSwitcherProps> = ({
 
   const views: ViewOption[] = [
     {
-      id: 'board',
-      label: 'Board',
+      id: "board",
+      label: "Board",
       icon: Columns3,
       count: ticketCount,
       isAvailable: true,
     },
     {
-      id: 'docs',
-      label: 'Docs',
+      id: "docs",
+      label: "Documents",
       icon: FileText,
       count: docCount,
       isAvailable: true,
@@ -56,32 +56,19 @@ export const ProjectViewSwitcher: React.FC<ProjectViewSwitcherProps> = ({
 
   const upcomingViews: ViewOption[] = [
     {
-      id: 'table',
-      label: 'Table',
-      icon: TableIcon,
-      badge: 'Soon',
-      isAvailable: false,
-    },
-    {
-      id: 'timeline',
-      label: 'Timeline & Gantt',
+      id: "timeline",
+      label: "Timeline & Gantt",
       icon: Clock,
-      badge: 'Soon',
-      isAvailable: false,
-    },
-    {
-      id: 'calendar',
-      label: 'Calendar',
-      icon: Calendar,
-      badge: 'Soon',
+      badge: "Soon",
       isAvailable: false,
     },
   ];
 
   return (
-    <div className="relative flex items-center gap-1.5 py-1 px-1 rounded-xl border bg-black/5 dark:bg-white/[0.04]"
+    <div
+      className="relative flex items-center gap-1.5 py-1 px-1 rounded-xl border bg-black/5 dark:bg-white/[0.04]"
       style={{
-        borderColor: 'var(--theme-border)',
+        borderColor: "var(--theme-border)",
       }}
     >
       {/* Active & Available Views */}
@@ -93,34 +80,41 @@ export const ProjectViewSwitcher: React.FC<ProjectViewSwitcherProps> = ({
           <button
             key={view.id}
             onClick={() => onSectionChange(view.id)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 relative ${
+            title={view.label}
+            className={`flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 relative shrink-0 ${
               isActive
-                ? 'shadow-sm font-bold'
-                : 'opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'
+                ? "shadow-sm font-bold"
+                : "opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5"
             }`}
             style={{
-              backgroundColor: isActive ? 'var(--theme-bg-surface)' : 'transparent',
-              color: isActive ? 'var(--theme-text-primary)' : 'var(--theme-text-muted)',
-              borderWidth: isActive ? '1px' : '0px',
-              borderColor: isActive ? 'var(--theme-border)' : 'transparent',
+              backgroundColor: isActive
+                ? "var(--theme-bg-surface)"
+                : "transparent",
+              color: isActive
+                ? "var(--theme-text-primary)"
+                : "var(--theme-text-muted)",
+              borderWidth: isActive ? "1px" : "0px",
+              borderColor: isActive ? "var(--theme-border)" : "transparent",
             }}
           >
             <Icon
               size={14}
               style={{
-                color: isActive ? 'var(--theme-primary)' : 'inherit',
+                color: isActive ? "var(--theme-primary)" : "inherit",
               }}
             />
-            <span>{view.label}</span>
+            <span className="hidden sm:inline">{view.label}</span>
 
-            {typeof view.count === 'number' && (
+            {typeof view.count === "number" && (
               <span
-                className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                className="text-[10px] px-1 sm:px-1.5 py-0.2 rounded-full font-medium"
                 style={{
                   backgroundColor: isActive
-                    ? 'var(--theme-bg-surface-hover)'
-                    : 'var(--theme-bg-surface)',
-                  color: isActive ? 'var(--theme-text-primary)' : 'var(--theme-text-muted)',
+                    ? "var(--theme-bg-surface-hover)"
+                    : "var(--theme-bg-surface)",
+                  color: isActive
+                    ? "var(--theme-text-primary)"
+                    : "var(--theme-text-muted)",
                 }}
               >
                 {view.count}
@@ -131,18 +125,18 @@ export const ProjectViewSwitcher: React.FC<ProjectViewSwitcherProps> = ({
       })}
 
       {/* Extensible Future Views Dropdown Trigger */}
-      <div className="relative">
+      <div className="relative shrink-0">
         <button
           onClick={() => setShowFutureViewsMenu((prev) => !prev)}
           title="Add or browse more project views"
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5 transition"
+          className="flex items-center gap-1 px-1.5 sm:px-2.5 py-1.5 rounded-lg text-xs font-medium opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5 transition"
           style={{
-            color: 'var(--theme-text-muted)',
+            color: "var(--theme-text-muted)",
           }}
         >
           <Plus size={13} />
           <span className="hidden sm:inline text-[11px]">View</span>
-          <ChevronDown size={11} className="opacity-70" />
+          <ChevronDown size={11} className="opacity-70 hidden sm:inline" />
         </button>
 
         {/* Future Views Popover */}
@@ -153,18 +147,18 @@ export const ProjectViewSwitcher: React.FC<ProjectViewSwitcherProps> = ({
               onClick={() => setShowFutureViewsMenu(false)}
             />
             <div
-              className="absolute left-0 top-full mt-1.5 z-50 w-56 rounded-xl border p-1.5 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-150"
+              className="absolute right-0 top-full mt-1.5 z-50 w-56 max-w-[calc(100vw-1.5rem)] rounded-xl border p-1.5 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-150"
               style={{
-                backgroundColor: 'var(--theme-bg-surface)',
-                borderColor: 'var(--theme-border)',
-                color: 'var(--theme-text-primary)',
+                backgroundColor: "var(--theme-bg-surface)",
+                borderColor: "var(--theme-border)",
+                color: "var(--theme-text-primary)",
               }}
             >
               <div
                 className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider opacity-50"
-                style={{ color: 'var(--theme-text-muted)' }}
+                style={{ color: "var(--theme-text-muted)" }}
               >
-                Upcoming Project Views
+                Upcoming Features
               </div>
 
               {upcomingViews.map((item) => {
@@ -174,7 +168,7 @@ export const ProjectViewSwitcher: React.FC<ProjectViewSwitcherProps> = ({
                     key={item.id}
                     className="flex items-center justify-between px-2.5 py-2 rounded-lg text-xs opacity-65 hover:opacity-90 transition cursor-not-allowed"
                     style={{
-                      color: 'var(--theme-text-muted)',
+                      color: "var(--theme-text-muted)",
                     }}
                   >
                     <div className="flex items-center gap-2">
@@ -185,8 +179,8 @@ export const ProjectViewSwitcher: React.FC<ProjectViewSwitcherProps> = ({
                       <span
                         className="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded-md"
                         style={{
-                          backgroundColor: 'var(--theme-bg-surface-hover)',
-                          color: 'var(--theme-primary)',
+                          backgroundColor: "var(--theme-bg-surface-hover)",
+                          color: "var(--theme-primary)",
                         }}
                       >
                         {item.badge}

@@ -32,6 +32,7 @@ import {
   Copy,
   Clock,
   ExternalLink,
+  X,
 } from 'lucide-react';
 
 interface ProjectDocsViewProps {
@@ -92,14 +93,24 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
   // 1. Fetch documents on project change
   useEffect(() => {
     let isMounted = true;
+
+    // Immediately clear stale document from previous project
+    if (currentDocument && currentDocument.projectId !== project.id) {
+      setCurrentDocument(null);
+    }
+
     const fetchDocuments = async () => {
       setIsLoadingDocs(true);
       try {
         const res = await api.get(`/api/projects/${project.id}/documents`);
         if (isMounted) {
-          setDocuments(res.data);
-          if (res.data.length > 0 && !currentDocument) {
-            setCurrentDocument(res.data[0]);
+          const docs: ProjectDocument[] = res.data;
+          setDocuments(docs);
+          if (docs.length > 0) {
+            const matchingDoc = docs.find((d) => d.id === currentDocument?.id && d.projectId === project.id);
+            setCurrentDocument(matchingDoc || docs[0]);
+          } else {
+            setCurrentDocument(null);
           }
         }
       } catch (err) {
@@ -167,7 +178,7 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
   // 4. Debounced Auto-Save function
   const triggerAutoSave = useCallback(
     (updates: Partial<ProjectDocument>) => {
-      if (!currentDocument) return;
+      if (!currentDocument || currentDocument.projectId !== project.id) return;
 
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
@@ -272,12 +283,22 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
         color: 'var(--theme-text-primary)',
       }}
     >
+      {/* Mobile Drawer Backdrop */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 md:hidden animate-in fade-in duration-200"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* ========================================== */}
       {/* 1. Left Document Navigation Sidebar        */}
       {/* ========================================== */}
       <div
         className={`${
-          isSidebarOpen ? 'w-64 sm:w-72' : 'w-0'
+          isSidebarOpen
+            ? 'w-72 max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:shadow-2xl'
+            : 'w-0 max-md:-translate-x-full'
         } shrink-0 border-r flex flex-col h-full transition-all duration-200 overflow-hidden relative`}
         style={{
           backgroundColor: 'var(--theme-bg-surface)',
@@ -291,7 +312,7 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
         >
           <div className="flex items-center gap-2">
             <FileText size={16} style={{ color: 'var(--theme-primary)' }} />
-            <span className="text-xs font-bold uppercase tracking-wider">Docs</span>
+            <span className="text-xs font-bold uppercase tracking-wider">Documents</span>
             <span
               className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
               style={{
@@ -303,18 +324,27 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
             </span>
           </div>
 
-          <button
-            onClick={handleCreateNewDoc}
-            className="p-1.5 rounded-lg text-xs font-semibold shadow transition flex items-center gap-1 active:scale-95"
-            style={{
-              backgroundColor: 'var(--theme-primary)',
-              color: 'var(--theme-primary-text)',
-            }}
-            title="Create new Notion document"
-          >
-            <Plus size={14} />
-            <span className="text-[11px]">New Doc</span>
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleCreateNewDoc}
+              className="p-1.5 rounded-lg text-xs font-semibold shadow transition flex items-center gap-1 active:scale-95"
+              style={{
+                backgroundColor: 'var(--theme-primary)',
+                color: 'var(--theme-primary-text)',
+              }}
+              title="Create new document"
+            >
+              <Plus size={14} />
+              <span className="text-[11px]">New Document</span>
+            </button>
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="p-1.5 rounded-lg opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5 md:hidden transition"
+              title="Close sidebar"
+            >
+              <X size={15} />
+            </button>
+          </div>
         </div>
 
         {/* Search Input */}
@@ -327,7 +357,7 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
             />
             <input
               type="text"
-              placeholder="Search docs..."
+              placeholder="Search documents..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full text-xs pl-8 pr-3 py-1.5 rounded-xl border bg-transparent focus:outline-none transition"
@@ -390,7 +420,12 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
               return (
                 <div
                   key={doc.id}
-                  onClick={() => setCurrentDocument(doc)}
+                  onClick={() => {
+                    setCurrentDocument(doc);
+                    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                      setIsSidebarOpen(false);
+                    }
+                  }}
                   className={`group px-2.5 py-2 rounded-xl text-xs flex items-center justify-between cursor-pointer transition relative ${
                     isSelected ? 'shadow-sm font-semibold' : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-80 hover:opacity-100'
                   }`}
@@ -463,15 +498,16 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
         {/* Sidebar Toggle Button */}
         <button
           onClick={() => setIsSidebarOpen((prev) => !prev)}
-          title={isSidebarOpen ? 'Collapse Docs Sidebar' : 'Expand Docs Sidebar'}
-          className="absolute left-2 top-2 z-20 p-1.5 rounded-lg border shadow-sm opacity-60 hover:opacity-100 transition"
+          title={isSidebarOpen ? 'Collapse Documents Sidebar' : 'Expand Documents Sidebar'}
+          className="absolute left-2.5 top-2.5 z-20 px-2 py-1.5 rounded-xl border shadow-sm opacity-80 hover:opacity-100 transition flex items-center gap-1 text-xs backdrop-blur-md"
           style={{
             backgroundColor: 'var(--theme-bg-surface)',
             borderColor: 'var(--theme-border)',
             color: 'var(--theme-text-primary)',
           }}
         >
-          {isSidebarOpen ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+          {isSidebarOpen ? <ChevronLeft size={14} /> : <FileText size={14} />}
+          <span className="text-[11px] font-semibold hidden sm:inline">{isSidebarOpen ? 'Hide' : 'Documents'}</span>
         </button>
 
         {currentDocument ? (
@@ -668,12 +704,12 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
               </div>
             </div>
 
-            {/* Notion Rich Text Editor */}
+            {/* Rich Document Editor */}
             <div className="flex-1 max-w-4xl w-full mx-auto flex flex-col px-4 md:px-8 pb-12">
               <NotionEditor
                 value={docContent}
                 onChange={handleContentChange}
-                placeholder="Type '/' for Notion blocks, headings, tables, pictures, checklists..."
+                placeholder="Type '/' for blocks, headings, tables, pictures, checklists..."
               />
             </div>
           </div>
@@ -694,7 +730,7 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
             <div className="max-w-sm space-y-1">
               <h3 className="text-base font-bold">No Document Selected</h3>
               <p className="text-xs leading-relaxed" style={{ color: 'var(--theme-text-muted)' }}>
-                Create rich Notion-style documentation, specs, guides, and meeting notes for your project.
+                Create rich project documentation, specs, guides, and meeting notes.
               </p>
             </div>
 

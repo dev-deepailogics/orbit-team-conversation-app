@@ -89,10 +89,12 @@ export const useProjectStore = create<ProjectState>((set) => ({
     })),
 
   setCurrentProject: (project) =>
-    set({
+    set((state) => ({
       currentProject: project,
       activeView: project ? 'project' : 'channel',
-    }),
+      documents: state.currentProject?.id === project?.id ? state.documents : [],
+      currentDocument: state.currentProject?.id === project?.id ? state.currentDocument : null,
+    })),
 
   setActiveView: (view) => set({ activeView: view }),
 
