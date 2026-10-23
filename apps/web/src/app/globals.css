@@ -91,3 +91,274 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(150, 150, 150, 0.5);
 }
+
+/* ==========================================================================
+   Orbit Ultra-Modern LiveKit WebRTC Glassmorphism Styling
+   ========================================================================== */
+.lk-video-conference {
+  background: radial-gradient(circle at 50% 20%, #1e222a 0%, #0d0f12 100%) !important;
+  font-family: inherit !important;
+}
+
+/* Participant Tiles */
+.lk-participant-tile {
+  background: rgba(22, 26, 32, 0.75) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 1.25rem !important;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  overflow: hidden !important;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.lk-participant-tile:hover {
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.8) !important;
+}
+
+/* Speaking State Glow (Replaces ugly blue outline with glowing neon green ring) */
+.lk-participant-tile.lk-speaking {
+  border-color: #10B981 !important;
+  box-shadow: 0 0 24px -2px rgba(16, 185, 129, 0.4), inset 0 0 12px rgba(16, 185, 129, 0.15) !important;
+}
+
+/* Participant Placeholder (Avatars) */
+.lk-participant-placeholder {
+  background: radial-gradient(circle at center, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.95) 100%) !important;
+}
+
+.lk-participant-placeholder svg {
+  color: #64748B !important;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+  opacity: 0.8;
+}
+
+/* Participant Metadata (Name pill bottom left) */
+.lk-participant-metadata {
+  background: rgba(0, 0, 0, 0.55) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 9999px !important;
+  padding: 4px 10px !important;
+  margin: 10px !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  color: #F8FAFC !important;
+  letter-spacing: 0.02em !important;
+}
+
+/* Bottom Control Bar - Floating Pill Dock */
+.lk-control-bar {
+  background: rgba(18, 21, 26, 0.8) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 9999px !important;
+  padding: 8px 16px !important;
+  margin: 0 auto 16px auto !important;
+  width: auto !important;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+  gap: 8px !important;
+}
+
+.lk-button {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 9999px !important;
+  color: #E2E8F0 !important;
+  font-weight: 500 !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  padding: 8px 14px !important;
+}
+
+.lk-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: #FFFFFF !important;
+  transform: translateY(-1px);
+}
+
+.lk-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* Leave Call Button (Red Glow Pill) */
+.lk-disconnect-button {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.85) 0%, rgba(220, 38, 38, 0.95) 100%) !important;
+  border: 1px solid rgba(248, 113, 113, 0.4) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.35) !important;
+  border-radius: 9999px !important;
+  padding: 8px 18px !important;
+  font-weight: 600 !important;
+}
+
+.lk-disconnect-button:hover {
+  background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%) !important;
+  box-shadow: 0 6px 20px rgba(220, 38, 38, 0.5) !important;
+  transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   Orbit In-Call Messages & Live Chat Ultra-Modern Redesign
+   ========================================================================== */
+.lk-chat {
+  background: rgba(13, 16, 21, 0.96) !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(30px) !important;
+  -webkit-backdrop-filter: blur(30px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  width: 320px !important;
+  max-width: 90vw !important;
+  box-shadow: -15px 0 35px -10px rgba(0, 0, 0, 0.7) !important;
+}
+
+.lk-chat-header {
+  height: 56px !important;
+  padding: 0 16px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  font-size: 0.825rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+  color: #F1F5F9 !important;
+}
+
+.lk-chat-header::before {
+  content: '💬 In-Call Chat';
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #F8FAFC;
+  letter-spacing: 0.02em;
+}
+
+/* Hide default text node inside chat header */
+.lk-chat-header > span:first-child,
+.lk-chat-header > div:first-child {
+  display: none !important;
+}
+
+.lk-chat-close-button {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 9999px !important;
+  color: #94A3B8 !important;
+  padding: 6px !important;
+  transition: all 0.2s ease !important;
+}
+
+.lk-chat-close-button:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #FFFFFF !important;
+  transform: scale(1.05);
+}
+
+/* Chat Messages Scroll List */
+.lk-chat-messages {
+  padding: 16px 14px !important;
+  gap: 12px !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.lk-chat-entry {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border-radius: 1rem !important;
+  padding: 10px 14px !important;
+  box-shadow: 0 4px 15px -3px rgba(0, 0, 0, 0.4) !important;
+  transition: all 0.2s ease !important;
+}
+
+.lk-chat-entry:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.lk-chat-entry-metadata {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin-bottom: 4px !important;
+}
+
+.lk-participant-name {
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  color: #38BDF8 !important;
+  letter-spacing: 0.01em !important;
+}
+
+.lk-chat-entry-time {
+  font-size: 0.65rem !important;
+  color: #64748B !important;
+  font-weight: 500 !important;
+}
+
+.lk-chat-entry-body {
+  font-size: 0.85rem !important;
+  color: #F8FAFC !important;
+  line-height: 1.45 !important;
+  word-break: break-word !important;
+}
+
+/* Bottom Chat Input Form */
+.lk-chat-form {
+  padding: 12px 14px 16px 14px !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: rgba(0, 0, 0, 0.3) !important;
+  gap: 8px !important;
+}
+
+.lk-chat-form-input {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 1rem !important;
+  padding: 10px 14px !important;
+  color: #FFFFFF !important;
+  font-size: 0.85rem !important;
+  transition: all 0.2s ease !important;
+}
+
+.lk-chat-form-input::placeholder {
+  color: #64748B !important;
+}
+
+.lk-chat-form-input:focus {
+  border-color: #10B981 !important;
+  background: rgba(255, 255, 255, 0.09) !important;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25) !important;
+  outline: none !important;
+}
+
+.lk-chat-form-button {
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
+  border: 1px solid rgba(16, 185, 129, 0.4) !important;
+  border-radius: 1rem !important;
+  padding: 0 16px !important;
+  color: #FFFFFF !important;
+  font-size: 0.8rem !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.lk-chat-form-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45) !important;
+  transform: translateY(-1px);
+}
+
+.lk-chat-form-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+

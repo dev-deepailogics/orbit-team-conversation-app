@@ -65,7 +65,9 @@ export default function AppDashboard() {
   } = useChatStore();
 
   const { startHuddle, setIncomingCall, channelId: activeHuddleChannelId } = useHuddleStore();
+  const [activeHuddleChannel, setActiveHuddleChannel] = useState<string | null>(null);
   const {
+
     projects,
     currentProject,
     setProjects,
@@ -427,6 +429,33 @@ export default function AppDashboard() {
       if (callData.hostUserId !== user.id) {
         setIncomingCall(callData);
       }
+      if (callData.channelId) {
+        setActiveHuddleChannel(callData.channelId);
+      }
+    };
+
+    const onCallEnded = (payload: { channelId: string }) => {
+      if (payload?.channelId) {
+        useHuddleStore.getState().clearChannelParticipants(payload.channelId);
+        setActiveHuddleChannel(null);
+      }
+    };
+
+    const onHuddleJoined = (payload: { channelId: string; userId: string; user?: any }) => {
+      if (payload?.channelId) {
+        setActiveHuddleChannel(payload.channelId);
+        useHuddleStore.getState().addChannelParticipant(payload.channelId, {
+          identity: payload.userId,
+          name: payload.user?.displayName || payload.user?.username || 'Participant',
+          user: payload.user,
+        });
+      }
+    };
+
+    const onHuddleLeft = (payload: { channelId: string; userId: string }) => {
+      if (payload?.channelId) {
+        useHuddleStore.getState().removeChannelParticipant(payload.channelId, payload.userId);
+      }
     };
 
     const onChannelNew = (newChan: Channel) => {
@@ -511,7 +540,11 @@ export default function AppDashboard() {
     };
 
     socket.on('huddle:started', onCallStarted);
+    socket.on('huddle:ended', onCallEnded);
+    socket.on('huddle:joined', onHuddleJoined);
+    socket.on('huddle:left', onHuddleLeft);
     socket.on('channel:new', onChannelNew);
+
     socket.on('channel:updated', onChannelUpdated);
     socket.on('channel:deleted', onChannelDeleted);
     socket.on(SOCKET_EVENTS.PROJECT_NEW, onProjectNew);
@@ -553,11 +586,28 @@ export default function AppDashboard() {
       const res = await api.post(`/api/huddles/${channel.id}/token`);
       const { token: livekitToken, serverUrl } = res.data;
       await api.post(`/api/huddles/${channel.id}/start`);
-      startHuddle(channel.id, channel.name, livekitToken, serverUrl);
+      startHuddle(channel.id, channel.name, livekitToken, serverUrl, channel.workspaceId);
+
+      const socket = getSocket(user?.id, currentWorkspace?.id);
+      if (socket) {
+        socket.emit('huddle:joined', {
+          channelId: channel.id,
+          workspaceId: channel.workspaceId,
+          user: user
+            ? {
+                id: user.id,
+                displayName: user.displayName,
+                username: user.username,
+                avatarUrl: user.avatarUrl,
+              }
+            : undefined,
+        });
+      }
     } catch (err) {
       alert('Could not start call session');
     }
   };
+
 
   if (isLoading || isDataLoading) {
     return (
@@ -612,8 +662,9 @@ export default function AppDashboard() {
                 members={members}
                 projects={projects}
                 currentProject={currentProject}
-                activeHuddleChannelId={activeHuddleChannelId}
+                activeHuddleChannelId={activeHuddleChannel || activeHuddleChannelId}
                 onSelectChannel={(ch) => {
+
                   handleSelectChannel(ch);
                   setIsMobileSidebarOpen(false);
                 }}
@@ -685,8 +736,9 @@ export default function AppDashboard() {
             members={members}
             projects={projects}
             currentProject={currentProject}
-            activeHuddleChannelId={activeHuddleChannelId}
+            activeHuddleChannelId={activeHuddleChannel || activeHuddleChannelId}
             onSelectChannel={handleSelectChannel}
+
             onSelectUserDM={handleSelectUserDM}
             onChannelCreated={(ch) => {
               setChannels([...channels, ch]);
