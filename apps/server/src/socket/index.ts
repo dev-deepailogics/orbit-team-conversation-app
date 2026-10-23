@@ -151,6 +151,48 @@ export function setupSocketServer(fastify: FastifyInstance, io: SocketIOServer) 
       }
     });
 
+    // Real-Time Huddle Participant Sync
+    socket.on(SOCKET_EVENTS.HUDDLE_JOINED, async ({ channelId, workspaceId, user }: { channelId: string; workspaceId: string; user?: any }) => {
+      const hasAccess = await canUserAccessChannel(userId, channelId);
+      if (hasAccess) {
+        // Mark user status as IN_HUDDLE
+        await prisma.user.update({
+          where: { id: userId },
+          data: { status: 'IN_HUDDLE' },
+        }).catch(() => {});
+
+        io.to(`workspace:${workspaceId}`).emit(SOCKET_EVENTS.USER_STATUS_CHANGE, {
+          userId,
+          status: 'IN_HUDDLE',
+        });
+
+        io.to(`workspace:${workspaceId}`).emit(SOCKET_EVENTS.HUDDLE_JOINED, {
+          channelId,
+          userId,
+          user: user || socket.data.user,
+        });
+      }
+    });
+
+    socket.on(SOCKET_EVENTS.HUDDLE_LEFT, async ({ channelId, workspaceId }: { channelId: string; workspaceId: string }) => {
+      // Revert user status to ONLINE
+      await prisma.user.update({
+        where: { id: userId },
+        data: { status: 'ONLINE' },
+      }).catch(() => {});
+
+      io.to(`workspace:${workspaceId}`).emit(SOCKET_EVENTS.USER_STATUS_CHANGE, {
+        userId,
+        status: 'ONLINE',
+      });
+
+      io.to(`workspace:${workspaceId}`).emit(SOCKET_EVENTS.HUDDLE_LEFT, {
+        channelId,
+        userId,
+      });
+    });
+
+
     // Whiteboard Live Collaboration
     socket.on(SOCKET_EVENTS.WHITEBOARD_UPDATE, async ({ channelId, data }) => {
       const hasAccess = await canUserAccessChannel(userId, channelId);

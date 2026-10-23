@@ -444,6 +444,14 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                       </span>
                     )}
 
+                    {/* Active Call Indicator & Avatars */}
+                    {hasHuddle && (
+                      <span className="flex items-center gap-1 bg-slack-green/20 border border-slack-green/40 text-slack-green px-1.5 py-0.5 rounded-full text-[10px] font-bold animate-pulse">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slack-green" />
+                        LIVE
+                      </span>
+                    )}
+
                     {/* Channel Call Action */}
                     <button
                       onClick={(e) => {
@@ -454,7 +462,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                       style={hasHuddle ? undefined : { color: 'var(--theme-text-muted)' }}
                       className={`p-1 rounded transition ${
                         hasHuddle
-                          ? 'bg-slack-green text-white animate-pulse'
+                          ? 'bg-slack-green text-white shadow-sm'
                           : 'opacity-0 group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10'
                       }`}
                     >
@@ -465,6 +473,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
               );
             })}
           </div>
+
         </div>
 
         {/* Direct Messages Section */}
