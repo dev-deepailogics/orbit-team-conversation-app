@@ -16,6 +16,19 @@ export interface UserProfile {
   customStatusEmoji: string | null;
   anonEmoji?: string | null;
   isAnonymous?: boolean;
+  role?: string;
+  leaves?: {
+    countLeaves?: Record<string, number>;
+    offCountLeaves?: Record<string, number>;
+  };
+  disabled?: boolean;
+  isActive?: boolean;
+  usersCollectionFlags?: {
+    disabled?: boolean;
+    isActive?: boolean;
+  };
+  slackThreadId?: string | null;
+  slackThreadExpiry?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -295,6 +308,14 @@ export interface Project {
   columns?: ProjectColumn[];
   tickets?: Ticket[];
   documents?: ProjectDocument[];
+  status?: string | null;
+  projectId?: string | null;
+  assignedEmployees?: any;
+  selectedManagers?: any;
+  slackMentions?: any;
+  clientUid?: string | null;
+  clientUsername?: string | null;
+  clientEmail?: string | null;
   _count?: {
     columns?: number;
     tickets?: number;
@@ -329,6 +350,26 @@ export interface Ticket {
   creator?: UserProfile;
   assignee?: UserProfile | null;
   column?: ProjectColumn;
+  issueNumber?: number | null;
+  customId?: string | null;
+  dueTime?: string | null;
+  range?: number | null;
+  gitbranch?: string | null;
+  labels?: any;
+  assignees?: any;
+  images?: any;
+  events?: any;
+  checklist?: any;
+  storyPoints?: number | null;
+  timeSpent?: number | null;
+  watchers?: any;
+  notes?: string | null;
+  testPlan?: string | null;
+  loom?: string | null;
+  status?: string | null;
+  _count?: {
+    comments?: number;
+  };
 }
 
 export interface ProjectDocumentShare {
@@ -415,6 +456,35 @@ export const SOCKET_EVENTS = {
   // Presence & Notifications
   USER_STATUS_CHANGE: 'user:status_change',
   NOTIFICATION_NEW: 'notification:new',
+
+  // Employee Availability & Time Tracking
+  AVAILABILITY_UPDATE: 'availability:update',
 } as const;
+
+// ==========================================
+// 10. Availability & Time Tracking Types
+// ==========================================
+export interface AvailabilityBreakItem {
+  id: string;
+  availabilityId: string;
+  breakReason: string;
+  breakStartTime: string;
+  availableAfterBreak?: string | null;
+  breakDurationMinutes: number;
+}
+
+export interface UserAvailabilityRecord {
+  id: string;
+  userId: string;
+  date: string;
+  availableTime: string;
+  offTime?: string | null;
+  totalWorkingMinutes: number;
+  isAvailable: boolean;
+  isOnBreak: boolean;
+  isAutoCheckedOut: boolean;
+  breaks: AvailabilityBreakItem[];
+}
+
 
 
