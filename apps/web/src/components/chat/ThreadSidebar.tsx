@@ -10,6 +10,8 @@ import { getTopEmojis, recordEmojiUsage } from '../../lib/emojiStore';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { RichTextEditor, RichTextEditorRef } from './RichTextEditor';
 import { FileAttachmentList, formatFileSize, getFileCategory } from './FileAttachmentList';
+import { CompressFileConfirmModal } from './CompressFileConfirmModal';
+import { compressFile } from '../../lib/compression';
 
 interface ThreadSidebarProps {
   parentMessage: Message;
@@ -46,6 +48,11 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [deleteConfirmMessage, setDeleteConfirmMessage] = useState<Message | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Compression Confirmation State
+  const [pendingCompressFiles, setPendingCompressFiles] = useState<File[]>([]);
+  const [showCompressModal, setShowCompressModal] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
 
   const currentWorkspace = useChatStore((state) => state.currentWorkspace);
   const isWsAdmin =
@@ -169,14 +176,24 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
+  const processThreadUploadFiles = async (filesToUpload: File[], shouldCompress: boolean) => {
     setIsUploading(true);
+    if (shouldCompress) {
+      setIsCompressing(true);
+    }
+
     try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+      for (let i = 0; i < filesToUpload.length; i++) {
+        let file = filesToUpload[i];
+
+        if (shouldCompress) {
+          try {
+            file = await compressFile(file);
+          } catch (compErr) {
+            console.error('Compression failed for thread file', file.name, compErr);
+          }
+        }
+
         const formData = new FormData();
         if (parentMessage.channelId) {
           formData.append('channelId', parentMessage.channelId);
@@ -196,8 +213,20 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
       console.error('Failed to upload thread file', err);
     } finally {
       setIsUploading(false);
+      setIsCompressing(false);
+      setShowCompressModal(false);
+      setPendingCompressFiles([]);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
+
+    const files = Array.from(fileList);
+    setPendingCompressFiles(files);
+    setShowCompressModal(true);
   };
 
   const handleSendReply = async (e?: React.FormEvent) => {
@@ -935,6 +964,22 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
           </div>
         </div>
       )}
+
+      {/* Compression Confirmation Modal */}
+      <CompressFileConfirmModal
+        isOpen={showCompressModal}
+        files={pendingCompressFiles}
+        isCompressing={isCompressing}
+        onConfirmCompress={() => processThreadUploadFiles(pendingCompressFiles, true)}
+        onSkip={() => processThreadUploadFiles(pendingCompressFiles, false)}
+        onCancel={() => {
+          setShowCompressModal(false);
+          setPendingCompressFiles([]);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+        }}
+      />
     </div>
   );
 };

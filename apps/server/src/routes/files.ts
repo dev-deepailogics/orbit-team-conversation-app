@@ -87,33 +87,60 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         channelId: channelId || undefined,
       });
 
-      // Insert Attachment record into DB with complete metadata
-      const attachment = await prisma.attachment.create({
-        data: {
-          workspaceId,
-          channelId: channelId || undefined,
-          messageId: messageId || undefined,
-          uploaderId: userId,
-          fileName: originalFileName,
-          fileKey: uploadResult.fileKey,
-          fileUrl: uploadResult.fileUrl,
-          fileType: mimeType,
-          fileSize: uploadResult.fileSize,
-          storageProvider: uploadResult.storageProvider,
-        },
-        include: {
-          uploader: {
-            select: {
-              id: true,
-              username: true,
-              displayName: true,
-              avatarUrl: true,
+      // If a messageId is explicitly provided, insert Attachment record immediately;
+      // otherwise, if the user is just staging/attaching the file in the composer,
+      // return the file metadata and ONLY save it into the database when the message is sent.
+      if (messageId) {
+        const attachment = await prisma.attachment.create({
+          data: {
+            workspaceId,
+            channelId: channelId || undefined,
+            messageId,
+            uploaderId: userId,
+            fileName: originalFileName,
+            fileKey: uploadResult.fileKey,
+            fileUrl: uploadResult.fileUrl,
+            fileType: mimeType,
+            fileSize: uploadResult.fileSize,
+            storageProvider: uploadResult.storageProvider,
+          },
+          include: {
+            uploader: {
+              select: {
+                id: true,
+                username: true,
+                displayName: true,
+                avatarUrl: true,
+              },
             },
           },
+        });
+        return reply.status(201).send(attachment);
+      }
+
+      // Staged file payload before message send (NOT saved in DB yet)
+      const uploader = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          username: true,
+          displayName: true,
+          avatarUrl: true,
         },
       });
 
-      return reply.status(201).send(attachment);
+      return reply.status(200).send({
+        workspaceId,
+        channelId: channelId || undefined,
+        uploaderId: userId,
+        fileName: originalFileName,
+        fileKey: uploadResult.fileKey,
+        fileUrl: uploadResult.fileUrl,
+        fileType: mimeType,
+        fileSize: uploadResult.fileSize,
+        storageProvider: uploadResult.storageProvider,
+        uploader,
+      });
     } catch (err) {
       fastify.log.error(err, 'Failed to upload file');
       return reply.status(500).send({ error: 'Failed to process file upload' });

@@ -20,12 +20,14 @@ import {
   Kanban,
   Palette,
   Check,
+  Building2,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useChatStore } from '../../stores/chatStore';
 import { WorkspaceStorageModal } from '../workspace/WorkspaceStorageModal';
 import { AddWorkspaceMemberDialog } from '../workspace/AddWorkspaceMemberDialog';
 import { ThemeModal } from '../theme/ThemeModal';
+import { OrganizationControlModal } from '../availability/OrganizationControlModal';
 
 interface ChannelSidebarProps {
   workspace: Workspace;
@@ -45,6 +47,7 @@ interface ChannelSidebarProps {
   onStartHuddle: (channel: Channel) => void;
   onLogout: () => void;
   onOpenSearch?: () => void;
+  onOpenOrganizationControl?: () => void;
   onCloseMobile?: () => void;
   onMemberAdded?: () => void;
 }
@@ -67,6 +70,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   onStartHuddle,
   onLogout,
   onOpenSearch,
+  onOpenOrganizationControl,
   onCloseMobile,
   onMemberAdded,
 }) => {
@@ -74,6 +78,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   const [showStorageModal, setShowStorageModal] = useState(false);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [showThemeModal, setShowThemeModal] = useState(false);
+  const [showOrgControlModal, setShowOrgControlModal] = useState(false);
   const [channelName, setChannelName] = useState('');
   const [channelTopic, setChannelTopic] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
@@ -81,6 +86,9 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
   const workspaceMenuRef = useRef<HTMLDivElement>(null);
+  const [isProjectsCollapsed, setIsProjectsCollapsed] = useState(false);
+  const [isChannelsCollapsed, setIsChannelsCollapsed] = useState(false);
+  const [isDmsCollapsed, setIsDmsCollapsed] = useState(false);
   const unreadCounts = useChatStore((s) => s.unreadCounts);
 
   useEffect(() => {
@@ -206,6 +214,25 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
             </div>
 
             <div className="py-1">
+              {/* Organization Control (Employee Availability & Shift Management) */}
+              <button
+                onClick={() => {
+                  setShowWorkspaceMenu(false);
+                  if (onOpenOrganizationControl) {
+                    onOpenOrganizationControl();
+                  } else {
+                    setShowOrgControlModal(true);
+                  }
+                }}
+                className="w-full px-3.5 py-2 text-left text-xs flex items-center justify-between transition hover:bg-black/5 dark:hover:bg-white/10 group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Building2 size={15} className="text-blue-400" />
+                  <span className="font-semibold text-blue-300">Organization Control</span>
+                </div>
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 group-hover:scale-125 transition" />
+              </button>
+
               {/* Theme & Appearance */}
               <button
                 onClick={() => {
@@ -297,13 +324,24 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
         {/* Projects & Boards Section (Trello-like) */}
         <div>
           <div
-            className="flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-wider mb-1"
+            className="flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-wider mb-1 select-none"
             style={{ color: 'var(--theme-text-muted)' }}
           >
-            <span className="flex items-center gap-1.5">
-              <FolderKanban size={13} style={{ color: 'var(--theme-primary)' }} />
-              <span>Projects & Boards</span>
-            </span>
+            <button
+              onClick={() => setIsProjectsCollapsed((prev) => !prev)}
+              className="flex items-center gap-1.5 hover:text-white transition cursor-pointer text-left focus:outline-none"
+            >
+              <ChevronDown
+                size={14}
+                className={`transition-transform duration-200 shrink-0 ${
+                  isProjectsCollapsed ? '-rotate-90' : 'rotate-0'
+                }`}
+              />
+              <span className="flex items-center gap-1.5">
+                <FolderKanban size={13} style={{ color: 'var(--theme-primary)' }} />
+                <span>Projects & Boards</span>
+              </span>
+            </button>
             {onOpenCreateProject && (
               <button
                 onClick={onOpenCreateProject}
@@ -315,76 +353,91 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
             )}
           </div>
 
-          <div className="space-y-0.5">
-            {projects.map((project) => {
-              const isActive = currentProject?.id === project.id;
-              const ticketCount = project._count?.tickets ?? project.tickets?.length ?? 0;
+          {!isProjectsCollapsed && (
+            <div className="space-y-0.5">
+              {projects
+                .filter((p) => (p.status || 'active').toLowerCase() === 'active')
+                .map((project) => {
+                  const isActive = currentProject?.id === project.id;
+                  const ticketCount = project._count?.tickets ?? project.tickets?.length ?? 0;
 
-              return (
-                <div
-                  key={project.id}
-                  onClick={() => onSelectProject?.(project)}
-                  className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
-                    isActive
-                      ? 'shadow font-semibold'
-                      : 'hover:bg-black/5 dark:hover:bg-white/10'
-                  }`}
-                  style={
-                    isActive
-                      ? {
-                          backgroundColor: 'var(--theme-primary)',
-                          color: 'var(--theme-primary-text)',
+                  return (
+                    <div
+                      key={project.id}
+                      onClick={() => onSelectProject?.(project)}
+                      className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
+                        isActive
+                          ? 'shadow font-semibold'
+                          : 'hover:bg-black/5 dark:hover:bg-white/10'
+                      }`}
+                      style={
+                        isActive
+                          ? {
+                              backgroundColor: 'var(--theme-primary)',
+                              color: 'var(--theme-primary-text)',
+                            }
+                          : {
+                              color: 'var(--theme-text-primary)',
+                            }
+                      }
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <span className="text-sm shrink-0">{project.icon || '📋'}</span>
+                        <span className="truncate">{project.name}</span>
+                      </div>
+
+                      <span
+                        className="text-[10px] font-mono px-1.5 py-0.5 rounded-full transition"
+                        style={
+                          isActive
+                            ? {
+                                backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                                color: 'inherit',
+                              }
+                            : {
+                                backgroundColor: 'var(--theme-bg-surface-hover)',
+                                color: 'var(--theme-text-muted)',
+                              }
                         }
-                      : {
-                          color: 'var(--theme-text-primary)',
-                        }
-                  }
+                      >
+                        {ticketCount}
+                      </span>
+                    </div>
+                  );
+                })}
+
+              {projects.length === 0 && onOpenCreateProject && (
+                <button
+                  onClick={onOpenCreateProject}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-2 cursor-pointer"
+                  style={{ color: 'var(--theme-text-muted)' }}
                 >
-                  <div className="flex items-center gap-2 truncate">
-                    <span className="text-sm shrink-0">{project.icon || '📋'}</span>
-                    <span className="truncate">{project.name}</span>
-                  </div>
-
-                  <span
-                    className="text-[10px] font-mono px-1.5 py-0.5 rounded-full transition"
-                    style={
-                      isActive
-                        ? {
-                            backgroundColor: 'rgba(0, 0, 0, 0.2)',
-                            color: 'inherit',
-                          }
-                        : {
-                            backgroundColor: 'var(--theme-bg-surface-hover)',
-                            color: 'var(--theme-text-muted)',
-                          }
-                    }
-                  >
-                    {ticketCount}
-                  </span>
-                </div>
-              );
-            })}
-
-            {projects.length === 0 && onOpenCreateProject && (
-              <button
-                onClick={onOpenCreateProject}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-2 cursor-pointer"
-                style={{ color: 'var(--theme-text-muted)' }}
-              >
-                <Plus size={12} />
-                <span>Create a project board...</span>
-              </button>
-            )}
-          </div>
+                  <Plus size={12} />
+                  <span>Create a project board...</span>
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Channels Section */}
         <div>
           <div
-            className="flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-wider mb-1"
+            className="flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-wider mb-1 select-none"
             style={{ color: 'var(--theme-text-muted)' }}
           >
-            <span>Channels</span>
+            <button
+              onClick={() => setIsChannelsCollapsed((prev) => !prev)}
+              className="flex items-center gap-1.5 hover:text-white transition cursor-pointer text-left focus:outline-none"
+            >
+              <ChevronDown
+                size={14}
+                className={`transition-transform duration-200 shrink-0 ${
+                  isChannelsCollapsed ? '-rotate-90' : 'rotate-0'
+                }`}
+              />
+              <span>Channels</span>
+            </button>
             <button
               onClick={() => setShowCreateChannel(true)}
               className="p-1 hover:opacity-80 rounded transition"
@@ -393,173 +446,187 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
             </button>
           </div>
 
-          <div className="space-y-0.5">
-            {channels.filter((c) => c.type !== 'DIRECT').map((channel) => {
-              const isActive = currentChannel?.id === channel.id;
-              const hasHuddle = activeHuddleChannelId === channel.id;
-              const unread = unreadCounts[channel.id] || 0;
+          {!isChannelsCollapsed && (
+            <div className="space-y-0.5">
+              {channels.filter((c) => c.type !== 'DIRECT').map((channel) => {
+                const isActive = currentChannel?.id === channel.id;
+                const hasHuddle = activeHuddleChannelId === channel.id;
+                const unread = unreadCounts[channel.id] || 0;
 
-              return (
-                <div
-                  key={channel.id}
-                  onClick={() => onSelectChannel(channel)}
-                  className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
-                    isActive
-                      ? 'shadow font-semibold'
-                      : unread > 0
-                      ? 'font-bold bg-black/5 dark:bg-white/10'
-                      : 'hover:bg-black/5 dark:hover:bg-white/10'
-                  }`}
-                  style={
-                    isActive
-                      ? {
-                          backgroundColor: 'var(--theme-primary)',
-                          color: 'var(--theme-primary-text)',
-                        }
-                      : {
-                          color: 'var(--theme-text-primary)',
-                        }
-                  }
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    {channel.isAnonymous ? (
-                      <span className="text-sm shrink-0 leading-none" title="Anonymous Channel">🎭</span>
-                    ) : channel.type === 'PRIVATE' ? (
-                      <Lock size={15} className={`shrink-0 ${unread > 0 ? '' : 'opacity-70'}`} />
-                    ) : (
-                      <Hash size={16} className={`shrink-0 ${unread > 0 ? '' : 'opacity-70'}`} />
-                    )}
-                    <span className="truncate">{channel.name}</span>
-                    {channel.isAnonymous && (
-                      <span className="text-[9px] px-1 py-0.2 rounded bg-purple-950/80 border border-purple-700/50 text-purple-300 font-semibold shrink-0">
-                        anon
-                      </span>
-                    )}
+                return (
+                  <div
+                    key={channel.id}
+                    onClick={() => onSelectChannel(channel)}
+                    className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
+                      isActive
+                        ? 'shadow font-semibold'
+                        : unread > 0
+                        ? 'font-bold bg-black/5 dark:bg-white/10'
+                        : 'hover:bg-black/5 dark:hover:bg-white/10'
+                    }`}
+                    style={
+                      isActive
+                        ? {
+                            backgroundColor: 'var(--theme-primary)',
+                            color: 'var(--theme-primary-text)',
+                          }
+                        : {
+                            color: 'var(--theme-text-primary)',
+                          }
+                    }
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      {channel.isAnonymous ? (
+                        <span className="text-sm shrink-0 leading-none" title="Anonymous Channel">🎭</span>
+                      ) : channel.type === 'PRIVATE' ? (
+                        <Lock size={15} className={`shrink-0 ${unread > 0 ? '' : 'opacity-70'}`} />
+                      ) : (
+                        <Hash size={16} className={`shrink-0 ${unread > 0 ? '' : 'opacity-70'}`} />
+                      )}
+                      <span className="truncate">{channel.name}</span>
+                      {channel.isAnonymous && (
+                        <span className="text-[9px] px-1 py-0.2 rounded bg-purple-950/80 border border-purple-700/50 text-purple-300 font-semibold shrink-0">
+                          anon
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {unread > 0 && (
+                        <span className="px-1.5 py-0.5 bg-slack-green text-white text-[10px] font-bold rounded-full min-w-[18px] text-center leading-none">
+                          {unread}
+                        </span>
+                      )}
+
+                      {/* Active Call Indicator & Avatars */}
+                      {hasHuddle && (
+                        <span className="flex items-center gap-1 bg-slack-green/20 border border-slack-green/40 text-slack-green px-1.5 py-0.5 rounded-full text-[10px] font-bold animate-pulse">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slack-green" />
+                          LIVE
+                        </span>
+                      )}
+
+                      {/* Channel Call Action */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onStartHuddle(channel);
+                        }}
+                        title={hasHuddle ? 'Active Call - Click to join' : 'Start Call'}
+                        style={hasHuddle ? undefined : { color: 'var(--theme-text-muted)' }}
+                        className={`p-1 rounded transition ${
+                          hasHuddle
+                            ? 'bg-slack-green text-white shadow-sm'
+                            : 'opacity-0 group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10'
+                        }`}
+                      >
+                        <PhoneCall size={13} />
+                      </button>
+                    </div>
                   </div>
-
-                  <div className="flex items-center gap-1.5">
-                    {unread > 0 && (
-                      <span className="px-1.5 py-0.5 bg-slack-green text-white text-[10px] font-bold rounded-full min-w-[18px] text-center leading-none">
-                        {unread}
-                      </span>
-                    )}
-
-                    {/* Active Call Indicator & Avatars */}
-                    {hasHuddle && (
-                      <span className="flex items-center gap-1 bg-slack-green/20 border border-slack-green/40 text-slack-green px-1.5 py-0.5 rounded-full text-[10px] font-bold animate-pulse">
-                        <span className="w-1.5 h-1.5 rounded-full bg-slack-green" />
-                        LIVE
-                      </span>
-                    )}
-
-                    {/* Channel Call Action */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onStartHuddle(channel);
-                      }}
-                      title={hasHuddle ? 'Active Call - Click to join' : 'Start Call'}
-                      style={hasHuddle ? undefined : { color: 'var(--theme-text-muted)' }}
-                      className={`p-1 rounded transition ${
-                        hasHuddle
-                          ? 'bg-slack-green text-white shadow-sm'
-                          : 'opacity-0 group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10'
-                      }`}
-                    >
-                      <PhoneCall size={13} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Direct Messages Section */}
         <div>
           <div
-            className="flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-wider mb-1"
+            className="flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-wider mb-1 select-none"
             style={{ color: 'var(--theme-text-muted)' }}
           >
-            <span>Direct Messages</span>
+            <button
+              onClick={() => setIsDmsCollapsed((prev) => !prev)}
+              className="flex items-center gap-1.5 hover:text-white transition cursor-pointer text-left focus:outline-none"
+            >
+              <ChevronDown
+                size={14}
+                className={`transition-transform duration-200 shrink-0 ${
+                  isDmsCollapsed ? '-rotate-90' : 'rotate-0'
+                }`}
+              />
+              <span>Direct Messages</span>
+            </button>
           </div>
 
-          <div className="space-y-0.5">
-            {members.map((member) => {
-              const user = member.user;
-              if (!user) return null;
-              const isOnline = user.status === 'ONLINE';
-              const isSelf = user.id === currentUser?.id;
-              
-              // Find matching DM channel to check selection and unread counts
-              const dmChannel = channels.find(
-                (c) =>
-                  c.type === 'DIRECT' &&
-                  c.members &&
-                  (isSelf
-                    ? c.members.length === 1 || c.members.every((m) => m.userId === currentUser?.id)
-                    : c.members.some((m) => m.userId === user.id) && c.members.some((m) => m.userId === currentUser?.id))
-              );
+          {!isDmsCollapsed && (
+            <div className="space-y-0.5">
+              {members.map((member) => {
+                const user = member.user;
+                if (!user) return null;
+                const isOnline = user.status === 'ONLINE';
+                const isSelf = user.id === currentUser?.id;
+                
+                // Find matching DM channel to check selection and unread counts
+                const dmChannel = channels.find(
+                  (c) =>
+                    c.type === 'DIRECT' &&
+                    c.members &&
+                    (isSelf
+                      ? c.members.length === 1 || c.members.every((m) => m.userId === currentUser?.id)
+                      : c.members.some((m) => m.userId === user.id) && c.members.some((m) => m.userId === currentUser?.id))
+                );
 
-              const isSelectedDM = currentChannel?.type === 'DIRECT' && (
-                isSelf
-                  ? (!currentChannel.members || currentChannel.members.length <= 1 || currentChannel.members.every((m) => m.userId === currentUser?.id))
-                  : (currentChannel.members?.some((m) => m.userId === user.id) && currentChannel.members?.some((m) => m.userId === currentUser?.id))
-              );
+                const isSelectedDM = currentChannel?.type === 'DIRECT' && (
+                  isSelf
+                    ? (!currentChannel.members || currentChannel.members.length <= 1 || currentChannel.members.every((m) => m.userId === currentUser?.id))
+                    : (currentChannel.members?.some((m) => m.userId === user.id) && currentChannel.members?.some((m) => m.userId === currentUser?.id))
+                );
 
-              const unread = dmChannel ? (unreadCounts[dmChannel.id] || 0) : 0;
+                const unread = dmChannel ? (unreadCounts[dmChannel.id] || 0) : 0;
 
-              return (
-                <div
-                  key={member.id}
-                  onClick={() => onSelectUserDM(user)}
-                  className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
-                    isSelectedDM
-                      ? 'shadow font-semibold'
-                      : unread > 0
-                      ? 'font-bold bg-black/5 dark:bg-white/10'
-                      : 'hover:bg-black/5 dark:hover:bg-white/10'
-                  }`}
-                  style={
-                    isSelectedDM
-                      ? {
-                          backgroundColor: 'var(--theme-primary)',
-                          color: 'var(--theme-primary-text)',
-                        }
-                      : {
-                          color: 'var(--theme-text-primary)',
-                        }
-                  }
-                >
-                  <div className="flex items-center gap-2.5 truncate min-w-0">
-                    <div className="relative shrink-0">
-                      <img
-                        src={user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`}
-                        alt={user.displayName}
-                        className="w-5 h-5 rounded-md object-cover"
-                      />
-                      <span
-                        className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-1 ring-black/40 ${
-                          isOnline ? 'bg-slack-green' : 'bg-gray-500'
-                        }`}
-                      />
+                return (
+                  <div
+                    key={member.id}
+                    onClick={() => onSelectUserDM(user)}
+                    className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
+                      isSelectedDM
+                        ? 'shadow font-semibold'
+                        : unread > 0
+                        ? 'font-bold bg-black/5 dark:bg-white/10'
+                        : 'hover:bg-black/5 dark:hover:bg-white/10'
+                    }`}
+                    style={
+                      isSelectedDM
+                        ? {
+                            backgroundColor: 'var(--theme-primary)',
+                            color: 'var(--theme-primary-text)',
+                          }
+                        : {
+                            color: 'var(--theme-text-primary)',
+                          }
+                    }
+                  >
+                    <div className="flex items-center gap-2.5 truncate min-w-0">
+                      <div className="relative shrink-0">
+                        <img
+                          src={user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`}
+                          alt={user.displayName}
+                          className="w-5 h-5 rounded-md object-cover"
+                        />
+                        <span
+                          className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-1 ring-black/40 ${
+                            isOnline ? 'bg-slack-green' : 'bg-gray-500'
+                          }`}
+                        />
+                      </div>
+                      <span className="truncate">{user.displayName}</span>
+                      {isSelf && (
+                        <span className="text-[10px] shrink-0" style={{ color: 'var(--theme-text-muted)' }}>you</span>
+                      )}
                     </div>
-                    <span className="truncate">{user.displayName}</span>
-                    {isSelf && (
-                      <span className="text-[10px] shrink-0" style={{ color: 'var(--theme-text-muted)' }}>you</span>
+
+                    {unread > 0 && (
+                      <span className="px-1.5 py-0.5 bg-slack-green text-white text-[10px] font-bold rounded-full min-w-[18px] text-center leading-none shrink-0 ml-1">
+                        {unread}
+                      </span>
                     )}
                   </div>
-
-                  {unread > 0 && (
-                    <span className="px-1.5 py-0.5 bg-slack-green text-white text-[10px] font-bold rounded-full min-w-[18px] text-center leading-none shrink-0 ml-1">
-                      {unread}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -771,6 +838,16 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           onClose={() => setShowThemeModal(false)}
           workspace={workspace}
           isAdminOrOwner={isAdminOrOwner}
+        />
+      )}
+
+      {/* Organization Control Modal */}
+      {showOrgControlModal && (
+        <OrganizationControlModal
+          isOpen={showOrgControlModal}
+          onClose={() => setShowOrgControlModal(false)}
+          workspace={workspace}
+          currentUser={currentUser}
         />
       )}
     </div>

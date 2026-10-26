@@ -15,8 +15,11 @@ import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
 import { useProjectStore } from '../../stores/projectStore';
 import { TicketModal } from './TicketModal';
+import { TicketDetailModal } from './TicketDetailModal';
 import { ProjectViewSwitcher } from './ProjectViewSwitcher';
 import { ProjectDocsView } from './ProjectDocsView';
+import { IssueChatModal } from './IssueChatModal';
+import { IssueTimelineModal } from './IssueTimelineModal';
 import {
   Plus,
   Search,
@@ -40,6 +43,9 @@ import {
   ChevronRight,
   Bell,
   GripVertical,
+  Eye,
+  Tag,
+  GitBranch,
 } from 'lucide-react';
 
 interface ProjectBoardViewProps {
@@ -107,8 +113,37 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
   // Modals & Popovers
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
+  const [viewingDetailTicket, setViewingDetailTicket] = useState<Ticket | null>(null);
   const [targetColumnId, setTargetColumnId] = useState<string | undefined>(undefined);
   const [showProjectMenu, setShowProjectMenu] = useState(false);
+  const [chatTicket, setChatTicket] = useState<any | null>(null);
+  const [timelineTicket, setTimelineTicket] = useState<any | null>(null);
+
+  // Direct Ticket Actions
+  const handleToggleWatch = async (ticket: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const res = await api.post(`/api/projects/${project.id}/tickets/${ticket.id}/watch`);
+      updateTicket({
+        ...ticket,
+        watchers: res.data.watchers,
+      });
+    } catch (err: any) {
+      console.error('Failed to toggle watch', err);
+    }
+  };
+
+  const handleDeleteTicketDirect = async (ticket: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const confirmed = window.confirm(`Delete issue "${ticket.title}"?`);
+    if (!confirmed) return;
+    try {
+      await api.delete(`/api/projects/${project.id}/tickets/${ticket.id}`);
+      removeTicket(ticket.id);
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to delete ticket');
+    }
+  };
 
   // Column creation & editing state
   const [showAddColumn, setShowAddColumn] = useState(false);
@@ -895,6 +930,10 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                     column.name.toLowerCase() !== 'done' &&
                     column.name.toLowerCase() !== 'completed';
 
+                  const watchersList = Array.isArray(ticket.watchers) ? ticket.watchers : [];
+                  const isWatching = currentUser ? watchersList.includes(currentUser.id) : false;
+                  const commentCount = (ticket as any)._count?.comments || ((ticket as any).comments?.length ?? 0);
+
                   return (
                     <div
                       key={ticket.id}
@@ -905,41 +944,113 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                         setTargetColumnId(column.id);
                         setShowTicketModal(true);
                       }}
-                      className={`border rounded-xl p-3 shadow-sm transition-all duration-150 cursor-grab active:cursor-grabbing hover:shadow-md ${
+                      className={`border rounded-2xl p-3.5 shadow-sm transition-all duration-150 cursor-grab active:cursor-grabbing hover:shadow-md relative group ${
+                        isOverdue ? 'ring-2 ring-rose-500/80 border-rose-500/80' : ''
+                      } ${
                         isBeingDragged ? 'opacity-40 scale-95 border-dashed ring-2 ring-slack-green' : ''
                       }`}
                       style={{
                         backgroundColor: 'var(--theme-bg-surface-hover)',
-                        borderColor: 'var(--theme-border)',
+                        borderColor: isOverdue ? '#ef4444' : 'var(--theme-border)',
                       }}
                     >
-                      {/* Priority Badge & ID */}
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold ${priorityMeta.bg} ${priorityMeta.text}`}
-                        >
-                          <PriorityIcon size={11} />
-                          {priorityMeta.label}
-                        </span>
+                      {/* Top Header: ID badge on left & 4 Action Buttons on right */}
+                      <div className="flex items-center justify-between gap-2 mb-2.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-600 text-white shadow-xs">
+                            ID: {ticket.issueNumber || ticket.customId || ticket.id.slice(0, 5)}
+                          </span>
 
-                        <span className="text-[10px] font-mono" style={{ color: 'var(--theme-text-muted)' }}>
-                          #{ticket.id.slice(0, 6)}
-                        </span>
+                          {/* Labels */}
+                          {ticket.labels && Array.isArray(ticket.labels) && ticket.labels.length > 0 && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                              <Tag size={10} />
+                              {typeof ticket.labels[0] === 'string' ? ticket.labels[0] : ticket.labels[0]?.name || 'Dev'}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Top-Right 4 Action Buttons */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          {/* 1. Eye Button (View Ticket Details) */}
+                          <button
+                            type="button"
+                            title="View Ticket Details"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setViewingDetailTicket(ticket);
+                            }}
+                            className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition"
+                          >
+                            <Eye size={13} />
+                          </button>
+
+                          {/* 2. Chat Button (With count badge) */}
+                          <button
+                            type="button"
+                            title="Issue Chat & Notes"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setChatTicket(ticket);
+                            }}
+                            className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition relative"
+                          >
+                            <MessageSquare size={13} />
+                            {commentCount > 0 && (
+                              <span className="absolute -top-1 -right-1 px-1 min-w-[14px] h-[14px] rounded-full text-[9px] font-bold bg-rose-500 text-white flex items-center justify-center shadow-xs">
+                                {commentCount}
+                              </span>
+                            )}
+                          </button>
+
+                          {/* 3. Clock Button (Issue Timeline) */}
+                          <button
+                            type="button"
+                            title="Issue Timeline & Activity"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTimelineTicket(ticket);
+                            }}
+                            className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition"
+                          >
+                            <Clock size={13} />
+                          </button>
+
+                          {/* 4. Trash Button (Delete Ticket) */}
+                          <button
+                            type="button"
+                            title="Delete issue"
+                            onClick={(e) => handleDeleteTicketDirect(ticket, e)}
+                            className="p-1 rounded-full text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
 
                       {/* Ticket Title */}
-                      <h4 className="text-xs font-semibold leading-snug mb-1.5 break-words" style={{ color: 'var(--theme-text-primary)' }}>
+                      <h4 className="text-xs font-bold leading-snug mb-1.5 break-words text-white">
                         {ticket.title}
                       </h4>
 
                       {/* Description Preview */}
                       {ticket.description && (
-                        <p className="text-[11px] line-clamp-2 mb-2.5 leading-relaxed" style={{ color: 'var(--theme-text-muted)' }}>
+                        <p className="text-[11px] line-clamp-2 mb-2 leading-relaxed text-slate-400">
                           {ticket.description}
                         </p>
                       )}
 
-                      {/* Footer: Due Date & Assignee Avatar */}
+                      {/* Git Branch Badge */}
+                      {ticket.gitbranch && (
+                        <div className="mb-2.5">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black/40 border border-slate-700/60 font-mono text-[10px] text-slate-300 max-w-full truncate">
+                            <GitBranch size={10} className="shrink-0 text-slate-400" />
+                            <span className="truncate">{ticket.gitbranch}</span>
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Footer: Due Date pill & Assignee Avatar */}
                       <div
                         className="flex items-center justify-between pt-2 border-t text-[11px]"
                         style={{ borderColor: 'var(--theme-border)' }}
@@ -947,18 +1058,21 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                         {/* Due Date */}
                         {ticket.dueDate ? (
                           <div
-                            className={`flex items-center gap-1 font-medium ${
-                              isOverdue ? 'text-red-400 font-bold' : ''
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                              isOverdue
+                                ? 'bg-rose-500/10 text-rose-400 border-rose-500/40'
+                                : 'bg-slate-800/80 text-slate-300 border-slate-700'
                             }`}
-                            style={!isOverdue ? { color: 'var(--theme-text-muted)' } : undefined}
                           >
-                            <Calendar size={12} />
+                            <Calendar size={11} className={isOverdue ? 'text-rose-400' : 'text-slate-400'} />
                             <span>
                               {new Date(ticket.dueDate).toLocaleDateString(undefined, {
-                                month: 'short',
-                                day: 'numeric',
+                                year: 'numeric',
+                                month: '2-digit',
+                                day: '2-digit',
                               })}
                             </span>
+                            {isOverdue && <AlertCircle size={12} className="text-rose-400 ml-0.5" />}
                           </div>
                         ) : (
                           <div />
@@ -976,14 +1090,14 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                                 `https://api.dicebear.com/7.x/bottts/svg?seed=${ticket.assignee.username}`
                               }
                               alt={ticket.assignee.displayName}
-                              className="w-5 h-5 rounded-full object-cover ring-1 ring-black/20 dark:ring-white/20"
+                              className="w-6 h-6 rounded-full object-cover ring-1 ring-black/20 dark:ring-white/20"
                             />
                             <span className="text-[10px] font-medium hidden sm:inline max-w-[80px] truncate" style={{ color: 'var(--theme-text-primary)' }}>
                               {ticket.assignee.displayName}
                             </span>
                           </div>
                         ) : (
-                          <span className="text-[10px] flex items-center gap-1" style={{ color: 'var(--theme-text-muted)' }}>
+                          <span className="text-[10px] flex items-center gap-1 text-slate-500">
                             <User size={11} />
                             Unassigned
                           </span>
@@ -1129,6 +1243,46 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
           onTicketCreated={(created) => addTicket(created)}
           onTicketUpdated={(updated) => updateTicket(updated)}
           onTicketDeleted={(id) => removeTicket(id)}
+        />
+      )}
+
+      {/* Issue Chat Modal (Matching Image 3) */}
+      {chatTicket && (
+        <IssueChatModal
+          projectId={project.id}
+          ticket={chatTicket}
+          currentUser={currentUser}
+          onClose={() => setChatTicket(null)}
+        />
+      )}
+
+      {/* Issue Timeline Modal (Matching Image 4) */}
+      {timelineTicket && (
+        <IssueTimelineModal
+          ticket={timelineTicket}
+          members={members}
+          columns={columns}
+          onClose={() => setTimelineTicket(null)}
+        />
+      )}
+
+      {/* Ticket Detail Modal (Matching Image 2 - Eye Button) */}
+      {viewingDetailTicket && (
+        <TicketDetailModal
+          projectId={project.id}
+          ticket={viewingDetailTicket}
+          columns={columns}
+          members={members}
+          onClose={() => setViewingDetailTicket(null)}
+          onEditTicket={(t) => {
+            setEditingTicket(t);
+            setTargetColumnId(t.columnId);
+            setShowTicketModal(true);
+          }}
+          onTicketUpdated={(updated) => {
+            updateTicket(updated);
+            setViewingDetailTicket(updated);
+          }}
         />
       )}
     </div>

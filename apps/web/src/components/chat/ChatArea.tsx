@@ -43,8 +43,12 @@ import { RichTextEditor, RichTextEditorRef } from './RichTextEditor';
 import { FileAttachmentList, formatFileSize, getFileCategory } from './FileAttachmentList';
 import { ChannelStorageModal } from './ChannelStorageModal';
 import { ChannelDetailsModal } from '../channel/ChannelDetailsModal';
+import { CompressFileConfirmModal } from './CompressFileConfirmModal';
+import { compressFile } from '../../lib/compression';
+import { EmployeeAvailabilityHeader } from '../availability/EmployeeAvailabilityHeader';
 import { PinnedMessagesModal } from './PinnedMessagesModal';
 import { AnonymousPersonaModal } from '../channel/AnonymousPersonaModal';
+
 
 interface ChatAreaProps {
   channel: Channel;
@@ -105,6 +109,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [deleteConfirmMessage, setDeleteConfirmMessage] = useState<Message | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Compression Confirmation State
+  const [pendingCompressFiles, setPendingCompressFiles] = useState<File[]>([]);
+  const [showCompressModal, setShowCompressModal] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
 
   const currentWorkspace = useChatStore((state) => state.currentWorkspace);
   const isWsAdmin =
@@ -341,15 +350,25 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
   };
 
-  // Multiple File Upload Handler
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
+  // Core file uploading logic with optional compression
+  const processUploadFiles = async (filesToUpload: File[], shouldCompress: boolean) => {
     setIsUploading(true);
+    if (shouldCompress) {
+      setIsCompressing(true);
+    }
+
     try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+      for (let i = 0; i < filesToUpload.length; i++) {
+        let file = filesToUpload[i];
+
+        if (shouldCompress) {
+          try {
+            file = await compressFile(file);
+          } catch (compErr) {
+            console.error('Compression failed for file', file.name, compErr);
+          }
+        }
+
         const formData = new FormData();
         formData.append('workspaceId', channel.workspaceId);
         formData.append('channelId', channel.id);
@@ -365,39 +384,35 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       alert(err.response?.data?.error || 'File upload failed');
     } finally {
       setIsUploading(false);
+      setIsCompressing(false);
+      setShowCompressModal(false);
+      setPendingCompressFiles([]);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     }
   };
 
-  // Drag & Drop File Upload Handler
-  const handleDrop = async (e: React.DragEvent) => {
+  // Multiple File Upload Handler (triggers confirmation prompt)
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
+
+    const files = Array.from(fileList);
+    setPendingCompressFiles(files);
+    setShowCompressModal(true);
+  };
+
+  // Drag & Drop File Upload Handler (triggers confirmation prompt)
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
-    const files = e.dataTransfer.files;
-    if (!files || files.length === 0) return;
+    const fileList = e.dataTransfer.files;
+    if (!fileList || fileList.length === 0) return;
 
-    setIsUploading(true);
-    try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const formData = new FormData();
-        formData.append('workspaceId', channel.workspaceId);
-        formData.append('channelId', channel.id);
-        formData.append('file', file);
-
-        const url = `/api/files/upload?workspaceId=${encodeURIComponent(channel.workspaceId)}&channelId=${encodeURIComponent(channel.id)}`;
-        const res = await api.post(url, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
-        setAttachments((prev) => [...prev, res.data]);
-      }
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'File upload failed');
-    } finally {
-      setIsUploading(false);
-    }
+    const files = Array.from(fileList);
+    setPendingCompressFiles(files);
+    setShowCompressModal(true);
   };
 
   // Socket listener for real-time file deletions
@@ -633,6 +648,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
         {/* Actions in Header */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Employee Availability & Working Hours Stopwatch Toolbar */}
+          <EmployeeAvailabilityHeader currentUserId={currentUser?.id} />
+
           {/* Anonymous Persona Badge / Edit Button */}
           {channel.isAnonymous && anonProfile && (
             <button
@@ -1630,6 +1648,22 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           </div>
         </div>
       )}
+
+      {/* Compression Confirmation Modal */}
+      <CompressFileConfirmModal
+        isOpen={showCompressModal}
+        files={pendingCompressFiles}
+        isCompressing={isCompressing}
+        onConfirmCompress={() => processUploadFiles(pendingCompressFiles, true)}
+        onSkip={() => processUploadFiles(pendingCompressFiles, false)}
+        onCancel={() => {
+          setShowCompressModal(false);
+          setPendingCompressFiles([]);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+        }}
+      />
     </div>
   );
 };

@@ -29,6 +29,7 @@ import { SearchMessagesDialog } from '../components/chat/SearchMessagesDialog';
 import { ProjectBoardView } from '../components/project/ProjectBoardView';
 import { CreateProjectModal } from '../components/project/CreateProjectModal';
 import { CreateTicketFromMessageDialog } from '../components/project/CreateTicketFromMessageDialog';
+import { OrganizationControlView } from '../components/availability/OrganizationControlView';
 import {
   Layers,
   ShieldCheck,
@@ -83,6 +84,7 @@ export default function AppDashboard() {
   const [showBotPortal, setShowBotPortal] = useState(false);
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
+  const [showOrgControl, setShowOrgControl] = useState(false);
   const [messageForTicket, setMessageForTicket] = useState<Message | null>(null);
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -236,6 +238,7 @@ export default function AppDashboard() {
 
   // 4. Handle Channel Selection (Chunked Initial Load)
   const handleSelectChannel = async (channel: Channel) => {
+    setShowOrgControl(false);
     setCurrentProject(null);
     setCurrentChannel(channel);
     setHasMoreMessages(false);
@@ -263,6 +266,7 @@ export default function AppDashboard() {
 
   // 4b. Handle Project Selection
   const handleSelectProject = (project: Project) => {
+    setShowOrgControl(false);
     setCurrentProject(project);
     if (typeof window !== 'undefined') {
       window.history.replaceState(null, '', `?projectId=${project.id}`);
@@ -698,6 +702,10 @@ export default function AppDashboard() {
                   setIsMobileSidebarOpen(false);
                   setShowSearchModal(true);
                 }}
+                onOpenOrganizationControl={() => {
+                  setIsMobileSidebarOpen(false);
+                  setShowOrgControl(true);
+                }}
                 onCloseMobile={() => setIsMobileSidebarOpen(false)}
                 onMemberAdded={async () => {
                   if (currentWorkspace) {
@@ -750,6 +758,7 @@ export default function AppDashboard() {
             onStartHuddle={handleStartHuddle}
             onLogout={logout}
             onOpenSearch={() => setShowSearchModal(true)}
+            onOpenOrganizationControl={() => setShowOrgControl(true)}
             onMemberAdded={async () => {
               if (currentWorkspace) {
                 const res = await api.get(`/api/workspaces/${currentWorkspace.id}`);
@@ -872,6 +881,20 @@ export default function AppDashboard() {
             </div>
           </div>
         </div>
+      ) : showOrgControl && currentWorkspace ? (
+        <OrganizationControlView
+          workspace={currentWorkspace}
+          currentUser={user}
+          members={members}
+          channels={channels}
+          onClose={() => setShowOrgControl(false)}
+          onOpenAddMembers={() => setShowAddMembers(true)}
+          onOpenBotPortal={() => setShowBotPortal(true)}
+          onOpenProjectBoard={(project) => {
+            setShowOrgControl(false);
+            handleSelectProject(project);
+          }}
+        />
       ) : currentProject ? (
         <ProjectBoardView
           project={currentProject}

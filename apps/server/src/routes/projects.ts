@@ -9,7 +9,14 @@ const createProjectSchema = z.object({
   description: z.string().optional().nullable(),
   icon: z.string().optional().default('📋'),
   color: z.string().optional().default('#007A5A'),
+  status: z.enum(['active', 'inactive', 'delivered']).optional().default('active'),
   notificationChannelId: z.string().uuid().optional().nullable(),
+  assignedEmployees: z.any().optional(),
+  selectedManagers: z.any().optional(),
+  slackMentions: z.any().optional(),
+  clientUid: z.string().optional().nullable(),
+  clientUsername: z.string().optional().nullable(),
+  clientEmail: z.string().optional().nullable(),
 });
 
 const updateProjectSchema = z.object({
@@ -17,7 +24,14 @@ const updateProjectSchema = z.object({
   description: z.string().optional().nullable(),
   icon: z.string().optional(),
   color: z.string().optional(),
+  status: z.enum(['active', 'inactive', 'delivered']).optional(),
   notificationChannelId: z.string().uuid().optional().nullable(),
+  assignedEmployees: z.any().optional(),
+  selectedManagers: z.any().optional(),
+  slackMentions: z.any().optional(),
+  clientUid: z.string().optional().nullable(),
+  clientUsername: z.string().optional().nullable(),
+  clientEmail: z.string().optional().nullable(),
 });
 
 const reorderColumnsSchema = z.object({
@@ -56,6 +70,12 @@ const updateTicketSchema = z.object({
   dueDate: z.string().optional().nullable(),
   assigneeId: z.string().uuid().optional().nullable(),
   orderIndex: z.number().int().optional(),
+  gitbranch: z.string().optional().nullable(),
+  checklist: z.any().optional().nullable(),
+  labels: z.any().optional().nullable(),
+  storyPoints: z.number().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  testPlan: z.string().optional().nullable(),
 });
 
 const moveTicketSchema = z.object({
@@ -99,8 +119,15 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.status(403).send({ error: 'You are not a member of this workspace' });
     }
 
+    const { status } = request.query as { status?: string };
+
+    const whereClause: any = { workspaceId };
+    if (status) {
+      whereClause.status = { equals: status, mode: 'insensitive' };
+    }
+
     const projects = await prisma.project.findMany({
-      where: { workspaceId },
+      where: whereClause,
       include: {
         creator: {
           select: {
@@ -148,7 +175,20 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.status(400).send({ error: parseResult.error.errors[0].message });
     }
 
-    const { name, description, icon, color, notificationChannelId } = parseResult.data;
+    const {
+      name,
+      description,
+      icon,
+      color,
+      status,
+      notificationChannelId,
+      assignedEmployees,
+      selectedManagers,
+      slackMentions,
+      clientUid,
+      clientUsername,
+      clientEmail,
+    } = parseResult.data;
 
     let targetNotifChannelId = notificationChannelId;
     if (!targetNotifChannelId) {
@@ -174,6 +214,13 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         description,
         icon,
         color,
+        status: status || 'active',
+        assignedEmployees: assignedEmployees ?? undefined,
+        selectedManagers: selectedManagers ?? undefined,
+        slackMentions: slackMentions ?? undefined,
+        clientUid: clientUid ?? null,
+        clientUsername: clientUsername ?? null,
+        clientEmail: clientEmail ?? null,
         notificationChannelId: targetNotifChannelId,
         createdById: userId,
         columns: {
@@ -257,6 +304,11 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
                     username: true,
                     displayName: true,
                     avatarUrl: true,
+                  },
+                },
+                _count: {
+                  select: {
+                    comments: true,
                   },
                 },
               },
@@ -526,6 +578,24 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     // Order index at bottom of column
     const ticketCount = await prisma.ticket.count({ where: { columnId } });
 
+    // Fetch creator name for initial event log & notifications
+    const actor = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { displayName: true, username: true },
+    });
+    const actorName = actor?.displayName || actor?.username || 'Team Member';
+
+    const initialEvents = [
+      {
+        id: `evt-${Date.now()}-0`,
+        type: 'created',
+        action: `Created to ${column.name}`,
+        user: actorName,
+        date: new Date().toISOString(),
+        color: '#3B82F6',
+      },
+    ];
+
     const ticket = await prisma.ticket.create({
       data: {
         projectId,
@@ -537,6 +607,7 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         dueDate: dueDate ? new Date(dueDate) : null,
         createdById: userId,
         assigneeId: assigneeId || null,
+        events: initialEvents,
       },
       include: {
         creator: {
@@ -558,13 +629,6 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         column: true,
       },
     });
-
-    // Notify assignee via Orbit Bot if assigned and send channel activity
-    const actor = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { displayName: true },
-    });
-    const actorName = actor?.displayName || 'A team member';
 
     const targetUserIds: string[] = [];
     if (assigneeId && assigneeId !== userId) {
@@ -604,7 +668,10 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     });
     if (!membership) return reply.status(403).send({ error: 'Unauthorized' });
 
-    const existingTicket = await prisma.ticket.findUnique({ where: { id: ticketId } });
+    const existingTicket = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      include: { column: true },
+    });
     if (!existingTicket) return reply.status(404).send({ error: 'Ticket not found' });
 
     const parseResult = updateTicketSchema.safeParse(request.body);
@@ -612,7 +679,42 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.status(400).send({ error: parseResult.error.errors[0].message });
     }
 
-    const { columnId, title, description, priority, dueDate, assigneeId, orderIndex } = parseResult.data;
+    const {
+      columnId,
+      title,
+      description,
+      priority,
+      dueDate,
+      assigneeId,
+      orderIndex,
+      gitbranch,
+      checklist,
+      labels,
+      storyPoints,
+      notes,
+      testPlan,
+    } = parseResult.data;
+
+    let updatedEvents = Array.isArray(existingTicket.events) ? [...(existingTicket.events as any[])] : [];
+
+    if (columnId && columnId !== existingTicket.columnId) {
+      const targetColumn = await prisma.projectColumn.findUnique({ where: { id: columnId } });
+      const actor = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { displayName: true, username: true },
+      });
+      const actorName = actor?.displayName || actor?.username || 'Team Member';
+      const prevColName = existingTicket.column?.name || 'status';
+
+      updatedEvents.push({
+        id: `evt-${Date.now()}-${updatedEvents.length}`,
+        type: 'status_change',
+        action: `Status Change from ${prevColName} to ${targetColumn?.name || 'status'}`,
+        user: actorName,
+        date: new Date().toISOString(),
+        color: '#10B981',
+      });
+    }
 
     const dataToUpdate: any = {};
     if (columnId !== undefined) dataToUpdate.columnId = columnId;
@@ -622,6 +724,15 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     if (dueDate !== undefined) dataToUpdate.dueDate = dueDate ? new Date(dueDate) : null;
     if (assigneeId !== undefined) dataToUpdate.assigneeId = assigneeId;
     if (orderIndex !== undefined) dataToUpdate.orderIndex = orderIndex;
+    if (gitbranch !== undefined) dataToUpdate.gitbranch = gitbranch;
+    if (checklist !== undefined) dataToUpdate.checklist = checklist;
+    if (labels !== undefined) dataToUpdate.labels = labels;
+    if (storyPoints !== undefined) dataToUpdate.storyPoints = storyPoints;
+    if (notes !== undefined) dataToUpdate.notes = notes;
+    if (testPlan !== undefined) dataToUpdate.testPlan = testPlan;
+    if (updatedEvents.length > (Array.isArray(existingTicket.events) ? (existingTicket.events as any[]).length : 0)) {
+      dataToUpdate.events = updatedEvents;
+    }
 
     const updated = await prisma.ticket.update({
       where: { id: ticketId },
@@ -704,11 +815,32 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     const previousColumnId = existingTicket.columnId;
     const isColumnChanged = previousColumnId !== newColumnId;
 
+    let updatedEvents = Array.isArray(existingTicket.events) ? [...(existingTicket.events as any[])] : [];
+
+    if (isColumnChanged) {
+      const actor = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { displayName: true, username: true },
+      });
+      const actorName = actor?.displayName || actor?.username || 'Team Member';
+
+      const prevColName = existingTicket.column?.name || 'status';
+      updatedEvents.push({
+        id: `evt-${Date.now()}-${updatedEvents.length}`,
+        type: 'status_change',
+        action: `Status Change from ${prevColName} to ${targetColumn.name}`,
+        user: actorName,
+        date: new Date().toISOString(),
+        color: '#10B981',
+      });
+    }
+
     const updated = await prisma.ticket.update({
       where: { id: ticketId },
       data: {
         columnId: newColumnId,
         orderIndex: newOrderIndex,
+        events: updatedEvents,
       },
       include: {
         creator: {
@@ -1271,6 +1403,94 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     fastify.io.to(`workspace:${project.workspaceId}`).emit(SOCKET_EVENTS.DOCUMENT_UPDATE, updatedDoc);
 
     return reply.send(updatedDoc);
+  });
+
+  // --------------------------------------------------------------------------
+  // TICKET COMMENTS & CHAT ENDPOINTS
+  // --------------------------------------------------------------------------
+  // List comments for a ticket
+  fastify.get('/:projectId/tickets/:ticketId/comments', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { projectId, ticketId } = request.params as { projectId: string; ticketId: string };
+    const comments = await prisma.ticketComment.findMany({
+      where: { ticketId },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+    return reply.send(comments);
+  });
+
+  // Create comment on ticket
+  fastify.post('/:projectId/tickets/:ticketId/comments', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { projectId, ticketId } = request.params as { projectId: string; ticketId: string };
+    const userId = (request.user as { id: string }).id;
+    const { text, type, audioUrl, audioDuration } = request.body as any;
+
+    if (!text && !audioUrl) {
+      return reply.status(400).send({ error: 'Comment text or audio is required' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { displayName: true, username: true },
+    });
+
+    const comment = await prisma.ticketComment.create({
+      data: {
+        ticketId,
+        userId,
+        username: user?.displayName || user?.username || 'Team Member',
+        text: text || '',
+        type: type || 'text',
+        audioUrl: audioUrl || null,
+        audioDuration: audioDuration ? Number(audioDuration) : null,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+
+    return reply.status(201).send(comment);
+  });
+
+  // Toggle watcher on ticket
+  fastify.post('/:projectId/tickets/:ticketId/watch', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { ticketId } = request.params as { ticketId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
+    if (!ticket) return reply.status(404).send({ error: 'Ticket not found' });
+
+    let watchers = Array.isArray(ticket.watchers) ? (ticket.watchers as string[]) : [];
+    const isWatching = watchers.includes(userId);
+
+    if (isWatching) {
+      watchers = watchers.filter((id) => id !== userId);
+    } else {
+      watchers.push(userId);
+    }
+
+    const updated = await prisma.ticket.update({
+      where: { id: ticketId },
+      data: { watchers },
+    });
+
+    return reply.send({ isWatching: !isWatching, watchers: updated.watchers });
   });
 };
 

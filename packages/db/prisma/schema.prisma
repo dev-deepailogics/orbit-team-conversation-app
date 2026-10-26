@@ -55,6 +55,16 @@ model User {
   status            UserStatus   @default(OFFLINE)
   customStatusText  String?
   customStatusEmoji String?
+  
+  // Organization, Leave & Integration Fields
+  role                  String?      @default("employee")
+  leaves                Json?        // e.g. { countLeaves: { casual: 10, sick: 8 }, offCountLeaves: { bereavement: 5, hajj: 15, ... } }
+  disabled              Boolean      @default(false)
+  isActive              Boolean      @default(true)
+  usersCollectionFlags  Json?        // e.g. { disabled: false, isActive: true }
+  slackThreadId         String?
+  slackThreadExpiry     DateTime?
+
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
@@ -76,6 +86,9 @@ model User {
   assignedTickets   Ticket[]          @relation("TicketAssignee")
   createdDocuments  ProjectDocument[] @relation("DocumentCreator")
   documentShares    ProjectDocumentShare[]
+  availabilities    UserAvailability[]
+  ticketComments    TicketComment[]
+
 
   @@index([email])
   @@index([username])
@@ -354,6 +367,16 @@ model Project {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
+  // Firebase imported fields
+  projectId         String?
+  status            String?         @default("active")
+  assignedEmployees Json?
+  selectedManagers  Json?
+  slackMentions     Json?
+  clientUid         String?
+  clientUsername    String?
+  clientEmail       String?
+
   workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   creator     User            @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: Cascade)
   notificationChannel Channel?  @relation("ProjectNotificationChannel", fields: [notificationChannelId], references: [id], onDelete: SetNull)
@@ -395,10 +418,30 @@ model Ticket {
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
+  // Firebase kanban_issues imported fields
+  issueNumber Int?
+  customId    String?
+  dueTime     String?
+  range       Int?
+  gitbranch   String?
+  labels      Json?
+  assignees   Json?
+  images      Json?
+  events      Json?
+  checklist   Json?
+  storyPoints Int?
+  timeSpent   Int?
+  watchers    Json?
+  notes       String?        @db.Text
+  testPlan    String?        @db.Text
+  loom        String?
+  status      String?
+
   project     Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
   column      ProjectColumn  @relation(fields: [columnId], references: [id], onDelete: Cascade)
   creator     User           @relation("TicketCreator", fields: [createdById], references: [id], onDelete: Cascade)
   assignee    User?          @relation("TicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  comments    TicketComment[]
 
   @@index([projectId])
   @@index([columnId, orderIndex])
@@ -459,5 +502,64 @@ model PushSubscription {
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+}
+
+// ==========================================
+// Employee Availability & Time Tracking Models
+// ==========================================
+model UserAvailability {
+  id                    String              @id @default(uuid())
+  userId                String
+  date                  String              // YYYY-MM-DD
+  availableTime         DateTime            @default(now())
+  offTime               DateTime?
+  totalWorkingMinutes   Int                 @default(0)
+  isAvailable           Boolean             @default(true)
+  isOnBreak             Boolean             @default(false)
+  isAutoCheckedOut      Boolean             @default(false)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  user                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  breaks                AvailabilityBreak[]
+
+  @@index([userId, date])
+  @@index([userId, isAvailable])
+}
+
+model AvailabilityBreak {
+  id                  String           @id @default(uuid())
+  availabilityId      String
+  uid                 String?
+  breakReason         String           // Lunch, Namaz, Tea, Personal, etc.
+  breakStartTime      DateTime         @default(now())
+  availableAfterBreak DateTime?
+  breakDurationMinutes Int             @default(0)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  availability        UserAvailability @relation(fields: [availabilityId], references: [id], onDelete: Cascade)
+
+  @@index([availabilityId])
+}
+
+
+model TicketComment {
+  id            String    @id @default(uuid())
+  ticketId      String
+  userId        String?
+  username      String?
+  text          String    @db.Text
+  type          String    @default("text")
+  audioUrl      String?
+  audioDuration Int?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  ticket        Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user          User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId, createdAt])
   @@index([userId])
 }

@@ -20,7 +20,9 @@ import { fileRoutes } from './routes/files.js';
 import { adminRoutes } from './routes/admin.js';
 import { projectRoutes } from './routes/projects.js';
 import { pushRoutes } from './routes/push.js';
+import { availabilityRoutes, performAutoCheckoutBackfill } from './routes/availability.js';
 import { registerPushMiddleware } from './services/pushService.js';
+
 import { setupSocketServer } from './socket/index.js';
 
 dotenv.config();
@@ -117,11 +119,23 @@ async function bootstrap() {
   await fastify.register(adminRoutes, { prefix: '/api/admin' });
   await fastify.register(projectRoutes, { prefix: '/api/projects' });
   await fastify.register(pushRoutes, { prefix: '/api/push' });
+  await fastify.register(availabilityRoutes, { prefix: '/api/availability' });
 
   // Start Server
+
   try {
     await fastify.listen({ port: PORT, host: HOST });
     console.log(`🚀 Orbit Backend & Socket Server running on http://${HOST}:${PORT}`);
+
+    // Initial check for any unclosed sessions from previous days
+    await performAutoCheckoutBackfill(fastify);
+
+    // Schedule regular check every 15 minutes to guarantee auto-checkout at 4:00 AM PKT
+    setInterval(() => {
+      performAutoCheckoutBackfill(fastify).catch((err) => {
+        fastify.log.error(err, 'Auto-checkout backfill interval error');
+      });
+    }, 15 * 60 * 1000);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
