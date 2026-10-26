@@ -107,6 +107,51 @@ export async function sendSystemNotification({
   }
 }
 
+// Default, undeletable channel where workspace events (channel deletions, reactions, ...) are logged.
+export const ACTIVITY_CHANNEL = 'activity';
+export const ACTIVITY_CHANNEL_TOPIC = 'Workspace activity: channel deletions, reactions and other events';
+
+// Created lazily so workspaces that predate the activity channel get one on their first event.
+// ponytail: matched by name and no unique constraint, so two simultaneous first events can create it twice; add a Channel.isSystem flag + unique index if that shows up.
+export async function getOrCreateActivityChannel(workspaceId: string, io?: any) {
+  const existing = await prisma.channel.findFirst({
+    where: { workspaceId, name: ACTIVITY_CHANNEL },
+    select: { id: true },
+  });
+  if (existing) return existing;
+
+  const ws = await prisma.workspace.findUnique({
+    where: { id: workspaceId },
+    select: { ownerId: true, members: { select: { userId: true } } },
+  });
+  if (!ws) return null;
+
+  const channel = await prisma.channel.create({
+    data: {
+      workspaceId,
+      name: ACTIVITY_CHANNEL,
+      topic: ACTIVITY_CHANNEL_TOPIC,
+      type: 'PUBLIC',
+      createdById: ws.ownerId,
+      members: { create: ws.members.map((m) => ({ userId: m.userId })) },
+    },
+  });
+  io?.to(`workspace:${workspaceId}`).emit(SOCKET_EVENTS.CHANNEL_NEW, channel);
+  return channel;
+}
+
+// Never throws: activity logging must not fail the action that triggered it.
+export async function postActivity(workspaceId: string, content: string, io?: any) {
+  try {
+    const channel = await getOrCreateActivityChannel(workspaceId, io);
+    if (channel) {
+      await sendSystemNotification({ workspaceId, channelId: channel.id, content, io });
+    }
+  } catch (err) {
+    console.error('Failed to post activity message:', err);
+  }
+}
+
 export async function sendTicketBotNotification({
   workspaceId,
   actorName,

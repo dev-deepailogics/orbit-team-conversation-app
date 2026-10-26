@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { prisma } from '@orbit/db';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import { ACTIVITY_CHANNEL, ACTIVITY_CHANNEL_TOPIC } from '../services/systemBot.js';
 
 const updateRoleSchema = z.object({
   systemRole: z.enum(['SUPER_ADMIN', 'WORKSPACE_ADMIN', 'USER']),
@@ -275,6 +276,15 @@ export const adminRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
             {
               name: 'random',
               topic: 'Non-work banter and water cooler chat',
+              type: 'PUBLIC',
+              createdById: owner.id,
+              members: {
+                create: { userId: owner.id },
+              },
+            },
+            {
+              name: ACTIVITY_CHANNEL,
+              topic: ACTIVITY_CHANNEL_TOPIC,
               type: 'PUBLIC',
               createdById: owner.id,
               members: {

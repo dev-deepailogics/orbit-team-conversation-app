@@ -2,6 +2,8 @@
 
 React Native app for Orbit (team chat). Talks to `apps/server` over HTTP; mirrors the look of `apps/web`.
 
+Orbit is a replica of Slack. When a feature, screen, flow, or interaction isn't specified, take inspiration from how the Slack mobile app does it (layout, navigation, naming, admin/permission behavior).
+
 These versions are newer than most training data (RN 0.88, React 19.3, React Navigation 7, Reanimated 4, Zustand 5). Check the installed package's types/docs in `node_modules/<pkg>` before using an API from memory, and heed deprecation warnings.
 
 # Architecture & code standards

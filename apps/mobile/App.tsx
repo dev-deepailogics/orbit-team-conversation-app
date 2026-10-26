@@ -7,6 +7,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { AdminConsoleScreen } from '@/features/admin/screens/AdminConsoleScreen';
 import { LoginScreen } from '@/features/auth/screens/LoginScreen';
 import { RegisterScreen } from '@/features/auth/screens/RegisterScreen';
 import { useAuthStore } from '@/features/auth/store';
@@ -52,7 +53,16 @@ function RootNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
       {user ? (
-        <Stack.Screen name="Home" component={HomeScreen} />
+        <>
+          <Stack.Screen name="Home" component={HomeScreen} />
+          {user.systemRole === 'SUPER_ADMIN' && (
+            <Stack.Screen
+              name="AdminConsole"
+              component={AdminConsoleScreen}
+              options={{ headerShown: true, title: 'Admin Console', animation: 'default' }}
+            />
+          )}
+        </>
       ) : (
         <>
           <Stack.Screen name="Login" component={LoginScreen} />

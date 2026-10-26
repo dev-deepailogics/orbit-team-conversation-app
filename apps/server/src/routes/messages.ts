@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { verifyMessageAccess, verifyWorkspaceMember } from '../utils/security.js';
 import { handleMessageMentions } from '../services/mentionService.js';
 import { getOrCreateAnonProfile, sanitizeMessageForViewer } from '../services/anonymousService.js';
+import { ACTIVITY_CHANNEL, postActivity } from '../services/systemBot.js';
 
 const searchQuerySchema = z.object({
   workspaceId: z.string().min(1, 'workspaceId is required'),
@@ -433,6 +434,18 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         action,
         reactions: message.reactions,
       });
+    }
+
+    // Only public, non-anonymous channels: DMs, private and anonymous activity must not leak into #activity.
+    const { channel } = access;
+    if (action === 'added' && channel.type === 'PUBLIC' && !channel.isAnonymous && channel.name !== ACTIVITY_CHANNEL) {
+      const actor = await prisma.user.findUnique({ where: { id: userId }, select: { displayName: true, username: true } });
+      // Not awaited: the reaction response shouldn't wait on the activity post (postActivity never throws).
+      void postActivity(
+        channel.workspaceId,
+        `${emoji} **${actor?.displayName || actor?.username || 'Someone'}** reacted to a message in #${channel.name}`,
+        fastify.io,
+      );
     }
 
     return reply.send({ success: true, action, reactions: message?.reactions || [] });

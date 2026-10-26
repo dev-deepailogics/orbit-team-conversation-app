@@ -19,6 +19,7 @@ import {
   Loader2,
   ExternalLink,
   Copy,
+  Trash2,
 } from 'lucide-react';
 import { Channel, UserProfile } from '@orbit/types';
 import { api } from '../../lib/api';
@@ -52,6 +53,9 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
   const [newTopic, setNewTopic] = useState('');
   const [isSavingTopic, setIsSavingTopic] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const handleCopyChannelId = () => {
     if (!channel) return;
@@ -81,6 +85,8 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
       setDetails(null);
       setActiveTab('about');
       setMemberSearch('');
+      setDeleteConfirmText('');
+      setDeleteError('');
     }
   }, [isOpen, channel]);
 
@@ -101,6 +107,25 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
       alert(err.response?.data?.error || 'Failed to update topic');
     } finally {
       setIsSavingTopic(false);
+    }
+  };
+
+  // Server rejects deleting these defaults; permission (creator / workspace admin) is also enforced there.
+  const canShowDelete =
+    (channel.type === 'PUBLIC' || channel.type === 'PRIVATE') && !['general', 'activity'].includes(channel.name);
+
+  // The page's channel:deleted socket listener removes the channel and switches away from it.
+  const handleDeleteChannel = async () => {
+    if (isDeleting || deleteConfirmText !== channel.name) return;
+    setIsDeleting(true);
+    setDeleteError('');
+    try {
+      await api.delete(`/api/channels/${channel.id}`);
+      onClose();
+    } catch (err: any) {
+      setDeleteError(err.response?.data?.error || 'Failed to delete channel');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -351,6 +376,35 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
                   </button>
                 )}
               </div>
+
+              {canShowDelete && (
+                <div className="border border-red-900/60 bg-red-950/20 rounded-xl p-4 space-y-2.5">
+                  <span className="text-xs uppercase font-bold tracking-wider text-red-400">Delete Channel</span>
+                  <p className="text-xs text-gray-300 leading-relaxed">
+                    This permanently deletes <span className="font-semibold text-white">#{channel.name}</span> and all
+                    of its messages and files. Type <span className="font-mono font-semibold text-white">{channel.name}</span>{' '}
+                    to confirm.
+                  </p>
+                  <input
+                    type="text"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleDeleteChannel()}
+                    placeholder={channel.name}
+                    autoComplete="off"
+                    className="w-full bg-[#1A1D21] border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-red-500"
+                  />
+                  {deleteError && <p className="text-xs text-red-400">{deleteError}</p>}
+                  <button
+                    onClick={handleDeleteChannel}
+                    disabled={isDeleting || deleteConfirmText !== channel.name}
+                    className="w-full px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {isDeleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                    <span>Delete this channel</span>
+                  </button>
+                </div>
+              )}
             </>
           ) : (
             /* Members Tab */

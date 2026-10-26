@@ -446,6 +446,20 @@ export default function AppDashboard() {
       }
     };
 
+    // Fires for everyone in the workspace, including whoever deleted it.
+    const onChannelDeleted = ({ channelId }: { channelId: string }) => {
+      const remaining = useChatStore.getState().channels.filter((c) => c.id !== channelId);
+      setChannels(remaining);
+      if (currentChannelRef.current?.id === channelId) {
+        const fallback = remaining.find((c) => c.name === 'general') || remaining[0];
+        if (fallback) {
+          handleSelectChannel(fallback);
+        } else {
+          setCurrentChannel(null);
+        }
+      }
+    };
+
     const onMessageUpdated = (updatedMsg: Message) => {
       useChatStore.getState().updateMessage(updatedMsg);
     };
@@ -499,6 +513,7 @@ export default function AppDashboard() {
     socket.on('huddle:started', onCallStarted);
     socket.on('channel:new', onChannelNew);
     socket.on('channel:updated', onChannelUpdated);
+    socket.on('channel:deleted', onChannelDeleted);
     socket.on(SOCKET_EVENTS.PROJECT_NEW, onProjectNew);
     socket.on(SOCKET_EVENTS.PROJECT_UPDATE, onProjectUpdate);
     socket.on(SOCKET_EVENTS.PROJECT_DELETE, onProjectDelete);
@@ -514,6 +529,7 @@ export default function AppDashboard() {
       socket.off('huddle:started', onCallStarted);
       socket.off('channel:new', onChannelNew);
       socket.off('channel:updated', onChannelUpdated);
+      socket.off('channel:deleted', onChannelDeleted);
       socket.off(SOCKET_EVENTS.PROJECT_NEW, onProjectNew);
       socket.off(SOCKET_EVENTS.PROJECT_UPDATE, onProjectUpdate);
       socket.off(SOCKET_EVENTS.PROJECT_DELETE, onProjectDelete);

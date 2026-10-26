@@ -1,11 +1,11 @@
 import { useRef, useState, type ComponentRef } from 'react';
 import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
+import { FormField } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { getErrorMessage } from '@/lib/api';
 import type { ScreenProps } from '@/navigation/types';
 import { AuthLayout } from '../components/AuthLayout';
-import { FormField } from '../components/FormField';
 import { register } from '../services/authApi';
 import { useAuthStore } from '../store';
 
