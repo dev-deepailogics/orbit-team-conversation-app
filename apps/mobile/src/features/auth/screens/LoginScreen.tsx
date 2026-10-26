@@ -15,7 +15,7 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const passwordRef = useRef<ComponentRef<typeof TextInput>>(null);
-  const setAuth = useAuthStore((s) => s.setAuth);
+  const setAuth = useAuthStore(s => s.setAuth);
 
   const handleSubmit = async () => {
     if (isLoading) return;
@@ -66,14 +66,26 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
         onSubmitEditing={handleSubmit}
       />
 
-      <Button className="h-11 bg-slack-activeChannel" disabled={isLoading} onPress={handleSubmit}>
-        {isLoading ? <ActivityIndicator color="white" /> : <Text className="font-semibold text-white">Sign In</Text>}
+      <Button
+        className="h-11 bg-slack-activeChannel"
+        disabled={isLoading}
+        onPress={handleSubmit}
+      >
+        {isLoading ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <Text className="font-semibold text-white">Sign In</Text>
+        )}
       </Button>
 
       <View className="mt-2 flex-row justify-center">
-        <Text className="text-xs text-gray-400">Don&apos;t have an account? </Text>
+        <Text className="text-xs text-gray-400">
+          Don&apos;t have an account?{' '}
+        </Text>
         <Pressable onPress={() => navigation.replace('Register')} hitSlop={8}>
-          <Text className="text-xs font-semibold text-slack-activeChannel">Create an account</Text>
+          <Text className="text-xs font-semibold text-slack-activeChannel">
+            Create an account
+          </Text>
         </Pressable>
       </View>
     </AuthLayout>
