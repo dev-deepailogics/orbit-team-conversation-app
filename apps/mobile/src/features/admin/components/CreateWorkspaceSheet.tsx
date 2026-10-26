@@ -17,7 +17,12 @@ interface Props {
   onCreated: (workspace: Workspace) => void;
 }
 
-export function CreateWorkspaceSheet({ visible, withOwner = false, onClose, onCreated }: Props) {
+export function CreateWorkspaceSheet({
+  visible,
+  withOwner = false,
+  onClose,
+  onCreated,
+}: Props) {
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [slugEdited, setSlugEdited] = useState(false);
@@ -50,7 +55,11 @@ export function CreateWorkspaceSheet({ visible, withOwner = false, onClose, onCr
     setError('');
     setIsLoading(true);
     try {
-      const ws = await createWorkspace({ name: trimmedName, slug, ownerEmailOrId: withOwner ? owner.trim() : undefined });
+      const ws = await createWorkspace({
+        name: trimmedName,
+        slug,
+        ownerEmailOrId: withOwner ? owner.trim() : undefined,
+      });
       setName('');
       setSlug('');
       setSlugEdited(false);
@@ -87,7 +96,9 @@ export function CreateWorkspaceSheet({ visible, withOwner = false, onClose, onCr
         }}
         maxLength={50}
         returnKeyType={withOwner ? 'next' : 'go'}
-        onSubmitEditing={withOwner ? () => ownerRef.current?.focus() : handleSubmit}
+        onSubmitEditing={
+          withOwner ? () => ownerRef.current?.focus() : handleSubmit
+        }
         submitBehavior={withOwner ? 'submit' : undefined}
       />
       {withOwner && (
@@ -107,8 +118,16 @@ export function CreateWorkspaceSheet({ visible, withOwner = false, onClose, onCr
 
       {!!error && <Text className="text-xs text-red-400">{error}</Text>}
 
-      <Button className="h-11 bg-slack-green" disabled={isLoading} onPress={handleSubmit}>
-        {isLoading ? <ActivityIndicator color="white" /> : <Text className="font-semibold text-white">Create workspace</Text>}
+      <Button
+        className="h-11 bg-slack-green"
+        disabled={isLoading}
+        onPress={handleSubmit}
+      >
+        {isLoading ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <Text className="font-semibold text-white">Create workspace</Text>
+        )}
       </Button>
     </Sheet>
   );

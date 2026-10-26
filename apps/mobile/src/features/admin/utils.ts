@@ -27,12 +27,23 @@ const matches = (query: string, ...fields: Array<string | undefined>) => {
   return !q || fields.some(f => f?.toLowerCase().includes(q));
 };
 
-export function filterUsers(users: AdminUser[], query: string, role: RoleFilter): AdminUser[] {
+export function filterUsers(
+  users: AdminUser[],
+  query: string,
+  role: RoleFilter,
+): AdminUser[] {
   return users.filter(
-    u => (role === 'ALL' || u.systemRole === role) && matches(query, u.displayName, u.username, u.email),
+    u =>
+      (role === 'ALL' || u.systemRole === role) &&
+      matches(query, u.displayName, u.username, u.email),
   );
 }
 
-export function filterWorkspaces(workspaces: AdminWorkspace[], query: string): AdminWorkspace[] {
-  return workspaces.filter(w => matches(query, w.name, w.slug, w.owner?.displayName, w.owner?.email));
+export function filterWorkspaces(
+  workspaces: AdminWorkspace[],
+  query: string,
+): AdminWorkspace[] {
+  return workspaces.filter(w =>
+    matches(query, w.name, w.slug, w.owner?.displayName, w.owner?.email),
+  );
 }

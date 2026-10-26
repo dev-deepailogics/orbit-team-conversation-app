@@ -20,13 +20,16 @@ import type { RootStackParamList } from '@/navigation/types';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 // The app is dark-only for now, matching the web auth screens.
-const navTheme = { ...DarkTheme, colors: { ...DarkTheme.colors, background: '#1A1D21' } };
+const navTheme = {
+  ...DarkTheme,
+  colors: { ...DarkTheme.colors, background: '#1A1D21' },
+};
 
 function RootNavigator() {
-  const user = useAuthStore((s) => s.user);
-  const isLoading = useAuthStore((s) => s.isLoading);
-  const bootError = useAuthStore((s) => s.bootError);
-  const fetchMe = useAuthStore((s) => s.fetchMe);
+  const user = useAuthStore(s => s.user);
+  const isLoading = useAuthStore(s => s.isLoading);
+  const bootError = useAuthStore(s => s.bootError);
+  const fetchMe = useAuthStore(s => s.fetchMe);
 
   useEffect(() => {
     fetchMe();
@@ -58,18 +61,35 @@ function RootNavigator() {
       {user ? (
         <>
           <Stack.Screen name="Main" component={MainTabs} />
-          <Stack.Screen name="Channel" component={ChannelScreen} options={{ animation: 'default' }} />
-          <Stack.Screen name="Thread" component={ThreadScreen} options={{ animation: 'default' }} />
+          <Stack.Screen
+            name="Channel"
+            component={ChannelScreen}
+            options={{ animation: 'default' }}
+          />
+          <Stack.Screen
+            name="Thread"
+            component={ThreadScreen}
+            options={{ animation: 'default' }}
+          />
           <Stack.Screen
             name="NewMessage"
             component={NewMessageScreen}
-            options={{ headerShown: true, title: 'New message', presentation: 'modal', animation: 'default' }}
+            options={{
+              headerShown: true,
+              title: 'New message',
+              presentation: 'modal',
+              animation: 'default',
+            }}
           />
           {user.systemRole === 'SUPER_ADMIN' && (
             <Stack.Screen
               name="AdminConsole"
               component={AdminConsoleScreen}
-              options={{ headerShown: true, title: 'Admin Console', animation: 'default' }}
+              options={{
+                headerShown: true,
+                title: 'Admin Console',
+                animation: 'default',
+              }}
             />
           )}
         </>

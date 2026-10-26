@@ -7,7 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { getErrorMessage } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { deleteUser, resetUserPassword, updateUserRole } from '../services/adminApi';
+import {
+  deleteUser,
+  resetUserPassword,
+  updateUserRole,
+} from '../services/adminApi';
 import type { AdminUser } from '../types';
 import { ROLES, ROLE_LABELS } from '../utils';
 
@@ -33,7 +37,11 @@ export function UserActionsSheet({ user, isSelf, onClose, onChanged }: Props) {
   };
 
   // One action at a time; every action resets loading and reports its own error.
-  const run = async (kind: Exclude<Busy, null>, action: () => Promise<void>, fallback: string) => {
+  const run = async (
+    kind: Exclude<Busy, null>,
+    action: () => Promise<void>,
+    fallback: string,
+  ) => {
     if (busy) return false;
     setError('');
     setBusy(kind);
@@ -61,8 +69,17 @@ export function UserActionsSheet({ user, isSelf, onClose, onChanged }: Props) {
       setError('Password must be at least 6 characters.');
       return;
     }
-    if (await run('password', () => resetUserPassword(user.id, password), 'Failed to reset password')) {
-      Alert.alert('Password reset', `${user.displayName} can now sign in with the new password.`);
+    if (
+      await run(
+        'password',
+        () => resetUserPassword(user.id, password),
+        'Failed to reset password',
+      )
+    ) {
+      Alert.alert(
+        'Password reset',
+        `${user.displayName} can now sign in with the new password.`,
+      );
       close();
     }
   };
@@ -77,7 +94,14 @@ export function UserActionsSheet({ user, isSelf, onClose, onChanged }: Props) {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            if (await run('delete', () => deleteUser(user.id), 'Failed to delete user')) close();
+            if (
+              await run(
+                'delete',
+                () => deleteUser(user.id),
+                'Failed to delete user',
+              )
+            )
+              close();
           },
         },
       ],
@@ -91,7 +115,9 @@ export function UserActionsSheet({ user, isSelf, onClose, onChanged }: Props) {
       </Text>
 
       <View className="gap-1">
-        <Text className="text-xs font-semibold uppercase tracking-wider text-gray-400">System role</Text>
+        <Text className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+          System role
+        </Text>
         <View className="overflow-hidden rounded-lg border border-slack-darkBorder">
           {ROLES.map((role, i) => {
             const selected = role === user.systemRole;
@@ -110,7 +136,12 @@ export function UserActionsSheet({ user, isSelf, onClose, onChanged }: Props) {
                 accessibilityRole="radio"
                 accessibilityState={{ selected, disabled }}
               >
-                <Text className={cn('text-sm text-gray-200', selected && 'font-semibold text-white')}>
+                <Text
+                  className={cn(
+                    'text-sm text-gray-200',
+                    selected && 'font-semibold text-white',
+                  )}
+                >
                   {ROLE_LABELS[role]}
                 </Text>
                 {selected && <Text className="text-slack-green">✓</Text>}
@@ -118,7 +149,9 @@ export function UserActionsSheet({ user, isSelf, onClose, onChanged }: Props) {
             );
           })}
         </View>
-        {busy === 'role' && <ActivityIndicator color="white" className="mt-1" />}
+        {busy === 'role' && (
+          <ActivityIndicator color="white" className="mt-1" />
+        )}
       </View>
 
       <View className="gap-2">
@@ -133,16 +166,34 @@ export function UserActionsSheet({ user, isSelf, onClose, onChanged }: Props) {
           returnKeyType="done"
           onSubmitEditing={handleResetPassword}
         />
-        <Button variant="secondary" className="h-10" disabled={!!busy} onPress={handleResetPassword}>
-          {busy === 'password' ? <ActivityIndicator color="white" /> : <Text>Reset password</Text>}
+        <Button
+          variant="secondary"
+          className="h-10"
+          disabled={!!busy}
+          onPress={handleResetPassword}
+        >
+          {busy === 'password' ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text>Reset password</Text>
+          )}
         </Button>
       </View>
 
       {!!error && <Text className="text-xs text-red-400">{error}</Text>}
 
       {!isSelf && (
-        <Button variant="destructive" className="h-11" disabled={!!busy} onPress={handleDelete}>
-          {busy === 'delete' ? <ActivityIndicator color="white" /> : <Text>Delete user</Text>}
+        <Button
+          variant="destructive"
+          className="h-11"
+          disabled={!!busy}
+          onPress={handleDelete}
+        >
+          {busy === 'delete' ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text>Delete user</Text>
+          )}
         </Button>
       )}
     </Sheet>
