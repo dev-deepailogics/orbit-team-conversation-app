@@ -563,3 +563,49 @@ model TicketComment {
   @@index([ticketId, createdAt])
   @@index([userId])
 }
+
+model GoogleOAuth {
+  id           String   @id @default("google_oauth")
+  tokens       Json     // Stores access_token, refresh_token, scope, token_type, expiry_date
+  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now())
+}
+
+model MediaFolder {
+  id            String        @id @default(uuid())
+  folderId      String        @unique // Google Drive Folder ID
+  name          String
+  projectId     String
+  parentId      String?       // Google Drive Parent Folder ID
+  isProjectRoot Boolean       @default(false)
+  webViewLink   String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  files         MediaFile[]
+
+  @@index([projectId])
+  @@index([parentId])
+}
+
+model MediaFile {
+  id               String       @id // Google Drive File ID
+  name             String
+  originalFileName String
+  fileNamePrefix   String?
+  description      String?      @db.Text
+  mimeType         String?
+  size             BigInt?
+  webViewLink      String?
+  folderId         String
+  folder           MediaFolder? @relation(fields: [folderId], references: [folderId], onDelete: Cascade)
+  projectId        String
+  projectTitle     String?
+  shareAccess      String       @default("linkReady") // "linkReady" | "restricted"
+  modifiedTime     DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([folderId])
+  @@index([projectId])
+}
+

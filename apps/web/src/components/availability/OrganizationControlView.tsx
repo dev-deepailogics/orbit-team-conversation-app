@@ -33,6 +33,8 @@ import {
   Mail,
   Zap,
   FolderKanban,
+  HardDrive,
+  UploadCloud,
 } from 'lucide-react';
 
 const BREAK_REASONS = [
@@ -71,6 +73,7 @@ interface TeamMemberAvailability {
 import { UserAvailabilityView } from './UserAvailabilityView';
 import { EmployeeStatusView } from './EmployeeStatusView';
 import { ProjectPortfolioView } from '../project/ProjectPortfolioView';
+import { MediaManagementView } from '../media/MediaManagementView';
 
 export const OrganizationControlView: React.FC<OrganizationControlViewProps> = ({
   workspace,
@@ -82,14 +85,15 @@ export const OrganizationControlView: React.FC<OrganizationControlViewProps> = (
   onOpenBotPortal,
   onOpenProjectBoard,
 }) => {
-  // Navigation: Toggle between Org Control overview, Employee Status page, User Availability page, & View Projects page
+  // Navigation: Toggle between Org Control overview, Employee Status page, User Availability page, View Projects page, & Media Management page
   const [showUserAvailabilityPage, setShowUserAvailabilityPage] = useState<boolean>(false);
   const [showEmployeeStatusPage, setShowEmployeeStatusPage] = useState<boolean>(false);
   const [showProjectsPage, setShowProjectsPage] = useState<boolean>(false);
+  const [showMediaManagementPage, setShowMediaManagementPage] = useState<boolean>(false);
   const [targetUserIdForAvailability, setTargetUserIdForAvailability] = useState<string>('');
 
   // Selected Card / Tab in Governance Modules
-  const [selectedModule, setSelectedModule] = useState<'availability' | 'roles' | 'members' | 'shifts' | 'policies' | 'integrations'>('availability');
+  const [selectedModule, setSelectedModule] = useState<'availability' | 'roles' | 'members' | 'shifts' | 'policies' | 'media' | 'integrations'>('availability');
   const [availabilityExpanded, setAvailabilityExpanded] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -302,6 +306,17 @@ export const OrganizationControlView: React.FC<OrganizationControlViewProps> = (
 
   const onlineCount = teamMembers.filter((m) => m.availability?.isAvailable && !m.availability?.isOnBreak).length;
   const onBreakCount = teamMembers.filter((m) => m.availability?.isOnBreak).length;
+
+  if (showMediaManagementPage) {
+    return (
+      <MediaManagementView
+        workspace={workspace}
+        currentUser={currentUser}
+        onBackToOrganizationControl={() => setShowMediaManagementPage(false)}
+        onOpenProjectBoard={onOpenProjectBoard}
+      />
+    );
+  }
 
   if (showProjectsPage) {
     return (
@@ -660,40 +675,32 @@ export const OrganizationControlView: React.FC<OrganizationControlViewProps> = (
               </div>
             </div>
 
-            {/* 6. Integrations & Webhooks */}
+            {/* 6. Media Management (Google Drive) */}
             <div
-              onClick={() => {
-                if (onOpenBotPortal) {
-                  onOpenBotPortal();
-                } else {
-                  setSelectedModule('integrations');
-                }
-              }}
-              className={`p-4 sm:p-5 rounded-2xl border cursor-pointer transition text-left flex flex-col justify-between group shadow-sm ${
-                selectedModule === 'integrations' ? 'ring-2 ring-blue-500 shadow-md' : 'hover:border-blue-500/50'
-              }`}
+              onClick={() => setShowMediaManagementPage(true)}
+              className="p-4 sm:p-5 rounded-2xl border cursor-pointer transition text-left flex flex-col justify-between group shadow-sm hover:border-blue-500/80 hover:shadow-md"
               style={{
                 backgroundColor: 'var(--theme-bg-surface)',
-                borderColor: selectedModule === 'integrations' ? '#0091FF' : 'var(--theme-border)',
+                borderColor: 'var(--theme-border)',
               }}
             >
               <div>
                 <div className="flex items-center justify-between gap-2 mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-400/30 flex items-center justify-center text-indigo-400">
-                      <Layers size={19} />
+                    <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center text-blue-400">
+                      <HardDrive size={19} />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-white">Integrations & Slack</h3>
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 inline-block mt-0.5">
-                        Live Webhooks
+                      <h3 className="text-sm font-bold text-white">Media Management</h3>
+                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30 inline-block mt-0.5">
+                        Google Drive Sync
                       </span>
                     </div>
                   </div>
                   <ChevronRight size={17} className="text-gray-400 group-hover:translate-x-0.5 transition" />
                 </div>
                 <p className="text-xs leading-relaxed" style={{ color: 'var(--theme-text-muted)' }}>
-                  Synchronize availability events, channel broadcasts, and automated notifications with Slack bots.
+                  Manage project media folders, upload large assets via 16MB direct chunked streams, and share viewer links.
                 </p>
               </div>
             </div>

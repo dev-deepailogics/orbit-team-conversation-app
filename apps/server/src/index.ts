@@ -21,11 +21,15 @@ import { adminRoutes } from './routes/admin.js';
 import { projectRoutes } from './routes/projects.js';
 import { pushRoutes } from './routes/push.js';
 import { availabilityRoutes, performAutoCheckoutBackfill } from './routes/availability.js';
+import { driveRoutes } from './routes/drive.js';
 import { registerPushMiddleware } from './services/pushService.js';
 
 import { setupSocketServer } from './socket/index.js';
 
+// Load environment variables from apps/server/.env or root ../../.env
 dotenv.config();
+dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '../server/.env') });
 
 // Extend Fastify types
 declare module 'fastify' {
@@ -120,6 +124,7 @@ async function bootstrap() {
   await fastify.register(projectRoutes, { prefix: '/api/projects' });
   await fastify.register(pushRoutes, { prefix: '/api/push' });
   await fastify.register(availabilityRoutes, { prefix: '/api/availability' });
+  await fastify.register(driveRoutes, { prefix: '/api' });
 
   // Start Server
 
