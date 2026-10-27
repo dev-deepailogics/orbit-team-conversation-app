@@ -60,6 +60,8 @@ const createTicketSchema = z.object({
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).default('MEDIUM'),
   dueDate: z.string().optional().nullable(),
   assigneeId: z.string().uuid().optional().nullable(),
+  // Multi-assign: [{ uid: <user id>, name }]. assigneeId mirrors the first entry for older clients.
+  assignees: z.array(z.object({ uid: z.string().uuid(), name: z.string() })).max(50).optional().nullable(),
 });
 
 const updateTicketSchema = z.object({
@@ -69,6 +71,8 @@ const updateTicketSchema = z.object({
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
   dueDate: z.string().optional().nullable(),
   assigneeId: z.string().uuid().optional().nullable(),
+  // Multi-assign: [{ uid: <user id>, name }]. assigneeId mirrors the first entry for older clients.
+  assignees: z.array(z.object({ uid: z.string().uuid(), name: z.string() })).max(50).optional().nullable(),
   orderIndex: z.number().int().optional(),
   gitbranch: z.string().optional().nullable(),
   checklist: z.any().optional().nullable(),
@@ -567,7 +571,8 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.status(400).send({ error: parseResult.error.errors[0].message });
     }
 
-    const { columnId, title, description, priority, dueDate, assigneeId } = parseResult.data;
+    const { columnId, title, description, priority, dueDate, assignees } = parseResult.data;
+    const assigneeId = parseResult.data.assigneeId ?? assignees?.[0]?.uid ?? null;
 
     // Check column exists
     const column = await prisma.projectColumn.findFirst({
@@ -607,6 +612,7 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         dueDate: dueDate ? new Date(dueDate) : null,
         createdById: userId,
         assigneeId: assigneeId || null,
+        assignees: assignees ?? undefined,
         events: initialEvents,
       },
       include: {
@@ -630,12 +636,10 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       },
     });
 
-    const targetUserIds: string[] = [];
-    if (assigneeId && assigneeId !== userId) {
-      targetUserIds.push(assigneeId);
-    }
+    const targetUserIds = [...new Set([...(assigneeId ? [assigneeId] : []), ...(assignees ?? []).map((a) => a.uid)])]
+      .filter((id) => id !== userId);
 
-    const actionText = assigneeId && assigneeId !== userId && ticket.assignee
+    const actionText = targetUserIds.length > 0 && ticket.assignee
       ? `created ticket and assigned to @${ticket.assignee.displayName}`
       : 'created ticket';
 
@@ -685,7 +689,7 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       description,
       priority,
       dueDate,
-      assigneeId,
+      assignees,
       orderIndex,
       gitbranch,
       checklist,
@@ -694,6 +698,16 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       notes,
       testPlan,
     } = parseResult.data;
+    const assigneeId = parseResult.data.assigneeId !== undefined || assignees === undefined
+      ? parseResult.data.assigneeId
+      : (assignees?.[0]?.uid ?? null);
+    const previousAssigneeIds = new Set<string>([
+      ...(existingTicket.assigneeId ? [existingTicket.assigneeId] : []),
+      ...(Array.isArray(existingTicket.assignees) ? (existingTicket.assignees as any[]).map((a) => a?.uid) : []),
+    ]);
+    const newAssigneeIds = (assignees ?? (assigneeId ? [{ uid: assigneeId }] : []))
+      .map((a) => a.uid)
+      .filter((id) => !previousAssigneeIds.has(id) && id !== userId);
 
     let updatedEvents = Array.isArray(existingTicket.events) ? [...(existingTicket.events as any[])] : [];
 
@@ -723,6 +737,7 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     if (priority !== undefined) dataToUpdate.priority = priority;
     if (dueDate !== undefined) dataToUpdate.dueDate = dueDate ? new Date(dueDate) : null;
     if (assigneeId !== undefined) dataToUpdate.assigneeId = assigneeId;
+    if (assignees !== undefined) dataToUpdate.assignees = assignees ?? [];
     if (orderIndex !== undefined) dataToUpdate.orderIndex = orderIndex;
     if (gitbranch !== undefined) dataToUpdate.gitbranch = gitbranch;
     if (checklist !== undefined) dataToUpdate.checklist = checklist;
@@ -759,7 +774,7 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     });
 
     // Check if assignee changed
-    if (assigneeId && assigneeId !== existingTicket.assigneeId && assigneeId !== userId) {
+    if (newAssigneeIds.length > 0) {
       const actor = await prisma.user.findUnique({
         where: { id: userId },
         select: { displayName: true },
@@ -770,7 +785,7 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         ticketTitle: updated.title,
         projectName: project.name,
         actionText: 'assigned you to ticket',
-        targetUserIds: [assigneeId],
+        targetUserIds: newAssigneeIds,
         channelId: project.notificationChannelId,
         io: fastify.io,
       });

@@ -14,6 +14,8 @@ import { useAuthStore } from '@/features/auth/store';
 import { ChannelScreen } from '@/features/chat/screens/ChannelScreen';
 import { ThreadScreen } from '@/features/chat/screens/ThreadScreen';
 import { NewMessageScreen } from '@/features/dms/screens/NewMessageScreen';
+import { ProjectBoardScreen } from '@/features/projects/screens/ProjectBoardScreen';
+import { TicketDetailScreen } from '@/features/projects/screens/TicketDetailScreen';
 import { MainTabs } from '@/navigation/MainTabs';
 import type { RootStackParamList } from '@/navigation/types';
 
@@ -81,6 +83,8 @@ function RootNavigator() {
               animation: 'default',
             }}
           />
+          <Stack.Screen name="ProjectBoard" component={ProjectBoardScreen} options={{ animation: 'default' }} />
+          <Stack.Screen name="TicketDetail" component={TicketDetailScreen} options={{ animation: 'default' }} />
           {user.systemRole === 'SUPER_ADMIN' && (
             <Stack.Screen
               name="AdminConsole"

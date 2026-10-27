@@ -3,15 +3,15 @@ import { ActivityIndicator, Pressable, View } from 'react-native';
 import {
   EnrichedTextInput,
   type EnrichedTextInputInstance,
-  type HtmlStyle,
   type OnChangeSelectionEvent,
   type OnChangeStateEvent,
 } from 'react-native-enriched-html';
+import { FormatToolbar, type Format } from '@/components/rich-text/FormatToolbar';
+import { LinkSheet } from '@/components/rich-text/LinkSheet';
+import { RICH_HTML_STYLE } from '@/components/rich-text/RichTextInput';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 import { htmlToMarkdown } from '../htmlToMarkdown';
-import { FormatToolbar, type Format } from './FormatToolbar';
-import { LinkSheet } from './LinkSheet';
 
 interface Props {
   placeholder: string;
@@ -21,23 +21,6 @@ interface Props {
 }
 
 const TYPING_IDLE_MS = 3000;
-
-// Dark-theme look for what the editor shows while typing (headings, code, quotes, lists, links).
-const HTML_STYLE: HtmlStyle = {
-  h1: { fontSize: 24, bold: true },
-  h2: { fontSize: 20, bold: true },
-  blockquote: {
-    borderColor: '#6B7280',
-    borderWidth: 4,
-    gapWidth: 8,
-    color: '#D1D5DB',
-  },
-  codeblock: { color: '#E5E7EB', borderRadius: 6, backgroundColor: '#0F1114' },
-  code: { color: '#FDBA74', backgroundColor: '#2A2D31' },
-  a: { color: '#1D9BD1', textDecorationLine: 'underline' },
-  ul: { bulletColor: '#9CA3AF', bulletSize: 6, marginLeft: 8, gapWidth: 8 },
-  ol: { gapWidth: 8, marginLeft: 8, markerColor: '#9CA3AF' },
-};
 
 const inputStyle = {
   minHeight: 40,
@@ -136,7 +119,7 @@ export function Composer({ placeholder, onSend, onTyping }: Props) {
           placeholderTextColor="#6B7280"
           cursorColor="#1D9BD1"
           selectionColor="#1D9BD155"
-          htmlStyle={HTML_STYLE}
+          htmlStyle={RICH_HTML_STYLE}
           style={inputStyle}
           onChangeText={e => handleChangeText(e.nativeEvent.value)}
           onChangeState={e => setState(e.nativeEvent)}

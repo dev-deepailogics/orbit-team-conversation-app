@@ -3,7 +3,7 @@ import { Sheet } from '@/components/Sheet';
 import { FormField } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { normalizeUrl } from '../link';
+import { normalizeUrl } from '@/features/chat/link';
 
 interface Props {
   visible: boolean;

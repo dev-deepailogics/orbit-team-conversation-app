@@ -15,6 +15,17 @@ export const EVENTS = {
   CHANNEL_NEW: 'channel:new',
   CHANNEL_UPDATED: 'channel:updated',
   CHANNEL_DELETED: 'channel:deleted',
+  PROJECT_NEW: 'project:new',
+  PROJECT_UPDATE: 'project:update',
+  PROJECT_DELETE: 'project:delete',
+  TICKET_NEW: 'ticket:new',
+  TICKET_UPDATE: 'ticket:update',
+  TICKET_DELETE: 'ticket:delete',
+  TICKET_MOVE: 'ticket:move',
+  COLUMN_NEW: 'column:new',
+  COLUMN_UPDATE: 'column:update',
+  COLUMN_DELETE: 'column:delete',
+  COLUMN_REORDER: 'column:reorder',
 } as const;
 
 let socket: Socket | null = null;

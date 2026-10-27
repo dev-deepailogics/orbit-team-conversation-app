@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
-import type { Channel, Message, Reaction } from '@orbit/types';
+import type { Channel, Message, Project, ProjectColumn, Reaction, Ticket } from '@orbit/types';
 import { useAuthStore } from '@/features/auth/store';
 import { useWorkspaceStore } from '@/features/workspaces/store';
 import { connectSocket, disconnectSocket, EVENTS } from '@/lib/socket';
+import { useProjectStore } from '@/features/projects/store';
 import { useChatStore } from '../store';
 import { isMine } from '../utils';
 
@@ -62,6 +63,23 @@ export function useRealtime() {
       typingTimers.set(p.userId, setTimeout(() => clearTyping(p.channelId, p.userId), TYPING_TTL_MS));
     });
     socket.on(EVENTS.TYPING_STOP, (p: { channelId: string; userId: string }) => clearTyping(p.channelId, p.userId));
+
+    const proj = useProjectStore.getState;
+    socket.on(EVENTS.PROJECT_NEW, (p: Project) => proj().upsertProject(p));
+    socket.on(EVENTS.PROJECT_UPDATE, (p: Project) => proj().upsertProject(p));
+    socket.on(EVENTS.PROJECT_DELETE, (p: { projectId: string }) => proj().removeProject(p.projectId));
+    socket.on(EVENTS.COLUMN_NEW, (c: ProjectColumn) => proj().addColumn(c));
+    socket.on(EVENTS.COLUMN_UPDATE, (c: ProjectColumn) => proj().updateColumn(c));
+    socket.on(EVENTS.COLUMN_DELETE, (p: { columnId: string }) => proj().removeColumn(p.columnId));
+    socket.on(EVENTS.COLUMN_REORDER, (p: { projectId: string; columns: ProjectColumn[] }) =>
+      proj().setColumnOrder(p.projectId, p.columns.map(c => c.id)),
+    );
+    socket.on(EVENTS.TICKET_NEW, (t: Ticket) => proj().addTicket(t));
+    socket.on(EVENTS.TICKET_UPDATE, (t: Ticket) => proj().updateTicket(t));
+    socket.on(EVENTS.TICKET_DELETE, (p: { ticketId: string }) => proj().removeTicket(p.ticketId));
+    socket.on(EVENTS.TICKET_MOVE, (p: { ticket: Ticket; toColumnId: string; orderIndex: number }) =>
+      proj().moveTicket(p.ticket, p.toColumnId, p.orderIndex),
+    );
 
     return () => {
       typingTimers.forEach(clearTimeout);

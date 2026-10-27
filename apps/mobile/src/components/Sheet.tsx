@@ -2,23 +2,29 @@ import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/text';
+import { cn } from '@/lib/utils';
 
 interface Props {
   visible: boolean;
   title: string;
   onClose: () => void;
   children: ReactNode;
+  // Tall form sheets (long forms with a keyboard) get most of the screen instead of hugging their content.
+  fullHeight?: boolean;
 }
 
 // Slack-style bottom sheet built on RN's Modal (Android back button → onRequestClose).
-export function Sheet({ visible, title, onClose, children }: Props) {
+export function Sheet({ visible, title, onClose, children, fullHeight }: Props) {
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <KeyboardAvoidingView className="flex-1 justify-end" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Pressable className="absolute inset-0 bg-black/60" onPress={onClose} accessibilityLabel="Close" />
         <View
-          className="gap-4 rounded-t-2xl border-t border-slack-darkBorder bg-slack-darkSidebar px-5 pt-3"
+          className={cn(
+            'gap-4 rounded-t-2xl border-t border-slack-darkBorder bg-slack-darkSidebar px-5 pt-3',
+            fullHeight && 'h-[92%]',
+          )}
           style={{ paddingBottom: insets.bottom + 20 }}
         >
           <View className="h-1 w-10 self-center rounded-full bg-gray-600" />

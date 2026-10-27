@@ -4,6 +4,8 @@ import { Text } from '@/components/ui/text';
 import { useChatStore } from '@/features/chat/store';
 import { useRealtime } from '@/features/chat/hooks/useRealtime';
 import { DMsScreen } from '@/features/dms/screens/DMsScreen';
+import { ProjectsScreen } from '@/features/projects/screens/ProjectsScreen';
+import { useProjectStore } from '@/features/projects/store';
 import { YouScreen } from '@/features/profile/screens/YouScreen';
 import { HomeScreen } from '@/features/workspaces/screens/HomeScreen';
 import { useWorkspaceStore } from '@/features/workspaces/store';
@@ -31,6 +33,7 @@ export function MainTabs() {
     return () => {
       useWorkspaceStore.getState().reset();
       useChatStore.getState().reset();
+      useProjectStore.getState().reset();
     };
   }, [load]);
 
@@ -49,6 +52,7 @@ export function MainTabs() {
         component={DMsScreen}
         options={{ tabBarIcon: icon('💬'), tabBarBadge: dmUnread || undefined }}
       />
+      <Tab.Screen name="Projects" component={ProjectsScreen} options={{ tabBarIcon: icon('📋') }} />
       <Tab.Screen name="You" component={YouScreen} options={{ tabBarIcon: icon('👤') }} />
     </Tab.Navigator>
   );

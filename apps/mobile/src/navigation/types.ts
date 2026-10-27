@@ -8,6 +8,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 export type TabParamList = {
   Home: undefined;
   DMs: undefined;
+  Projects: undefined;
   You: undefined;
 };
 
@@ -19,6 +20,8 @@ export type RootStackParamList = {
   Thread: { channelId: string; messageId: string };
   NewMessage: undefined;
   AdminConsole: undefined;
+  ProjectBoard: { projectId: string };
+  TicketDetail: { projectId: string; ticketId: string };
 };
 
 export type ScreenProps<T extends keyof RootStackParamList> =
