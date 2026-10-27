@@ -11,7 +11,10 @@ import { AdminConsoleScreen } from '@/features/admin/screens/AdminConsoleScreen'
 import { LoginScreen } from '@/features/auth/screens/LoginScreen';
 import { RegisterScreen } from '@/features/auth/screens/RegisterScreen';
 import { useAuthStore } from '@/features/auth/store';
-import { HomeScreen } from '@/features/home/screens/HomeScreen';
+import { ChannelScreen } from '@/features/chat/screens/ChannelScreen';
+import { ThreadScreen } from '@/features/chat/screens/ThreadScreen';
+import { NewMessageScreen } from '@/features/dms/screens/NewMessageScreen';
+import { MainTabs } from '@/navigation/MainTabs';
 import type { RootStackParamList } from '@/navigation/types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -54,7 +57,14 @@ function RootNavigator() {
     <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
       {user ? (
         <>
-          <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="Main" component={MainTabs} />
+          <Stack.Screen name="Channel" component={ChannelScreen} options={{ animation: 'default' }} />
+          <Stack.Screen name="Thread" component={ThreadScreen} options={{ animation: 'default' }} />
+          <Stack.Screen
+            name="NewMessage"
+            component={NewMessageScreen}
+            options={{ headerShown: true, title: 'New message', presentation: 'modal', animation: 'default' }}
+          />
           {user.systemRole === 'SUPER_ADMIN' && (
             <Stack.Screen
               name="AdminConsole"

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
 import type { SystemRole } from '@orbit/types';
 import { FormField } from '@/components/FormField';
+import { Sheet } from '@/components/Sheet';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { getErrorMessage } from '@/lib/api';
@@ -9,7 +10,6 @@ import { cn } from '@/lib/utils';
 import { deleteUser, resetUserPassword, updateUserRole } from '../services/adminApi';
 import type { AdminUser } from '../types';
 import { ROLES, ROLE_LABELS } from '../utils';
-import { Sheet } from './Sheet';
 
 interface Props {
   user: AdminUser | null;

@@ -11,7 +11,6 @@ interface Props {
 }
 
 // Slack-style bottom sheet built on RN's Modal (Android back button → onRequestClose).
-// ponytail: lives in admin until a second feature needs it, then move to src/components/.
 export function Sheet({ visible, title, onClose, children }: Props) {
   const insets = useSafeAreaInsets();
   return (

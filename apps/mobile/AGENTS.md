@@ -20,6 +20,8 @@ These versions are newer than most training data (RN 0.88, React 19.3, React Nav
 - Navigation: `@react-navigation/native` + `native-stack`. Route params are typed in `src/navigation/types.ts` (`RootStackParamList`, `ScreenProps<'Name'>`) — add every new screen there.
 - State: Zustand. Read with selectors (`useAuthStore((s) => s.user)`), never destructure the whole store (causes re-renders on every change).
 - HTTP: the single axios instance `api` from `@/lib/api` (base URL, 15s timeout, bearer token, 401 → logout already wired). Never create another axios instance or call `fetch` to the server directly. Turn errors into user text with `getErrorMessage(err, fallback)` — the server returns `{ error: string }` on failure.
+- Message text: stored as **markdown** (same as web). The composer is `react-native-enriched-html`'s `EnrichedTextInput` (WYSIWYG, native; emits HTML), converted with `features/chat/htmlToMarkdown.ts` before sending; messages render with `react-native-markdown-display` (`MarkdownText`). Don't hand-roll editors or markdown parsers. `react-native-enriched-html` is pinned to a **nightly** (1.2.x) because stable 1.1.x only supports RN ≤ 0.86; move to the stable 1.2 release when it ships.
+- Realtime: the single socket.io connection in `@/lib/socket` (opened per workspace by `useRealtime`, mounted in `MainTabs`). Never open another; use the `EVENTS` names there (runtime values can't come from `@orbit/types`).
 - Server URL: `@/lib/config` (`SERVER_URL`; dev uses `10.0.2.2` on Android emulator, `localhost` on iOS simulator).
 - Styling: NativeWind v4 (`className` on RN components) with a **Tailwind v3** config (`tailwind.config.js`) — use v3 syntax, not v4. Merge classes with `cn()` from `@/lib/utils`. Use theme tokens (`slack.*`, `primary`, `muted`, …) instead of raw hex. The theme mirrors `apps/web/tailwind.config.js` and `global.css` mirrors web's `globals.css` — change both sides together. The app is dark-only for now.
 - UI primitives: shadcn-style react-native-reusables in `@/components/ui/*` (`@rn-primitives/*` + `class-variance-authority` + `tailwind-merge`). Reuse/extend these instead of one-off styled elements or a new UI library. Render text with `Text` from `@/components/ui/text` (not RN's `Text`) so `Button` variants can style it.
@@ -43,7 +45,7 @@ These versions are newer than most training data (RN 0.88, React 19.3, React Nav
 # Project layout
 
 - `App.tsx` — providers + root navigator only. Auth gating swaps screen sets on `user` (React Navigation's auth pattern): never call `navigate()` after login/logout.
-- `src/features/<name>/` — one folder per feature (`auth`, `home`, later `chat`, `channels`, …). API calls for a feature go in its `services/` (e.g. `features/auth/services/authApi.ts`), not in screens.
+- `src/features/<name>/` — one folder per feature (`auth`, `admin`, `workspaces`, `chat`, `dms`, `profile`, …). API calls for a feature go in its `services/` (e.g. `features/auth/services/authApi.ts`), not in screens.
 - `src/components/` — cross-feature UI only (`ui/*` primitives, layouts used by 2+ features).
 - `src/lib/` — cross-cutting singletons/utilities (`api`, `config`, `utils`). Not feature logic.
 - `src/navigation/` — navigator param types and (later) nested navigators.

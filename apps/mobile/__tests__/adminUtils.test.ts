@@ -1,4 +1,5 @@
-import { filterUsers, filterWorkspaces, initials, isValidSlug, slugify } from '../src/features/admin/utils';
+import { filterUsers, filterWorkspaces, isValidSlug, slugify } from '../src/features/admin/utils';
+import { initials } from '../src/lib/utils';
 import type { AdminUser, AdminWorkspace } from '../src/features/admin/types';
 
 const user = (over: Partial<AdminUser>) => ({ displayName: 'Ann Lee', username: 'ann', email: 'ann@x.io', systemRole: 'USER', ...over }) as AdminUser;

@@ -1,19 +1,20 @@
 import { useRef, useState, type ComponentRef } from 'react';
 import { ActivityIndicator, TextInput } from 'react-native';
+import type { Workspace } from '@orbit/types';
 import { FormField } from '@/components/FormField';
+import { Sheet } from '@/components/Sheet';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { getErrorMessage } from '@/lib/api';
 import { createWorkspace } from '../services/adminApi';
 import { isValidSlug, slugify } from '../utils';
-import { Sheet } from './Sheet';
 
 interface Props {
   visible: boolean;
   // Super admin console creates on behalf of another user; workspace admins create their own.
   withOwner?: boolean;
   onClose: () => void;
-  onCreated: (workspaceName: string) => void;
+  onCreated: (workspace: Workspace) => void;
 }
 
 export function CreateWorkspaceSheet({ visible, withOwner = false, onClose, onCreated }: Props) {
@@ -54,7 +55,7 @@ export function CreateWorkspaceSheet({ visible, withOwner = false, onClose, onCr
       setSlug('');
       setSlugEdited(false);
       setOwner('');
-      onCreated(ws.name);
+      onCreated(ws);
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to create workspace'));
     } finally {

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
@@ -13,7 +14,7 @@ import { UserActionsSheet } from '../components/UserActionsSheet';
 import { deleteWorkspace } from '../services/adminApi';
 import { useAdminStore } from '../store';
 import type { AdminStats, AdminUser, AdminWorkspace, RoleFilter } from '../types';
-import { filterUsers, filterWorkspaces, initials, ROLES, ROLE_LABELS } from '../utils';
+import { filterUsers, filterWorkspaces, ROLES, ROLE_LABELS } from '../utils';
 
 type Tab = 'users' | 'workspaces';
 
@@ -194,10 +195,10 @@ export function AdminConsoleScreen() {
         visible={showCreate}
         withOwner
         onClose={() => setShowCreate(false)}
-        onCreated={name => {
+        onCreated={ws => {
           setShowCreate(false);
           load();
-          Alert.alert('Workspace created', `"${name}" is ready.`);
+          Alert.alert('Workspace created', `"${ws.name}" is ready.`);
         }}
       />
     </View>
@@ -246,9 +247,7 @@ function TabButton({ label, active, onPress }: { label: string; active: boolean;
 function UserRow({ user, isSelf, onPress }: { user: AdminUser; isSelf: boolean; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} className="min-h-[56px] flex-row items-center gap-3 py-2.5 active:opacity-70">
-      <View className="h-10 w-10 items-center justify-center rounded-lg bg-slack-accent">
-        <Text className="text-sm font-bold text-white">{initials(user.displayName || user.username)}</Text>
-      </View>
+      <Avatar name={user.displayName || user.username} className="h-10 w-10" />
       <View className="flex-1">
         <View className="flex-row items-center gap-1.5">
           <Text className="shrink text-sm font-semibold text-white" numberOfLines={1}>
@@ -296,9 +295,7 @@ function WorkspaceRow({
 }) {
   return (
     <View className="min-h-[56px] flex-row items-center gap-3 py-2.5">
-      <View className="h-10 w-10 items-center justify-center rounded-lg bg-slack-activeChannel">
-        <Text className="text-sm font-bold text-white">{initials(workspace.name)}</Text>
-      </View>
+      <Avatar name={workspace.name} className="h-10 w-10 bg-slack-activeChannel" />
       <View className="flex-1">
         <Text className="text-sm font-semibold text-white" numberOfLines={1}>
           {workspace.name}

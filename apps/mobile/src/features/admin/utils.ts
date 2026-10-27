@@ -36,8 +36,3 @@ export function filterUsers(users: AdminUser[], query: string, role: RoleFilter)
 export function filterWorkspaces(workspaces: AdminWorkspace[], query: string): AdminWorkspace[] {
   return workspaces.filter(w => matches(query, w.name, w.slug, w.owner?.displayName, w.owner?.email));
 }
-
-export function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  return ((parts[0]?.[0] ?? '?') + (parts[1]?.[0] ?? '')).toUpperCase();
-}
