@@ -22,7 +22,6 @@ export interface UserProfile {
     offCountLeaves?: Record<string, number>;
   };
   disabled?: boolean;
-  isActive?: boolean;
   usersCollectionFlags?: {
     disabled?: boolean;
     isActive?: boolean;

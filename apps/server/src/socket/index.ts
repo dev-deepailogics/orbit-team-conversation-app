@@ -17,6 +17,13 @@ export function setupSocketServer(fastify: FastifyInstance, io: SocketIOServer) 
     if (token) {
       try {
         const decoded = fastify.jwt.verify(token) as { id: string; email: string; username: string };
+        const user = await prisma.user.findUnique({
+          where: { id: decoded.id },
+          select: { id: true, disabled: true },
+        });
+        if (!user || user.disabled) {
+          return next(new Error('Account is deactivated'));
+        }
         socket.data.userId = decoded.id;
         socket.data.user = decoded;
         return next();
@@ -25,7 +32,7 @@ export function setupSocketServer(fastify: FastifyInstance, io: SocketIOServer) 
         const fallbackUserId = socket.handshake.auth?.userId as string;
         if (fallbackUserId) {
           const user = await prisma.user.findUnique({ where: { id: fallbackUserId } });
-          if (user) {
+          if (user && !user.disabled) {
             socket.data.userId = user.id;
             socket.data.user = user;
             return next();

@@ -437,9 +437,12 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       where: { workspaceId, userId: memberUserId },
     });
 
-    // Remove from channels of that workspace
+    // Remove from non-DIRECT channels of that workspace (preserve DM channels and history)
     const channels = await prisma.channel.findMany({
-      where: { workspaceId },
+      where: {
+        workspaceId,
+        type: { not: 'DIRECT' },
+      },
       select: { id: true },
     });
 
@@ -449,6 +452,19 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
         channelId: { in: channels.map((c) => c.id) },
       },
     });
+
+    if (fastify.io) {
+      // Notify the removed member so their client redirects or clears the workspace
+      fastify.io.to(`user:${memberUserId}`).emit('workspace:kicked', {
+        workspaceId,
+        message: 'You have been removed from this workspace by an administrator.',
+      });
+      // Notify the workspace that a member was removed
+      fastify.io.to(`workspace:${workspaceId}`).emit('workspace:member_removed', {
+        workspaceId,
+        userId: memberUserId,
+      });
+    }
 
     return reply.send({ success: true, removedUserId: memberUserId });
   });

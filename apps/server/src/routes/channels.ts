@@ -112,14 +112,32 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.status(403).send({ error: 'You are not a member of this workspace' });
     }
 
-    // Verify target user belongs to workspace
-    const targetMember = await prisma.workspaceMember.findUnique({
-      where: { workspaceId_userId: { workspaceId, userId: targetUserId } },
+    // Check if an existing 1:1 DM channel already exists between these users (including history with kicked users)
+    const existingDm = await prisma.channel.findFirst({
+      where: {
+        workspaceId,
+        type: 'DIRECT',
+        AND: [
+          { members: { some: { userId: currentUserId } } },
+          { members: { some: { userId: targetUserId } } },
+        ],
+      },
+      include: {
+        members: {
+          include: {
+            user: {
+              select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
+            },
+          },
+        },
+      },
     });
-    if (!targetMember) {
-      return reply.status(403).send({ error: 'Target user is not a member of this workspace' });
+
+    if (existingDm) {
+      return reply.send(existingDm);
     }
 
+    // If creating a brand new DM channel, verify target user exists
     const targetUser = await prisma.user.findUnique({
       where: { id: targetUserId },
     });
@@ -179,31 +197,6 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       });
 
       return reply.status(201).send(selfDmChannel);
-    }
-
-    // Peer-to-peer 1:1 DM between two different users
-    const existingDm = await prisma.channel.findFirst({
-      where: {
-        workspaceId,
-        type: 'DIRECT',
-        AND: [
-          { members: { some: { userId: currentUserId } } },
-          { members: { some: { userId: targetUserId } } },
-        ],
-      },
-      include: {
-        members: {
-          include: {
-            user: {
-              select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
-            },
-          },
-        },
-      },
-    });
-
-    if (existingDm) {
-      return reply.send(existingDm);
     }
 
     // Create new 1:1 DM channel

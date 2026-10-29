@@ -21,6 +21,8 @@ import {
   Lock,
   Mail,
   UserCheck,
+  UserX,
+  CheckCircle2,
   Loader2,
   Sparkles,
 } from 'lucide-react';
@@ -47,6 +49,7 @@ interface AdminUser {
   avatarUrl: string | null;
   systemRole: 'SUPER_ADMIN' | 'WORKSPACE_ADMIN' | 'USER';
   status: string;
+  disabled?: boolean;
   createdAt: string;
   updatedAt: string;
   memberships: Array<{
@@ -202,6 +205,25 @@ export default function AdminDashboardPage() {
       showFeedback('error', err.response?.data?.error || 'Failed to delete user');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  // Handle Toggle Enable / Disable User
+  const handleToggleUserDisabled = async (targetUser: AdminUser) => {
+    const willDisable = !targetUser.disabled;
+    try {
+      await api.patch(`/api/admin/users/${targetUser.id}/status`, {
+        disabled: willDisable,
+      });
+      showFeedback(
+        'success',
+        willDisable
+          ? `User "${targetUser.displayName}" disabled (login blocked)`
+          : `User "${targetUser.displayName}" re-enabled successfully`
+      );
+      fetchAdminData();
+    } catch (err: any) {
+      showFeedback('error', err.response?.data?.error || 'Failed to update user status');
     }
   };
 
@@ -453,9 +475,9 @@ export default function AdminDashboardPage() {
             </div>
 
             {/* Users Table */}
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto overflow-y-auto max-h-[620px] rounded-b-2xl border-t border-gray-800/80">
               <table className="w-full text-left text-xs">
-                <thead className="bg-[#16181B] text-gray-400 uppercase font-semibold text-[10px] tracking-wider border-b border-gray-800">
+                <thead className="bg-[#16181B] text-gray-400 uppercase font-semibold text-[10px] tracking-wider border-b border-gray-800 sticky top-0 z-10 shadow-sm">
                   <tr>
                     <th className="py-3 px-4">User</th>
                     <th className="py-3 px-4">Email</th>
@@ -511,18 +533,25 @@ export default function AdminDashboardPage() {
                           </td>
 
                           <td className="py-3 px-4">
-                            <span
-                              className={`inline-flex items-center gap-1.5 text-[11px] font-semibold ${
-                                u.status === 'ONLINE' ? 'text-emerald-400' : 'text-gray-500'
-                              }`}
-                            >
+                            {u.disabled ? (
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-rose-950/40 text-rose-400 border border-rose-800/60">
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                Deactivated
+                              </span>
+                            ) : (
                               <span
-                                className={`w-2 h-2 rounded-full ${
-                                  u.status === 'ONLINE' ? 'bg-emerald-400 animate-pulse' : 'bg-gray-600'
+                                className={`inline-flex items-center gap-1.5 text-[11px] font-semibold ${
+                                  u.status === 'ONLINE' ? 'text-emerald-400' : 'text-gray-500'
                                 }`}
-                              />
-                              {u.status}
-                            </span>
+                              >
+                                <span
+                                  className={`w-2 h-2 rounded-full ${
+                                    u.status === 'ONLINE' ? 'bg-emerald-400 animate-pulse' : 'bg-gray-600'
+                                  }`}
+                                />
+                                {u.status}
+                              </span>
+                            )}
                           </td>
 
                           <td className="py-3 px-4 text-gray-300 font-medium">
@@ -541,6 +570,31 @@ export default function AdminDashboardPage() {
 
                           <td className="py-3 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
+                              {/* Enable / Disable User Toggle */}
+                              {u.id !== user.id && (
+                                <button
+                                  onClick={() => handleToggleUserDisabled(u)}
+                                  title={u.disabled ? 'Re-enable User Account' : 'Deactivate / Disable User Account'}
+                                  className={`px-2 py-1 rounded-lg transition font-medium text-[11px] border flex items-center gap-1 ${
+                                    u.disabled
+                                      ? 'bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-400 border-emerald-800/60'
+                                      : 'bg-rose-950/30 hover:bg-rose-900/40 text-rose-300 hover:text-white border-rose-800/50'
+                                  }`}
+                                >
+                                  {u.disabled ? (
+                                    <>
+                                      <CheckCircle2 size={12} />
+                                      <span>Enable</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <UserX size={12} />
+                                      <span>Disable</span>
+                                    </>
+                                  )}
+                                </button>
+                              )}
+
                               {/* Change Role Button */}
                               <button
                                 onClick={() => {
@@ -605,9 +659,9 @@ export default function AdminDashboardPage() {
             </div>
 
             {/* Workspaces Table */}
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto overflow-y-auto max-h-[620px] rounded-b-2xl border-t border-gray-800/80">
               <table className="w-full text-left text-xs">
-                <thead className="bg-[#16181B] text-gray-400 uppercase font-semibold text-[10px] tracking-wider border-b border-gray-800">
+                <thead className="bg-[#16181B] text-gray-400 uppercase font-semibold text-[10px] tracking-wider border-b border-gray-800 sticky top-0 z-10 shadow-sm">
                   <tr>
                     <th className="py-3 px-4">Workspace / Organization</th>
                     <th className="py-3 px-4">URL Slug</th>

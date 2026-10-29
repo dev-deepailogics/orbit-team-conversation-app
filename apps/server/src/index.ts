@@ -10,6 +10,7 @@ import path from 'path';
 import fs from 'fs';
 
 // Routes
+import { prisma } from '@orbit/db';
 import { authRoutes } from './routes/auth.js';
 import { workspaceRoutes } from './routes/workspaces.js';
 import { channelRoutes } from './routes/channels.js';
@@ -74,6 +75,16 @@ async function bootstrap() {
   fastify.decorate('authenticate', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       await request.jwtVerify();
+      const payload = request.user as { id?: string };
+      if (payload?.id) {
+        const userRecord = await prisma.user.findUnique({
+          where: { id: payload.id },
+          select: { disabled: true },
+        });
+        if (userRecord?.disabled) {
+          return reply.status(403).send({ error: 'Account is deactivated' });
+        }
+      }
     } catch (err) {
       return reply.status(401).send({ error: 'Unauthorized: Invalid or expired token' });
     }

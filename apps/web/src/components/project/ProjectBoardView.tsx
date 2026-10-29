@@ -41,6 +41,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Bell,
   GripVertical,
   Eye,
@@ -118,6 +119,55 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
   const [showProjectMenu, setShowProjectMenu] = useState(false);
   const [chatTicket, setChatTicket] = useState<any | null>(null);
   const [timelineTicket, setTimelineTicket] = useState<any | null>(null);
+
+  // Edit Project Modal State
+  const [showEditProjectModal, setShowEditProjectModal] = useState(false);
+  const [editProjectName, setEditProjectName] = useState('');
+  const [editProjectDesc, setEditProjectDesc] = useState('');
+  const [editProjectStatus, setEditProjectStatus] = useState<'active' | 'inactive' | 'delivered'>('active');
+  const [editAssignedEmployees, setEditAssignedEmployees] = useState<Array<{ name: string; uid?: string }>>([]);
+  const [editEmployeeDropdownOpen, setEditEmployeeDropdownOpen] = useState(false);
+  const [isUpdatingProject, setIsUpdatingProject] = useState(false);
+
+  const handleOpenEditProject = () => {
+    setEditProjectName(project.name || '');
+    setEditProjectDesc(project.description || '');
+    setEditProjectStatus((project.status as any) || 'active');
+    setEditAssignedEmployees(Array.isArray(project.assignedEmployees) ? (project.assignedEmployees as any) : []);
+    setEditEmployeeDropdownOpen(false);
+    setShowEditProjectModal(true);
+  };
+
+  const handleToggleEditEmployee = (empName: string, empUid?: string) => {
+    setEditAssignedEmployees((prev) => {
+      const exists = prev.some((e) => e.name === empName);
+      if (exists) {
+        return prev.filter((e) => e.name !== empName);
+      }
+      return [...prev, { name: empName, uid: empUid || empName }];
+    });
+  };
+
+  const handleSaveEditProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editProjectName.trim()) return;
+    setIsUpdatingProject(true);
+    try {
+      const res = await api.put(`/api/projects/${project.id}`, {
+        name: editProjectName.trim(),
+        description: editProjectDesc.trim() || undefined,
+        status: editProjectStatus,
+        assignedEmployees: editAssignedEmployees,
+      });
+      updateProject(res.data);
+      setCurrentProject(res.data);
+      setShowEditProjectModal(false);
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to update project');
+    } finally {
+      setIsUpdatingProject(false);
+    }
+  };
 
   // Direct Ticket Actions
   const handleToggleWatch = async (ticket: any, e: React.MouseEvent) => {
@@ -557,6 +607,17 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                   >
                     Project Settings
                   </div>
+                  <button
+                    onClick={() => {
+                      setShowProjectMenu(false);
+                      handleOpenEditProject();
+                    }}
+                    className="w-full px-3 py-2 text-xs text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/10 transition"
+                    style={{ color: 'var(--theme-text-primary)' }}
+                  >
+                    <Edit2 size={14} className="text-blue-400" />
+                    <span>Edit Project</span>
+                  </button>
                   <button
                     onClick={() => {
                       setShowProjectMenu(false);
@@ -1284,6 +1345,179 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
             setViewingDetailTicket(updated);
           }}
         />
+      )}
+
+      {/* Edit Project Modal */}
+      {showEditProjectModal && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in">
+          <div
+            className="w-full max-w-lg rounded-2xl border p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150"
+            style={{
+              backgroundColor: 'var(--theme-bg-surface, #1e293b)',
+              borderColor: 'var(--theme-border, #334155)',
+              color: 'var(--theme-text-primary)',
+            }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: 'var(--theme-border)' }}>
+              <div className="flex items-center gap-2">
+                <Edit2 size={18} className="text-blue-400" />
+                <h3 className="text-base font-bold text-white">Edit Project</h3>
+              </div>
+              <button
+                onClick={() => setShowEditProjectModal(false)}
+                className="text-gray-400 hover:text-white transition"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditProject} className="space-y-4 text-xs">
+              {/* Field 1: Project Title */}
+              <div>
+                <label className="block text-xs font-semibold mb-1.5 text-slate-200">
+                  <span className="text-rose-500 mr-1">*</span>Project Title
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editProjectName}
+                  onChange={(e) => setEditProjectName(e.target.value)}
+                  placeholder="Project name"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-black/20 border border-slate-700/80 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition text-xs"
+                />
+              </div>
+
+              {/* Field 2: Project Details */}
+              <div>
+                <label className="block text-xs font-semibold mb-1.5 text-slate-200">
+                  Project Details
+                </label>
+                <textarea
+                  rows={4}
+                  value={editProjectDesc}
+                  onChange={(e) => setEditProjectDesc(e.target.value)}
+                  placeholder="Project description and notes..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-black/20 border border-slate-700/80 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition resize-none text-xs"
+                />
+              </div>
+
+              {/* Field 3: Status */}
+              <div>
+                <label className="block text-xs font-semibold mb-1.5 text-slate-200">
+                  Status
+                </label>
+                <div className="relative">
+                  <select
+                    value={editProjectStatus}
+                    onChange={(e: any) => setEditProjectStatus(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-black/20 border border-slate-700/80 text-white focus:outline-none focus:border-blue-500 transition appearance-none cursor-pointer text-xs pr-9"
+                  >
+                    <option value="active" className="bg-slate-900 text-white">Active</option>
+                    <option value="inactive" className="bg-slate-900 text-white">Inactive</option>
+                    <option value="delivered" className="bg-slate-900 text-white">Delivered</option>
+                  </select>
+                  <ChevronDown
+                    size={16}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                  />
+                </div>
+              </div>
+
+              {/* Field 4: Assign Employees */}
+              <div className="relative">
+                <label className="block text-xs font-semibold mb-1.5 text-slate-200">
+                  Assign Employees
+                </label>
+                <div
+                  onClick={() => setEditEmployeeDropdownOpen((prev) => !prev)}
+                  className="min-h-[46px] w-full px-2.5 py-2 rounded-xl bg-black/20 border border-slate-700/80 flex flex-wrap items-center gap-1.5 cursor-pointer hover:border-slate-600 transition pr-8 relative"
+                >
+                  {editAssignedEmployees.length === 0 ? (
+                    <span className="text-slate-500 text-xs px-1 select-none">
+                      Select employees to assign...
+                    </span>
+                  ) : (
+                    editAssignedEmployees.map((emp) => (
+                      <span
+                        key={emp.name}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-800 text-slate-200 border border-slate-700 shadow-xs"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {emp.name}
+                        <button
+                          type="button"
+                          onClick={() => setEditAssignedEmployees((prev) => prev.filter((e) => e.name !== emp.name))}
+                          className="text-slate-400 hover:text-rose-400 transition ml-0.5"
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))
+                  )}
+                  <ChevronDown
+                    size={16}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+                </div>
+
+                {editEmployeeDropdownOpen && (
+                  <div
+                    className="absolute left-0 right-0 top-full mt-1.5 z-50 rounded-xl border p-2 shadow-2xl max-h-52 overflow-y-auto space-y-1 animate-in fade-in zoom-in-95"
+                    style={{
+                      backgroundColor: 'var(--theme-bg-surface, #1e293b)',
+                      borderColor: 'var(--theme-border, #334155)',
+                    }}
+                  >
+                    {members && members.length > 0 ? (
+                      members.map((member: any) => {
+                        const mName = member.user?.displayName || member.user?.name || member.displayName || member.name || 'Member';
+                        const mUid = member.userId || member.user?.id || member.id;
+                        const isAssigned = editAssignedEmployees.some((e) => e.name === mName);
+                        return (
+                          <div
+                            key={mUid || mName}
+                            onClick={() => handleToggleEditEmployee(mName, mUid)}
+                            className={`flex items-center justify-between px-3 py-1.5 rounded-lg cursor-pointer text-xs transition ${
+                              isAssigned
+                                ? 'bg-blue-600/20 text-blue-300 font-semibold'
+                                : 'hover:bg-white/5 text-slate-300'
+                            }`}
+                          >
+                            <span>{mName}</span>
+                            {isAssigned && <Check size={14} className="text-blue-400" />}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="px-3 py-2 text-xs text-slate-500 text-center">
+                        No team members found in workspace
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons: Cancel and Save */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t" style={{ borderColor: 'var(--theme-border)' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowEditProjectModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold border border-slate-700 bg-transparent text-slate-300 hover:text-white hover:bg-white/5 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingProject}
+                  className="px-6 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 active:scale-98 shadow-sm transition disabled:opacity-50"
+                >
+                  {isUpdatingProject ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

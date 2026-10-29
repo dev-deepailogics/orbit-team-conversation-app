@@ -19,6 +19,8 @@ import {
   Activity,
   AlertCircle,
   FileSpreadsheet,
+  UserMinus,
+  Loader2,
 } from 'lucide-react';
 
 interface UserAvailabilityViewProps {
@@ -65,32 +67,57 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
   const [selectedRecordForModal, setSelectedRecordForModal] = useState<UserAvailabilityRecord | null>(null);
   const [modalDateLabel, setModalDateLabel] = useState<string>('');
   const [showDetailModal, setShowDetailModal] = useState<boolean>(false);
+  const [isKicking, setIsKicking] = useState<boolean>(false);
+
+  // Check if current logged-in user can kick members (Super Admin or Workspace Owner/Admin)
+  const myMemberItem = teamMembers.find((m) => m.user.id === currentUser?.id);
+  const canKick =
+    currentUser?.systemRole === 'SUPER_ADMIN' ||
+    workspace.ownerId === currentUser?.id ||
+    myMemberItem?.role === 'OWNER' ||
+    myMemberItem?.role === 'ADMIN';
+
+  const fetchTeam = async () => {
+    try {
+      setIsLoading(true);
+      const res = await api.get(`/api/availability/team/${workspace.id}`);
+      const list: TeamMemberItem[] = res.data.team || [];
+      setTeamMembers(list);
+
+      // Auto-select initial user, current logged-in user, or first user
+      if (list.length > 0) {
+        if (initialUserId && list.some((m) => m.user.id === initialUserId)) {
+          setSelectedUserId(initialUserId);
+        } else {
+          const selfMatch = list.find((m) => m.user.id === currentUser?.id);
+          setSelectedUserId(selfMatch ? selfMatch.user.id : list[0].user.id);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load team availability:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleKickMember = async (memberToKick: TeamMemberItem) => {
+    if (!confirm(`Are you sure you want to kick ${memberToKick.user.displayName} from ${workspace.name}?`)) {
+      return;
+    }
+    try {
+      setIsKicking(true);
+      await api.delete(`/api/workspaces/${workspace.id}/members/${memberToKick.user.id}`);
+      alert(`Successfully removed ${memberToKick.user.displayName} from ${workspace.name}.`);
+      await fetchTeam();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to remove member from workspace');
+    } finally {
+      setIsKicking(false);
+    }
+  };
 
   // 1. Fetch Workspace Team List
   useEffect(() => {
-    const fetchTeam = async () => {
-      try {
-        setIsLoading(true);
-        const res = await api.get(`/api/availability/team/${workspace.id}`);
-        const list: TeamMemberItem[] = res.data.team || [];
-        setTeamMembers(list);
-
-        // Auto-select initial user, current logged-in user, or first user
-        if (list.length > 0) {
-          if (initialUserId && list.some((m) => m.user.id === initialUserId)) {
-            setSelectedUserId(initialUserId);
-          } else {
-            const selfMatch = list.find((m) => m.user.id === currentUser?.id);
-            setSelectedUserId(selfMatch ? selfMatch.user.id : list[0].user.id);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load team availability:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchTeam();
   }, [workspace.id, currentUser?.id]);
 
@@ -411,13 +438,32 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:items-end gap-1.5">
-                  <span className="text-xs text-slate-300 flex items-center gap-1.5">
-                    <span>✉</span> {selectedMember.user.email}
-                  </span>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-slate-200 border border-white/10 self-start sm:self-auto">
-                    {selectedMember.role}
-                  </span>
+                <div className="flex flex-col sm:items-end gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-300 flex items-center gap-1.5">
+                      <span>✉</span> {selectedMember.user.email}
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-slate-200 border border-white/10">
+                      {selectedMember.role}
+                    </span>
+                  </div>
+
+                  {/* Kick from Workspace Button for SuperAdmin / Workspace Admin */}
+                  {canKick && selectedMember.user.id !== currentUser?.id && selectedMember.role !== 'OWNER' && (
+                    <button
+                      onClick={() => handleKickMember(selectedMember)}
+                      disabled={isKicking}
+                      title={`Kick ${selectedMember.user.displayName} from this workspace`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 hover:text-white border border-rose-800/60 shadow-sm transition disabled:opacity-50"
+                    >
+                      {isKicking ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <UserMinus size={13} className="text-rose-400" />
+                      )}
+                      <span>Kick from Workspace</span>
+                    </button>
+                  )}
                 </div>
               </div>
 

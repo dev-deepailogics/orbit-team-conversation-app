@@ -552,29 +552,53 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 
           {!isDmsCollapsed && (
             <div className="space-y-0.5">
-              {members.map((member) => {
-                const user = member.user;
-                if (!user) return null;
-                const isOnline = user.status === 'ONLINE';
-                const isSelf = user.id === currentUser?.id;
-                
-                // Find matching DM channel to check selection and unread counts
-                const dmChannel = channels.find(
-                  (c) =>
-                    c.type === 'DIRECT' &&
-                    c.members &&
-                    (isSelf
-                      ? c.members.length === 1 || c.members.every((m) => m.userId === currentUser?.id)
-                      : c.members.some((m) => m.userId === user.id) && c.members.some((m) => m.userId === currentUser?.id))
-                );
+              {(() => {
+                // Collect users from members + any user from existing DIRECT channels (e.g. kicked users with chat history)
+                const userMap = new Map<string, { user: any; id: string }>();
 
-                const isSelectedDM = currentChannel?.type === 'DIRECT' && (
-                  isSelf
-                    ? (!currentChannel.members || currentChannel.members.length <= 1 || currentChannel.members.every((m) => m.userId === currentUser?.id))
-                    : (currentChannel.members?.some((m) => m.userId === user.id) && currentChannel.members?.some((m) => m.userId === currentUser?.id))
-                );
+                // 1. Add current workspace members
+                members.forEach((m) => {
+                  if (m?.user) {
+                    userMap.set(m.user.id, { user: m.user, id: m.id || m.user.id });
+                  }
+                });
 
-                const unread = dmChannel ? (unreadCounts[dmChannel.id] || 0) : 0;
+                // 2. Add any other participant in an existing 1:1 DIRECT channel
+                channels
+                  .filter((c) => c.type === 'DIRECT' && Array.isArray(c.members))
+                  .forEach((c) => {
+                    c.members?.forEach((cm: any) => {
+                      if (cm?.user && !userMap.has(cm.user.id)) {
+                        userMap.set(cm.user.id, { user: cm.user, id: `dm-peer-${cm.user.id}` });
+                      }
+                    });
+                  });
+
+                const dmList = Array.from(userMap.values());
+
+                return dmList.map((member) => {
+                  const user = member.user;
+                  if (!user) return null;
+                  const isOnline = user.status === 'ONLINE';
+                  const isSelf = user.id === currentUser?.id;
+                  
+                  // Find matching DM channel to check selection and unread counts
+                  const dmChannel = channels.find(
+                    (c) =>
+                      c.type === 'DIRECT' &&
+                      c.members &&
+                      (isSelf
+                        ? c.members.length === 1 || c.members.every((m) => m.userId === currentUser?.id)
+                        : c.members.some((m) => m.userId === user.id) && c.members.some((m) => m.userId === currentUser?.id))
+                  );
+
+                  const isSelectedDM = currentChannel?.type === 'DIRECT' && (
+                    isSelf
+                      ? (!currentChannel.members || currentChannel.members.length <= 1 || currentChannel.members.every((m) => m.userId === currentUser?.id))
+                      : (currentChannel.members?.some((m) => m.userId === user.id) && currentChannel.members?.some((m) => m.userId === currentUser?.id))
+                  );
+
+                  const unread = dmChannel ? (unreadCounts[dmChannel.id] || 0) : 0;
 
                 return (
                   <div
@@ -624,8 +648,9 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                     )}
                   </div>
                 );
-              })}
-            </div>
+              });
+            })()}
+          </div>
           )}
         </div>
       </div>

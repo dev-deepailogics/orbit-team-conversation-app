@@ -85,6 +85,7 @@ export default function AppDashboard() {
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
   const [showOrgControl, setShowOrgControl] = useState(false);
+  const [orgControlResetKey, setOrgControlResetKey] = useState(0);
   const [messageForTicket, setMessageForTicket] = useState<Message | null>(null);
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -140,9 +141,10 @@ export default function AppDashboard() {
       const res = await api.get('/api/workspaces');
       setWorkspaces(res.data);
       if (res.data.length > 0) {
-        if (!currentWorkspace || !res.data.some((w: Workspace) => w.id === currentWorkspace.id)) {
-          handleSelectWorkspace(res.data[0]);
-        }
+        const savedWsId = typeof window !== 'undefined' ? localStorage.getItem('orbit_active_workspace_id') : null;
+        const matchedSaved = savedWsId ? res.data.find((w: Workspace) => w.id === savedWsId) : null;
+        const targetWs = matchedSaved || (currentWorkspace && res.data.find((w: Workspace) => w.id === currentWorkspace.id)) || res.data[0];
+        handleSelectWorkspace(targetWs);
       } else {
         // Clear active workspace and channels when user has 0 workspaces
         setCurrentWorkspace(null);
@@ -171,6 +173,9 @@ export default function AppDashboard() {
   // 3. Handle Workspace Selection
   const handleSelectWorkspace = async (workspace: Workspace) => {
     setCurrentWorkspace(workspace);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('orbit_active_workspace_id', workspace.id);
+    }
     setCurrentProject(null);
     try {
       const res = await api.get(`/api/workspaces/${workspace.id}`);
@@ -190,10 +195,16 @@ export default function AppDashboard() {
 
       let targetChannel: Channel | null = null;
       let targetProject: Project | null = null;
+      let targetIsOrgControl = false;
       if (typeof window !== 'undefined') {
         const urlParams = new URLSearchParams(window.location.search);
+        const urlView = urlParams.get('view');
         const urlChId = urlParams.get('channelId');
         const urlProjId = urlParams.get('projectId');
+
+        if (urlView === 'org-control' || urlView === 'organization-control') {
+          targetIsOrgControl = true;
+        }
         if (urlChId && res.data.channels) {
           targetChannel = res.data.channels.find((c: Channel) => c.id === urlChId) || null;
         }
@@ -202,7 +213,9 @@ export default function AppDashboard() {
         }
       }
 
-      if (targetProject) {
+      if (targetIsOrgControl) {
+        handleOpenOrgControl();
+      } else if (targetProject) {
         handleSelectProject(targetProject);
       } else if (targetChannel) {
         handleSelectChannel(targetChannel);
@@ -270,6 +283,30 @@ export default function AppDashboard() {
     setCurrentProject(project);
     if (typeof window !== 'undefined') {
       window.history.replaceState(null, '', `?projectId=${project.id}`);
+    }
+  };
+
+  // 4c. Handle Organization Control URL Sync
+  const handleOpenOrgControl = (subview?: string) => {
+    setShowOrgControl(true);
+    setCurrentProject(null);
+    setOrgControlResetKey((prev) => prev + 1);
+    if (typeof window !== 'undefined') {
+      const param = subview ? `?view=org-control&subview=${subview}` : `?view=org-control`;
+      window.history.replaceState(null, '', param);
+    }
+  };
+
+  const handleCloseOrgControl = () => {
+    setShowOrgControl(false);
+    if (typeof window !== 'undefined') {
+      if (currentChannel) {
+        window.history.replaceState(null, '', `?channelId=${currentChannel.id}`);
+      } else if (currentProject) {
+        window.history.replaceState(null, '', `?projectId=${currentProject.id}`);
+      } else {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
     }
   };
 
@@ -510,6 +547,13 @@ export default function AppDashboard() {
       }
     };
 
+    const onAccountDeactivated = (payload?: { message?: string }) => {
+      logout();
+      alert(payload?.message || 'Your account has been deactivated. Please contact your administrator.');
+      router.push('/login');
+    };
+
+    socket.on('account:deactivated', onAccountDeactivated);
     socket.on('message:new', onNewMessage);
     socket.on('message:reaction', onReaction);
     socket.on('message:updated', onMessageUpdated);
@@ -541,6 +585,7 @@ export default function AppDashboard() {
     socket.on(SOCKET_EVENTS.PROJECT_DELETE, onProjectDelete);
 
     return () => {
+      socket.off('account:deactivated', onAccountDeactivated);
       socket.off('message:new', onNewMessage);
       socket.off('message:reaction', onReaction);
       socket.off('message:updated', onMessageUpdated);
@@ -688,7 +733,7 @@ export default function AppDashboard() {
                 }}
                 onOpenOrganizationControl={() => {
                   setIsMobileSidebarOpen(false);
-                  setShowOrgControl(true);
+                  handleOpenOrgControl();
                 }}
                 onCloseMobile={() => setIsMobileSidebarOpen(false)}
                 onMemberAdded={async () => {
@@ -742,7 +787,7 @@ export default function AppDashboard() {
             onStartHuddle={handleStartHuddle}
             onLogout={logout}
             onOpenSearch={() => setShowSearchModal(true)}
-            onOpenOrganizationControl={() => setShowOrgControl(true)}
+            onOpenOrganizationControl={() => handleOpenOrgControl()}
             onMemberAdded={async () => {
               if (currentWorkspace) {
                 const res = await api.get(`/api/workspaces/${currentWorkspace.id}`);
@@ -871,7 +916,8 @@ export default function AppDashboard() {
           currentUser={user}
           members={members}
           channels={channels}
-          onClose={() => setShowOrgControl(false)}
+          resetKey={orgControlResetKey}
+          onClose={handleCloseOrgControl}
           onOpenAddMembers={() => setShowAddMembers(true)}
           onOpenBotPortal={() => setShowBotPortal(true)}
           onOpenProjectBoard={(project) => {

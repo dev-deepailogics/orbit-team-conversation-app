@@ -95,6 +95,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
         avatarUrl: true,
         systemRole: true,
         status: true,
+        disabled: true,
         createdAt: true,
         updatedAt: true,
         memberships: {
@@ -154,7 +155,56 @@ export const adminRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
     return reply.send({ success: true, user: updatedUser });
   });
 
-  // 4. Reset User Password
+  // 4. Toggle User Disabled / Active Status
+  fastify.patch('/users/:userId/status', { preHandler: [ensureSuperAdmin] }, async (request, reply) => {
+    const { userId } = request.params as { userId: string };
+    const callerId = (request.user as { id: string }).id;
+
+    const bodySchema = z.object({
+      disabled: z.boolean(),
+    });
+
+    const parseResult = bodySchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: 'disabled boolean value is required' });
+    }
+
+    const { disabled } = parseResult.data;
+
+    if (callerId === userId && disabled) {
+      return reply.status(400).send({ error: 'You cannot disable your own Super Admin account' });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { 
+        disabled,
+        ...(disabled ? { status: 'OFFLINE' } : {}),
+      },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        displayName: true,
+        systemRole: true,
+        disabled: true,
+      },
+    });
+
+    if (disabled && fastify.io) {
+      // Notify the deactivated user's sockets to immediately log out
+      fastify.io.to(`user:${userId}`).emit('account:deactivated', {
+        message: 'Your account has been deactivated by an administrator.',
+      });
+      // Disconnect all sockets belonging to this user
+      const userSockets = await fastify.io.in(`user:${userId}`).fetchSockets();
+      userSockets.forEach((s) => s.disconnect(true));
+    }
+
+    return reply.send({ success: true, user: updatedUser });
+  });
+
+  // 5. Reset User Password
   fastify.post('/users/:userId/reset-password', { preHandler: [ensureSuperAdmin] }, async (request, reply) => {
     const { userId } = request.params as { userId: string };
     const parseResult = resetPasswordSchema.safeParse(request.body);

@@ -93,6 +93,10 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       return reply.status(401).send({ error: 'Invalid email or password' });
     }
 
+    if (user.disabled) {
+      return reply.status(403).send({ error: 'Account is deactivated' });
+    }
+
     const token = fastify.jwt.sign({
       id: user.id,
       email: user.email,

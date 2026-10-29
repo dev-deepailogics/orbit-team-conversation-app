@@ -114,6 +114,16 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
     const membership = await prisma.workspaceMember.findUnique({
       where: { workspaceId_userId: { workspaceId, userId } },
+      include: {
+        user: {
+          select: {
+            id: true,
+            systemRole: true,
+            displayName: true,
+            username: true,
+          },
+        },
+      },
     });
     if (!membership) {
       return reply.status(403).send({ error: 'You are not a member of this workspace' });
@@ -125,6 +135,12 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     if (status) {
       whereClause.status = { equals: status, mode: 'insensitive' };
     }
+
+    const isAdmin =
+      membership.role === 'OWNER' ||
+      membership.role === 'ADMIN' ||
+      membership.user.systemRole === 'SUPER_ADMIN' ||
+      membership.user.systemRole === 'WORKSPACE_ADMIN';
 
     const projects = await prisma.project.findMany({
       where: whereClause,
@@ -155,7 +171,40 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       orderBy: { createdAt: 'desc' },
     });
 
-    return reply.send(projects);
+    if (isAdmin) {
+      return reply.send(projects);
+    }
+
+    // Filter projects for non-admin members: must be creator, assigned, or manager
+    const filteredProjects = projects.filter((p: any) => {
+      if (p.createdById === userId) return true;
+
+      const userName = (membership.user.displayName || membership.user.username || '').toLowerCase();
+
+      const assigned = Array.isArray(p.assignedEmployees) ? p.assignedEmployees : [];
+      const isAssigned = assigned.some((e: any) => {
+        if (!e) return false;
+        if (typeof e === 'string') return e.toLowerCase() === userName;
+        if (e.uid && e.uid === userId) return true;
+        if (e.name && e.name.toLowerCase() === userName) return true;
+        return false;
+      });
+      if (isAssigned) return true;
+
+      const managers = Array.isArray(p.selectedManagers) ? p.selectedManagers : [];
+      const isManager = managers.some((m: any) => {
+        if (!m) return false;
+        if (typeof m === 'string') return m.toLowerCase() === userName;
+        if (m.uid && m.uid === userId) return true;
+        if (m.name && m.name.toLowerCase() === userName) return true;
+        return false;
+      });
+      if (isManager) return true;
+
+      return false;
+    });
+
+    return reply.send(filteredProjects);
   });
 
   // 2. Create a new project with default columns
@@ -331,9 +380,51 @@ export const projectRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
     const membership = await prisma.workspaceMember.findUnique({
       where: { workspaceId_userId: { workspaceId: project.workspaceId, userId } },
+      include: {
+        user: {
+          select: {
+            id: true,
+            systemRole: true,
+            displayName: true,
+            username: true,
+          },
+        },
+      },
     });
     if (!membership) {
       return reply.status(403).send({ error: 'You are not a member of this workspace' });
+    }
+
+    const isAdmin =
+      membership.role === 'OWNER' ||
+      membership.role === 'ADMIN' ||
+      membership.user.systemRole === 'SUPER_ADMIN' ||
+      membership.user.systemRole === 'WORKSPACE_ADMIN';
+
+    if (!isAdmin && project.createdById !== userId) {
+      const userName = (membership.user.displayName || membership.user.username || '').toLowerCase();
+      const assigned = Array.isArray(project.assignedEmployees) ? (project.assignedEmployees as any[]) : [];
+      const managers = Array.isArray(project.selectedManagers) ? (project.selectedManagers as any[]) : [];
+
+      const isAssigned = assigned.some((e: any) => {
+        if (!e) return false;
+        if (typeof e === 'string') return e.toLowerCase() === userName;
+        if (e.uid && e.uid === userId) return true;
+        if (e.name && e.name.toLowerCase() === userName) return true;
+        return false;
+      });
+
+      const isManager = managers.some((m: any) => {
+        if (!m) return false;
+        if (typeof m === 'string') return m.toLowerCase() === userName;
+        if (m.uid && m.uid === userId) return true;
+        if (m.name && m.name.toLowerCase() === userName) return true;
+        return false;
+      });
+
+      if (!isAssigned && !isManager) {
+        return reply.status(403).send({ error: 'You are not assigned to this project' });
+      }
     }
 
     return reply.send(project);

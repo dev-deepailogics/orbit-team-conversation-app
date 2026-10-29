@@ -60,7 +60,6 @@ model User {
   role                  String?      @default("employee")
   leaves                Json?        // e.g. { countLeaves: { casual: 10, sick: 8 }, offCountLeaves: { bereavement: 5, hajj: 15, ... } }
   disabled              Boolean      @default(false)
-  isActive              Boolean      @default(true)
   usersCollectionFlags  Json?        // e.g. { disabled: false, isActive: true }
   slackThreadId         String?
   slackThreadExpiry     DateTime?

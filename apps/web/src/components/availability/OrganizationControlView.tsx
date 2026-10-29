@@ -51,6 +51,7 @@ interface OrganizationControlViewProps {
   currentUser: UserProfile | null;
   members: any[];
   channels?: any[];
+  resetKey?: number;
   onClose: () => void;
   onOpenAddMembers?: () => void;
   onOpenBotPortal?: () => void;
@@ -80,6 +81,7 @@ export const OrganizationControlView: React.FC<OrganizationControlViewProps> = (
   currentUser,
   members,
   channels = [],
+  resetKey,
   onClose,
   onOpenAddMembers,
   onOpenBotPortal,
@@ -91,6 +93,41 @@ export const OrganizationControlView: React.FC<OrganizationControlViewProps> = (
   const [showProjectsPage, setShowProjectsPage] = useState<boolean>(false);
   const [showMediaManagementPage, setShowMediaManagementPage] = useState<boolean>(false);
   const [targetUserIdForAvailability, setTargetUserIdForAvailability] = useState<string>('');
+
+  // Synchronize subview with URL query parameter
+  const updateUrlParam = (subview?: string) => {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('view', 'org-control');
+      if (subview) {
+        url.searchParams.set('subview', subview);
+      } else {
+        url.searchParams.delete('subview');
+      }
+      window.history.replaceState(null, '', url.toString());
+    }
+  };
+
+  const syncFromUrl = () => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const subview = params.get('subview');
+      setShowUserAvailabilityPage(subview === 'availability');
+      setShowEmployeeStatusPage(subview === 'employee-status');
+      setShowProjectsPage(subview === 'projects');
+      setShowMediaManagementPage(subview === 'media');
+    }
+  };
+
+  useEffect(() => {
+    syncFromUrl();
+  }, [resetKey]);
+
+  useEffect(() => {
+    const handlePopState = () => syncFromUrl();
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Selected Card / Tab in Governance Modules
   const [selectedModule, setSelectedModule] = useState<'availability' | 'roles' | 'members' | 'shifts' | 'policies' | 'media' | 'integrations'>('availability');
@@ -312,7 +349,10 @@ export const OrganizationControlView: React.FC<OrganizationControlViewProps> = (
       <MediaManagementView
         workspace={workspace}
         currentUser={currentUser}
-        onBackToOrganizationControl={() => setShowMediaManagementPage(false)}
+        onBackToOrganizationControl={() => {
+          setShowMediaManagementPage(false);
+          updateUrlParam();
+        }}
         onOpenProjectBoard={onOpenProjectBoard}
       />
     );
@@ -325,7 +365,10 @@ export const OrganizationControlView: React.FC<OrganizationControlViewProps> = (
         currentUser={currentUser}
         members={members}
         channels={channels}
-        onBackToOrganizationControl={() => setShowProjectsPage(false)}
+        onBackToOrganizationControl={() => {
+          setShowProjectsPage(false);
+          updateUrlParam();
+        }}
         onOpenProjectBoard={onOpenProjectBoard}
       />
     );
@@ -336,11 +379,15 @@ export const OrganizationControlView: React.FC<OrganizationControlViewProps> = (
       <EmployeeStatusView
         workspace={workspace}
         currentUser={currentUser}
-        onBackToOrganizationControl={() => setShowEmployeeStatusPage(false)}
+        onBackToOrganizationControl={() => {
+          setShowEmployeeStatusPage(false);
+          updateUrlParam();
+        }}
         onSelectEmployeeForAvailability={(uid) => {
           setTargetUserIdForAvailability(uid);
           setShowEmployeeStatusPage(false);
           setShowUserAvailabilityPage(true);
+          updateUrlParam('availability');
         }}
       />
     );
@@ -355,6 +402,7 @@ export const OrganizationControlView: React.FC<OrganizationControlViewProps> = (
         onBackToOrganizationControl={() => {
           setShowUserAvailabilityPage(false);
           setTargetUserIdForAvailability('');
+          updateUrlParam();
         }}
       />
     );
@@ -518,6 +566,7 @@ export const OrganizationControlView: React.FC<OrganizationControlViewProps> = (
             <div
               onClick={() => {
                 setShowUserAvailabilityPage(true);
+                updateUrlParam('availability');
               }}
               className={`p-4 sm:p-5 rounded-2xl border cursor-pointer transition text-left flex flex-col justify-between group shadow-sm hover:border-blue-500/80 hover:shadow-md`}
               style={{
@@ -617,7 +666,10 @@ export const OrganizationControlView: React.FC<OrganizationControlViewProps> = (
 
             {/* 4. Employee Status Dashboard */}
             <div
-              onClick={() => setShowEmployeeStatusPage(true)}
+              onClick={() => {
+                setShowEmployeeStatusPage(true);
+                updateUrlParam('employee-status');
+              }}
               className="p-4 sm:p-5 rounded-2xl border cursor-pointer transition text-left flex flex-col justify-between group shadow-sm hover:border-emerald-500/80 hover:shadow-md"
               style={{
                 backgroundColor: 'var(--theme-bg-surface)',
@@ -647,7 +699,10 @@ export const OrganizationControlView: React.FC<OrganizationControlViewProps> = (
 
             {/* 5. View Projects Portfolio */}
             <div
-              onClick={() => setShowProjectsPage(true)}
+              onClick={() => {
+                setShowProjectsPage(true);
+                updateUrlParam('projects');
+              }}
               className="p-4 sm:p-5 rounded-2xl border cursor-pointer transition text-left flex flex-col justify-between group shadow-sm hover:border-purple-500/80 hover:shadow-md"
               style={{
                 backgroundColor: 'var(--theme-bg-surface)',
@@ -677,7 +732,10 @@ export const OrganizationControlView: React.FC<OrganizationControlViewProps> = (
 
             {/* 6. Media Management (Google Drive) */}
             <div
-              onClick={() => setShowMediaManagementPage(true)}
+              onClick={() => {
+                setShowMediaManagementPage(true);
+                updateUrlParam('media');
+              }}
               className="p-4 sm:p-5 rounded-2xl border cursor-pointer transition text-left flex flex-col justify-between group shadow-sm hover:border-blue-500/80 hover:shadow-md"
               style={{
                 backgroundColor: 'var(--theme-bg-surface)',
