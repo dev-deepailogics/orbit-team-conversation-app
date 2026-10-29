@@ -8,7 +8,8 @@ require Pod::Executable.execute_command('node', ['-p',
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
-linkage = ENV['USE_FRAMEWORKS']
+# react-native-firebase v27 pulls Firebase in via SPM, which requires dynamic linkage (rnfirebase.io/ios-spm).
+linkage = ENV['USE_FRAMEWORKS'] || 'dynamic'
 if linkage != nil
   Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
   use_frameworks! :linkage => linkage.to_sym
@@ -30,5 +31,9 @@ target 'OrbitMobile' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+    # Dynamic linkage (needed by react-native-firebase) exposes that this pod uses UTType* without linking the framework.
+    installer.pods_project.targets.each do |t|
+      t.add_system_framework('UniformTypeIdentifiers') if t.name == 'ReactNativeEnrichedHtml'
+    end
   end
 end

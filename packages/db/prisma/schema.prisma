@@ -76,6 +76,7 @@ model User {
   reactions         Reaction[]
   notifications     Notification[]
   pushSubscriptions PushSubscription[]
+  deviceTokens      DeviceToken[]
   huddlesHosted     Huddle[]          @relation("HuddleHost")
   createdBots       BotApp[]          @relation("BotCreator")
   createdWebhooks   Webhook[]         @relation("WebhookCreator")
@@ -561,5 +562,18 @@ model TicketComment {
   user          User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([ticketId, createdAt])
+  @@index([userId])
+}
+
+// FCM registration tokens for the mobile app (web uses PushSubscription).
+model DeviceToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  platform  String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
 }

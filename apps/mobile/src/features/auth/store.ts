@@ -3,6 +3,7 @@ import * as Keychain from 'react-native-keychain';
 import { create } from 'zustand';
 import type { UserProfile } from '@orbit/types';
 import { api, setAuthToken } from '@/lib/api';
+import { unregisterPushToken } from '@/features/notifications/services/pushToken';
 import { getMe } from './services/authApi';
 
 // Token lives in iOS Keychain / Android Keystore, never in plain AsyncStorage.
@@ -35,6 +36,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
+    // Fire before the bearer token is cleared so this device stops getting the old user's pushes.
+    unregisterPushToken();
     await Keychain.resetGenericPassword({ service: KEYCHAIN_SERVICE });
     setAuthToken(null);
     set({ user: null, token: null, isLoading: false, bootError: null });

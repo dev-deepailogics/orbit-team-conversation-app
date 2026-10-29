@@ -13,7 +13,8 @@ interface WorkspaceState {
   error: string;
   // Loads the list and opens `preferId`, else the current one, else the first.
   load: (preferId?: string) => Promise<void>;
-  select: (workspaceId: string) => Promise<void>;
+  // silent: background refetch that leaves isLoading alone (no spinner on screens that bind to it).
+  select: (workspaceId: string, silent?: boolean) => Promise<void>;
   upsertChannel: (channel: Channel) => void;
   removeChannel: (channelId: string) => void;
   incrementUnread: (channelId: string) => void;
@@ -47,9 +48,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   // ponytail: last-opened workspace isn't persisted (no AsyncStorage yet); app reopens on the first one.
-  select: async workspaceId => {
+  select: async (workspaceId, silent) => {
     const req = ++selectSeq;
-    set({ isLoading: true, error: '' });
+    set(silent ? { error: '' } : { isLoading: true, error: '' });
     try {
       const current = await getWorkspace(workspaceId);
       if (req !== selectSeq) return; // a newer switch won

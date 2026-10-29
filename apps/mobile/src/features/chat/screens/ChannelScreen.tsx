@@ -11,6 +11,7 @@ import { channelLabel, channelPrefix, isDirect } from '@/features/workspaces/uti
 import { getErrorMessage } from '@/lib/api';
 import { EVENTS, getSocket } from '@/lib/socket';
 import type { ScreenProps } from '@/navigation/types';
+import { AddChannelMembersSheet } from '@/features/workspaces/components/AddChannelMembersSheet';
 import { ChatHeader } from '../components/ChatHeader';
 import { Composer } from '../components/Composer';
 import { MessageActionsSheet } from '../components/MessageActionsSheet';
@@ -36,6 +37,7 @@ export function ChannelScreen({ route, navigation }: ScreenProps<'Channel'>) {
   const receiveMessage = useChatStore(s => s.receiveMessage);
   const setReactions = useChatStore(s => s.setReactions);
   const [actionTarget, setActionTarget] = useState<Message | null>(null);
+  const [showAddPeople, setShowAddPeople] = useState(false);
 
   useEffect(() => {
     openChannel(channelId);
@@ -112,6 +114,7 @@ export function ChannelScreen({ route, navigation }: ScreenProps<'Channel'>) {
         title={title}
         subtitle={direct ? undefined : memberCount === 1 ? '1 member' : `${memberCount} members`}
         onBack={navigation.goBack}
+        action={direct ? undefined : { label: 'Add people', onPress: () => setShowAddPeople(true) }}
       />
       {/* Android runs edge-to-edge (gradle.properties), where adjustResize no longer resizes the window. */}
       <KeyboardAvoidingView className="flex-1" behavior="padding">
@@ -165,6 +168,9 @@ export function ChannelScreen({ route, navigation }: ScreenProps<'Channel'>) {
         <Composer placeholder={direct ? `Message ${label}` : `Message ${channelPrefix(channel)}${label}`} onSend={handleSend} onTyping={handleTyping} />
       </KeyboardAvoidingView>
 
+      {!direct && (
+        <AddChannelMembersSheet visible={showAddPeople} channel={channel} onClose={() => setShowAddPeople(false)} />
+      )}
       <MessageActionsSheet
         message={actionTarget}
         onClose={() => setActionTarget(null)}

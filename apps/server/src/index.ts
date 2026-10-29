@@ -26,6 +26,8 @@ import { registerPushMiddleware } from './services/pushService.js';
 import { setupSocketServer } from './socket/index.js';
 
 dotenv.config();
+// The server runs from apps/server but .env lives at the repo root (dotenv never overrides vars already set).
+dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
 
 // Extend Fastify types
 declare module 'fastify' {

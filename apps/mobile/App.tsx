@@ -7,6 +7,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { WorkspaceControlScreen } from '@/features/workspaces/screens/WorkspaceControlScreen';
 import { AdminConsoleScreen } from '@/features/admin/screens/AdminConsoleScreen';
 import { LoginScreen } from '@/features/auth/screens/LoginScreen';
 import { RegisterScreen } from '@/features/auth/screens/RegisterScreen';
@@ -16,7 +17,9 @@ import { ThreadScreen } from '@/features/chat/screens/ThreadScreen';
 import { NewMessageScreen } from '@/features/dms/screens/NewMessageScreen';
 import { ProjectBoardScreen } from '@/features/projects/screens/ProjectBoardScreen';
 import { TicketDetailScreen } from '@/features/projects/screens/TicketDetailScreen';
+import { NotificationHost } from '@/features/notifications/components/NotificationHost';
 import { MainTabs } from '@/navigation/MainTabs';
+import { navigationRef } from '@/navigation/ref';
 import type { RootStackParamList } from '@/navigation/types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -87,6 +90,13 @@ function RootNavigator() {
           <Stack.Screen name="TicketDetail" component={TicketDetailScreen} options={{ animation: 'default' }} />
           {user.systemRole === 'SUPER_ADMIN' && (
             <Stack.Screen
+              name="WorkspaceControl"
+              component={WorkspaceControlScreen}
+              options={{ headerShown: true, title: 'Workspace control', animation: 'default' }}
+            />
+          )}
+          {user.systemRole === 'SUPER_ADMIN' && (
+            <Stack.Screen
               name="AdminConsole"
               component={AdminConsoleScreen}
               options={{
@@ -111,8 +121,9 @@ function App() {
   return (
     <SafeAreaProvider>
       <StatusBar barStyle="light-content" />
-      <NavigationContainer theme={navTheme}>
+      <NavigationContainer ref={navigationRef} theme={navTheme}>
         <RootNavigator />
+        <NotificationHost />
       </NavigationContainer>
     </SafeAreaProvider>
   );

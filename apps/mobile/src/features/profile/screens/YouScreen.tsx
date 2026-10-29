@@ -52,6 +52,11 @@ export function YouScreen({ navigation }: TabScreenProps<'You'>) {
                 <Text className="font-semibold text-white">Admin Console</Text>
               </Button>
             )}
+            {isSuperAdmin && (
+              <Button className="h-11 bg-slack-accent" onPress={() => navigation.navigate('WorkspaceControl')}>
+                <Text className="font-semibold text-white">Workspace control</Text>
+              </Button>
+            )}
             <Button className="h-11 bg-slack-green" onPress={() => setShowCreate(true)}>
               <Text className="font-semibold text-white">Create workspace</Text>
             </Button>

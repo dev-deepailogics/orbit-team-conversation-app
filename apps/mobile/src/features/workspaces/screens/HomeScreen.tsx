@@ -6,6 +6,7 @@ import type { Channel } from '@orbit/types';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { CreateChannelSheet } from '../components/CreateChannelSheet';
 import { CreateWorkspaceSheet } from '@/features/admin/components/CreateWorkspaceSheet';
 import { useAuthStore } from '@/features/auth/store';
 import type { TabScreenProps } from '@/navigation/types';
@@ -27,11 +28,15 @@ export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
   const load = useWorkspaceStore(s => s.load);
   const [showSwitcher, setShowSwitcher] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const [showCreateChannel, setShowCreateChannel] = useState(false);
+  // Local, not the store's isLoading: background refetches (e.g. after adding a member while Home is off-screen)
+  // toggle that flag, and iOS RefreshControl can miss the true→false change and spin forever.
+  const [refreshing, setRefreshing] = useState(false);
 
   const rows = useMemo<Row[]>(() => {
     const { channels, dms } = splitChannels(current?.channels ?? [], myId);
     return [
-      { kind: 'header', title: 'Channels' },
+      { kind: 'header', title: 'Channels', onAdd: () => setShowCreateChannel(true) },
       ...channels.map(channel => ({ kind: 'channel' as const, channel })),
       { kind: 'header', title: 'Direct messages', onAdd: () => navigation.navigate('NewMessage') },
       ...dms.map(channel => ({ kind: 'channel' as const, channel })),
@@ -110,14 +115,21 @@ export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
         data={rows}
         getItemType={r => r.kind}
         keyExtractor={r => (r.kind === 'header' ? r.title : r.channel.id)}
-        refreshing={isLoading}
-        onRefresh={() => load()}
+        refreshing={refreshing}
+        onRefresh={async () => {
+          setRefreshing(true);
+          try {
+            await load();
+          } finally {
+            setRefreshing(false);
+          }
+        }}
         renderItem={({ item }) =>
           item.kind === 'header' ? (
             <View className="mt-4 flex-row items-center justify-between px-4 pb-1">
               <Text className="text-sm font-semibold text-gray-400">{item.title}</Text>
               {item.onAdd && (
-                <Pressable onPress={item.onAdd} hitSlop={12} accessibilityLabel="New message">
+                <Pressable onPress={item.onAdd} hitSlop={12} accessibilityLabel={`Add ${item.title}`}>
                   <Text className="text-xl text-gray-400">＋</Text>
                 </Pressable>
               )}
@@ -133,6 +145,15 @@ export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
         }
       />
 
+      <CreateChannelSheet
+        visible={showCreateChannel}
+        workspaceId={current.id}
+        onClose={() => setShowCreateChannel(false)}
+        onCreated={c => {
+          setShowCreateChannel(false);
+          navigation.navigate('Channel', { channelId: c.id });
+        }}
+      />
       <WorkspaceSwitcherSheet visible={showSwitcher} onClose={() => setShowSwitcher(false)} />
       {createSheet}
     </SafeAreaView>

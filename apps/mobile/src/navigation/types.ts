@@ -20,6 +20,7 @@ export type RootStackParamList = {
   Thread: { channelId: string; messageId: string };
   NewMessage: undefined;
   AdminConsole: undefined;
+  WorkspaceControl: undefined;
   ProjectBoard: { projectId: string };
   TicketDetail: { projectId: string; ticketId: string };
 };

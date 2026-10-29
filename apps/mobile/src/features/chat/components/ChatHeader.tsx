@@ -5,10 +5,12 @@ interface Props {
   title: string;
   subtitle?: string;
   onBack: () => void;
+  // Optional trailing text button (e.g. "Add").
+  action?: { label: string; onPress: () => void };
 }
 
 // Custom header (native one is hidden) so KeyboardAvoidingView needs no header-height offset.
-export function ChatHeader({ title, subtitle, onBack }: Props) {
+export function ChatHeader({ title, subtitle, onBack, action }: Props) {
   return (
     <View className="flex-row items-center gap-1 border-b border-slack-darkBorder px-2 py-2">
       <Pressable
@@ -30,6 +32,11 @@ export function ChatHeader({ title, subtitle, onBack }: Props) {
           </Text>
         )}
       </View>
+      {action && (
+        <Pressable onPress={action.onPress} hitSlop={8} className="px-3 py-2" accessibilityRole="button">
+          <Text className="text-sm font-semibold text-slack-green">{action.label}</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
