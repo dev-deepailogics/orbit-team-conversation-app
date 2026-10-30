@@ -7,8 +7,10 @@ import { getErrorMessage } from '@/lib/api';
 import { joinWorkspace } from '../services/workspaceApi';
 import { useWorkspaceStore } from '../store';
 import { parseInviteCode } from '../utils';
+import { useTheme } from '@/lib/theme';
 
 export function JoinWorkspaceForm({ onJoined }: { onJoined?: () => void }) {
+  const { colors } = useTheme();
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -36,7 +38,7 @@ export function JoinWorkspaceForm({ onJoined }: { onJoined?: () => void }) {
   };
 
   return (
-    <View className="gap-2">
+    <View className="gap-3">
       <FormField
         label="Join with an invite"
         placeholder="Invite link or code"
@@ -46,9 +48,9 @@ export function JoinWorkspaceForm({ onJoined }: { onJoined?: () => void }) {
         returnKeyType="go"
         onSubmitEditing={handleJoin}
       />
-      {!!error && <Text className="text-xs text-red-400">{error}</Text>}
-      <Button variant="secondary" className="h-10" disabled={isLoading} onPress={handleJoin}>
-        {isLoading ? <ActivityIndicator color="white" /> : <Text>Join workspace</Text>}
+      {!!error && <Text className="text-sm text-destructive">{error}</Text>}
+      <Button disabled={isLoading} onPress={handleJoin}>
+        {isLoading ? <ActivityIndicator color={colors.primaryForeground} /> : <Text>Join workspace</Text>}
       </Button>
     </View>
   );

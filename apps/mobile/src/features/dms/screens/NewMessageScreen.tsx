@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
+import { Search } from '@/components/icons';
 import type { WorkspaceMember } from '@orbit/types';
 import { Avatar } from '@/components/Avatar';
 import { Input } from '@/components/ui/input';
@@ -9,9 +10,11 @@ import { useAuthStore } from '@/features/auth/store';
 import { openDirectMessage } from '@/features/workspaces/services/workspaceApi';
 import { useWorkspaceStore } from '@/features/workspaces/store';
 import { getErrorMessage } from '@/lib/api';
+import { useTheme } from '@/lib/theme';
 import type { ScreenProps } from '@/navigation/types';
 
 export function NewMessageScreen({ navigation }: ScreenProps<'NewMessage'>) {
+  const { colors } = useTheme();
   const myId = useAuthStore(s => s.user?.id);
   const workspaceId = useWorkspaceStore(s => s.current?.id);
   const members = useWorkspaceStore(s => s.current?.members);
@@ -43,12 +46,11 @@ export function NewMessageScreen({ navigation }: ScreenProps<'NewMessage'>) {
   };
 
   return (
-    <View className="flex-1 bg-slack-darkBg">
-      <View className="border-b border-slack-darkBorder p-4">
+    <View className="flex-1 bg-background">
+      <View className="border-b border-border px-4 py-3">
         <Input
-          className="h-10 border-gray-700 bg-slack-darkSidebar text-white"
+          className="h-10 border-0 bg-muted pl-10"
           placeholder="To: search people"
-          placeholderTextColor="#6B7280"
           value={query}
           onChangeText={setQuery}
           autoFocus
@@ -56,6 +58,9 @@ export function NewMessageScreen({ navigation }: ScreenProps<'NewMessage'>) {
           autoCorrect={false}
           clearButtonMode="while-editing"
         />
+        <View className="absolute left-7 top-6" pointerEvents="none">
+          <Search size={17} color={colors.subtle} />
+        </View>
       </View>
       <FlashList
         data={filtered}
@@ -67,22 +72,22 @@ export function NewMessageScreen({ navigation }: ScreenProps<'NewMessage'>) {
             <Pressable
               onPress={() => open(item)}
               disabled={!!openingId}
-              className="min-h-[52px] flex-row items-center gap-3 px-4 py-2 active:bg-white/5"
+              className="min-h-[56px] flex-row items-center gap-3 px-4 py-2 active:bg-muted"
               accessibilityRole="button"
             >
               <Avatar name={name} />
               <View className="flex-1">
-                <Text className="text-sm font-semibold text-white" numberOfLines={1}>
+                <Text className="font-bold" numberOfLines={1}>
                   {name}
                   {item.userId === myId ? ' (you)' : ''}
                 </Text>
-                <Text className="text-xs text-gray-400">@{item.user?.username}</Text>
+                <Text className="text-sm text-muted-foreground">@{item.user?.username}</Text>
               </View>
-              {openingId === item.userId && <ActivityIndicator color="white" />}
+              {openingId === item.userId && <ActivityIndicator color={colors.mutedForeground} />}
             </Pressable>
           );
         }}
-        ListEmptyComponent={<Text className="py-12 text-center text-sm text-gray-500">No one matches “{query}”.</Text>}
+        ListEmptyComponent={<Text className="py-12 text-center text-muted-foreground">No one matches “{query}”.</Text>}
       />
     </View>
   );

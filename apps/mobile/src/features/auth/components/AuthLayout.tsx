@@ -13,25 +13,25 @@ interface Props {
 // Shared shell for Login/Register, mirroring apps/web/src/app/login/page.tsx.
 export function AuthLayout({ title, subtitle, error, children }: Props) {
   return (
-    <SafeAreaView className="flex-1 bg-slack-darkBg">
+    <SafeAreaView className="flex-1 bg-background">
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           contentContainerClassName="flex-grow justify-center p-6"
           keyboardShouldPersistTaps="handled"
         >
-          <View className="mb-6 flex-row items-center justify-center gap-2">
-            <View className="h-10 w-10 items-center justify-center rounded-xl bg-slack-activeChannel">
-              <Text className="text-xl font-black text-white">O</Text>
+          <View className="mb-10 flex-row items-center justify-center gap-2">
+            <View className="h-9 w-9 items-center justify-center rounded-xl bg-brand">
+              <Text className="text-lg font-black text-brand-foreground">O</Text>
             </View>
-            <Text className="text-2xl font-black tracking-tight text-white">ORBIT</Text>
+            <Text className="text-2xl font-black">orbit</Text>
           </View>
 
-          <Text className="mb-2 text-center text-xl font-bold text-white">{title}</Text>
-          <Text className="mb-6 text-center text-xs text-gray-400">{subtitle}</Text>
+          <Text className="mb-2 text-center text-3xl font-black">{title}</Text>
+          <Text className="mb-8 text-center text-muted-foreground">{subtitle}</Text>
 
           {!!error && (
-            <View className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3">
-              <Text className="text-xs text-red-400">{error}</Text>
+            <View className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+              <Text className="text-sm text-destructive">{error}</Text>
             </View>
           )}
 

@@ -8,6 +8,7 @@ import { Text } from '@/components/ui/text';
 import { getErrorMessage } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { addWorkspaceMember } from '../services/workspaceApi';
+import { useTheme } from '@/lib/theme';
 
 const ROLES = [
   { value: 'MEMBER', label: 'Member', hint: 'Chat, huddles, files' },
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export function AddMemberSheet({ visible, workspace, onClose, onAdded }: Props) {
+  const { colors } = useTheme();
   const [who, setWho] = useState('');
   const [role, setRole] = useState<'MEMBER' | 'ADMIN'>('MEMBER');
   const [error, setError] = useState('');
@@ -59,7 +61,7 @@ export function AddMemberSheet({ visible, workspace, onClose, onAdded }: Props) 
         returnKeyType="go"
         onSubmitEditing={submit}
       />
-      <Text className="-mt-2 text-xs text-gray-500">They must already have an Orbit account.</Text>
+      <Text className="-mt-2 text-sm text-muted-foreground">They must already have an Orbit account.</Text>
 
       <View className="flex-row gap-2">
         {ROLES.map(r => (
@@ -69,20 +71,20 @@ export function AddMemberSheet({ visible, workspace, onClose, onAdded }: Props) 
             accessibilityRole="radio"
             accessibilityState={{ selected: role === r.value }}
             className={cn(
-              'flex-1 gap-0.5 rounded-lg border p-3',
-              role === r.value ? 'border-slack-green bg-slack-green/15' : 'border-slack-darkBorder',
+              'flex-1 gap-0.5 rounded-xl border p-3',
+              role === r.value ? 'border-link bg-accent' : 'border-border',
             )}
           >
-            <Text className="text-sm font-semibold text-white">{r.label}</Text>
-            <Text className="text-xs text-gray-400">{r.hint}</Text>
+            <Text className="font-bold">{r.label}</Text>
+            <Text className="text-sm text-muted-foreground">{r.hint}</Text>
           </Pressable>
         ))}
       </View>
 
-      {!!error && <Text className="text-xs text-red-400">{error}</Text>}
+      {!!error && <Text className="text-sm text-destructive">{error}</Text>}
 
-      <Button className="h-11 bg-slack-green" disabled={isLoading} onPress={submit}>
-        {isLoading ? <ActivityIndicator color="white" /> : <Text className="font-semibold text-white">Add member</Text>}
+      <Button disabled={isLoading} onPress={submit}>
+        {isLoading ? <ActivityIndicator color={colors.primaryForeground} /> : <Text>Add member</Text>}
       </Button>
     </Sheet>
   );

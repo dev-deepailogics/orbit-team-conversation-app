@@ -7,15 +7,9 @@ type Props = ComponentProps<typeof Input> & { label: string };
 
 export function FormField({ label, ...inputProps }: Props) {
   return (
-    <View className="gap-1">
-      <Label className="text-xs font-semibold text-gray-300">{label}</Label>
-      <Input
-        className="h-11 border-gray-700 bg-slack-darkBg text-white"
-        placeholderTextColor="#6B7280"
-        autoCapitalize="none"
-        autoCorrect={false}
-        {...inputProps}
-      />
+    <View className="gap-1.5">
+      <Label>{label}</Label>
+      <Input autoCapitalize="none" autoCorrect={false} {...inputProps} />
     </View>
   );
 }

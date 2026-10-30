@@ -10,10 +10,11 @@ import { getErrorMessage } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { createChannel } from '../services/workspaceApi';
 import { useWorkspaceStore } from '../store';
+import { useTheme } from '@/lib/theme';
 
 const TYPES = [
-  { value: 'PUBLIC', label: '# Public', hint: 'Everyone in the workspace joins' },
-  { value: 'PRIVATE', label: '🔒 Private', hint: 'Invite-only' },
+  { value: 'PUBLIC', label: 'Public', hint: 'Everyone in the workspace joins' },
+  { value: 'PRIVATE', label: 'Private', hint: 'Invite-only' },
 ] as const;
 
 interface Props {
@@ -25,6 +26,7 @@ interface Props {
 
 // Any workspace member can create a channel (server checks membership).
 export function CreateChannelSheet({ visible, workspaceId, onClose, onCreated }: Props) {
+  const { colors } = useTheme();
   const upsertChannel = useWorkspaceStore(s => s.upsertChannel);
   const [name, setName] = useState('');
   const [type, setType] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
@@ -72,18 +74,18 @@ export function CreateChannelSheet({ visible, workspaceId, onClose, onCreated }:
             accessibilityRole="radio"
             accessibilityState={{ selected: type === t.value }}
             className={cn(
-              'flex-1 gap-0.5 rounded-lg border p-3',
-              type === t.value ? 'border-slack-green bg-slack-green/15' : 'border-slack-darkBorder',
+              'flex-1 gap-0.5 rounded-xl border p-3',
+              type === t.value ? 'border-link bg-accent' : 'border-border',
             )}
           >
-            <Text className="text-sm font-semibold text-white">{t.label}</Text>
-            <Text className="text-xs text-gray-400">{t.hint}</Text>
+            <Text className="font-bold">{t.label}</Text>
+            <Text className="text-sm text-muted-foreground">{t.hint}</Text>
           </Pressable>
         ))}
       </View>
-      {!!error && <Text className="text-xs text-red-400">{error}</Text>}
-      <Button className="h-11 bg-slack-green" disabled={isLoading} onPress={submit}>
-        {isLoading ? <ActivityIndicator color="white" /> : <Text className="font-semibold text-white">Create channel</Text>}
+      {!!error && <Text className="text-sm text-destructive">{error}</Text>}
+      <Button disabled={isLoading} onPress={submit}>
+        {isLoading ? <ActivityIndicator color={colors.primaryForeground} /> : <Text>Create channel</Text>}
       </Button>
     </Sheet>
   );

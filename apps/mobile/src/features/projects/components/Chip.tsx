@@ -1,5 +1,6 @@
-import { Pressable } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { Text } from '@/components/ui/text';
+import { onSwatch } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -14,16 +15,24 @@ export function Chip({ label, selected, color, onPress }: Props) {
   return (
     <Pressable
       onPress={onPress}
-      hitSlop={4}
+      hitSlop={6}
       accessibilityRole="button"
       accessibilityState={{ selected }}
       style={selected && color ? { backgroundColor: color, borderColor: color } : undefined}
       className={cn(
-        'min-h-[36px] justify-center rounded-full border border-slack-darkBorder px-3 active:opacity-70',
-        selected && !color && 'border-slack-activeChannel bg-slack-activeChannel',
+        'h-8 flex-row items-center gap-1.5 rounded-full border border-border bg-background px-3 active:bg-muted',
+        selected && !color && 'border-link bg-accent',
       )}
     >
-      <Text className={cn('text-sm', selected ? 'font-semibold text-white' : 'text-gray-300')} numberOfLines={1}>
+      {!!color && !selected && <View className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />}
+      <Text
+        className={cn(
+          'text-sm font-bold text-muted-foreground',
+          selected && !color && 'text-accent-foreground',
+        )}
+        style={selected && color ? { color: onSwatch } : undefined}
+        numberOfLines={1}
+      >
         {label}
       </Text>
     </Pressable>

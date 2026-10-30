@@ -2,10 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActionSheetIOS, ActivityIndicator, Alert, Platform, Pressable, ScrollView, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ellipsis, Plus, Search } from '@/components/icons';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { getErrorMessage } from '@/lib/api';
+import { useTheme } from '@/lib/theme';
 import type { ScreenProps } from '@/navigation/types';
 import { Chip } from '../components/Chip';
 import { ColumnsSheet } from '../components/ColumnsSheet';
@@ -19,6 +22,7 @@ import type { Ticket } from '../types';
 import { filterTickets } from '../utils';
 
 export function ProjectBoardScreen({ route, navigation }: ScreenProps<'ProjectBoard'>) {
+  const { colors } = useTheme();
   const { projectId } = route.params;
   const project = useProjectStore(s => (s.current?.id === projectId ? s.current : null));
   const isLoading = useProjectStore(s => s.isLoading);
@@ -92,37 +96,35 @@ export function ProjectBoardScreen({ route, navigation }: ScreenProps<'ProjectBo
   };
 
   const header = (
-    <View className="flex-row items-center gap-4 border-b border-slack-darkBorder px-5 py-4">
-      <Pressable onPress={navigation.goBack} hitSlop={12} accessibilityLabel="Back">
-        <Text className="text-2xl text-white">‹</Text>
-      </Pressable>
-      <Text className="flex-1 text-lg font-bold text-white" numberOfLines={1}>
-        {project ? `${project.icon || '📋'} ${project.name}` : 'Project'}
-      </Text>
-      {project && (
-        <Pressable onPress={openMenu} hitSlop={12} accessibilityLabel="Project options">
-          <Text className="text-2xl text-white">⋯</Text>
-        </Pressable>
-      )}
-    </View>
+    <ScreenHeader
+      title={project ? `${project.icon || '📋'} ${project.name}` : 'Project'}
+      onBack={navigation.goBack}
+      right={
+        project && (
+          <Button variant="ghost" size="icon" onPress={openMenu} accessibilityLabel="Project options">
+            <Ellipsis size={22} color={colors.foreground} />
+          </Button>
+        )
+      }
+    />
   );
 
   if (!project) {
     return (
-      <SafeAreaView className="flex-1 bg-slack-darkBg" edges={['top']}>
+      <SafeAreaView className="flex-1 bg-background" edges={['top']}>
         {header}
         <View className="flex-1 items-center justify-center gap-4 p-6">
           {error ? (
             <>
-              <Text className="text-center text-gray-300">{error}</Text>
-              <Button className="bg-slack-activeChannel" onPress={() => openProject(projectId)}>
-                <Text className="text-white">Retry</Text>
+              <Text className="text-center text-muted-foreground">{error}</Text>
+              <Button variant="outline" onPress={() => openProject(projectId)}>
+                <Text>Retry</Text>
               </Button>
             </>
           ) : isLoading ? (
-            <ActivityIndicator color="white" />
+            <ActivityIndicator color={colors.mutedForeground} />
           ) : (
-            <Text className="text-gray-400">This project is no longer available.</Text>
+            <Text className="text-muted-foreground">This project is no longer available.</Text>
           )}
         </View>
       </SafeAreaView>
@@ -130,10 +132,10 @@ export function ProjectBoardScreen({ route, navigation }: ScreenProps<'ProjectBo
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-slack-darkBg" edges={['top', 'bottom']}>
+    <SafeAreaView className="flex-1 bg-background" edges={['top', 'bottom']}>
       {header}
-      <View className="h-16 justify-center">
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="items-center gap-2 px-5">
+      <View className="h-14 justify-center">
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="items-center gap-2 px-4">
           {columns.map(c => (
             <Chip
               key={c.id}
@@ -145,23 +147,25 @@ export function ProjectBoardScreen({ route, navigation }: ScreenProps<'ProjectBo
           ))}
         </ScrollView>
       </View>
-      <View className="px-5 pb-4">
+      <View className="justify-center px-4 pb-3">
         <Input
           value={query}
           onChangeText={setQuery}
           placeholder="Search tickets"
-          placeholderTextColor="#6B7280"
-          className="h-11 border-gray-700 bg-slack-darkSidebar text-white"
+          className="h-10 border-0 bg-muted pl-10"
           returnKeyType="search"
           clearButtonMode="while-editing"
         />
+        <View className="absolute left-7 top-3" pointerEvents="none">
+          <Search size={17} color={colors.subtle} />
+        </View>
       </View>
 
       {columns.length === 0 ? (
         <View className="flex-1 items-center gap-3 p-6">
-          <Text className="text-center text-gray-400">This project has no columns yet.</Text>
-          <Button className="bg-slack-green" onPress={() => setSheet('columns')}>
-            <Text className="text-white">Add a column</Text>
+          <Text className="text-center text-muted-foreground">This project has no columns yet.</Text>
+          <Button onPress={() => setSheet('columns')}>
+            <Text>Add a column</Text>
           </Button>
         </View>
       ) : (
@@ -179,7 +183,7 @@ export function ProjectBoardScreen({ route, navigation }: ScreenProps<'ProjectBo
             />
           )}
           ListEmptyComponent={
-            <Text className="mt-10 text-center text-gray-400">{query ? 'No matching tickets.' : 'No tickets in this column.'}</Text>
+            <Text className="mt-10 text-center text-muted-foreground">{query ? 'No matching tickets.' : 'No tickets in this column.'}</Text>
           }
         />
       )}
@@ -187,10 +191,11 @@ export function ProjectBoardScreen({ route, navigation }: ScreenProps<'ProjectBo
       {!!active && (
         <Pressable
           onPress={() => setSheet('ticket')}
-          className="absolute bottom-6 right-5 h-14 w-14 items-center justify-center rounded-full bg-slack-green active:opacity-80"
+          className="absolute bottom-6 right-4 h-14 w-14 items-center justify-center rounded-2xl bg-primary shadow-lg shadow-overlay/20 active:bg-primary/90"
+          accessibilityRole="button"
           accessibilityLabel="New ticket"
         >
-          <Text className="text-3xl text-white">＋</Text>
+          <Plus size={26} color={colors.primaryForeground} strokeWidth={2.25} />
         </Pressable>
       )}
 

@@ -61,9 +61,9 @@ export function LinkSheet({ visible, hasSelection, onClose, onSubmit }: Props) {
         onSubmitEditing={handleSubmit}
         autoFocus
       />
-      {!!error && <Text className="text-xs text-red-400">{error}</Text>}
-      <Button className="h-11 bg-slack-activeChannel" onPress={handleSubmit}>
-        <Text className="font-semibold text-white">Add link</Text>
+      {!!error && <Text className="text-sm text-destructive">{error}</Text>}
+      <Button onPress={handleSubmit}>
+        <Text>Add link</Text>
       </Button>
     </Sheet>
   );

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { Check } from '@/components/icons';
 import { FormField } from '@/components/FormField';
 import { MultiSelectField } from '@/components/MultiSelectField';
 import { Sheet } from '@/components/Sheet';
@@ -7,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useWorkspaceStore } from '@/features/workspaces/store';
 import { getErrorMessage } from '@/lib/api';
+import { onSwatch, useTheme } from '@/lib/theme';
 import type { Project, ProjectInput, ProjectStatus } from '../types';
 import { COLUMN_COLORS, memberName, projectMembers } from '../utils';
 import { Chip } from './Chip';
@@ -21,6 +23,7 @@ interface Props {
 const STATUSES: ProjectStatus[] = ['active', 'inactive', 'delivered'];
 
 export function ProjectFormSheet({ visible, project, onClose, onSubmit }: Props) {
+  const { colors } = useTheme();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [icon, setIcon] = useState('📋');
@@ -85,15 +88,32 @@ export function ProjectFormSheet({ visible, project, onClose, onSubmit }: Props)
         returnKeyType="done"
       />
       <FormField label="Icon (emoji)" value={icon} onChangeText={setIcon} maxLength={4} />
-      <View className="flex-row flex-wrap gap-2">
-        {COLUMN_COLORS.map(c => (
-          <Chip key={c} label={c === color ? '✓' : '  '} color={c} selected={c === color} onPress={() => setColor(c)} />
-        ))}
+      <View className="gap-1.5">
+        <Text className="text-sm font-bold">Color</Text>
+        <View className="flex-row flex-wrap gap-3">
+          {COLUMN_COLORS.map(c => (
+            <Pressable
+              key={c}
+              onPress={() => setColor(c)}
+              hitSlop={4}
+              className="h-9 w-9 items-center justify-center rounded-full"
+              style={{ backgroundColor: c }}
+              accessibilityRole="radio"
+              accessibilityLabel={`Color ${c}`}
+              accessibilityState={{ selected: c === color }}
+            >
+              {c === color && <Check size={18} color={onSwatch} strokeWidth={3} />}
+            </Pressable>
+          ))}
+        </View>
       </View>
-      <View className="flex-row flex-wrap gap-2">
-        {STATUSES.map(s => (
-          <Chip key={s} label={s} selected={s === status} onPress={() => setStatus(s)} />
-        ))}
+      <View className="gap-1.5">
+        <Text className="text-sm font-bold">Status</Text>
+        <View className="flex-row flex-wrap gap-2">
+          {STATUSES.map(s => (
+            <Chip key={s} label={s} selected={s === status} onPress={() => setStatus(s)} />
+          ))}
+        </View>
       </View>
       <MultiSelectField
         label="Team members"
@@ -104,9 +124,9 @@ export function ProjectFormSheet({ visible, project, onClose, onSubmit }: Props)
         emptyText="No workspace members found."
       />
       </ScrollView>
-      {!!error && <Text className="text-xs text-red-400">{error}</Text>}
-      <Button className="h-12 bg-slack-green" onPress={submit} disabled={busy}>
-        {busy ? <ActivityIndicator color="white" /> : <Text className="font-semibold text-white">{project ? 'Save' : 'Create'}</Text>}
+      {!!error && <Text className="text-sm text-destructive">{error}</Text>}
+      <Button size="lg" onPress={submit} disabled={busy}>
+        {busy ? <ActivityIndicator color={colors.primaryForeground} /> : <Text>{project ? 'Save' : 'Create'}</Text>}
       </Button>
     </Sheet>
   );

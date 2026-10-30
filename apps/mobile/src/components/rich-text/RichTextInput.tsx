@@ -10,20 +10,24 @@ import {
 import { Text } from '@/components/ui/text';
 import { htmlToMarkdown } from '@/features/chat/htmlToMarkdown';
 import { markdownToHtml } from '@/lib/markdownToHtml';
+import { FONT, perScheme, useTheme } from '@/lib/theme';
 import { FormatToolbar, type Format } from './FormatToolbar';
 import { LinkSheet } from './LinkSheet';
 
-// Dark-theme look for what the editor shows while typing (headings, code, quotes, lists, links).
-export const RICH_HTML_STYLE: HtmlStyle = {
-  h1: { fontSize: 24, bold: true },
-  h2: { fontSize: 20, bold: true },
-  blockquote: { borderColor: '#6B7280', borderWidth: 4, gapWidth: 8, color: '#D1D5DB' },
-  codeblock: { color: '#E5E7EB', borderRadius: 6, backgroundColor: '#0F1114' },
-  code: { color: '#FDBA74', backgroundColor: '#2A2D31' },
-  a: { color: '#1D9BD1', textDecorationLine: 'underline' },
-  ul: { bulletColor: '#9CA3AF', bulletSize: 6, marginLeft: 8, gapWidth: 8 },
-  ol: { gapWidth: 8, marginLeft: 8, markerColor: '#9CA3AF' },
-};
+// Slack's look for what the editor shows while typing (headings, code, quotes, lists, links); matches MarkdownText.
+export const RICH_HTML_STYLE = perScheme<HtmlStyle>(c => ({
+  h1: { fontSize: 22, bold: true },
+  h2: { fontSize: 18, bold: true },
+  blockquote: { borderColor: c.border, borderWidth: 4, gapWidth: 10, color: c.foreground },
+  codeblock: { color: c.foreground, borderRadius: 8, backgroundColor: c.codeBg },
+  code: { color: c.destructive, backgroundColor: c.codeBg },
+  a: { color: c.link, textDecorationLine: 'none' },
+  ul: { bulletColor: c.foreground, bulletSize: 5, marginLeft: 8, gapWidth: 10 },
+  ol: { gapWidth: 10, marginLeft: 8, markerColor: c.foreground },
+}));
+
+// Shared by the composer and form editors.
+export const RICH_INPUT_TEXT = perScheme(c => ({ fontFamily: FONT, fontSize: 15, lineHeight: 22, color: c.foreground }));
 
 export interface RichTextInputHandle {
   // Reads on demand: getHTML per keystroke is slow, and forms only need the value on submit.
@@ -51,21 +55,21 @@ export function RichTextInput({
   maxHeight = 280,
   autoFocus,
 }: Props) {
+  const { colors, scheme } = useTheme();
   const editor = useRef<EnrichedTextInputInstance>(null);
   const [state, setState] = useState<OnChangeStateEvent>();
   const [selection, setSelection] = useState<OnChangeSelectionEvent>({ start: 0, end: 0, text: '' });
   const [showLink, setShowLink] = useState(false);
   const inputStyle = useMemo(
     () => ({
+      ...RICH_INPUT_TEXT[scheme],
       minHeight,
       maxHeight,
-      fontSize: 15,
-      color: '#FFFFFF',
-      backgroundColor: '#19171D',
+      backgroundColor: colors.background,
       paddingHorizontal: 12,
       paddingVertical: 10,
     }),
-    [minHeight, maxHeight],
+    [minHeight, maxHeight, scheme, colors],
   );
   const defaultValue = useMemo(() => markdownToHtml(initialMarkdown ?? ''), [initialMarkdown]);
 
@@ -94,18 +98,20 @@ export function RichTextInput({
 
   return (
     <View className="gap-1.5">
-      {!!label && <Text className="text-xs font-semibold text-gray-300">{label}</Text>}
-      <View className="overflow-hidden rounded-lg border border-gray-700 bg-slack-darkBg">
-        <FormatToolbar state={state} onPress={handleFormat} />
+      {!!label && <Text className="text-sm font-bold">{label}</Text>}
+      <View className="overflow-hidden rounded-lg border border-input bg-background">
+        <View className="border-b border-border bg-muted py-1">
+          <FormatToolbar state={state} onPress={handleFormat} />
+        </View>
         <EnrichedTextInput
           ref={editor}
           defaultValue={defaultValue}
           autoFocus={autoFocus}
           placeholder={placeholder}
-          placeholderTextColor="#6B7280"
-          cursorColor="#1D9BD1"
-          selectionColor="#1D9BD155"
-          htmlStyle={RICH_HTML_STYLE}
+          placeholderTextColor={colors.subtle}
+          cursorColor={colors.link}
+          selectionColor={colors.link}
+          htmlStyle={RICH_HTML_STYLE[scheme]}
           style={inputStyle}
           onChangeState={e => setState(e.nativeEvent)}
           onChangeSelection={e => setSelection(e.nativeEvent)}

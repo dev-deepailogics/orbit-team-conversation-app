@@ -3,14 +3,15 @@ import { ActivityIndicator, Alert, KeyboardAvoidingView, View } from 'react-nati
 import { FlashList } from '@shopify/flash-list';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { Message } from '@orbit/types';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useAuthStore } from '@/features/auth/store';
 import { useWorkspaceStore } from '@/features/workspaces/store';
 import { channelLabel, channelPrefix, isDirect } from '@/features/workspaces/utils';
 import { getErrorMessage } from '@/lib/api';
+import { useTheme } from '@/lib/theme';
 import type { ScreenProps } from '@/navigation/types';
-import { ChatHeader } from '../components/ChatHeader';
 import { Composer } from '../components/Composer';
 import { MessageActionsSheet } from '../components/MessageActionsSheet';
 import { MessageItem } from '../components/MessageItem';
@@ -19,6 +20,7 @@ import { useChatStore } from '../store';
 
 // Pushed on top of ChannelScreen, which stays mounted and keeps the channel room (where replies arrive) joined.
 export function ThreadScreen({ route, navigation }: ScreenProps<'Thread'>) {
+  const { colors } = useTheme();
   const { channelId, messageId } = route.params;
   const myId = useAuthStore(s => s.user?.id);
   const channel = useWorkspaceStore(s => s.current?.channels.find(c => c.id === channelId));
@@ -63,18 +65,18 @@ export function ThreadScreen({ route, navigation }: ScreenProps<'Thread'>) {
   const { parent, replies } = thread;
 
   return (
-    <SafeAreaView className="flex-1 bg-slack-darkBg" edges={['top', 'bottom']}>
-      <ChatHeader title="Thread" subtitle={subtitle} onBack={navigation.goBack} />
+    <SafeAreaView className="flex-1 bg-background" edges={['top', 'bottom']}>
+      <ScreenHeader title="Thread" subtitle={subtitle} onBack={navigation.goBack} />
       <KeyboardAvoidingView className="flex-1" behavior="padding">
         {!parent && thread.isLoading ? (
           <View className="flex-1 items-center justify-center">
-            <ActivityIndicator color="white" />
+            <ActivityIndicator color={colors.mutedForeground} />
           </View>
         ) : !parent ? (
           <View className="flex-1 items-center justify-center gap-4 p-6">
-            <Text className="text-center text-gray-300">{thread.error || 'Thread not found.'}</Text>
-            <Button className="bg-slack-activeChannel" onPress={() => openThread(messageId)}>
-              <Text className="text-white">Retry</Text>
+            <Text className="text-center text-muted-foreground">{thread.error || 'Thread not found.'}</Text>
+            <Button variant="outline" onPress={() => openThread(messageId)}>
+              <Text>Retry</Text>
             </Button>
           </View>
         ) : (
@@ -101,14 +103,14 @@ export function ThreadScreen({ route, navigation }: ScreenProps<'Thread'>) {
                   onLongPress={setActionTarget}
                   onToggleReaction={handleReaction}
                 />
-                <View className="my-2 flex-row items-center gap-2 px-4">
-                  <Text className="text-xs font-semibold text-gray-400">
+                <View className="my-3 flex-row items-center gap-3 px-4">
+                  <Text className="text-sm font-bold text-muted-foreground">
                     {replies.length === 1 ? '1 reply' : `${replies.length} replies`}
                   </Text>
-                  <View className="h-px flex-1 bg-slack-darkBorder" />
-                  {thread.isLoading && <ActivityIndicator color="white" size="small" />}
+                  <View className="h-px flex-1 bg-border" />
+                  {thread.isLoading && <ActivityIndicator color={colors.mutedForeground} size="small" />}
                 </View>
-                {!!thread.error && <Text className="px-4 text-xs text-red-400">{thread.error}</Text>}
+                {!!thread.error && <Text className="px-4 text-sm text-destructive">{thread.error}</Text>}
               </View>
             }
           />

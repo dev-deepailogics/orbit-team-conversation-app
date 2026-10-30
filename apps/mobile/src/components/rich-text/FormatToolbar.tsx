@@ -1,6 +1,20 @@
 import { Pressable, ScrollView } from 'react-native';
 import type { OnChangeStateEvent } from 'react-native-enriched-html';
-import { Text } from '@/components/ui/text';
+import {
+  Bold,
+  Code,
+  Heading1,
+  Heading2,
+  Italic,
+  Link,
+  List,
+  ListOrdered,
+  SquareCode,
+  Strikethrough,
+  TextQuote,
+  type LucideIcon,
+} from '@/components/icons';
+import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
 export type Format =
@@ -32,59 +46,18 @@ type StateKey = keyof Pick<
 >;
 
 // Same set and order as the web editor toolbar. `key` is the editor's own state for the button highlight.
-const TOOLS: Array<{
-  format: Format;
-  key: StateKey;
-  label: string;
-  a11y: string;
-  className?: string;
-}> = [
-  {
-    format: 'bold',
-    key: 'bold',
-    label: 'B',
-    a11y: 'Bold',
-    className: 'font-bold',
-  },
-  {
-    format: 'italic',
-    key: 'italic',
-    label: 'I',
-    a11y: 'Italic',
-    className: 'italic',
-  },
-  {
-    format: 'strike',
-    key: 'strikeThrough',
-    label: 'S',
-    a11y: 'Strikethrough',
-    className: 'line-through',
-  },
-  {
-    format: 'h1',
-    key: 'h1',
-    label: 'H1',
-    a11y: 'Heading 1',
-    className: 'font-bold',
-  },
-  {
-    format: 'h2',
-    key: 'h2',
-    label: 'H2',
-    a11y: 'Heading 2',
-    className: 'font-bold',
-  },
-  { format: 'bullet', key: 'unorderedList', label: '•', a11y: 'Bullet list' },
-  {
-    format: 'numbered',
-    key: 'orderedList',
-    label: '1.',
-    a11y: 'Numbered list',
-  },
-  { format: 'quote', key: 'blockQuote', label: '❝', a11y: 'Blockquote' },
-  { format: 'code', key: 'inlineCode', label: '</>', a11y: 'Inline code' },
-  { format: 'codeblock', key: 'codeBlock', label: '{ }', a11y: 'Code block' },
-  { format: 'link', key: 'link', label: '🔗', a11y: 'Link' },
+const TOOLS: Array<{ format: Format; key: StateKey; Icon: LucideIcon; a11y: string }> = [
+  { format: 'bold', key: 'bold', Icon: Bold, a11y: 'Bold' },
+  { format: 'italic', key: 'italic', Icon: Italic, a11y: 'Italic' },
+  { format: 'strike', key: 'strikeThrough', Icon: Strikethrough, a11y: 'Strikethrough' },
+  { format: 'h1', key: 'h1', Icon: Heading1, a11y: 'Heading 1' },
+  { format: 'h2', key: 'h2', Icon: Heading2, a11y: 'Heading 2' },
+  { format: 'bullet', key: 'unorderedList', Icon: List, a11y: 'Bullet list' },
+  { format: 'numbered', key: 'orderedList', Icon: ListOrdered, a11y: 'Numbered list' },
+  { format: 'quote', key: 'blockQuote', Icon: TextQuote, a11y: 'Blockquote' },
+  { format: 'code', key: 'inlineCode', Icon: Code, a11y: 'Inline code' },
+  { format: 'codeblock', key: 'codeBlock', Icon: SquareCode, a11y: 'Code block' },
+  { format: 'link', key: 'link', Icon: Link, a11y: 'Link' },
 ];
 
 interface Props {
@@ -93,13 +66,14 @@ interface Props {
 }
 
 export function FormatToolbar({ state, onPress }: Props) {
+  const { colors } = useTheme();
   return (
     // "always": taps must not dismiss the keyboard or blur the editor first.
     <ScrollView
       horizontal
       keyboardShouldPersistTaps="always"
       showsHorizontalScrollIndicator={false}
-      contentContainerClassName="px-2"
+      contentContainerClassName="gap-0.5 px-1"
     >
       {TOOLS.map(t => {
         const active = !!state?.[t.key]?.isActive;
@@ -112,23 +86,15 @@ export function FormatToolbar({ state, onPress }: Props) {
             disabled={blocked}
             hitSlop={{ top: 4, bottom: 4 }}
             className={cn(
-              'h-10 min-w-[40px] items-center justify-center rounded-md px-2 active:bg-white/10',
-              active && 'bg-slack-activeChannel/30',
+              'h-9 w-9 items-center justify-center rounded-md active:bg-muted',
+              active && 'bg-accent',
               blocked && 'opacity-30',
             )}
             accessibilityRole="button"
             accessibilityLabel={t.a11y}
             accessibilityState={{ selected: active, disabled: blocked }}
           >
-            <Text
-              className={cn(
-                'text-base text-gray-300',
-                active && 'text-white',
-                t.className,
-              )}
-            >
-              {t.label}
-            </Text>
+            <t.Icon size={18} strokeWidth={2} color={active ? colors.link : colors.mutedForeground} />
           </Pressable>
         );
       })}

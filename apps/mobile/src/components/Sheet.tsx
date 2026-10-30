@@ -19,16 +19,13 @@ export function Sheet({ visible, title, onClose, children, fullHeight }: Props) 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <KeyboardAvoidingView className="flex-1 justify-end" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Pressable className="absolute inset-0 bg-black/60" onPress={onClose} accessibilityLabel="Close" />
+        <Pressable className="absolute inset-0 bg-overlay/40" onPress={onClose} accessibilityLabel="Close" />
         <View
-          className={cn(
-            'gap-4 rounded-t-2xl border-t border-slack-darkBorder bg-slack-darkSidebar px-5 pt-3',
-            fullHeight && 'h-[92%]',
-          )}
+          className={cn('gap-4 rounded-t-3xl bg-background px-5 pt-2.5', fullHeight && 'h-[92%]')}
           style={{ paddingBottom: insets.bottom + 20 }}
         >
-          <View className="h-1 w-10 self-center rounded-full bg-gray-600" />
-          <Text className="text-lg font-bold text-white">{title}</Text>
+          <View className="h-1 w-9 self-center rounded-full bg-border" />
+          <Text className="text-lg font-bold">{title}</Text>
           {children}
         </View>
       </KeyboardAvoidingView>

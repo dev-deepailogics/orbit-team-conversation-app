@@ -1,7 +1,9 @@
 import { Pressable, View } from 'react-native';
+import { MessageSquareText } from '@/components/icons';
 import type { Message } from '@orbit/types';
 import { Sheet } from '@/components/Sheet';
 import { Text } from '@/components/ui/text';
+import { useTheme } from '@/lib/theme';
 import { senderName } from '../utils';
 
 // Same quick picks as Slack's long-press menu. ponytail: full emoji picker comes in Phase 2.
@@ -15,6 +17,7 @@ interface Props {
 }
 
 export function MessageActionsSheet({ message, onClose, onReact, onReplyInThread }: Props) {
+  const { colors } = useTheme();
   if (!message) return null;
   const act = (fn: () => void) => () => {
     onClose();
@@ -24,7 +27,7 @@ export function MessageActionsSheet({ message, onClose, onReact, onReplyInThread
   return (
     <Sheet visible title={senderName(message)} onClose={onClose}>
       {!!message.content && (
-        <Text className="-mt-2 text-sm text-gray-400" numberOfLines={2}>
+        <Text className="-mt-2 text-sm text-muted-foreground" numberOfLines={2}>
           {message.content}
         </Text>
       )}
@@ -33,7 +36,7 @@ export function MessageActionsSheet({ message, onClose, onReact, onReplyInThread
           <Pressable
             key={emoji}
             onPress={act(() => onReact(message, emoji))}
-            className="h-12 w-12 items-center justify-center rounded-full bg-white/5 active:bg-white/15"
+            className="h-12 w-12 items-center justify-center rounded-full bg-muted active:bg-border"
             accessibilityLabel={`React with ${emoji}`}
           >
             <Text className="text-2xl">{emoji}</Text>
@@ -43,11 +46,11 @@ export function MessageActionsSheet({ message, onClose, onReact, onReplyInThread
       {onReplyInThread && (
         <Pressable
           onPress={act(() => onReplyInThread(message))}
-          className="min-h-[48px] flex-row items-center gap-3 rounded-lg px-2 active:bg-white/5"
+          className="min-h-[48px] flex-row items-center gap-3 rounded-lg px-2 active:bg-muted"
           accessibilityRole="button"
         >
-          <Text className="text-lg">💬</Text>
-          <Text className="text-base text-white">Reply in thread</Text>
+          <MessageSquareText size={20} color={colors.foreground} />
+          <Text>Reply in thread</Text>
         </Pressable>
       )}
     </Sheet>

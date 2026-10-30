@@ -1,0 +1,46 @@
+// Every icon the app uses, imported per file: Metro doesn't tree-shake, and the
+// 'lucide-react-native' barrel alone adds ~2 MB (all ~2,000 icons) to the bundle.
+// Add new icons here; file names are lucide's kebab-case names (see node_modules/lucide-react-native/dist/esm/icons).
+export type { LucideIcon } from 'lucide-react-native';
+export { default as Bold } from 'lucide-react-native/icons/letter-b';
+export { default as Building2 } from 'lucide-react-native/icons/building-complex';
+export { default as CalendarDays } from 'lucide-react-native/icons/calendar-days';
+export { default as Check } from 'lucide-react-native/icons/check';
+export { default as ChevronDown } from 'lucide-react-native/icons/chevron-down';
+export { default as ChevronLeft } from 'lucide-react-native/icons/chevron-left';
+export { default as ChevronRight } from 'lucide-react-native/icons/chevron-right';
+export { default as ChevronUp } from 'lucide-react-native/icons/chevron-up';
+export { default as CircleUser } from 'lucide-react-native/icons/circle-user';
+export { default as Code } from 'lucide-react-native/icons/code';
+export { default as Ellipsis } from 'lucide-react-native/icons/ellipsis';
+export { default as Eye } from 'lucide-react-native/icons/eye';
+export { default as Hash } from 'lucide-react-native/icons/hash';
+export { default as Heading1 } from 'lucide-react-native/icons/heading-1';
+export { default as Heading2 } from 'lucide-react-native/icons/heading-2';
+export { default as House } from 'lucide-react-native/icons/house';
+export { default as Italic } from 'lucide-react-native/icons/italic';
+export { default as Link } from 'lucide-react-native/icons/link';
+export { default as List } from 'lucide-react-native/icons/list';
+export { default as ListOrdered } from 'lucide-react-native/icons/list-ordered';
+export { default as Lock } from 'lucide-react-native/icons/lock';
+export { default as LogOut } from 'lucide-react-native/icons/log-out';
+export { default as MessageCircle } from 'lucide-react-native/icons/message-circle';
+export { default as MessageSquareText } from 'lucide-react-native/icons/message-square-text';
+export { default as MessagesSquare } from 'lucide-react-native/icons/messages-square';
+export { default as Moon } from 'lucide-react-native/icons/moon';
+export { default as Paperclip } from 'lucide-react-native/icons/paperclip';
+export { default as Pencil } from 'lucide-react-native/icons/pencil';
+export { default as Plus } from 'lucide-react-native/icons/plus';
+export { default as Search } from 'lucide-react-native/icons/search';
+export { default as SendHorizontal } from 'lucide-react-native/icons/send-horizontal';
+export { default as ShieldCheck } from 'lucide-react-native/icons/shield-check';
+export { default as SquareCheck } from 'lucide-react-native/icons/square-check';
+export { default as SquareCode } from 'lucide-react-native/icons/square-code';
+export { default as SquareKanban } from 'lucide-react-native/icons/square-kanban';
+export { default as SquarePen } from 'lucide-react-native/icons/square-pen';
+export { default as Strikethrough } from 'lucide-react-native/icons/strikethrough';
+export { default as TextQuote } from 'lucide-react-native/icons/text-quote';
+export { default as Trash2 } from 'lucide-react-native/icons/trash';
+export { default as UserPlus } from 'lucide-react-native/icons/user-plus';
+export { default as VenetianMask } from 'lucide-react-native/icons/venetian-mask';
+export { default as X } from 'lucide-react-native/icons/x';

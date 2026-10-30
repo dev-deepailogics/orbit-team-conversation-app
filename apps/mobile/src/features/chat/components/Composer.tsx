@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
+import { SendHorizontal } from '@/components/icons';
 import {
   EnrichedTextInput,
   type EnrichedTextInputInstance,
@@ -8,8 +9,8 @@ import {
 } from 'react-native-enriched-html';
 import { FormatToolbar, type Format } from '@/components/rich-text/FormatToolbar';
 import { LinkSheet } from '@/components/rich-text/LinkSheet';
-import { RICH_HTML_STYLE } from '@/components/rich-text/RichTextInput';
-import { Text } from '@/components/ui/text';
+import { RICH_HTML_STYLE, RICH_INPUT_TEXT } from '@/components/rich-text/RichTextInput';
+import { perScheme, useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import { htmlToMarkdown } from '../htmlToMarkdown';
 
@@ -22,21 +23,17 @@ interface Props {
 
 const TYPING_IDLE_MS = 3000;
 
-const inputStyle = {
+const inputStyle = perScheme((_, scheme) => ({
+  ...RICH_INPUT_TEXT[scheme],
   minHeight: 40,
-  maxHeight: 140,
-  fontSize: 15,
-  color: '#FFFFFF',
-  backgroundColor: '#19171D',
-  borderWidth: 1,
-  borderColor: '#374151',
-  borderRadius: 8,
-  paddingHorizontal: 12,
-  paddingVertical: 8,
-  flex: 1,
-};
+  maxHeight: 160,
+  paddingHorizontal: 16,
+  paddingTop: 12,
+  paddingBottom: 4,
+}));
 
 export function Composer({ placeholder, onSend, onTyping }: Props) {
+  const { colors, scheme } = useTheme();
   const editor = useRef<EnrichedTextInputInstance>(null);
   const [state, setState] = useState<OnChangeStateEvent>();
   const [selection, setSelection] = useState<OnChangeSelectionEvent>({
@@ -110,36 +107,37 @@ export function Composer({ placeholder, onSend, onTyping }: Props) {
   };
 
   return (
-    <View className="border-t border-slack-darkBorder bg-slack-darkBg">
-      <FormatToolbar state={state} onPress={handleFormat} />
-      <View className="flex-row items-end gap-2 px-3 pb-2 pt-1">
-        <EnrichedTextInput
-          ref={editor}
-          placeholder={placeholder}
-          placeholderTextColor="#6B7280"
-          cursorColor="#1D9BD1"
-          selectionColor="#1D9BD155"
-          htmlStyle={RICH_HTML_STYLE}
-          style={inputStyle}
-          onChangeText={e => handleChangeText(e.nativeEvent.value)}
-          onChangeState={e => setState(e.nativeEvent)}
-          onChangeSelection={e => setSelection(e.nativeEvent)}
-        />
+    // Slack's mobile composer: full-width field on top, formatting + send on the row beneath.
+    <View className="border-t border-border bg-background">
+      <EnrichedTextInput
+        ref={editor}
+        placeholder={placeholder}
+        placeholderTextColor={colors.subtle}
+        cursorColor={colors.link}
+        selectionColor={colors.link}
+        htmlStyle={RICH_HTML_STYLE[scheme]}
+        style={inputStyle[scheme]}
+        onChangeText={e => handleChangeText(e.nativeEvent.value)}
+        onChangeState={e => setState(e.nativeEvent)}
+        onChangeSelection={e => setSelection(e.nativeEvent)}
+      />
+      <View className="flex-row items-center gap-2 pb-1.5 pl-2 pr-3">
+        <View className="flex-1">
+          <FormatToolbar state={state} onPress={handleFormat} />
+        </View>
         <Pressable
           onPress={handleSend}
           disabled={!canSend}
-          className={cn(
-            'h-10 w-10 items-center justify-center rounded-lg',
-            canSend ? 'bg-slack-green' : 'bg-gray-700',
-          )}
+          hitSlop={6}
+          className={cn('h-9 w-9 items-center justify-center rounded-lg', canSend && 'bg-primary active:bg-primary/90')}
           accessibilityRole="button"
           accessibilityLabel="Send message"
           accessibilityState={{ disabled: !canSend }}
         >
           {isSending ? (
-            <ActivityIndicator color="white" />
+            <ActivityIndicator color={colors.mutedForeground} size="small" />
           ) : (
-            <Text className="text-lg font-bold text-white">➤</Text>
+            <SendHorizontal size={18} strokeWidth={2.25} color={canSend ? colors.primaryForeground : colors.subtle} />
           )}
         </Pressable>
       </View>

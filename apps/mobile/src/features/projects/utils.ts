@@ -1,11 +1,12 @@
 import type { WorkspaceMember } from '@orbit/types';
+import { priorityColors, swatches } from '@/lib/theme';
 import type { ChecklistItem, PersonRef, Project, ProjectColumn, StatusFilter, Ticket, TicketEvent, TicketPriority } from './types';
 
 export const PRIORITIES: { value: TicketPriority; label: string; color: string }[] = [
-  { value: 'LOW', label: 'Low', color: '#6B7280' },
-  { value: 'MEDIUM', label: 'Medium', color: '#3B82F6' },
-  { value: 'HIGH', label: 'High', color: '#F59E0B' },
-  { value: 'URGENT', label: 'Urgent', color: '#EF4444' },
+  { value: 'LOW', label: 'Low', color: priorityColors.LOW },
+  { value: 'MEDIUM', label: 'Medium', color: priorityColors.MEDIUM },
+  { value: 'HIGH', label: 'High', color: priorityColors.HIGH },
+  { value: 'URGENT', label: 'Urgent', color: priorityColors.URGENT },
 ];
 
 export const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
@@ -15,7 +16,7 @@ export const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
   { value: 'delivered', label: 'Delivered' },
 ];
 
-export const COLUMN_COLORS = ['#6B7280', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+export const COLUMN_COLORS = swatches;
 
 export const priorityMeta = (p: TicketPriority) => PRIORITIES.find(x => x.value === p) ?? PRIORITIES[1];
 

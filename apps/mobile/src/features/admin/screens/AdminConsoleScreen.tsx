@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
+import { ChevronRight, Plus, Search, Trash2 } from '@/components/icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { useAuthStore } from '@/features/auth/store';
 import { getErrorMessage } from '@/lib/api';
+import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import { CreateWorkspaceSheet } from '../components/CreateWorkspaceSheet';
 import { UserActionsSheet } from '../components/UserActionsSheet';
@@ -33,6 +35,7 @@ const ROLE_FILTERS: RoleFilter[] = ['ALL', ...ROLES];
 
 // Mobile port of apps/web/src/app/admin/page.tsx. Registered only for SUPER_ADMIN (App.tsx); the server enforces it too.
 export function AdminConsoleScreen() {
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const currentUserId = useAuthStore(s => s.user?.id);
   const stats = useAdminStore(s => s.stats);
@@ -101,14 +104,14 @@ export function AdminConsoleScreen() {
   // First load: nothing to show yet.
   if (!stats) {
     return (
-      <View className="flex-1 items-center justify-center gap-4 bg-slack-darkBg p-6">
+      <View className="flex-1 items-center justify-center gap-4 bg-background p-6">
         {isLoading || !error ? (
-          <ActivityIndicator color="white" />
+          <ActivityIndicator color={colors.mutedForeground} />
         ) : (
           <>
-            <Text className="text-center text-gray-300">{error}</Text>
-            <Button className="bg-slack-activeChannel" onPress={load}>
-              <Text className="text-white">Retry</Text>
+            <Text className="text-center text-muted-foreground">{error}</Text>
+            <Button variant="outline" onPress={load}>
+              <Text>Retry</Text>
             </Button>
           </>
         )}
@@ -128,10 +131,10 @@ export function AdminConsoleScreen() {
   };
 
   return (
-    <View className="flex-1 bg-slack-darkBg">
+    <View className="flex-1 bg-background">
       <StatsRow stats={stats} />
 
-      <View className="mx-4 flex-row border-b border-slack-darkBorder">
+      <View className="flex-row border-b border-border px-4">
         <TabButton
           label={`Users (${users.length})`}
           active={tab === 'users'}
@@ -145,21 +148,25 @@ export function AdminConsoleScreen() {
       </View>
 
       <View className="gap-3 p-4">
-        <Input
-          className="h-10 border-gray-700 bg-slack-darkSidebar text-white"
-          placeholder={
-            tab === 'users'
-              ? 'Search name, username or email'
-              : 'Search name, slug or owner'
-          }
-          placeholderTextColor="#6B7280"
-          value={query}
-          onChangeText={setQuery}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-        />
+        <View className="justify-center">
+          <Input
+            className="h-10 border-0 bg-muted pl-10"
+            placeholder={
+              tab === 'users'
+                ? 'Search name, username or email'
+                : 'Search name, slug or owner'
+            }
+            value={query}
+            onChangeText={setQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+          <View className="absolute left-3 top-3" pointerEvents="none">
+            <Search size={17} color={colors.subtle} />
+          </View>
+        </View>
         {tab === 'users' ? (
           <ScrollView
             horizontal
@@ -172,20 +179,20 @@ export function AdminConsoleScreen() {
                 onPress={() => setRoleFilter(r)}
                 hitSlop={6}
                 className={cn(
-                  'rounded-full border px-3 py-1.5',
+                  'h-8 justify-center rounded-full border px-3',
                   roleFilter === r
-                    ? 'border-slack-activeChannel bg-slack-activeChannel/20'
-                    : 'border-gray-700',
+                    ? 'border-link bg-accent'
+                    : 'border-border',
                 )}
                 accessibilityRole="button"
                 accessibilityState={{ selected: roleFilter === r }}
               >
                 <Text
                   className={cn(
-                    'text-xs',
+                    'text-sm font-bold',
                     roleFilter === r
-                      ? 'font-semibold text-white'
-                      : 'text-gray-400',
+                      ? 'text-accent-foreground'
+                      : 'text-muted-foreground',
                   )}
                 >
                   {r === 'ALL' ? 'All' : ROLE_LABELS[r]}
@@ -195,13 +202,15 @@ export function AdminConsoleScreen() {
           </ScrollView>
         ) : (
           <Button
-            className="h-10 bg-slack-green"
+            size="sm"
+            className="self-start"
             onPress={() => setShowCreate(true)}
           >
-            <Text className="font-semibold text-white">+ New workspace</Text>
+            <Plus size={16} color={colors.primaryForeground} strokeWidth={2.5} />
+            <Text>New workspace</Text>
           </Button>
         )}
-        {!!error && <Text className="text-xs text-red-400">{error}</Text>}
+        {!!error && <Text className="text-sm text-destructive">{error}</Text>}
       </View>
 
       {tab === 'users' ? (
@@ -294,17 +303,13 @@ function StatsRow({ stats }: { stats: AdminStats }) {
       {tiles.map(t => (
         <View
           key={t.label}
-          className="min-w-[104px] rounded-xl border border-slack-darkBorder bg-slack-darkSidebar p-3"
+          className="min-w-[112px] rounded-xl border border-border bg-background p-3"
         >
-          <Text className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-            {t.label}
-          </Text>
-          <Text className="mt-1 text-xl font-bold text-white">
+          <Text className="text-sm text-muted-foreground">{t.label}</Text>
+          <Text className="mt-0.5 text-2xl font-black">
             {t.value.toLocaleString()}
           </Text>
-          {!!t.hint && (
-            <Text className="text-[11px] text-gray-500">{t.hint}</Text>
-          )}
+          {!!t.hint && <Text className="text-xs text-subtle">{t.hint}</Text>}
         </View>
       ))}
     </ScrollView>
@@ -325,15 +330,15 @@ function TabButton({
       onPress={onPress}
       className={cn(
         'min-h-[44px] flex-1 items-center justify-center border-b-2',
-        active ? 'border-slack-green' : 'border-transparent',
+        active ? 'border-foreground' : 'border-transparent',
       )}
       accessibilityRole="tab"
       accessibilityState={{ selected: active }}
     >
       <Text
         className={cn(
-          'text-sm',
-          active ? 'font-bold text-white' : 'text-gray-400',
+          'font-bold',
+          active ? 'text-foreground' : 'text-muted-foreground',
         )}
       >
         {label}
@@ -351,34 +356,32 @@ function UserRow({
   isSelf: boolean;
   onPress: () => void;
 }) {
+  const { colors } = useTheme();
   return (
     <Pressable
       onPress={onPress}
-      className="min-h-[56px] flex-row items-center gap-3 py-2.5 active:opacity-70"
+      className="min-h-[64px] flex-row items-center gap-3 py-3 active:opacity-70"
     >
       <Avatar name={user.displayName || user.username} className="h-10 w-10" />
       <View className="flex-1">
         <View className="flex-row items-center gap-1.5">
-          <Text
-            className="shrink text-sm font-semibold text-white"
-            numberOfLines={1}
-          >
+          <Text className="shrink font-bold" numberOfLines={1}>
             {user.displayName}
             {isSelf ? ' (you)' : ''}
           </Text>
           {user.systemRole !== 'USER' && <RoleBadge role={user.systemRole} />}
         </View>
-        <Text className="text-xs text-gray-400" numberOfLines={1}>
+        <Text className="text-sm text-muted-foreground" numberOfLines={1}>
           @{user.username} · {user.email}
         </Text>
-        <Text className="text-[11px] text-gray-500" numberOfLines={1}>
+        <Text className="text-xs text-subtle" numberOfLines={1}>
           {user._count.memberships === 1
             ? '1 workspace'
             : `${user._count.memberships} workspaces`}{' '}
           · {user._count.messages.toLocaleString()} messages
         </Text>
       </View>
-      <Text className="text-lg text-gray-500">›</Text>
+      <ChevronRight size={18} color={colors.subtle} />
     </Pressable>
   );
 }
@@ -387,16 +390,14 @@ function RoleBadge({ role }: { role: AdminUser['systemRole'] }) {
   return (
     <View
       className={cn(
-        'rounded-full border px-1.5 py-0.5',
-        role === 'SUPER_ADMIN'
-          ? 'border-purple-500/40 bg-purple-500/20'
-          : 'border-slack-green/40 bg-slack-green/20',
+        'rounded-md px-1.5 py-0.5',
+        role === 'SUPER_ADMIN' ? 'bg-accent' : 'bg-muted',
       )}
     >
       <Text
         className={cn(
-          'text-[9px] font-bold uppercase',
-          role === 'SUPER_ADMIN' ? 'text-purple-300' : 'text-green-300',
+          'text-2xs font-bold',
+          role === 'SUPER_ADMIN' ? 'text-accent-foreground' : 'text-muted-foreground',
         )}
       >
         {ROLE_LABELS[role]}
@@ -414,35 +415,32 @@ function WorkspaceRow({
   isDeleting: boolean;
   onDelete: () => void;
 }) {
+  const { colors } = useTheme();
   return (
-    <View className="min-h-[56px] flex-row items-center gap-3 py-2.5">
-      <Avatar
-        name={workspace.name}
-        className="h-10 w-10 bg-slack-activeChannel"
-      />
+    <View className="min-h-[64px] flex-row items-center gap-3 py-3">
+      <Avatar name={workspace.name} className="h-10 w-10 rounded-xl" />
       <View className="flex-1">
-        <Text className="text-sm font-semibold text-white" numberOfLines={1}>
+        <Text className="font-bold" numberOfLines={1}>
           {workspace.name}
         </Text>
-        <Text className="text-xs text-gray-400" numberOfLines={1}>
+        <Text className="text-sm text-muted-foreground" numberOfLines={1}>
           /{workspace.slug} · Owner: {workspace.owner?.displayName ?? 'Unknown'}
         </Text>
-        <Text className="text-[11px] text-gray-500">
+        <Text className="text-xs text-subtle">
           {workspace._count.members} members · {workspace._count.channels}{' '}
           channels
         </Text>
       </View>
       {isDeleting ? (
-        <ActivityIndicator color="white" />
+        <ActivityIndicator color={colors.mutedForeground} />
       ) : (
         <Button
           variant="ghost"
-          size="sm"
+          size="icon"
           onPress={onDelete}
-          hitSlop={8}
           accessibilityLabel={`Delete workspace ${workspace.name}`}
         >
-          <Text className="text-xs font-semibold text-red-400">Delete</Text>
+          <Trash2 size={19} color={colors.destructive} />
         </Button>
       )}
     </View>
@@ -450,11 +448,11 @@ function WorkspaceRow({
 }
 
 function Separator() {
-  return <View className="h-px bg-slack-darkBorder/60" />;
+  return <View className="h-px bg-border" />;
 }
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <Text className="py-12 text-center text-sm text-gray-500">{text}</Text>
+    <Text className="py-12 text-center text-muted-foreground">{text}</Text>
   );
 }

@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
+import { Check } from '@/components/icons';
 import type { SystemRole } from '@orbit/types';
 import { FormField } from '@/components/FormField';
 import { Sheet } from '@/components/Sheet';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { getErrorMessage } from '@/lib/api';
+import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import {
   deleteUser,
@@ -26,6 +28,7 @@ interface Props {
 type Busy = 'role' | 'password' | 'delete' | null;
 
 export function UserActionsSheet({ user, isSelf, onClose, onChanged }: Props) {
+  const { colors } = useTheme();
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState<Busy>(null);
@@ -110,15 +113,15 @@ export function UserActionsSheet({ user, isSelf, onClose, onChanged }: Props) {
 
   return (
     <Sheet visible title={user.displayName} onClose={close}>
-      <Text className="-mt-3 text-xs text-gray-400">
+      <Text className="-mt-3 text-sm text-muted-foreground">
         @{user.username} · {user.email}
       </Text>
 
-      <View className="gap-1">
-        <Text className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+      <View className="gap-1.5">
+        <Text className="text-sm font-bold">
           System role
         </Text>
-        <View className="overflow-hidden rounded-lg border border-slack-darkBorder">
+        <View className="overflow-hidden rounded-xl border border-border">
           {ROLES.map((role, i) => {
             const selected = role === user.systemRole;
             // Server rejects demoting your own super admin account.
@@ -129,8 +132,8 @@ export function UserActionsSheet({ user, isSelf, onClose, onChanged }: Props) {
                 disabled={disabled}
                 onPress={() => handleRole(role)}
                 className={cn(
-                  'min-h-[44px] flex-row items-center justify-between px-3 active:bg-white/5',
-                  i > 0 && 'border-t border-slack-darkBorder',
+                  'min-h-[48px] flex-row items-center justify-between px-3 active:bg-muted',
+                  i > 0 && 'border-t border-border',
                   disabled && !selected && 'opacity-40',
                 )}
                 accessibilityRole="radio"
@@ -138,19 +141,18 @@ export function UserActionsSheet({ user, isSelf, onClose, onChanged }: Props) {
               >
                 <Text
                   className={cn(
-                    'text-sm text-gray-200',
-                    selected && 'font-semibold text-white',
+                    selected && 'font-bold',
                   )}
                 >
                   {ROLE_LABELS[role]}
                 </Text>
-                {selected && <Text className="text-slack-green">✓</Text>}
+                {selected && <Check size={18} color={colors.primary} strokeWidth={2.5} />}
               </Pressable>
             );
           })}
         </View>
         {busy === 'role' && (
-          <ActivityIndicator color="white" className="mt-1" />
+          <ActivityIndicator color={colors.mutedForeground} className="mt-1" />
         )}
       </View>
 
@@ -167,30 +169,28 @@ export function UserActionsSheet({ user, isSelf, onClose, onChanged }: Props) {
           onSubmitEditing={handleResetPassword}
         />
         <Button
-          variant="secondary"
-          className="h-10"
+          variant="outline"
           disabled={!!busy}
           onPress={handleResetPassword}
         >
           {busy === 'password' ? (
-            <ActivityIndicator color="white" />
+            <ActivityIndicator color={colors.mutedForeground} />
           ) : (
             <Text>Reset password</Text>
           )}
         </Button>
       </View>
 
-      {!!error && <Text className="text-xs text-red-400">{error}</Text>}
+      {!!error && <Text className="text-sm text-destructive">{error}</Text>}
 
       {!isSelf && (
         <Button
           variant="destructive"
-          className="h-11"
           disabled={!!busy}
           onPress={handleDelete}
         >
           {busy === 'delete' ? (
-            <ActivityIndicator color="white" />
+            <ActivityIndicator color={colors.destructiveForeground} />
           ) : (
             <Text>Delete user</Text>
           )}

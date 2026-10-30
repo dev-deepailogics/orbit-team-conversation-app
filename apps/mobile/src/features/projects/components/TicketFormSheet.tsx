@@ -13,6 +13,7 @@ import { useProjectStore } from '../store';
 import type { PersonRef, Ticket, TicketInput, TicketPriority } from '../types';
 import { dueToInput, getAssignees, getLabels, parseDueInput, PRIORITIES, projectMembers } from '../utils';
 import { Chip } from './Chip';
+import { useTheme } from '@/lib/theme';
 
 interface Props {
   visible: boolean;
@@ -32,6 +33,7 @@ export function TicketFormSheet({ visible, ticket, onClose, onSubmit }: Props) {
 }
 
 function TicketForm({ ticket, onSubmit }: Pick<Props, 'ticket' | 'onSubmit'>) {
+  const { colors } = useTheme();
   const workspaceMembers = useWorkspaceStore(s => s.current?.members);
   const project = useProjectStore(s => s.current);
   const people = projectMembers(project, workspaceMembers ?? []);
@@ -104,7 +106,7 @@ function TicketForm({ ticket, onSubmit }: Pick<Props, 'ticket' | 'onSubmit'>) {
           maxHeight={360}
         />
         <View className="gap-1.5">
-          <Text className="text-xs font-semibold text-gray-300">Priority</Text>
+          <Text className="text-sm font-bold">Priority</Text>
           <View className="flex-row flex-wrap gap-2">
             {PRIORITIES.map(p => (
               <Chip key={p.value} label={p.label} color={p.color} selected={p.value === priority} onPress={() => setPriority(p.value)} />
@@ -126,9 +128,9 @@ function TicketForm({ ticket, onSubmit }: Pick<Props, 'ticket' | 'onSubmit'>) {
         <RichTextInput ref={testPlan} label="Test plan" initialMarkdown={ticket?.testPlan} placeholder="How should this be tested?" minHeight={140} />
         <RichTextInput ref={notes} label="Notes" initialMarkdown={ticket?.notes} placeholder="Anything else worth noting" minHeight={140} />
       </ScrollView>
-      {!!error && <Text className="text-xs text-red-400">{error}</Text>}
-      <Button className="h-12 bg-slack-green" onPress={submit} disabled={busy}>
-        {busy ? <ActivityIndicator color="white" /> : <Text className="font-semibold text-white">{ticket ? 'Save' : 'Create'}</Text>}
+      {!!error && <Text className="text-sm text-destructive">{error}</Text>}
+      <Button size="lg" onPress={submit} disabled={busy}>
+        {busy ? <ActivityIndicator color={colors.primaryForeground} /> : <Text>{ticket ? 'Save' : 'Create'}</Text>}
       </Button>
     </>
   );

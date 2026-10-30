@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Check, ChevronDown, Eye, Pencil, SendHorizontal, Trash2, X } from '@/components/icons';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { useAuthStore } from '@/features/auth/store';
 import { getErrorMessage } from '@/lib/api';
+import { onSwatch, useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import type { ScreenProps } from '@/navigation/types';
 import { MarkdownText } from '@/features/chat/components/MarkdownText';
@@ -31,12 +34,13 @@ import {
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <View className="gap-3">
-    <Text className="text-xs font-semibold uppercase text-gray-500">{title}</Text>
+    <Text className="font-bold">{title}</Text>
     {children}
   </View>
 );
 
 export function TicketDetailScreen({ route, navigation }: ScreenProps<'TicketDetail'>) {
+  const { colors } = useTheme();
   const { projectId, ticketId } = route.params;
   const myId = useAuthStore(s => s.user?.id);
   const ticket = useProjectStore(s => findTicket(s.current?.id === projectId ? s.current : null, ticketId));
@@ -77,10 +81,10 @@ export function TicketDetailScreen({ route, navigation }: ScreenProps<'TicketDet
 
   if (!ticket) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center gap-4 bg-slack-darkBg p-6">
-        <Text className="text-gray-400">This ticket is no longer available.</Text>
-        <Button className="bg-slack-activeChannel" onPress={navigation.goBack}>
-          <Text className="text-white">Go back</Text>
+      <SafeAreaView className="flex-1 items-center justify-center gap-4 bg-background p-6">
+        <Text className="text-muted-foreground">This ticket is no longer available.</Text>
+        <Button variant="outline" onPress={navigation.goBack}>
+          <Text>Go back</Text>
         </Button>
       </SafeAreaView>
     );
@@ -134,36 +138,39 @@ export function TicketDetailScreen({ route, navigation }: ScreenProps<'TicketDet
     ]);
 
   return (
-    <SafeAreaView className="flex-1 bg-slack-darkBg" edges={['top', 'bottom']}>
-      <View className="flex-row items-center gap-4 border-b border-slack-darkBorder px-5 py-4">
-        <Pressable onPress={navigation.goBack} hitSlop={12} accessibilityLabel="Back">
-          <Text className="text-2xl text-white">‹</Text>
-        </Pressable>
-        <Text className="flex-1 text-sm text-gray-400" numberOfLines={1}>
-          {ref || 'Ticket'}
-        </Text>
-        <Pressable onPress={() => setShowEdit(true)} hitSlop={10} accessibilityLabel="Edit ticket">
-          <Text className="text-sm font-semibold text-slack-activeChannel">Edit</Text>
-        </Pressable>
-        <Pressable onPress={confirmDelete} hitSlop={10} accessibilityLabel="Delete ticket">
-          <Text className="text-lg">🗑</Text>
-        </Pressable>
-      </View>
+    <SafeAreaView className="flex-1 bg-background" edges={['top', 'bottom']}>
+      <ScreenHeader
+        title={ref || 'Ticket'}
+        subtitle={columnName}
+        onBack={navigation.goBack}
+        right={
+          <>
+            <Button variant="ghost" size="icon" onPress={() => setShowEdit(true)} accessibilityLabel="Edit ticket">
+              <Pencil size={19} color={colors.foreground} />
+            </Button>
+            <Button variant="ghost" size="icon" onPress={confirmDelete} accessibilityLabel="Delete ticket">
+              <Trash2 size={19} color={colors.destructive} />
+            </Button>
+          </>
+        }
+      />
 
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerClassName="gap-6 px-5 py-6" keyboardShouldPersistTaps="handled">
-          <Text className="text-xl font-bold text-white">{ticket.title}</Text>
+        <ScrollView contentContainerClassName="gap-6 px-4 py-5" keyboardShouldPersistTaps="handled">
+          <Text className="text-2xl font-black">{ticket.title}</Text>
 
-          <View className="flex-row flex-wrap gap-3">
+          <View className="flex-row flex-wrap gap-2">
             <Pressable
               onPress={() => setShowMove(true)}
-              className="rounded-full border border-slack-darkBorder px-4 py-2.5 active:opacity-70"
+              className="h-9 flex-row items-center gap-1 rounded-full border border-border px-3.5 active:bg-muted"
+              accessibilityRole="button"
               accessibilityLabel="Move ticket"
             >
-              <Text className="text-sm text-white">{columnName ?? '—'} ▾</Text>
+              <Text className="text-sm font-bold">{columnName ?? '—'}</Text>
+              <ChevronDown size={15} color={colors.foreground} strokeWidth={2.5} />
             </Pressable>
-            <View className="rounded-full px-4 py-2.5" style={{ backgroundColor: p.color }}>
-              <Text className="text-sm font-semibold text-white">{p.label}</Text>
+            <View className="h-9 justify-center rounded-full px-3.5" style={{ backgroundColor: p.color }}>
+              <Text className="text-sm font-bold" style={{ color: onSwatch }}>{p.label}</Text>
             </View>
             <Pressable
               onPress={() =>
@@ -172,48 +179,54 @@ export function TicketDetailScreen({ route, navigation }: ScreenProps<'TicketDet
                   useProjectStore.getState().updateTicket({ ...ticket, watchers: r.watchers });
                 }, 'Watch failed')
               }
-              className="rounded-full border border-slack-darkBorder px-4 py-2.5 active:opacity-70"
+              className={cn(
+                'h-9 flex-row items-center gap-1.5 rounded-full border px-3.5 active:bg-muted',
+                watching ? 'border-link bg-accent' : 'border-border',
+              )}
               accessibilityRole="button"
               accessibilityState={{ selected: watching }}
             >
-              <Text className="text-sm text-white">{watching ? '👁 Watching' : '👁 Watch'}</Text>
+              <Eye size={15} color={watching ? colors.link : colors.foreground} />
+              <Text className={cn('text-sm font-bold', watching && 'text-accent-foreground')}>
+                {watching ? 'Watching' : 'Watch'}
+              </Text>
             </Pressable>
           </View>
 
-          <View className="gap-3 rounded-xl border border-slack-darkBorder p-4">
+          <View className="gap-3.5 rounded-xl border border-border p-4">
             <View className="flex-row items-start gap-2">
-              <Text className="w-24 text-sm text-gray-400">Assignees</Text>
+              <Text className="w-28 text-muted-foreground">Assignees</Text>
               {assignees.length ? (
                 <View className="flex-1 gap-2">
                   {assignees.map(a => (
                     <View key={a.uid} className="flex-row items-center gap-2">
                       <Avatar name={a.name} className="h-6 w-6 rounded-md" />
-                      <Text className="flex-1 text-sm text-white">{a.name}</Text>
+                      <Text className="flex-1 font-bold">{a.name}</Text>
                     </View>
                   ))}
                 </View>
               ) : (
-                <Text className="text-sm text-gray-500">Unassigned</Text>
+                <Text className="text-subtle">Unassigned</Text>
               )}
             </View>
             <View className="flex-row items-center gap-2">
-              <Text className="w-24 text-sm text-gray-400">Due</Text>
-              <Text className={cn('text-sm', isOverdue(ticket.dueDate) ? 'font-semibold text-red-400' : 'text-white')}>
+              <Text className="w-28 text-muted-foreground">Due</Text>
+              <Text className={cn(isOverdue(ticket.dueDate) && 'font-bold text-destructive')}>
                 {ticket.dueDate ? formatDue(ticket.dueDate) : '—'}
               </Text>
             </View>
             <View className="flex-row items-center gap-2">
-              <Text className="w-24 text-sm text-gray-400">Story points</Text>
-              <Text className="text-sm text-white">{ticket.storyPoints ?? '—'}</Text>
+              <Text className="w-28 text-muted-foreground">Story points</Text>
+              <Text>{ticket.storyPoints ?? '—'}</Text>
             </View>
             <View className="flex-row items-center gap-2">
-              <Text className="w-24 text-sm text-gray-400">Reporter</Text>
-              <Text className="text-sm text-white">{ticket.creator?.displayName ?? '—'}</Text>
+              <Text className="w-28 text-muted-foreground">Reporter</Text>
+              <Text>{ticket.creator?.displayName ?? '—'}</Text>
             </View>
             {!!ticket.gitbranch && (
               <View className="flex-row items-center gap-2">
-                <Text className="w-24 text-sm text-gray-400">Branch</Text>
-                <Text className="flex-1 text-sm text-white" selectable>
+                <Text className="w-28 text-muted-foreground">Branch</Text>
+                <Text className="flex-1 font-mono text-sm" selectable>
                   {ticket.gitbranch}
                 </Text>
               </View>
@@ -223,8 +236,8 @@ export function TicketDetailScreen({ route, navigation }: ScreenProps<'TicketDet
           {labels.length > 0 && (
             <View className="flex-row flex-wrap gap-1">
               {labels.map(l => (
-                <View key={l} className="rounded bg-white/10 px-2 py-1">
-                  <Text className="text-xs text-gray-200">{l}</Text>
+                <View key={l} className="rounded-md bg-muted px-2 py-1">
+                  <Text className="text-xs font-bold text-muted-foreground">{l}</Text>
                 </View>
               ))}
             </View>
@@ -255,15 +268,22 @@ export function TicketDetailScreen({ route, navigation }: ScreenProps<'TicketDet
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: c.completed }}
                 >
-                  <Text className="text-lg text-white">{c.completed ? '☑' : '☐'}</Text>
-                  <Text className={cn('flex-1 text-white', c.completed && 'text-gray-500 line-through')}>{c.text}</Text>
+                  <View
+                    className={cn(
+                      'h-5 w-5 items-center justify-center rounded border',
+                      c.completed ? 'border-primary bg-primary' : 'border-input',
+                    )}
+                  >
+                    {c.completed && <Check size={14} color={colors.primaryForeground} strokeWidth={3} />}
+                  </View>
+                  <Text className={cn('flex-1', c.completed && 'text-subtle line-through')}>{c.text}</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => setChecklist(checklist.filter(x => x.id !== c.id))}
                   hitSlop={10}
                   accessibilityLabel={`Remove ${c.text}`}
                 >
-                  <Text className="text-gray-500">✕</Text>
+                  <X size={16} color={colors.subtle} />
                 </Pressable>
               </View>
             ))}
@@ -272,23 +292,25 @@ export function TicketDetailScreen({ route, navigation }: ScreenProps<'TicketDet
               onChangeText={setItem}
               onSubmitEditing={addItem}
               placeholder="Add checklist item"
-              placeholderTextColor="#6B7280"
               returnKeyType="done"
-              className="h-10 border-gray-700 bg-slack-darkSidebar text-white"
+              className="h-10"
             />
           </Section>
 
           <Section title="Comments">
-            {!!commentsError && <Text className="text-xs text-red-400">{commentsError}</Text>}
-            {comments.length === 0 && !commentsError && <Text className="text-sm text-gray-500">No comments yet.</Text>}
+            {!!commentsError && <Text className="text-sm text-destructive">{commentsError}</Text>}
+            {comments.length === 0 && !commentsError && <Text className="text-subtle">No comments yet.</Text>}
             {comments.map(c => (
               <View key={c.id} className="flex-row gap-2">
-                <Avatar name={c.user?.displayName || c.username} className="h-7 w-7 rounded-md" />
+                <Avatar name={c.user?.displayName || c.username} />
                 <View className="flex-1">
-                  <Text className="text-xs text-gray-400">
-                    {c.user?.displayName || c.username} · {new Date(c.createdAt).toLocaleString()}
-                  </Text>
-                  <Text className="text-white" selectable>
+                  <View className="flex-row items-baseline gap-2">
+                    <Text className="shrink font-bold" numberOfLines={1}>
+                      {c.user?.displayName || c.username}
+                    </Text>
+                    <Text className="text-xs text-muted-foreground">{new Date(c.createdAt).toLocaleString()}</Text>
+                  </View>
+                  <Text selectable>
                     {c.text}
                   </Text>
                 </View>
@@ -300,8 +322,8 @@ export function TicketDetailScreen({ route, navigation }: ScreenProps<'TicketDet
             <Section title="Activity">
               {getEvents(ticket).map(e => (
                 <View key={e.id} className="flex-row items-start gap-2">
-                  <View className="mt-1.5 h-2 w-2 rounded-full" style={{ backgroundColor: e.color || '#6B7280' }} />
-                  <Text className="flex-1 text-xs text-gray-400">
+                  <View className="mt-1.5 h-2 w-2 rounded-full" style={{ backgroundColor: e.color || colors.subtle }} />
+                  <Text className="flex-1 text-sm text-muted-foreground">
                     {e.user ? `${e.user} · ` : ''}
                     {e.action} · {new Date(e.date).toLocaleString()}
                   </Text>
@@ -311,18 +333,30 @@ export function TicketDetailScreen({ route, navigation }: ScreenProps<'TicketDet
           )}
         </ScrollView>
 
-        <View className="flex-row items-center gap-3 border-t border-slack-darkBorder px-5 py-3">
+        <View className="flex-row items-end gap-2 border-t border-border px-4 py-2.5">
           <Input
             value={draft}
             onChangeText={setDraft}
             placeholder="Add a comment"
-            placeholderTextColor="#6B7280"
             multiline
-            className="max-h-24 min-h-[40px] flex-1 border-gray-700 bg-slack-darkSidebar text-white"
+            className="h-auto max-h-24 min-h-[40px] flex-1 py-2"
           />
-          <Button className="h-10 bg-slack-green" onPress={send} disabled={sending || !draft.trim()}>
-            {sending ? <ActivityIndicator color="white" /> : <Text className="text-white">Send</Text>}
-          </Button>
+          <Pressable
+            onPress={send}
+            disabled={sending || !draft.trim()}
+            className={cn(
+              'h-10 w-10 items-center justify-center rounded-lg',
+              !sending && draft.trim() && 'bg-primary active:bg-primary/90',
+            )}
+            accessibilityRole="button"
+            accessibilityLabel="Send comment"
+          >
+            {sending ? (
+              <ActivityIndicator color={colors.mutedForeground} size="small" />
+            ) : (
+              <SendHorizontal size={18} strokeWidth={2.25} color={draft.trim() ? colors.primaryForeground : colors.subtle} />
+            )}
+          </Pressable>
         </View>
       </KeyboardAvoidingView>
 

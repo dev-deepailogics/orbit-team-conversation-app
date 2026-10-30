@@ -15,38 +15,43 @@ export function WorkspaceControlScreen() {
 
   if (!current) {
     return (
-      <View className="flex-1 items-center justify-center bg-slack-darkBg p-6">
-        <Text className="text-gray-400">Open a workspace first.</Text>
+      <View className="flex-1 items-center justify-center bg-background p-6">
+        <Text className="text-muted-foreground">Open a workspace first.</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView className="flex-1 bg-slack-darkBg" contentContainerClassName="gap-6 p-6">
-      <View className="gap-1">
-        <Text className="text-xl font-bold text-white">{current.name}</Text>
-        <Text className="text-xs text-gray-400">Invite code: {current.inviteCode}</Text>
+    <ScrollView className="flex-1 bg-background" contentContainerClassName="gap-6 p-5">
+      <View className="flex-row items-center gap-3">
+        <Avatar name={current.name} className="h-12 w-12 rounded-xl" />
+        <View className="flex-1 gap-0.5">
+          <Text className="text-xl font-black" numberOfLines={1}>
+            {current.name}
+          </Text>
+          <Text className="text-sm text-muted-foreground" selectable>
+            Invite code: {current.inviteCode}
+          </Text>
+        </View>
       </View>
 
       <View className="gap-3">
         <View className="flex-row items-center justify-between">
-          <Text className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-            Members ({current.members.length})
-          </Text>
+          <Text className="font-bold">Members ({current.members.length})</Text>
+          <Button size="sm" variant="outline" onPress={() => setShowAdd(true)}>
+            <Text>Add member</Text>
+          </Button>
         </View>
-        <Button className="h-11 bg-slack-green" onPress={() => setShowAdd(true)}>
-          <Text className="font-semibold text-white">Add member</Text>
-        </Button>
         {current.members.map(m => (
-          <View key={m.id} className="flex-row items-center gap-3">
-            <Avatar name={m.user?.displayName ?? '?'} className="h-9 w-9 rounded-lg" />
+          <View key={m.id} className="min-h-[52px] flex-row items-center gap-3">
+            <Avatar name={m.user?.displayName ?? '?'} />
             <View className="flex-1">
-              <Text className="text-sm font-semibold text-white" numberOfLines={1}>
+              <Text className="font-bold" numberOfLines={1}>
                 {m.user?.displayName ?? m.userId}
               </Text>
-              {!!m.user?.username && <Text className="text-xs text-gray-400">@{m.user.username}</Text>}
+              {!!m.user?.username && <Text className="text-sm text-muted-foreground">@{m.user.username}</Text>}
             </View>
-            <Text className="text-xs text-gray-400">{m.role}</Text>
+            <Text className="rounded-md bg-muted px-2 py-0.5 text-xs font-bold text-muted-foreground">{m.role}</Text>
           </View>
         ))}
       </View>

@@ -1,16 +1,20 @@
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, View } from 'react-native';
+import { ChevronDown, ChevronUp, Trash2 } from '@/components/icons';
 import { FormField } from '@/components/FormField';
 import { Sheet } from '@/components/Sheet';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { getErrorMessage } from '@/lib/api';
+import { useTheme } from '@/lib/theme';
 import { createColumn, deleteColumn, reorderColumns, updateColumn } from '../services/projectApi';
 import { useProjectStore } from '../store';
+import { cn } from '@/lib/utils';
 import { moveItem } from '../utils';
 
 // Manage board columns: add, rename, reorder (up/down instead of drag), delete.
 export function ColumnsSheet({ visible, projectId, onClose }: { visible: boolean; projectId: string; onClose: () => void }) {
+  const { colors } = useTheme();
   const columns = useProjectStore(s => s.current?.columns ?? []);
   const store = useProjectStore.getState;
   const [newName, setNewName] = useState('');
@@ -73,9 +77,9 @@ export function ColumnsSheet({ visible, projectId, onClose }: { visible: boolean
 
   return (
     <Sheet visible={visible} title="Columns" onClose={onClose}>
-      <ScrollView className="max-h-80" keyboardShouldPersistTaps="handled">
+      <ScrollView className="max-h-80 rounded-xl border border-border" keyboardShouldPersistTaps="handled">
         {columns.map((c, i) => (
-          <View key={c.id} className="min-h-[48px] flex-row items-center gap-2 border-b border-slack-darkBorder">
+          <View key={c.id} className={cn('min-h-[52px] flex-row items-center gap-1 px-3', i > 0 && 'border-t border-border')}>
             {renaming?.id === c.id ? (
               <View className="flex-1 flex-row items-center gap-2 py-1">
                 <View className="flex-1">
@@ -88,27 +92,27 @@ export function ColumnsSheet({ visible, projectId, onClose }: { visible: boolean
                     onSubmitEditing={rename}
                   />
                 </View>
-                <Button size="sm" className="bg-slack-green" onPress={rename}>
-                  <Text className="text-white">OK</Text>
+                <Button size="sm" onPress={rename}>
+                  <Text>Save</Text>
                 </Button>
               </View>
             ) : (
               <>
-                <View className="h-3 w-3 rounded-full" style={{ backgroundColor: c.color || '#6B7280' }} />
-                <Pressable className="flex-1 py-3" onPress={() => setRenaming({ id: c.id, name: c.name })} accessibilityLabel={`Rename ${c.name}`}>
-                  <Text className="text-white" numberOfLines={1}>
-                    {c.name} <Text className="text-xs text-gray-500">({c.tickets?.length ?? 0})</Text>
+                <View className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: c.color || colors.subtle }} />
+                <Pressable className="flex-1 py-3 pl-2" onPress={() => setRenaming({ id: c.id, name: c.name })} accessibilityLabel={`Rename ${c.name}`}>
+                  <Text className="font-bold" numberOfLines={1}>
+                    {c.name} <Text className="text-sm font-normal text-subtle">{c.tickets?.length ?? 0}</Text>
                   </Text>
                 </Pressable>
-                <Pressable hitSlop={10} onPress={() => move(i, i - 1)} disabled={i === 0} accessibilityLabel={`Move ${c.name} up`}>
-                  <Text className={i === 0 ? 'text-gray-700' : 'text-gray-300'}>▲</Text>
-                </Pressable>
-                <Pressable hitSlop={10} onPress={() => move(i, i + 1)} disabled={i === columns.length - 1} accessibilityLabel={`Move ${c.name} down`}>
-                  <Text className={i === columns.length - 1 ? 'text-gray-700' : 'text-gray-300'}>▼</Text>
-                </Pressable>
-                <Pressable hitSlop={10} onPress={() => remove(c.id, c.name, c.tickets?.length ?? 0)} accessibilityLabel={`Delete ${c.name}`}>
-                  <Text className="text-red-400">🗑</Text>
-                </Pressable>
+                <Button variant="ghost" size="icon" className="h-9 w-9" onPress={() => move(i, i - 1)} disabled={i === 0} accessibilityLabel={`Move ${c.name} up`}>
+                  <ChevronUp size={18} color={colors.mutedForeground} />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-9 w-9" onPress={() => move(i, i + 1)} disabled={i === columns.length - 1} accessibilityLabel={`Move ${c.name} down`}>
+                  <ChevronDown size={18} color={colors.mutedForeground} />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-9 w-9" onPress={() => remove(c.id, c.name, c.tickets?.length ?? 0)} accessibilityLabel={`Delete ${c.name}`}>
+                  <Trash2 size={17} color={colors.destructive} />
+                </Button>
               </>
             )}
           </View>
@@ -118,8 +122,8 @@ export function ColumnsSheet({ visible, projectId, onClose }: { visible: boolean
         <View className="flex-1">
           <FormField label="New column" value={newName} onChangeText={setNewName} autoCapitalize="sentences" maxLength={50} onSubmitEditing={add} />
         </View>
-        <Button className="h-11 bg-slack-green" onPress={add} disabled={busy}>
-          <Text className="text-white">Add</Text>
+        <Button onPress={add} disabled={busy}>
+          <Text>Add</Text>
         </Button>
       </View>
     </Sheet>

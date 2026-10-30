@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { UserPlus } from '@/components/icons';
 import type { Message } from '@orbit/types';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useAuthStore } from '@/features/auth/store';
@@ -10,10 +12,10 @@ import { markChannelRead } from '@/features/workspaces/services/workspaceApi';
 import { useWorkspaceStore } from '@/features/workspaces/store';
 import { channelLabel, channelPrefix, isDirect } from '@/features/workspaces/utils';
 import { getErrorMessage } from '@/lib/api';
+import { useTheme } from '@/lib/theme';
 import { EVENTS, getSocket } from '@/lib/socket';
 import type { ScreenProps } from '@/navigation/types';
 import { AddChannelMembersSheet } from '@/features/workspaces/components/AddChannelMembersSheet';
-import { ChatHeader } from '../components/ChatHeader';
 import { Composer } from '../components/Composer';
 import { MessageActionsSheet } from '../components/MessageActionsSheet';
 import { MessageItem } from '../components/MessageItem';
@@ -22,6 +24,7 @@ import { useChatStore } from '../store';
 import { typingLabel } from '../utils';
 
 export function ChannelScreen({ route, navigation }: ScreenProps<'Channel'>) {
+  const { colors } = useTheme();
   const { channelId } = route.params;
   const me = useAuthStore(s => s.user);
   const channel = useWorkspaceStore(s => s.current?.channels.find(c => c.id === channelId));
@@ -99,9 +102,9 @@ export function ChannelScreen({ route, navigation }: ScreenProps<'Channel'>) {
 
   if (!channel) {
     return (
-      <SafeAreaView className="flex-1 bg-slack-darkBg">
-        <ChatHeader title="Channel" onBack={navigation.goBack} />
-        <Text className="p-6 text-center text-gray-400">This channel is no longer available.</Text>
+      <SafeAreaView className="flex-1 bg-background">
+        <ScreenHeader title="Channel" onBack={navigation.goBack} />
+        <Text className="p-6 text-center text-muted-foreground">This channel is no longer available.</Text>
       </SafeAreaView>
     );
   }
@@ -113,24 +116,30 @@ export function ChannelScreen({ route, navigation }: ScreenProps<'Channel'>) {
   const typingText = typingLabel(Object.values(typing));
 
   return (
-    <SafeAreaView className="flex-1 bg-slack-darkBg" edges={['top', 'bottom']}>
-      <ChatHeader
+    <SafeAreaView className="flex-1 bg-background" edges={['top', 'bottom']}>
+      <ScreenHeader
         title={title}
         subtitle={direct ? undefined : memberCount === 1 ? '1 member' : `${memberCount} members`}
         onBack={navigation.goBack}
-        action={direct ? undefined : { label: 'Add people', onPress: () => setShowAddPeople(true) }}
+        right={
+          !direct && (
+            <Button variant="ghost" size="icon" onPress={() => setShowAddPeople(true)} accessibilityLabel="Add people">
+              <UserPlus size={21} color={colors.foreground} />
+            </Button>
+          )
+        }
       />
       {/* Android runs edge-to-edge (gradle.properties), where adjustResize no longer resizes the window. */}
       <KeyboardAvoidingView className="flex-1" behavior="padding">
         {isLoading && messages.length === 0 ? (
           <View className="flex-1 items-center justify-center">
-            <ActivityIndicator color="white" />
+            <ActivityIndicator color={colors.mutedForeground} />
           </View>
         ) : error && messages.length === 0 ? (
           <View className="flex-1 items-center justify-center gap-4 p-6">
-            <Text className="text-center text-gray-300">{error}</Text>
-            <Button className="bg-slack-activeChannel" onPress={() => openChannel(channelId)}>
-              <Text className="text-white">Retry</Text>
+            <Text className="text-center text-muted-foreground">{error}</Text>
+            <Button variant="outline" onPress={() => openChannel(channelId)}>
+              <Text>Retry</Text>
             </Button>
           </View>
         ) : (
@@ -152,11 +161,11 @@ export function ChannelScreen({ route, navigation }: ScreenProps<'Channel'>) {
             keyboardShouldPersistTaps="handled"
             ListHeaderComponent={
               isLoadingOlder ? (
-                <ActivityIndicator color="white" className="py-4" />
+                <ActivityIndicator color={colors.mutedForeground} className="py-4" />
               ) : !hasMore ? (
-                <View className="gap-1 px-4 pb-2 pt-6">
-                  <Text className="text-xl font-bold text-white">{title}</Text>
-                  <Text className="text-sm text-gray-400">
+                <View className="gap-1.5 px-4 pb-3 pt-8">
+                  <Text className="text-2xl font-black">{title}</Text>
+                  <Text className="text-muted-foreground">
                     {direct
                       ? `This is the very beginning of your conversation with ${label}.`
                       : `This is the very beginning of the ${channelPrefix(channel)}${label} channel.${channel.topic ? ` ${channel.topic}` : ''}`}
@@ -166,7 +175,7 @@ export function ChannelScreen({ route, navigation }: ScreenProps<'Channel'>) {
             }
           />
         )}
-        <Text className="h-5 px-4 text-xs italic text-gray-400" numberOfLines={1}>
+        <Text className="h-5 px-4 text-xs text-muted-foreground" numberOfLines={1}>
           {typingText}
         </Text>
         <Composer placeholder={direct ? `Message ${label}` : `Message ${channelPrefix(channel)}${label}`} onSend={handleSend} onTyping={handleTyping} />

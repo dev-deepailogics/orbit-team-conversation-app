@@ -8,6 +8,7 @@ import { Text } from '@/components/ui/text';
 import { getErrorMessage } from '@/lib/api';
 import { createWorkspace } from '../services/adminApi';
 import { isValidSlug, slugify } from '../utils';
+import { useTheme } from '@/lib/theme';
 
 interface Props {
   visible: boolean;
@@ -23,6 +24,7 @@ export function CreateWorkspaceSheet({
   onClose,
   onCreated,
 }: Props) {
+  const { colors } = useTheme();
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [slugEdited, setSlugEdited] = useState(false);
@@ -116,17 +118,16 @@ export function CreateWorkspaceSheet({
         />
       )}
 
-      {!!error && <Text className="text-xs text-red-400">{error}</Text>}
+      {!!error && <Text className="text-sm text-destructive">{error}</Text>}
 
       <Button
-        className="h-11 bg-slack-green"
         disabled={isLoading}
         onPress={handleSubmit}
       >
         {isLoading ? (
-          <ActivityIndicator color="white" />
+          <ActivityIndicator color={colors.primaryForeground} />
         ) : (
-          <Text className="font-semibold text-white">Create workspace</Text>
+          <Text>Create workspace</Text>
         )}
       </Button>
     </Sheet>

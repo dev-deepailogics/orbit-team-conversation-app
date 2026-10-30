@@ -8,8 +8,10 @@ import type { ScreenProps } from '@/navigation/types';
 import { AuthLayout } from '../components/AuthLayout';
 import { register } from '../services/authApi';
 import { useAuthStore } from '../store';
+import { useTheme } from '@/lib/theme';
 
 export function RegisterScreen({ navigation }: ScreenProps<'Register'>) {
+  const { colors } = useTheme();
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -100,21 +102,21 @@ export function RegisterScreen({ navigation }: ScreenProps<'Register'>) {
       />
 
       <Button
-        className="h-11 bg-slack-activeChannel"
+        size="lg"
         disabled={isLoading}
         onPress={handleSubmit}
       >
         {isLoading ? (
-          <ActivityIndicator color="white" />
+          <ActivityIndicator color={colors.primaryForeground} />
         ) : (
-          <Text className="font-semibold text-white">Continue</Text>
+          <Text>Continue</Text>
         )}
       </Button>
 
       <View className="mt-2 flex-row justify-center">
-        <Text className="text-xs text-gray-400">Already have an account? </Text>
+        <Text className="text-muted-foreground">Already have an account? </Text>
         <Pressable onPress={() => navigation.replace('Login')} hitSlop={8}>
-          <Text className="text-xs font-semibold text-slack-activeChannel">
+          <Text className="font-bold text-link">
             Sign in
           </Text>
         </Pressable>

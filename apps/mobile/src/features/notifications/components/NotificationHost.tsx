@@ -30,11 +30,11 @@ function Banner() {
           dismiss();
           openTarget(banner);
         }}
-        className="rounded-xl border border-slack-darkBorder bg-slack-darkSidebar p-3 shadow-lg">
-        <Text className="font-semibold text-white" numberOfLines={1}>
+        className="rounded-2xl border border-border bg-background px-4 py-3 shadow-lg shadow-overlay/15">
+        <Text className="font-bold" numberOfLines={1}>
           {banner.title}
         </Text>
-        <Text className="text-sm text-gray-300" numberOfLines={2}>
+        <Text className="text-sm text-muted-foreground" numberOfLines={2}>
           {banner.body}
         </Text>
       </Pressable>

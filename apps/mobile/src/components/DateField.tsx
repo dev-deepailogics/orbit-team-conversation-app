@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
+import { CalendarDays, ChevronLeft, ChevronRight } from '@/components/icons';
 import { Sheet } from '@/components/Sheet';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { formatYmd, MONTHS, monthGrid, parseYmd, shiftMonth, toYmd, todayYmd, WEEKDAYS } from '@/lib/date';
+import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -16,18 +18,19 @@ interface Props {
 
 // Tappable field that opens a calendar. JS-only so it needs no native module / pod install.
 export function DateField({ label, value, onChange, placeholder = 'Select date' }: Props) {
+  const { colors } = useTheme();
   const [open, setOpen] = useState(false);
   return (
     <View className="gap-1.5">
-      <Text className="text-xs font-semibold text-gray-300">{label}</Text>
+      <Text className="text-sm font-bold">{label}</Text>
       <Pressable
         onPress={() => setOpen(true)}
-        className="h-11 flex-row items-center justify-between rounded-md border border-gray-700 bg-slack-darkBg px-3 active:opacity-70"
+        className="h-11 flex-row items-center justify-between rounded-lg border border-input bg-background px-3 active:bg-muted"
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${value ? formatYmd(value) : 'not set'}`}
       >
-        <Text className={value ? 'text-white' : 'text-gray-500'}>{value ? formatYmd(value) : placeholder}</Text>
-        <Text>📅</Text>
+        <Text className={value ? '' : 'text-subtle'}>{value ? formatYmd(value) : placeholder}</Text>
+        <CalendarDays size={18} color={colors.mutedForeground} />
       </Pressable>
       {open && (
         <CalendarSheet
@@ -55,6 +58,7 @@ function CalendarSheet({
   onClose: () => void;
   onPick: (v: string) => void;
 }) {
+  const { colors } = useTheme();
   const today = todayYmd();
   const start = parseYmd(value) ?? parseYmd(today)!;
   const [view, setView] = useState({ year: start.year, month: start.month });
@@ -62,19 +66,19 @@ function CalendarSheet({
   return (
     <Sheet visible title={title} onClose={onClose}>
       <View className="flex-row items-center justify-between">
-        <Pressable onPress={() => setView(v => shiftMonth(v.year, v.month, -1))} hitSlop={12} className="px-3 py-2" accessibilityLabel="Previous month">
-          <Text className="text-2xl text-white">‹</Text>
+        <Pressable onPress={() => setView(v => shiftMonth(v.year, v.month, -1))} hitSlop={12} className="h-10 w-10 items-center justify-center rounded-lg active:bg-muted" accessibilityLabel="Previous month">
+          <ChevronLeft size={22} color={colors.foreground} />
         </Pressable>
-        <Text className="text-base font-semibold text-white">
+        <Text className="font-bold">
           {MONTHS[view.month]} {view.year}
         </Text>
-        <Pressable onPress={() => setView(v => shiftMonth(v.year, v.month, 1))} hitSlop={12} className="px-3 py-2" accessibilityLabel="Next month">
-          <Text className="text-2xl text-white">›</Text>
+        <Pressable onPress={() => setView(v => shiftMonth(v.year, v.month, 1))} hitSlop={12} className="h-10 w-10 items-center justify-center rounded-lg active:bg-muted" accessibilityLabel="Next month">
+          <ChevronRight size={22} color={colors.foreground} />
         </Pressable>
       </View>
       <View className="flex-row">
         {WEEKDAYS.map((d, i) => (
-          <Text key={i} className="flex-1 text-center text-xs text-gray-500">
+          <Text key={i} className="flex-1 text-center text-xs font-bold text-muted-foreground">
             {d}
           </Text>
         ))}
@@ -98,11 +102,11 @@ function CalendarSheet({
                   <View
                     className={cn(
                       'h-10 w-10 items-center justify-center rounded-full',
-                      selected && 'bg-slack-activeChannel',
-                      !selected && ymd === today && 'border border-slack-activeChannel',
+                      selected && 'bg-primary',
+                      !selected && ymd === today && 'border border-link',
                     )}
                   >
-                    <Text className={cn('text-white', selected && 'font-bold')}>{day}</Text>
+                    <Text className={cn(selected && 'font-bold text-primary-foreground', !selected && ymd === today && 'font-bold text-link')}>{day}</Text>
                   </View>
                 </Pressable>
               );
@@ -111,11 +115,11 @@ function CalendarSheet({
         ))}
       </View>
       <View className="flex-row gap-3">
-        <Button variant="outline" className="h-11 flex-1" onPress={() => onPick('')}>
+        <Button variant="outline" className="flex-1" onPress={() => onPick('')}>
           <Text>Clear</Text>
         </Button>
-        <Button className="h-11 flex-1 bg-slack-green" onPress={() => onPick(today)}>
-          <Text className="text-white">Today</Text>
+        <Button className="flex-1" onPress={() => onPick(today)}>
+          <Text>Today</Text>
         </Button>
       </View>
     </Sheet>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { Check } from '@/components/icons';
 import type { Channel } from '@orbit/types';
 import { Avatar } from '@/components/Avatar';
 import { Sheet } from '@/components/Sheet';
@@ -9,6 +10,7 @@ import { getErrorMessage } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { addChannelMembers } from '../services/workspaceApi';
 import { useWorkspaceStore } from '../store';
+import { useTheme } from '@/lib/theme';
 
 interface Props {
   visible: boolean;
@@ -18,6 +20,7 @@ interface Props {
 
 // Lists workspace members not yet in the channel; the server enforces workspace membership.
 export function AddChannelMembersSheet({ visible, channel, onClose }: Props) {
+  const { colors } = useTheme();
   const members = useWorkspaceStore(s => s.current?.members ?? []);
   const upsertChannel = useWorkspaceStore(s => s.upsertChannel);
   const [selected, setSelected] = useState<string[]>([]);
@@ -47,7 +50,7 @@ export function AddChannelMembersSheet({ visible, channel, onClose }: Props) {
   return (
     <Sheet visible={visible} title={`Add people to ${channel.name}`} onClose={onClose}>
       {candidates.length === 0 ? (
-        <Text className="text-sm text-gray-400">Everyone in this workspace is already in the channel.</Text>
+        <Text className="text-muted-foreground">Everyone in this workspace is already in the channel.</Text>
       ) : (
         <ScrollView className="max-h-72" contentContainerClassName="gap-1">
           {candidates.map(m => {
@@ -58,25 +61,27 @@ export function AddChannelMembersSheet({ visible, channel, onClose }: Props) {
                 onPress={() => toggle(m.userId)}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: on }}
-                className={cn('flex-row items-center gap-3 rounded-lg px-2 py-2', on && 'bg-slack-green/15')}
+                className={cn('min-h-[52px] flex-row items-center gap-3 rounded-lg px-2 active:bg-muted', on && 'bg-accent')}
               >
-                <Avatar name={m.user?.displayName ?? '?'} className="h-9 w-9 rounded-lg" />
-                <Text className="flex-1 text-sm text-white" numberOfLines={1}>
+                <Avatar name={m.user?.displayName ?? '?'} />
+                <Text className="flex-1 font-bold" numberOfLines={1}>
                   {m.user?.displayName ?? m.userId}
-                  {!!m.user?.username && <Text className="text-gray-400">  @{m.user.username}</Text>}
+                  {!!m.user?.username && <Text className="font-normal text-muted-foreground">  @{m.user.username}</Text>}
                 </Text>
-                {on && <Text className="text-slack-green">✓</Text>}
+                <View className={cn('h-5 w-5 items-center justify-center rounded border', on ? 'border-primary bg-primary' : 'border-input')}>
+                  {on && <Check size={14} color={colors.primaryForeground} strokeWidth={3} />}
+                </View>
               </Pressable>
             );
           })}
         </ScrollView>
       )}
-      {!!error && <Text className="text-xs text-red-400">{error}</Text>}
-      <Button className="h-11 bg-slack-green" disabled={isLoading || !selected.length} onPress={submit}>
+      {!!error && <Text className="text-sm text-destructive">{error}</Text>}
+      <Button disabled={isLoading || !selected.length} onPress={submit}>
         {isLoading ? (
-          <ActivityIndicator color="white" />
+          <ActivityIndicator color={colors.primaryForeground} />
         ) : (
-          <Text className="font-semibold text-white">{selected.length ? `Add ${selected.length}` : 'Select people'}</Text>
+          <Text>{selected.length ? `Add ${selected.length}` : 'Select people'}</Text>
         )}
       </Button>
     </Sheet>
