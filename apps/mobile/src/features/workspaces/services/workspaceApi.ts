@@ -12,6 +12,16 @@ export async function getWorkspace(workspaceId: string): Promise<WorkspaceDetail
   return res.data;
 }
 
+// channelId → unread count, persisted server-side via each member's lastReadAt.
+export async function getUnread(workspaceId: string): Promise<Record<string, number>> {
+  const res = await api.get<Record<string, number>>(`/api/channels/workspaces/${workspaceId}/unread`);
+  return res.data;
+}
+
+export async function markChannelRead(channelId: string): Promise<void> {
+  await api.post(`/api/channels/${channelId}/read`);
+}
+
 export async function joinWorkspace(inviteCode: string): Promise<string> {
   const res = await api.post<{ workspaceId: string }>('/api/workspaces/join', { inviteCode });
   return res.data.workspaceId;

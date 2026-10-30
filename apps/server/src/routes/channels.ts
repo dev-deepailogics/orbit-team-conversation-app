@@ -240,6 +240,28 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     return reply.status(201).send(dmChannel);
   });
 
+  // Unread message counts per channel for the signed-in user (top-level messages from others since lastReadAt).
+  fastify.get('/workspaces/:workspaceId/unread', { preHandler: [fastify.authenticate] }, async (request) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    const userId = (request.user as { id: string }).id;
+    const rows = await prisma.$queryRaw<{ channelId: string; count: number }[]>`
+      SELECT m."channelId", COUNT(*)::int AS count
+      FROM "Message" m
+      JOIN "ChannelMember" cm ON cm."channelId" = m."channelId" AND cm."userId" = ${userId}
+      JOIN "Channel" ch ON ch.id = m."channelId" AND ch."workspaceId" = ${workspaceId}
+      WHERE m."parentMessageId" IS NULL AND m."isDeleted" = false
+        AND m."userId" IS DISTINCT FROM ${userId} AND m."createdAt" > cm."lastReadAt"
+      GROUP BY m."channelId"`;
+    return Object.fromEntries(rows.map((r) => [r.channelId, r.count]));
+  });
+
+  fastify.post('/:channelId/read', { preHandler: [fastify.authenticate] }, async (request) => {
+    const { channelId } = request.params as { channelId: string };
+    const userId = (request.user as { id: string }).id;
+    await prisma.channelMember.updateMany({ where: { channelId, userId }, data: { lastReadAt: new Date() } });
+    return { success: true };
+  });
+
   // Get complete details for a channel
   fastify.get('/:channelId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
     const { channelId } = request.params as { channelId: string };

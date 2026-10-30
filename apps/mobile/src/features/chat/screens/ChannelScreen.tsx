@@ -6,6 +6,7 @@ import type { Message } from '@orbit/types';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useAuthStore } from '@/features/auth/store';
+import { markChannelRead } from '@/features/workspaces/services/workspaceApi';
 import { useWorkspaceStore } from '@/features/workspaces/store';
 import { channelLabel, channelPrefix, isDirect } from '@/features/workspaces/utils';
 import { getErrorMessage } from '@/lib/api';
@@ -42,11 +43,14 @@ export function ChannelScreen({ route, navigation }: ScreenProps<'Channel'>) {
   useEffect(() => {
     openChannel(channelId);
     clearUnread(channelId);
+    markChannelRead(channelId).catch(() => {});
     // Typing, reactions and thread replies are broadcast to the channel room only.
     getSocket()?.emit(EVENTS.JOIN_CHANNEL, channelId);
     return () => {
       getSocket()?.emit(EVENTS.LEAVE_CHANNEL, channelId);
       closeChannel(channelId);
+      // Anything that arrived while it was open counts as read.
+      markChannelRead(channelId).catch(() => {});
     };
   }, [channelId, openChannel, closeChannel, clearUnread]);
 

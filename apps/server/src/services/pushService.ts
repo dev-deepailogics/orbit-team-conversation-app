@@ -48,7 +48,10 @@ interface MobilePush {
 async function sendToDevices(userIds: string[], push: MobilePush) {
   if (!initFcm() || userIds.length === 0) return;
   const tokens = await prisma.deviceToken.findMany({ where: { userId: { in: userIds } }, select: { token: true } });
-  if (tokens.length === 0) return;
+  if (tokens.length === 0) {
+    console.log('FCM push: recipients have no registered devices');
+    return;
+  }
   // Per-thread collapse key so replies stack under one notification, like Slack.
   const group = push.parentMessageId ? `thread:${push.parentMessageId}` : `channel:${push.channelId}`;
   // FCM data values must be strings.
@@ -63,6 +66,13 @@ async function sendToDevices(userIds: string[], push: MobilePush) {
       android: { priority: 'high', notification: { tag: group } },
       apns: { headers: { 'apns-collapse-id': group.slice(0, 64) }, payload: { aps: { threadId: group, sound: 'default' } } },
     });
+    // One bad token never throws; surface the reason so silent failures aren't invisible.
+    res.responses.forEach((r) => {
+      if (r.error && r.error.code !== 'messaging/registration-token-not-registered') {
+        console.warn('FCM send failed', r.error.code, r.error.message);
+      }
+    });
+    console.log(`FCM push ${group}: ${res.successCount} sent, ${res.failureCount} failed`);
     const dead = res.responses
       .map((r, j) => (r.error?.code === 'messaging/registration-token-not-registered' ? batch[j] : null))
       .filter((t): t is string => Boolean(t));
@@ -103,6 +113,7 @@ async function notifyMessage(io: any, messageId: string) {
     },
   });
   if (!msg || msg.isDeleted) return;
+  console.log(`Push fan-out for message ${msg.id} in ${msg.channel.type} ${msg.channelId}`);
 
   // Thread replies only notify people in the thread (parent author + earlier repliers), like Slack.
   let participants: string[] | null = null;
@@ -123,7 +134,10 @@ async function notifyMessage(io: any, messageId: string) {
     },
     select: { userId: true },
   });
-  if (members.length === 0) return;
+  if (members.length === 0) {
+    console.log('Push fan-out: no recipients');
+    return;
+  }
   const memberIds = members.map((m) => m.userId);
 
   const isDM = msg.channel.type === 'DIRECT' || msg.channel.type === 'GROUP_DIRECT';

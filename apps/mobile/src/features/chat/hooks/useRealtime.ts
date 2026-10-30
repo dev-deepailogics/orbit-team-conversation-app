@@ -3,6 +3,7 @@ import type { Channel, Message, Project, ProjectColumn, Reaction, Ticket } from 
 import { useAuthStore } from '@/features/auth/store';
 import { useWorkspaceStore } from '@/features/workspaces/store';
 import { connectSocket, disconnectSocket, EVENTS } from '@/lib/socket';
+import { markChannelRead } from '@/features/workspaces/services/workspaceApi';
 import { useProjectStore } from '@/features/projects/store';
 import { useChatStore } from '../store';
 import { isMine } from '../utils';
@@ -41,6 +42,10 @@ export function useRealtime() {
     socket.on(EVENTS.MESSAGE_NEW, (m: Message) => {
       chat().receiveMessage(m);
       const unseen = !m.parentMessageId && m.channelId !== chat().channelId && !isMine(m, myId);
+      // Open channel: keep the server's lastReadAt current so a kill mid-chat doesn't resurrect these as unread.
+      if (!m.parentMessageId && m.channelId === chat().channelId && !isMine(m, myId)) {
+        markChannelRead(m.channelId).catch(() => {});
+      }
       if (unseen && !counted.has(m.id)) {
         counted.add(m.id);
         ws().incrementUnread(m.channelId);

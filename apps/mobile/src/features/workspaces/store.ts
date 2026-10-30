@@ -1,13 +1,13 @@
 import { create } from 'zustand';
 import type { Channel, Workspace } from '@orbit/types';
 import { getErrorMessage } from '@/lib/api';
-import { getWorkspace, getWorkspaces } from './services/workspaceApi';
+import { getUnread, getWorkspace, getWorkspaces } from './services/workspaceApi';
 import type { WorkspaceDetail } from './types';
 
 interface WorkspaceState {
   workspaces: Workspace[];
   current: WorkspaceDetail | null;
-  // Live-only, like web: the server has no unread API yet, so counts start at 0 each launch.
+  // Seeded from the server on workspace open (lastReadAt), then bumped live by socket events.
   unread: Record<string, number>;
   isLoading: boolean;
   error: string;
@@ -52,9 +52,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const req = ++selectSeq;
     set(silent ? { error: '' } : { isLoading: true, error: '' });
     try {
-      const current = await getWorkspace(workspaceId);
+      const [current, counts] = await Promise.all([
+        getWorkspace(workspaceId),
+        // Counts are a nicety: if they fail, keep what we have rather than failing the whole open.
+        getUnread(workspaceId).catch(() => null),
+      ]);
       if (req !== selectSeq) return; // a newer switch won
-      set({ current, unread: get().current?.id === workspaceId ? get().unread : {}, isLoading: false });
+      const sameWorkspace = get().current?.id === workspaceId;
+      set({ current, unread: counts ?? (sameWorkspace ? get().unread : {}), isLoading: false });
     } catch (err) {
       if (req !== selectSeq) return;
       set({ isLoading: false, error: getErrorMessage(err, 'Failed to open workspace') });
