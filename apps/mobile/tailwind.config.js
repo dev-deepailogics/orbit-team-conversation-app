@@ -1,5 +1,6 @@
-// Slack-style theme: Lato, 15/22 body text, hairline borders, navy + blue accents, light and dark.
+// Slack-style theme: Rubik, 15/22 body text, hairline borders, navy + blue accents, light and dark.
 // Colors are CSS variables set from src/lib/theme.ts (the only place hex values live), so every token follows the scheme.
+const plugin = require('tailwindcss/plugin');
 const v = name => `rgb(var(--${name}) / <alpha-value>)`;
 
 /** @type {import('tailwindcss').Config} */
@@ -10,9 +11,6 @@ module.exports = {
   presets: [require('nativewind/preset')],
   theme: {
     extend: {
-      fontFamily: {
-        sans: ['Lato'],
-      },
       // Slack mobile's type scale: [size, line height].
       fontSize: {
         '2xs': ['11px', '14px'],
@@ -23,12 +21,6 @@ module.exports = {
         xl: ['20px', '26px'],
         '2xl': ['24px', '30px'],
         '3xl': ['28px', '34px'],
-      },
-      // Lato ships 400/700/900 only; map the in-between weights to bold so iOS and Android render the same face.
-      fontWeight: {
-        medium: '700',
-        semibold: '700',
-        extrabold: '900',
       },
       colors: {
         background: v('background'),
@@ -70,5 +62,22 @@ module.exports = {
       },
     },
   },
-  plugins: [],
+  // Rubik is bundled as one static font per weight (see FONTS in src/lib/theme.ts), so the weight
+  // classes select the font family instead of fontWeight. Everything heavier than bold renders as bold.
+  corePlugins: { fontWeight: false },
+  plugins: [
+    plugin(({ addUtilities }) => {
+      const face = name => ({ fontFamily: name, fontWeight: 'normal' });
+      addUtilities({
+        '.font-sans': face('Rubik-Regular'),
+        '.font-normal': face('Rubik-Regular'),
+        '.font-medium': face('Rubik-Medium'),
+        '.font-semibold': face('Rubik-SemiBold'),
+        '.font-bold': face('Rubik-Bold'),
+        '.font-extrabold': face('Rubik-Bold'),
+        '.font-black': face('Rubik-Bold'),
+        '.italic': face('Rubik-Italic'),
+      });
+    }),
+  ],
 };

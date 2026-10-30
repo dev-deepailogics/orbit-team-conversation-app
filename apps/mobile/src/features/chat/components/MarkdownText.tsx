@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Alert, Linking, Platform } from 'react-native';
 import Markdown from 'react-native-markdown-display';
-import { FONT, MONO, perScheme, useTheme } from '@/lib/theme';
+import { FONTS, MONO, perScheme, useTheme } from '@/lib/theme';
 import { isSafeHref } from '../link';
 
 const mono = Platform.select({ ios: MONO, default: 'monospace' });
@@ -9,8 +9,7 @@ const mono = Platform.select({ ios: MONO, default: 'monospace' });
 const styles = perScheme(c => {
   const heading = {
     color: c.foreground,
-    fontFamily: FONT,
-    fontWeight: '700' as const,
+    fontFamily: FONTS.bold,
     marginTop: 4,
     marginBottom: 4,
   };
@@ -29,12 +28,13 @@ const styles = perScheme(c => {
   return {
     body: {
       color: c.foreground,
-      fontFamily: FONT,
+      fontFamily: FONTS.regular,
       fontSize: 15,
       lineHeight: 22,
     },
     paragraph: { marginTop: 0, marginBottom: 2 },
-    strong: { fontWeight: '700' as const },
+    strong: { fontFamily: FONTS.bold },
+    em: { fontFamily: FONTS.italic },
     link: { color: c.link, textDecorationLine: 'none' as const },
     heading1: { ...heading, fontSize: 22, lineHeight: 28 },
     heading2: { ...heading, fontSize: 18, lineHeight: 24 },

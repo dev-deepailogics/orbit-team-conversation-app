@@ -64,7 +64,15 @@ export const onSwatch = '#FFFFFF';
 export const priorityColors = { LOW: '#868686', MEDIUM: '#1D6FE0', HIGH: '#E8912D', URGENT: '#E01E5A' };
 export const swatches = ['#6B7280', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
-export const FONT = 'Lato';
+// One family per weight: RN's Android can only pick custom fonts by file name (regular/bold/italic), so
+// each static Rubik face is addressed by its own name on both platforms. Use these (or font-* classes), never fontWeight.
+export const FONTS = {
+  regular: 'Rubik-Regular',
+  medium: 'Rubik-Medium',
+  semibold: 'Rubik-SemiBold',
+  bold: 'Rubik-Bold',
+  italic: 'Rubik-Italic',
+} as const;
 export const MONO = 'Menlo';
 
 const kebab = (key: string) => key.replace(/[A-Z]/g, c => `-${c.toLowerCase()}`);

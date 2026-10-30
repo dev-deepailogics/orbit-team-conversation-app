@@ -10,7 +10,7 @@ import { YouScreen } from '@/features/profile/screens/YouScreen';
 import { HomeScreen } from '@/features/workspaces/screens/HomeScreen';
 import { useWorkspaceStore } from '@/features/workspaces/store';
 import { isDirect } from '@/features/workspaces/utils';
-import { FONT, useTheme } from '@/lib/theme';
+import { FONTS, useTheme } from '@/lib/theme';
 import type { TabParamList } from './types';
 
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -46,8 +46,8 @@ export function MainTabs() {
         tabBarActiveTintColor: colors.foreground,
         tabBarInactiveTintColor: colors.subtle,
         tabBarStyle: { backgroundColor: colors.background, borderTopColor: colors.border },
-        tabBarLabelStyle: { fontFamily: FONT, fontSize: 11, fontWeight: '700' },
-        tabBarBadgeStyle: { backgroundColor: colors.destructive, color: colors.destructiveForeground, fontFamily: FONT, fontSize: 11, fontWeight: '700' },
+        tabBarLabelStyle: { fontFamily: FONTS.semibold, fontSize: 11 },
+        tabBarBadgeStyle: { backgroundColor: colors.destructive, color: colors.destructiveForeground, fontFamily: FONTS.semibold, fontSize: 11 },
       }}
     >
       <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarIcon: icon(House) }} />

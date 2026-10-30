@@ -60,11 +60,11 @@
 	</array>
 	<key>UIAppFonts</key>
 	<array>
-		<string>fonts/Lato.ttf</string>
-		<string>fonts/Lato_bold.ttf</string>
-		<string>fonts/Lato_italic.ttf</string>
-		<string>fonts/Lato_bold_italic.ttf</string>
-		<string>fonts/Lato-Black.ttf</string>
+		<string>fonts/Rubik-Regular.ttf</string>
+		<string>fonts/Rubik-Medium.ttf</string>
+		<string>fonts/Rubik-SemiBold.ttf</string>
+		<string>fonts/Rubik-Bold.ttf</string>
+		<string>fonts/Rubik-Italic.ttf</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>

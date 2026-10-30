@@ -18,7 +18,7 @@ import { NewMessageScreen } from '@/features/dms/screens/NewMessageScreen';
 import { ProjectBoardScreen } from '@/features/projects/screens/ProjectBoardScreen';
 import { TicketDetailScreen } from '@/features/projects/screens/TicketDetailScreen';
 import { NotificationHost } from '@/features/notifications/components/NotificationHost';
-import { FONT, perScheme, useTheme } from '@/lib/theme';
+import { FONTS, perScheme, useTheme } from '@/lib/theme';
 import { useSettingsStore } from '@/features/settings/store';
 import { MainTabs } from '@/navigation/MainTabs';
 import { navigationRef } from '@/navigation/ref';
@@ -26,7 +26,7 @@ import type { RootStackParamList } from '@/navigation/types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-// Native headers and tab labels pick up the palette and Lato from here.
+// Native headers and tab labels pick up the palette and Rubik from here.
 const navTheme = perScheme<Theme>((c, scheme) => ({
   ...DefaultTheme,
   dark: scheme === 'dark',
@@ -39,10 +39,10 @@ const navTheme = perScheme<Theme>((c, scheme) => ({
     notification: c.destructive,
   },
   fonts: {
-    regular: { fontFamily: FONT, fontWeight: '400' },
-    medium: { fontFamily: FONT, fontWeight: '700' },
-    bold: { fontFamily: FONT, fontWeight: '700' },
-    heavy: { fontFamily: FONT, fontWeight: '900' },
+    regular: { fontFamily: FONTS.regular, fontWeight: 'normal' },
+    medium: { fontFamily: FONTS.medium, fontWeight: 'normal' },
+    bold: { fontFamily: FONTS.semibold, fontWeight: 'normal' },
+    heavy: { fontFamily: FONTS.bold, fontWeight: 'normal' },
   },
 }));
 

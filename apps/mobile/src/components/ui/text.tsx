@@ -32,7 +32,7 @@ const textVariants = cva(
         ),
         lead: 'text-muted-foreground text-lg',
         large: 'text-lg font-semibold',
-        small: 'text-sm font-bold',
+        small: 'text-sm font-semibold',
         muted: 'text-muted-foreground text-sm',
       },
     },

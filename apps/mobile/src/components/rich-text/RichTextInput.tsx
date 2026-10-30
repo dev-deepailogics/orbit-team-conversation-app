@@ -10,7 +10,7 @@ import {
 import { Text } from '@/components/ui/text';
 import { htmlToMarkdown } from '@/features/chat/htmlToMarkdown';
 import { markdownToHtml } from '@/lib/markdownToHtml';
-import { FONT, perScheme, useTheme } from '@/lib/theme';
+import { FONTS, perScheme, useTheme } from '@/lib/theme';
 import { FormatToolbar, type Format } from './FormatToolbar';
 import { LinkSheet } from './LinkSheet';
 
@@ -27,7 +27,7 @@ export const RICH_HTML_STYLE = perScheme<HtmlStyle>(c => ({
 }));
 
 // Shared by the composer and form editors.
-export const RICH_INPUT_TEXT = perScheme(c => ({ fontFamily: FONT, fontSize: 15, lineHeight: 22, color: c.foreground }));
+export const RICH_INPUT_TEXT = perScheme(c => ({ fontFamily: FONTS.regular, fontSize: 15, lineHeight: 22, color: c.foreground }));
 
 export interface RichTextInputHandle {
   // Reads on demand: getHTML per keystroke is slow, and forms only need the value on submit.
