@@ -10,6 +10,8 @@
     "test": "jest"
   },
   "dependencies": {
+    "@livekit/react-native": "^3.1.0",
+    "@livekit/react-native-webrtc": "^150.1.1",
     "@react-native-async-storage/async-storage": "^3.1.1",
     "@react-native-firebase/app": "^27.1.0",
     "@react-native-firebase/messaging": "^27.1.0",
@@ -22,6 +24,7 @@
     "axios": "^1.20.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "livekit-client": "^2.23.0",
     "lucide-react-native": "^1.64.0",
     "markdown-it": "^10.0.0",
     "nativewind": "^4.2.7",

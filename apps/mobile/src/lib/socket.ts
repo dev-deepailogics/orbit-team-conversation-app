@@ -26,6 +26,10 @@ export const EVENTS = {
   COLUMN_UPDATE: 'column:update',
   COLUMN_DELETE: 'column:delete',
   COLUMN_REORDER: 'column:reorder',
+  HUDDLE_STARTED: 'huddle:started',
+  HUDDLE_ENDED: 'huddle:ended',
+  HUDDLE_JOINED: 'huddle:joined',
+  HUDDLE_LEFT: 'huddle:left',
 } as const;
 
 let socket: Socket | null = null;

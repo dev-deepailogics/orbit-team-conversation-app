@@ -20,6 +20,8 @@ const light = {
   accentForeground: '#1A5DC2',
   destructive: '#E01E5A',
   destructiveForeground: '#FFFFFF',
+  success: '#007A5A',
+  successForeground: '#FFFFFF',
   codeBg: '#F8F8F8',
   overlay: '#000000',
 };
@@ -44,6 +46,8 @@ const dark: Palette = {
   accentForeground: '#8DC0F2',
   destructive: '#E5507A',
   destructiveForeground: '#1A1D21',
+  success: '#007A5A',
+  successForeground: '#FFFFFF',
   codeBg: '#222529',
   overlay: '#000000',
 };

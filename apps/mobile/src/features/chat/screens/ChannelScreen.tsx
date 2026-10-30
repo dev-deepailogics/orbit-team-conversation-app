@@ -2,12 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { UserPlus } from '@/components/icons';
+import { Headphones, Phone, UserPlus } from '@/components/icons';
 import type { Message } from '@orbit/types';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useAuthStore } from '@/features/auth/store';
+import { useCallStore } from '@/features/calls/store';
 import { markChannelRead } from '@/features/workspaces/services/workspaceApi';
 import { useWorkspaceStore } from '@/features/workspaces/store';
 import { channelLabel, channelPrefix, isDirect } from '@/features/workspaces/utils';
@@ -42,6 +43,9 @@ export function ChannelScreen({ route, navigation }: ScreenProps<'Channel'>) {
   const setReactions = useChatStore(s => s.setReactions);
   const [actionTarget, setActionTarget] = useState<Message | null>(null);
   const [showAddPeople, setShowAddPeople] = useState(false);
+  const callLive = useCallStore(s => !!s.live[channelId]);
+  const joiningCall = useCallStore(s => s.joining);
+  const joinCall = useCallStore(s => s.join);
 
   useEffect(() => {
     openChannel(channelId);
@@ -122,11 +126,27 @@ export function ChannelScreen({ route, navigation }: ScreenProps<'Channel'>) {
         subtitle={direct ? undefined : memberCount === 1 ? '1 member' : `${memberCount} members`}
         onBack={navigation.goBack}
         right={
-          !direct && (
-            <Button variant="ghost" size="icon" onPress={() => setShowAddPeople(true)} accessibilityLabel="Add people">
-              <UserPlus size={21} color={colors.foreground} />
+          <>
+            {!direct && (
+              <Button variant="ghost" size="icon" onPress={() => setShowAddPeople(true)} accessibilityLabel="Add people">
+                <UserPlus size={21} color={colors.foreground} />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className={callLive ? 'bg-success active:bg-success/90' : undefined}
+              disabled={joiningCall}
+              onPress={() => joinCall(channel)}
+              accessibilityLabel={callLive ? 'Join call' : 'Start call'}
+            >
+              {callLive ? (
+                <Headphones size={20} color={colors.successForeground} />
+              ) : (
+                <Phone size={20} color={colors.foreground} />
+              )}
             </Button>
-          )
+          </>
         }
       />
       {/* Android runs edge-to-edge (gradle.properties), where adjustResize no longer resizes the window. */}

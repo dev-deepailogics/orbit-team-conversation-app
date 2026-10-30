@@ -18,6 +18,7 @@ import { NewMessageScreen } from '@/features/dms/screens/NewMessageScreen';
 import { ProjectBoardScreen } from '@/features/projects/screens/ProjectBoardScreen';
 import { TicketDetailScreen } from '@/features/projects/screens/TicketDetailScreen';
 import { NotificationHost } from '@/features/notifications/components/NotificationHost';
+import { CallHost } from '@/features/calls/components/CallHost';
 import { FONTS, perScheme, useTheme } from '@/lib/theme';
 import { useSettingsStore } from '@/features/settings/store';
 import { MainTabs } from '@/navigation/MainTabs';
@@ -150,6 +151,7 @@ function App() {
         <NavigationContainer ref={navigationRef} theme={navTheme[scheme]}>
           <RootNavigator />
           <NotificationHost />
+          <CallHost />
         </NavigationContainer>
       </View>
     </SafeAreaProvider>

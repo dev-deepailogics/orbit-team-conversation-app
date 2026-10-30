@@ -5,6 +5,8 @@ import { useWorkspaceStore } from '@/features/workspaces/store';
 import { connectSocket, disconnectSocket, EVENTS } from '@/lib/socket';
 import { markChannelRead } from '@/features/workspaces/services/workspaceApi';
 import { useProjectStore } from '@/features/projects/store';
+import { useCallStore } from '@/features/calls/store';
+import type { IncomingCall } from '@/features/calls/types';
 import { useChatStore } from '../store';
 import { isMine } from '../utils';
 
@@ -85,6 +87,17 @@ export function useRealtime() {
     socket.on(EVENTS.TICKET_MOVE, (p: { ticket: Ticket; toColumnId: string; orderIndex: number }) =>
       proj().moveTicket(p.ticket, p.toColumnId, p.orderIndex),
     );
+
+    const calls = useCallStore.getState;
+    socket.on(EVENTS.HUDDLE_STARTED, (c: IncomingCall) => {
+      calls().setLive(c.channelId, true);
+      if (c.hostUserId !== myId) calls().ring(c);
+    });
+    socket.on(EVENTS.HUDDLE_JOINED, (p: { channelId: string }) => calls().setLive(p.channelId, true));
+    socket.on(EVENTS.HUDDLE_ENDED, (p: { channelId: string }) => {
+      calls().setLive(p.channelId, false);
+      if (calls().incoming?.channelId === p.channelId) calls().dismiss();
+    });
 
     return () => {
       typingTimers.forEach(clearTimeout);

@@ -1,3 +1,7 @@
+# LiveKitWebRTC (calls) is published to livekit/podspecs; keep trunk for every other pod.
+source 'https://github.com/livekit/podspecs.git'
+source 'https://cdn.cocoapods.org/'
+
 # Resolve react_native_pods.rb with node to allow for hoisting
 require Pod::Executable.execute_command('node', ['-p',
   'require.resolve(

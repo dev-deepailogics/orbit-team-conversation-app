@@ -33,6 +33,10 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Orbit uses your camera when you turn on video in a call.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Orbit uses your microphone so others can hear you in calls.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
 	<key>RCTNewArchEnabled</key>
@@ -57,7 +61,14 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
+		<string>audio</string>
+		<string>voip</string>
 	</array>
+	<!-- Screen sharing: read by @livekit/react-native-webrtc; must match the OrbitScreenShare extension. -->
+	<key>RTCAppGroupIdentifier</key>
+	<string>group.org.reactjs.native.example.OrbitMobile</string>
+	<key>RTCScreenSharingExtension</key>
+	<string>org.reactjs.native.example.OrbitMobile.ScreenShare</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>fonts/Rubik-Regular.ttf</string>
