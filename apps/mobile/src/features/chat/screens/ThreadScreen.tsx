@@ -13,9 +13,10 @@ import { getErrorMessage } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import type { ScreenProps } from '@/navigation/types';
 import { Composer } from '../components/Composer';
+import { ImageViewer, type Gallery } from '../components/ImageViewer';
 import { MessageActionsSheet } from '../components/MessageActionsSheet';
 import { MessageItem } from '../components/MessageItem';
-import { sendReply, toggleReaction } from '../services/chatApi';
+import { sendReply, toggleReaction, type StagedAttachment } from '../services/chatApi';
 import { useChatStore } from '../store';
 
 // Pushed on top of ChannelScreen, which stays mounted and keeps the channel room (where replies arrive) joined.
@@ -30,15 +31,16 @@ export function ThreadScreen({ route, navigation }: ScreenProps<'Thread'>) {
   const receiveMessage = useChatStore(s => s.receiveMessage);
   const setReactions = useChatStore(s => s.setReactions);
   const [actionTarget, setActionTarget] = useState<Message | null>(null);
+  const [gallery, setGallery] = useState<Gallery | null>(null);
 
   useEffect(() => {
     openThread(messageId);
     return () => closeThread(messageId);
   }, [messageId, openThread, closeThread]);
 
-  const handleSend = async (text: string) => {
+  const handleSend = async (text: string, attachments: StagedAttachment[]) => {
     try {
-      receiveMessage(await sendReply(messageId, text));
+      receiveMessage(await sendReply(messageId, text, attachments));
       return true;
     } catch (err) {
       Alert.alert('Reply not sent', getErrorMessage(err, 'Please try again.'));
@@ -90,9 +92,11 @@ export function ThreadScreen({ route, navigation }: ScreenProps<'Thread'>) {
                 myId={myId}
                 onLongPress={setActionTarget}
                 onToggleReaction={handleReaction}
+                onOpenImages={setGallery}
               />
             )}
-            maintainVisibleContentPosition={{ startRenderingFromBottom: true, autoscrollToBottomThreshold: 0.2 }}
+            // Slack's thread view: parent pinned to the top, replies flowing beneath it; new replies still follow you down.
+            maintainVisibleContentPosition={{ autoscrollToBottomThreshold: 0.2 }}
             keyboardShouldPersistTaps="handled"
             ListHeaderComponent={
               <View className="pt-2">
@@ -102,6 +106,7 @@ export function ThreadScreen({ route, navigation }: ScreenProps<'Thread'>) {
                   myId={myId}
                   onLongPress={setActionTarget}
                   onToggleReaction={handleReaction}
+                  onOpenImages={setGallery}
                 />
                 <View className="my-3 flex-row items-center gap-3 px-4">
                   <Text className="text-sm font-bold text-muted-foreground">
@@ -115,9 +120,10 @@ export function ThreadScreen({ route, navigation }: ScreenProps<'Thread'>) {
             }
           />
         )}
-        <Composer placeholder="Reply…" onSend={handleSend} />
+        <Composer channelId={channelId} placeholder="Reply…" onSend={handleSend} />
       </KeyboardAvoidingView>
 
+      <ImageViewer gallery={gallery} onClose={() => setGallery(null)} />
       <MessageActionsSheet message={actionTarget} onClose={() => setActionTarget(null)} onReact={handleReaction} />
     </SafeAreaView>
   );

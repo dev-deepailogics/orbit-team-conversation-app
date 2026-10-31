@@ -37,6 +37,8 @@
 	<string>Orbit uses your camera when you turn on video in a call.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Orbit uses your microphone so others can hear you in calls.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Orbit lets you attach photos and videos to messages.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
 	<key>RCTNewArchEnabled</key>

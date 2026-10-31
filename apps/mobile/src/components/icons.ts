@@ -12,13 +12,16 @@ export { default as ChevronRight } from 'lucide-react-native/icons/chevron-right
 export { default as ChevronUp } from 'lucide-react-native/icons/chevron-up';
 export { default as CircleUser } from 'lucide-react-native/icons/circle-user';
 export { default as Code } from 'lucide-react-native/icons/code';
+export { default as Download } from 'lucide-react-native/icons/download';
 export { default as Ellipsis } from 'lucide-react-native/icons/ellipsis';
 export { default as Eye } from 'lucide-react-native/icons/eye';
+export { default as FolderOpen } from 'lucide-react-native/icons/folder-open';
 export { default as Hash } from 'lucide-react-native/icons/hash';
 export { default as Heading1 } from 'lucide-react-native/icons/heading-1';
 export { default as Heading2 } from 'lucide-react-native/icons/heading-2';
 export { default as Headphones } from 'lucide-react-native/icons/headphones';
 export { default as House } from 'lucide-react-native/icons/house';
+export { default as Images } from 'lucide-react-native/icons/images';
 export { default as Italic } from 'lucide-react-native/icons/italic';
 export { default as Link } from 'lucide-react-native/icons/link';
 export { default as List } from 'lucide-react-native/icons/list';

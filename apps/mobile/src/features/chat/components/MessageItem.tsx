@@ -1,12 +1,24 @@
 import { memo } from 'react';
-import { Pressable, View } from 'react-native';
+import { Image, Linking, Pressable, View } from 'react-native';
 import { ChevronRight, Paperclip } from '@/components/icons';
 import type { Message } from '@orbit/types';
 import { Avatar } from '@/components/Avatar';
 import { Text } from '@/components/ui/text';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
-import { formatDay, formatTime, groupReactions, isNewDay, senderEmoji, senderName, showHeader } from '../utils';
+import {
+  fileUrl,
+  formatBytes,
+  formatDay,
+  formatTime,
+  groupReactions,
+  isImage,
+  isNewDay,
+  senderEmoji,
+  senderName,
+  showHeader,
+} from '../utils';
+import type { Gallery } from './ImageViewer';
 import { MarkdownText } from './MarkdownText';
 
 interface Props {
@@ -15,6 +27,7 @@ interface Props {
   myId: string | undefined;
   onLongPress: (m: Message) => void;
   onToggleReaction: (m: Message, emoji: string) => void;
+  onOpenImages: (gallery: Gallery) => void;
   // Omitted inside a thread, where replies don't have their own threads.
   onOpenThread?: (m: Message) => void;
 }
@@ -25,13 +38,16 @@ export const MessageItem = memo(function MessageItemView({
   myId,
   onLongPress,
   onToggleReaction,
+  onOpenImages,
   onOpenThread,
 }: Props) {
   const { colors } = useTheme();
   const header = showHeader(prev, m);
   const reactions = groupReactions(m.reactions, myId);
   const name = senderName(m);
-  const files = (m.attachments ?? []).filter(a => !a.isDeleted);
+  const attachments = (m.attachments ?? []).filter(a => !a.isDeleted);
+  const images = attachments.filter(a => isImage(a.fileType));
+  const files = attachments.filter(a => !isImage(a.fileType));
 
   return (
     <View>
@@ -72,15 +88,42 @@ export const MessageItem = memo(function MessageItemView({
             )
           )}
 
-          {/* ponytail: names only; previews/downloads come with attachments in Phase 2. */}
+          {!m.isDeleted && images.length > 0 && (
+            <View className="mt-1.5 flex-row flex-wrap gap-1.5">
+              {images.map((img, i) => (
+                <Pressable
+                  key={img.id}
+                  onPress={() => onOpenImages({ images, index: i })}
+                  className="overflow-hidden rounded-lg border border-border bg-muted"
+                  accessibilityRole="imagebutton"
+                  accessibilityLabel={`Open ${img.fileName}`}
+                >
+                  <Image
+                    source={{ uri: fileUrl(img) }}
+                    className={images.length === 1 ? 'h-48 w-64' : 'h-28 w-28'}
+                    resizeMode="cover"
+                  />
+                </Pressable>
+              ))}
+            </View>
+          )}
+
+          {/* Non-image files open in the browser, which previews PDFs/video and downloads the rest. */}
           {!m.isDeleted &&
             files.map(f => (
-              <View key={f.id} className="mt-1.5 flex-row items-center gap-2 self-start rounded-lg border border-border px-3 py-2">
+              <Pressable
+                key={f.id}
+                onPress={() => Linking.openURL(fileUrl(f))}
+                className="mt-1.5 flex-row items-center gap-2 self-start rounded-lg border border-border px-3 py-2 active:bg-muted"
+                accessibilityRole="link"
+                accessibilityLabel={`Open ${f.fileName}`}
+              >
                 <Paperclip size={14} color={colors.mutedForeground} />
                 <Text className="shrink text-sm font-bold" numberOfLines={1}>
                   {f.fileName}
                 </Text>
-              </View>
+                <Text className="text-xs text-muted-foreground">{formatBytes(f.fileSize)}</Text>
+              </Pressable>
             ))}
 
           {reactions.length > 0 && (

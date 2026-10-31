@@ -11,13 +11,15 @@ interface Props {
   children: ReactNode;
   // Tall form sheets (long forms with a keyboard) get most of the screen instead of hugging their content.
   fullHeight?: boolean;
+  // iOS only: fires once the sheet is fully gone. Native pickers can't be presented while it's still animating out.
+  onDismiss?: () => void;
 }
 
 // Slack-style bottom sheet built on RN's Modal (Android back button → onRequestClose).
-export function Sheet({ visible, title, onClose, children, fullHeight }: Props) {
+export function Sheet({ visible, title, onClose, children, fullHeight, onDismiss }: Props) {
   const insets = useSafeAreaInsets();
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} onDismiss={onDismiss} statusBarTranslucent>
       <KeyboardAvoidingView className="flex-1 justify-end" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Pressable className="absolute inset-0 bg-overlay/40" onPress={onClose} accessibilityLabel="Close" />
         <View

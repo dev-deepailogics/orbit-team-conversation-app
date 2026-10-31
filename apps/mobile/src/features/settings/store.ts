@@ -12,12 +12,16 @@ export const THEME_OPTIONS: { value: ThemePreference; label: string; hint: strin
 
 // A display preference, not a secret, so AsyncStorage (not the Keychain) is the right home.
 const STORAGE_KEY = 'orbit_theme';
+const COMPRESS_KEY = 'orbit_compress_uploads';
 
 export const isThemePreference = (v: unknown): v is ThemePreference => v === 'system' || v === 'light' || v === 'dark';
 
 interface SettingsState {
   theme: ThemePreference;
   setTheme: (theme: ThemePreference) => void;
+  // Shrink photos when attaching them. On by default, like Slack.
+  compressUploads: boolean;
+  setCompressUploads: (on: boolean) => void;
   // Applies the saved choice on launch; until it resolves the app follows the system scheme.
   hydrate: () => Promise<void>;
 }
@@ -32,8 +36,17 @@ export const useSettingsStore = create<SettingsState>(set => ({
     AsyncStorage.setItem(STORAGE_KEY, theme).catch(() => {});
   },
 
+  compressUploads: true,
+
+  setCompressUploads: on => {
+    set({ compressUploads: on });
+    AsyncStorage.setItem(COMPRESS_KEY, on ? '1' : '0').catch(() => {});
+  },
+
   hydrate: async () => {
-    const saved = await AsyncStorage.getItem(STORAGE_KEY).catch(() => null);
+    const stored = await AsyncStorage.getMany([STORAGE_KEY, COMPRESS_KEY]).catch(() => ({}) as Record<string, string | null>);
+    const saved = stored[STORAGE_KEY];
+    if (stored[COMPRESS_KEY]) set({ compressUploads: stored[COMPRESS_KEY] === '1' });
     if (!isThemePreference(saved) || saved === 'system') return;
     colorScheme.set(saved);
     set({ theme: saved });

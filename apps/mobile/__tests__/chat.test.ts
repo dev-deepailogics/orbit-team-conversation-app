@@ -1,6 +1,6 @@
 import type { Channel, Message } from '@orbit/types';
 import { useChatStore } from '../src/features/chat/store';
-import { groupReactions, showHeader, typingLabel } from '../src/features/chat/utils';
+import { formatBytes, groupReactions, isImage, messagePermissions, showHeader, typingLabel } from '../src/features/chat/utils';
 import { channelLabel, parseInviteCode, splitChannels } from '../src/features/workspaces/utils';
 
 const msg = (over: Partial<Message>) =>
@@ -75,4 +75,21 @@ describe('chat store', () => {
     expect(s.messages[0].replyCount).toBe(1);
     expect(s.thread.parent?.replyCount).toBe(1);
   });
+});
+
+test('attachments: SVGs are files, not slideshow images; sizes read like Slack', () => {
+  expect(isImage('image/jpeg')).toBe(true);
+  expect(isImage('image/svg+xml')).toBe(false);
+  expect(isImage('application/pdf')).toBe(false);
+  expect(formatBytes(512)).toBe('512 B');
+  expect(formatBytes(2048)).toBe('2 KB');
+  expect(formatBytes(5.5 * 1024 * 1024)).toBe('5.5 MB');
+});
+
+test('only authors edit; authors and workspace admins delete; nothing once deleted', () => {
+  const mine = msg({ userId: 'me' });
+  expect(messagePermissions(mine, 'me', false)).toEqual({ canEdit: true, canDelete: true });
+  expect(messagePermissions(msg({ userId: 'u2' }), 'me', false)).toEqual({ canEdit: false, canDelete: false });
+  expect(messagePermissions(msg({ userId: 'u2' }), 'me', true)).toEqual({ canEdit: false, canDelete: true });
+  expect(messagePermissions(msg({ userId: 'me', isDeleted: true }), 'me', true)).toEqual({ canEdit: false, canDelete: false });
 });

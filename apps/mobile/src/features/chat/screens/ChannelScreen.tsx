@@ -18,9 +18,10 @@ import { EVENTS, getSocket } from '@/lib/socket';
 import type { ScreenProps } from '@/navigation/types';
 import { AddChannelMembersSheet } from '@/features/workspaces/components/AddChannelMembersSheet';
 import { Composer } from '../components/Composer';
+import { ImageViewer, type Gallery } from '../components/ImageViewer';
 import { MessageActionsSheet } from '../components/MessageActionsSheet';
 import { MessageItem } from '../components/MessageItem';
-import { sendMessage, toggleReaction } from '../services/chatApi';
+import { sendMessage, toggleReaction, type StagedAttachment } from '../services/chatApi';
 import { useChatStore } from '../store';
 import { typingLabel } from '../utils';
 
@@ -42,6 +43,7 @@ export function ChannelScreen({ route, navigation }: ScreenProps<'Channel'>) {
   const receiveMessage = useChatStore(s => s.receiveMessage);
   const setReactions = useChatStore(s => s.setReactions);
   const [actionTarget, setActionTarget] = useState<Message | null>(null);
+  const [gallery, setGallery] = useState<Gallery | null>(null);
   const [showAddPeople, setShowAddPeople] = useState(false);
   const callLive = useCallStore(s => !!s.live[channelId]);
   const joiningCall = useCallStore(s => s.joining);
@@ -72,9 +74,9 @@ export function ChannelScreen({ route, navigation }: ScreenProps<'Channel'>) {
     }
   }, [channel, navigation]);
 
-  const handleSend = async (text: string) => {
+  const handleSend = async (text: string, attachments: StagedAttachment[]) => {
     try {
-      receiveMessage(await sendMessage(channelId, text));
+      receiveMessage(await sendMessage(channelId, text, attachments));
       return true;
     } catch (err) {
       Alert.alert('Message not sent', getErrorMessage(err, 'Please try again.'));
@@ -173,6 +175,7 @@ export function ChannelScreen({ route, navigation }: ScreenProps<'Channel'>) {
                 myId={me?.id}
                 onLongPress={setActionTarget}
                 onToggleReaction={handleReaction}
+                onOpenImages={setGallery}
                 onOpenThread={openThread}
               />
             )}
@@ -198,12 +201,13 @@ export function ChannelScreen({ route, navigation }: ScreenProps<'Channel'>) {
         <Text className="h-5 px-4 text-xs text-muted-foreground" numberOfLines={1}>
           {typingText}
         </Text>
-        <Composer placeholder={direct ? `Message ${label}` : `Message ${channelPrefix(channel)}${label}`} onSend={handleSend} onTyping={handleTyping} />
+        <Composer channelId={channelId} placeholder={direct ? `Message ${label}` : `Message ${channelPrefix(channel)}${label}`} onSend={handleSend} onTyping={handleTyping} />
       </KeyboardAvoidingView>
 
       {!direct && (
         <AddChannelMembersSheet visible={showAddPeople} channel={channel} onClose={() => setShowAddPeople(false)} />
       )}
+      <ImageViewer gallery={gallery} onClose={() => setGallery(null)} />
       <MessageActionsSheet
         message={actionTarget}
         onClose={() => setActionTarget(null)}

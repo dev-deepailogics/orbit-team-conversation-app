@@ -1,7 +1,14 @@
-import type { Message, Reaction } from '@orbit/types';
+import type { Attachment, Message, Reaction } from '@orbit/types';
+import { SERVER_URL } from '@/lib/config';
 
 // Socket payloads for normal channels don't carry isSelf, so fall back to comparing ids.
 export const isMine = (m: Message, myId: string | undefined) => !!m.isSelf || (!!myId && m.userId === myId);
+
+// Mirrors apps/server/src/routes/messages.ts: only authors edit; authors and workspace admins delete.
+export function messagePermissions(m: Message, myId: string | undefined, isAdmin: boolean) {
+  const mine = !m.bot && !m.isDeleted && isMine(m, myId);
+  return { canEdit: mine, canDelete: !m.isDeleted && (mine || isAdmin) };
+}
 
 export function senderName(m: Message): string {
   if (m.isAnonymous && !m.bot) return m.anonName || m.user?.displayName || 'Anonymous Member';
@@ -66,4 +73,16 @@ export function typingLabel(names: string[]): string {
   if (names.length === 1) return `${names[0]} is typing…`;
   if (names.length === 2) return `${names[0]} and ${names[1]} are typing…`;
   return 'Several people are typing…';
+}
+
+// SVGs can't be drawn by <Image>, so they're treated as plain files.
+export const isImage = (type: string) => type.startsWith('image/') && !type.includes('svg');
+
+// Downloads are public GETs (see apps/server/src/routes/files.ts).
+export const fileUrl = (a: Pick<Attachment, 'fileUrl'>) => SERVER_URL + a.fileUrl;
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
