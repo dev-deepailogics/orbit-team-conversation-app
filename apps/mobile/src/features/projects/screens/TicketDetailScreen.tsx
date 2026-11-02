@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Check, ChevronDown, Eye, Pencil, SendHorizontal, Trash2, X } from '@/components/icons';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -155,7 +155,7 @@ export function TicketDetailScreen({ route, navigation }: ScreenProps<'TicketDet
         }
       />
 
-      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView className="flex-1" behavior="padding">
         <ScrollView contentContainerClassName="gap-6 px-4 py-5" keyboardShouldPersistTaps="handled">
           <Text className="text-2xl font-black">{ticket.title}</Text>
 

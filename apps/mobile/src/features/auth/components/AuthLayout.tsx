@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/text';
 
@@ -14,7 +14,7 @@ interface Props {
 export function AuthLayout({ title, subtitle, error, children }: Props) {
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView className="flex-1" behavior="padding">
         <ScrollView
           contentContainerClassName="flex-grow justify-center p-6"
           keyboardShouldPersistTaps="handled"
