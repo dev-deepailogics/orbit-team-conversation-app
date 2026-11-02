@@ -8,7 +8,8 @@ COPY packages/types/package.json ./packages/types/
 COPY packages/db/package.json ./packages/db/
 COPY apps/web/package.json ./apps/web/
 
-RUN npm install
+# --include=dev: build tools are devDependencies; a NODE_ENV=production build arg would skip them
+RUN npm install --include=dev
 
 # Copy source files
 COPY packages/types ./packages/types
