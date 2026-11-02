@@ -19,6 +19,7 @@ services:
       - traefik.http.routers.orbit-web.tls=true
       - traefik.http.routers.orbit-web.tls.certresolver=letsencrypt
       - traefik.http.routers.orbit-web.priority=1
+      - traefik.http.routers.orbit-web.service=orbit-web
       - traefik.http.services.orbit-web.loadbalancer.server.port=3000
 
   server:
@@ -34,6 +35,7 @@ services:
       - traefik.http.routers.orbit-api.tls=true
       - traefik.http.routers.orbit-api.tls.certresolver=letsencrypt
       - traefik.http.routers.orbit-api.priority=10
+      - traefik.http.routers.orbit-api.service=orbit-api
       - traefik.http.services.orbit-api.loadbalancer.server.port=4000
     environment:
       NODE_ENV: production
@@ -106,6 +108,7 @@ services:
       - traefik.http.routers.orbit-livekit.tls=true
       - traefik.http.routers.orbit-livekit.tls.certresolver=letsencrypt
       - traefik.http.routers.orbit-livekit.priority=10
+      - traefik.http.routers.orbit-livekit.service=orbit-livekit
       - traefik.http.middlewares.orbit-livekit-strip.stripprefix.prefixes=/livekit
       - traefik.http.routers.orbit-livekit.middlewares=orbit-livekit-strip
       - traefik.http.services.orbit-livekit.loadbalancer.server.port=7880
