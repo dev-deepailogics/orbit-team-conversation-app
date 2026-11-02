@@ -33,7 +33,6 @@ orbit-beta/
 │   ├── db/                # Prisma ORM, PostgreSQL schema & seeders
 │   └── types/             # Shared TypeScript models and socket event contracts
 ├── docker/
-│   ├── Caddyfile          # Production reverse proxy with automatic SSL
 │   └── livekit.yaml       # LiveKit SFU configuration
 ├── docker-compose.yml     # Local development infrastructure
 ├── docker-compose.prod.yml# VPS production deployment
@@ -115,30 +114,35 @@ curl -X POST "http://localhost:4000/api/bot/webhooks/YOUR_WEBHOOK_TOKEN" \
 
 ---
 
-## 🌐 Deploying to your VPS (Production)
+## 🌐 Deploying to your VPS with Coolify
 
 ### 1. Configure DNS
 Point your domain (e.g. `orbit.yourdomain.com`) to your VPS public IP address in your DNS manager (A record).
 
-### 2. Configure Environment
-On your VPS:
+### 2. Install Coolify (if not already)
 ```bash
-git clone <your-repo-url>
-cd orbit-beta
-cp .env.example .env
+curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
 ```
-Edit `.env` to set your domain and production secrets:
+Open `http://<vps-ip>:8000` to finish setup.
+
+### 3. Create the resource
+In Coolify: **New Resource → Docker Compose**, pointing at this repo/branch with compose file `docker-compose.prod.yml`. Routing (TLS + path-based proxying to `web`/`server`/`livekit`) is handled by Coolify's built-in Traefik via the `traefik.*` labels already on those services — no separate reverse proxy container is needed.
+
+### 4. Set environment variables
+In the resource's Environment Variables tab, set at minimum:
 ```env
 DOMAIN=orbit.yourdomain.com
+POSTGRES_PASSWORD=generate_a_secure_random_string_here
+REDIS_PASSWORD=generate_a_secure_random_string_here
 JWT_SECRET=generate_a_secure_random_string_here
 LIVEKIT_API_SECRET=generate_another_secure_random_string_here
 ```
+(see `.env.example` for the full list). Don't ship the defaults baked into `docker-compose.prod.yml` — they're dev fallbacks only.
 
-### 3. Run Production Containers
-```bash
-docker compose -f docker-compose.prod.yml up -d --build
-```
-Caddy will automatically provision and renew a free Let's Encrypt SSL certificate for your domain.
+### 5. Deploy
+Click **Deploy**. Coolify builds the `web`/`server` images and brings up `postgres`, `redis`, and `livekit`, then provisions a Let's Encrypt certificate for `DOMAIN` automatically.
+
+LiveKit's media ports (`7881/tcp`, `40000-40050/udp`) are published directly on the host since they're not HTTP — open them in your Contabo firewall alongside 80/443.
 
 ---
 

@@ -1,22 +1,4 @@
 services:
-  caddy:
-    image: caddy:2-alpine
-    container_name: orbit-caddy
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    environment:
-      DOMAIN: ${DOMAIN:-localhost}
-    volumes:
-      - ./docker/Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - web
-      - server
-
   web:
     build:
       context: .
@@ -24,10 +6,18 @@ services:
     container_name: orbit-web
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_SERVER_URL: https://${DOMAIN:-localhost}
-      NEXT_PUBLIC_LIVEKIT_URL: wss://${DOMAIN:-localhost}/livekit
+      NEXT_PUBLIC_SERVER_URL: https://${DOMAIN:?DOMAIN is required}
+      NEXT_PUBLIC_LIVEKIT_URL: wss://${DOMAIN:?DOMAIN is required}/livekit
     depends_on:
       - server
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.orbit-web.rule=Host(`${DOMAIN:?DOMAIN is required}`)
+      - traefik.http.routers.orbit-web.entrypoints=https
+      - traefik.http.routers.orbit-web.tls=true
+      - traefik.http.routers.orbit-web.tls.certresolver=letsencrypt
+      - traefik.http.routers.orbit-web.priority=1
+      - traefik.http.services.orbit-web.loadbalancer.server.port=3000
 
   server:
     build:
@@ -35,6 +25,14 @@ services:
       dockerfile: apps/server/Dockerfile
     container_name: orbit-server
     restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.orbit-api.rule=Host(`${DOMAIN:?DOMAIN is required}`) && (PathPrefix(`/api`) || PathPrefix(`/socket.io`))
+      - traefik.http.routers.orbit-api.entrypoints=https
+      - traefik.http.routers.orbit-api.tls=true
+      - traefik.http.routers.orbit-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.orbit-api.priority=10
+      - traefik.http.services.orbit-api.loadbalancer.server.port=4000
     environment:
       NODE_ENV: production
       PORT: 4000
@@ -91,14 +89,21 @@ services:
     volumes:
       - ./docker/livekit.yaml:/etc/livekit.yaml:ro
     ports:
-      - "7880:7880"
       - "7881:7881"
       - "40000-40050:40000-40050/udp"
     depends_on:
       - redis
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.orbit-livekit.rule=Host(`${DOMAIN:?DOMAIN is required}`) && PathPrefix(`/livekit`)
+      - traefik.http.routers.orbit-livekit.entrypoints=https
+      - traefik.http.routers.orbit-livekit.tls=true
+      - traefik.http.routers.orbit-livekit.tls.certresolver=letsencrypt
+      - traefik.http.routers.orbit-livekit.priority=10
+      - traefik.http.middlewares.orbit-livekit-strip.stripprefix.prefixes=/livekit
+      - traefik.http.routers.orbit-livekit.middlewares=orbit-livekit-strip
+      - traefik.http.services.orbit-livekit.loadbalancer.server.port=7880
 
 volumes:
   postgres_data:
   redis_data:
-  caddy_data:
-  caddy_config:
