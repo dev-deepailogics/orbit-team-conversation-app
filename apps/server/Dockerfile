@@ -29,4 +29,5 @@ ENV NODE_ENV=production
 COPY --from=builder /app ./
 
 EXPOSE 4000
-CMD ["npm", "run", "start", "--workspace=@orbit/server"]
+# Sync schema on boot; prisma refuses data-losing changes, so a destructive schema edit stops startup instead of dropping data
+CMD ["sh", "-c", "npm run push --workspace=@orbit/db && npm run start --workspace=@orbit/server"]
