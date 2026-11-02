@@ -16,6 +16,8 @@ COPY apps/web ./apps/web
 
 # Next.js inlines NEXT_PUBLIC_* into the client bundle at build time
 ARG NEXT_PUBLIC_SERVER_URL
+# next build breaks (prerender useContext null) if NODE_ENV=development leaks in as a build arg
+ENV NODE_ENV=production
 
 # Build packages
 RUN npm run build --workspace=@orbit/types
