@@ -14,6 +14,9 @@ RUN npm install
 COPY packages/types ./packages/types
 COPY apps/web ./apps/web
 
+# Next.js inlines NEXT_PUBLIC_* into the client bundle at build time
+ARG NEXT_PUBLIC_SERVER_URL
+
 # Build packages
 RUN npm run build --workspace=@orbit/types
 RUN npm run build --workspace=@orbit/web
