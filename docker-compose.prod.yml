@@ -4,17 +4,17 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        NEXT_PUBLIC_SERVER_URL: https://${DOMAIN:?DOMAIN is required}
+        NEXT_PUBLIC_SERVER_URL: https://${DOMAIN}
     container_name: orbit-web
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_SERVER_URL: https://${DOMAIN:?DOMAIN is required}
-      NEXT_PUBLIC_LIVEKIT_URL: wss://${DOMAIN:?DOMAIN is required}/livekit
+      NEXT_PUBLIC_SERVER_URL: https://${DOMAIN}
+      NEXT_PUBLIC_LIVEKIT_URL: wss://${DOMAIN}/livekit
     depends_on:
       - server
     labels:
       - traefik.enable=true
-      - traefik.http.routers.orbit-web.rule=Host(`${DOMAIN:?DOMAIN is required}`)
+      - traefik.http.routers.orbit-web.rule=Host(`orbit.wondercraftz.com`)
       - traefik.http.routers.orbit-web.entrypoints=https
       - traefik.http.routers.orbit-web.tls=true
       - traefik.http.routers.orbit-web.tls.certresolver=letsencrypt
@@ -29,7 +29,7 @@ services:
     restart: unless-stopped
     labels:
       - traefik.enable=true
-      - traefik.http.routers.orbit-api.rule=Host(`${DOMAIN:?DOMAIN is required}`) && (PathPrefix(`/api`) || PathPrefix(`/socket.io`))
+      - traefik.http.routers.orbit-api.rule=Host(`orbit.wondercraftz.com`) && (PathPrefix(`/api`) || PathPrefix(`/socket.io`))
       - traefik.http.routers.orbit-api.entrypoints=https
       - traefik.http.routers.orbit-api.tls=true
       - traefik.http.routers.orbit-api.tls.certresolver=letsencrypt
@@ -44,8 +44,8 @@ services:
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-API_KEY_ORBIT}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-orbit_livekit_secret_key_change_in_production}
       LIVEKIT_URL: http://livekit:7880
-      NEXT_PUBLIC_LIVEKIT_URL: wss://${DOMAIN:?DOMAIN is required}/livekit
-      CLIENT_URL: https://${DOMAIN:?DOMAIN is required}
+      NEXT_PUBLIC_LIVEKIT_URL: wss://${DOMAIN}/livekit
+      CLIENT_URL: https://${DOMAIN}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@example.com}
@@ -89,9 +89,11 @@ services:
     image: livekit/livekit-server:latest
     container_name: orbit-livekit
     restart: unless-stopped
-    command: --config /etc/livekit.yaml
-    volumes:
-      - ./docker/livekit.yaml:/etc/livekit.yaml:ro
+    # Inline config: Coolify doesn't copy repo files for bind mounts (they appear as empty dirs).
+    # Redis password and key/secret must match REDIS_PASSWORD / LIVEKIT_API_KEY / LIVEKIT_API_SECRET.
+    command:
+      - --config-body
+      - '{port: 7880, rtc: {tcp_port: 7881, port_range_start: 40000, port_range_end: 40050, use_external_ip: true}, redis: {address: "redis:6379", password: orbit_redis_password}, keys: {API_KEY_ORBIT: orbit_livekit_secret_key_change_in_production}, logging: {level: info}}'
     ports:
       - "7881:7881"
       - "40000-40050:40000-40050/udp"
@@ -99,7 +101,7 @@ services:
       - redis
     labels:
       - traefik.enable=true
-      - traefik.http.routers.orbit-livekit.rule=Host(`${DOMAIN:?DOMAIN is required}`) && PathPrefix(`/livekit`)
+      - traefik.http.routers.orbit-livekit.rule=Host(`orbit.wondercraftz.com`) && PathPrefix(`/livekit`)
       - traefik.http.routers.orbit-livekit.entrypoints=https
       - traefik.http.routers.orbit-livekit.tls=true
       - traefik.http.routers.orbit-livekit.tls.certresolver=letsencrypt
