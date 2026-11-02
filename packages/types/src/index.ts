@@ -1,8 +1,8 @@
 // ==========================================
 // 1. User & Auth Types
 // ==========================================
-export type UserStatus = 'ONLINE' | 'OFFLINE' | 'AWAY' | 'BUSY' | 'IN_HUDDLE';
-export type SystemRole = 'SUPER_ADMIN' | 'WORKSPACE_ADMIN' | 'USER';
+export type UserStatus = "ONLINE" | "OFFLINE" | "AWAY" | "BUSY" | "IN_HUDDLE";
+export type SystemRole = "SUPER_ADMIN" | "WORKSPACE_ADMIN" | "USER";
 
 export interface UserProfile {
   id: string;
@@ -22,6 +22,7 @@ export interface UserProfile {
     offCountLeaves?: Record<string, number>;
   };
   disabled?: boolean;
+  isActive?: boolean;
   usersCollectionFlags?: {
     disabled?: boolean;
     isActive?: boolean;
@@ -41,7 +42,7 @@ export interface AuthTokens {
 // ==========================================
 // 2. Workspace / Organization & Roles
 // ==========================================
-export type WorkspaceRole = 'OWNER' | 'ADMIN' | 'MEMBER' | 'GUEST';
+export type WorkspaceRole = "OWNER" | "ADMIN" | "MEMBER" | "GUEST";
 
 export interface ThemeConfig {
   id?: string;
@@ -100,7 +101,7 @@ export interface WorkspaceMember {
 // ==========================================
 // 3. Channels & Direct Messages
 // ==========================================
-export type ChannelType = 'PUBLIC' | 'PRIVATE' | 'DIRECT' | 'GROUP_DIRECT';
+export type ChannelType = "PUBLIC" | "PRIVATE" | "DIRECT" | "GROUP_DIRECT";
 
 export interface Channel {
   id: string;
@@ -145,7 +146,14 @@ export interface Attachment {
 }
 
 export interface StorageCategoryStat {
-  category: 'images' | 'videos' | 'audio' | 'documents' | 'archives' | 'code' | 'other';
+  category:
+    | "images"
+    | "videos"
+    | "audio"
+    | "documents"
+    | "archives"
+    | "code"
+    | "other";
   label: string;
   bytes: number;
   count: number;
@@ -196,7 +204,13 @@ export interface Message {
 // ==========================================
 // 5. Notifications
 // ==========================================
-export type NotificationType = 'MENTION' | 'DIRECT_MESSAGE' | 'REACTION' | 'THREAD_REPLY' | 'HUDDLE_INVITE' | 'SYSTEM';
+export type NotificationType =
+  | "MENTION"
+  | "DIRECT_MESSAGE"
+  | "REACTION"
+  | "THREAD_REPLY"
+  | "HUDDLE_INVITE"
+  | "SYSTEM";
 
 export interface AppNotification {
   id: string;
@@ -246,13 +260,13 @@ export interface LiveKitTokenResponse {
 // 7. Bot, Webhooks & Developer Platform
 // ==========================================
 export type BotScope =
-  | 'channels:read'
-  | 'channels:write'
-  | 'chat:write'
-  | 'chat:read'
-  | 'users:read'
-  | 'files:write'
-  | 'commands';
+  | "channels:read"
+  | "channels:write"
+  | "chat:write"
+  | "chat:read"
+  | "users:read"
+  | "files:write"
+  | "commands";
 
 export interface BotApp {
   id: string;
@@ -289,7 +303,7 @@ export interface SlashCommandPayload {
 // ==========================================
 // 8. Projects & Kanban Boards (Trello-like)
 // ==========================================
-export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+export type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
 export interface Project {
   id: string;
@@ -375,7 +389,7 @@ export interface ProjectDocumentShare {
   id: string;
   documentId: string;
   userId: string;
-  permission: 'VIEW' | 'EDIT';
+  permission: "VIEW" | "EDIT";
   createdAt: string;
   updatedAt: string;
   user?: UserProfile;
@@ -405,59 +419,59 @@ export interface ProjectDocument {
 // ==========================================
 export const SOCKET_EVENTS = {
   // Connection / Rooms
-  JOIN_WORKSPACE: 'workspace:join',
-  LEAVE_WORKSPACE: 'workspace:leave',
-  JOIN_CHANNEL: 'channel:join',
-  LEAVE_CHANNEL: 'channel:leave',
+  JOIN_WORKSPACE: "workspace:join",
+  LEAVE_WORKSPACE: "workspace:leave",
+  JOIN_CHANNEL: "channel:join",
+  LEAVE_CHANNEL: "channel:leave",
 
   // Messages & Threads
-  MESSAGE_NEW: 'message:new',
-  MESSAGE_UPDATE: 'message:update',
-  MESSAGE_DELETE: 'message:delete',
-  MESSAGE_REACTION: 'message:reaction',
-  FILE_DELETE: 'file:delete',
-  TYPING_START: 'typing:start',
-  TYPING_STOP: 'typing:stop',
+  MESSAGE_NEW: "message:new",
+  MESSAGE_UPDATE: "message:update",
+  MESSAGE_DELETE: "message:delete",
+  MESSAGE_REACTION: "message:reaction",
+  FILE_DELETE: "file:delete",
+  TYPING_START: "typing:start",
+  TYPING_STOP: "typing:stop",
 
   // Huddles
-  HUDDLE_STARTED: 'huddle:started',
-  HUDDLE_ENDED: 'huddle:ended',
-  HUDDLE_JOINED: 'huddle:joined',
-  HUDDLE_LEFT: 'huddle:left',
+  HUDDLE_STARTED: "huddle:started",
+  HUDDLE_ENDED: "huddle:ended",
+  HUDDLE_JOINED: "huddle:joined",
+  HUDDLE_LEFT: "huddle:left",
 
   // Channels & Workspaces
-  CHANNEL_NEW: 'channel:new',
-  CHANNEL_UPDATE: 'channel:updated',
+  CHANNEL_NEW: "channel:new",
+  CHANNEL_UPDATE: "channel:updated",
 
   // Whiteboard / Collaborative Canvas
-  WHITEBOARD_UPDATE: 'whiteboard:update',
-  WHITEBOARD_CURSOR: 'whiteboard:cursor',
-  WHITEBOARD_CLEAR: 'whiteboard:clear',
+  WHITEBOARD_UPDATE: "whiteboard:update",
+  WHITEBOARD_CURSOR: "whiteboard:cursor",
+  WHITEBOARD_CLEAR: "whiteboard:clear",
 
   // Projects & Kanban Boards (Trello-like)
-  PROJECT_NEW: 'project:new',
-  PROJECT_UPDATE: 'project:update',
-  PROJECT_DELETE: 'project:delete',
-  TICKET_NEW: 'ticket:new',
-  TICKET_UPDATE: 'ticket:update',
-  TICKET_DELETE: 'ticket:delete',
-  TICKET_MOVE: 'ticket:move',
-  COLUMN_NEW: 'column:new',
-  COLUMN_UPDATE: 'column:update',
-  COLUMN_DELETE: 'column:delete',
-  COLUMN_REORDER: 'column:reorder',
+  PROJECT_NEW: "project:new",
+  PROJECT_UPDATE: "project:update",
+  PROJECT_DELETE: "project:delete",
+  TICKET_NEW: "ticket:new",
+  TICKET_UPDATE: "ticket:update",
+  TICKET_DELETE: "ticket:delete",
+  TICKET_MOVE: "ticket:move",
+  COLUMN_NEW: "column:new",
+  COLUMN_UPDATE: "column:update",
+  COLUMN_DELETE: "column:delete",
+  COLUMN_REORDER: "column:reorder",
 
   // Documents (Docs)
-  DOCUMENT_NEW: 'document:new',
-  DOCUMENT_UPDATE: 'document:update',
-  DOCUMENT_DELETE: 'document:delete',
+  DOCUMENT_NEW: "document:new",
+  DOCUMENT_UPDATE: "document:update",
+  DOCUMENT_DELETE: "document:delete",
 
   // Presence & Notifications
-  USER_STATUS_CHANGE: 'user:status_change',
-  NOTIFICATION_NEW: 'notification:new',
+  USER_STATUS_CHANGE: "user:status_change",
+  NOTIFICATION_NEW: "notification:new",
 
   // Employee Availability & Time Tracking
-  AVAILABILITY_UPDATE: 'availability:update',
+  AVAILABILITY_UPDATE: "availability:update",
 } as const;
 
 // ==========================================
@@ -484,6 +498,3 @@ export interface UserAvailabilityRecord {
   isAutoCheckedOut: boolean;
   breaks: AvailabilityBreakItem[];
 }
-
-
-

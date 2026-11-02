@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { prisma } from '@orbit/db';
 import { z } from 'zod';
-import { sendSystemNotification } from '../services/systemBot.js';
+import { ACTIVITY_CHANNEL, ACTIVITY_CHANNEL_TOPIC, sendSystemNotification } from '../services/systemBot.js';
 
 const createWorkspaceSchema = z.object({
   name: z.string().min(2).max(50),
@@ -103,6 +103,17 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
             {
               name: 'random',
               topic: 'Non-work banter and water cooler chat',
+              type: 'PUBLIC',
+              createdById: userId,
+              members: {
+                create: {
+                  userId,
+                },
+              },
+            },
+            {
+              name: ACTIVITY_CHANNEL,
+              topic: ACTIVITY_CHANNEL_TOPIC,
               type: 'PUBLIC',
               createdById: userId,
               members: {

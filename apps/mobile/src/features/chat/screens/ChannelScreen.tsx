@@ -1,0 +1,219 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, View } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Headphones, Phone, UserPlus } from '@/components/icons';
+import type { Message } from '@orbit/types';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { Button } from '@/components/ui/button';
+import { Text } from '@/components/ui/text';
+import { useAuthStore } from '@/features/auth/store';
+import { useCallStore } from '@/features/calls/store';
+import { markChannelRead } from '@/features/workspaces/services/workspaceApi';
+import { useWorkspaceStore } from '@/features/workspaces/store';
+import { channelLabel, channelPrefix, isDirect } from '@/features/workspaces/utils';
+import { getErrorMessage } from '@/lib/api';
+import { useTheme } from '@/lib/theme';
+import { EVENTS, getSocket } from '@/lib/socket';
+import type { ScreenProps } from '@/navigation/types';
+import { AddChannelMembersSheet } from '@/features/workspaces/components/AddChannelMembersSheet';
+import { Composer } from '../components/Composer';
+import { ImageViewer, type Gallery } from '../components/ImageViewer';
+import { MessageActionsSheet } from '../components/MessageActionsSheet';
+import { MessageItem } from '../components/MessageItem';
+import { sendMessage, toggleReaction, type StagedAttachment } from '../services/chatApi';
+import { useChatStore } from '../store';
+import { typingLabel } from '../utils';
+
+export function ChannelScreen({ route, navigation }: ScreenProps<'Channel'>) {
+  const { colors } = useTheme();
+  const { channelId } = route.params;
+  const me = useAuthStore(s => s.user);
+  const channel = useWorkspaceStore(s => s.current?.channels.find(c => c.id === channelId));
+  const clearUnread = useWorkspaceStore(s => s.clearUnread);
+  const messages = useChatStore(s => s.messages);
+  const hasMore = useChatStore(s => s.hasMore);
+  const isLoading = useChatStore(s => s.isLoading);
+  const isLoadingOlder = useChatStore(s => s.isLoadingOlder);
+  const error = useChatStore(s => s.error);
+  const typing = useChatStore(s => s.typing);
+  const openChannel = useChatStore(s => s.openChannel);
+  const closeChannel = useChatStore(s => s.closeChannel);
+  const loadOlder = useChatStore(s => s.loadOlder);
+  const receiveMessage = useChatStore(s => s.receiveMessage);
+  const setReactions = useChatStore(s => s.setReactions);
+  const [actionTarget, setActionTarget] = useState<Message | null>(null);
+  const [gallery, setGallery] = useState<Gallery | null>(null);
+  const [showAddPeople, setShowAddPeople] = useState(false);
+  const callLive = useCallStore(s => !!s.live[channelId]);
+  const joiningCall = useCallStore(s => s.joining);
+  const joinCall = useCallStore(s => s.join);
+
+  useEffect(() => {
+    openChannel(channelId);
+    clearUnread(channelId);
+    markChannelRead(channelId).catch(() => {});
+    // Typing, reactions and thread replies are broadcast to the channel room only.
+    getSocket()?.emit(EVENTS.JOIN_CHANNEL, channelId);
+    return () => {
+      getSocket()?.emit(EVENTS.LEAVE_CHANNEL, channelId);
+      closeChannel(channelId);
+      // Anything that arrived while it was open counts as read.
+      markChannelRead(channelId).catch(() => {});
+    };
+  }, [channelId, openChannel, closeChannel, clearUnread]);
+
+  // Someone deleted the channel while it was open (channel:deleted removes it from the store).
+  const existed = useRef(!!channel);
+  useEffect(() => {
+    if (channel) {
+      existed.current = true;
+    } else if (existed.current) {
+      Alert.alert('Channel deleted', 'This channel was deleted.');
+      navigation.goBack();
+    }
+  }, [channel, navigation]);
+
+  const handleSend = async (text: string, attachments: StagedAttachment[]) => {
+    try {
+      receiveMessage(await sendMessage(channelId, text, attachments));
+      return true;
+    } catch (err) {
+      Alert.alert('Message not sent', getErrorMessage(err, 'Please try again.'));
+      return false;
+    }
+  };
+
+  const handleTyping = (isTyping: boolean) =>
+    getSocket()?.emit(
+      isTyping ? EVENTS.TYPING_START : EVENTS.TYPING_STOP,
+      isTyping ? { channelId, username: me?.displayName } : { channelId },
+    );
+
+  const handleReaction = useCallback(
+    async (m: Message, emoji: string) => {
+      try {
+        setReactions(m.id, await toggleReaction(m.id, emoji));
+      } catch (err) {
+        Alert.alert('Reaction failed', getErrorMessage(err, 'Please try again.'));
+      }
+    },
+    [setReactions],
+  );
+
+  const openThread = useCallback(
+    (m: Message) => navigation.navigate('Thread', { channelId, messageId: m.id }),
+    [navigation, channelId],
+  );
+
+  if (!channel) {
+    return (
+      <SafeAreaView className="flex-1 bg-background">
+        <ScreenHeader title="Channel" onBack={navigation.goBack} />
+        <Text className="p-6 text-center text-muted-foreground">This channel is no longer available.</Text>
+      </SafeAreaView>
+    );
+  }
+
+  const label = channelLabel(channel, me?.id);
+  const direct = isDirect(channel);
+  const title = direct ? label : `${channelPrefix(channel)} ${label}`;
+  const memberCount = channel.members?.length ?? 0;
+  const typingText = typingLabel(Object.values(typing));
+
+  return (
+    <SafeAreaView className="flex-1 bg-background" edges={['top', 'bottom']}>
+      <ScreenHeader
+        title={title}
+        subtitle={direct ? undefined : memberCount === 1 ? '1 member' : `${memberCount} members`}
+        onBack={navigation.goBack}
+        right={
+          <>
+            {!direct && (
+              <Button variant="ghost" size="icon" onPress={() => setShowAddPeople(true)} accessibilityLabel="Add people">
+                <UserPlus size={21} color={colors.foreground} />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className={callLive ? 'bg-success active:bg-success/90' : undefined}
+              disabled={joiningCall}
+              onPress={() => joinCall(channel)}
+              accessibilityLabel={callLive ? 'Join call' : 'Start call'}
+            >
+              {callLive ? (
+                <Headphones size={20} color={colors.successForeground} />
+              ) : (
+                <Phone size={20} color={colors.foreground} />
+              )}
+            </Button>
+          </>
+        }
+      />
+      {/* Android runs edge-to-edge (gradle.properties), where adjustResize no longer resizes the window. */}
+      <KeyboardAvoidingView className="flex-1" behavior="padding">
+        {isLoading && messages.length === 0 ? (
+          <View className="flex-1 items-center justify-center">
+            <ActivityIndicator color={colors.mutedForeground} />
+          </View>
+        ) : error && messages.length === 0 ? (
+          <View className="flex-1 items-center justify-center gap-4 p-6">
+            <Text className="text-center text-muted-foreground">{error}</Text>
+            <Button variant="outline" onPress={() => openChannel(channelId)}>
+              <Text>Retry</Text>
+            </Button>
+          </View>
+        ) : (
+          <FlashList
+            data={messages}
+            keyExtractor={m => m.id}
+            renderItem={({ item, index }) => (
+              <MessageItem
+                message={item}
+                prev={messages[index - 1]}
+                myId={me?.id}
+                onLongPress={setActionTarget}
+                onToggleReaction={handleReaction}
+                onOpenImages={setGallery}
+                onOpenThread={openThread}
+              />
+            )}
+            maintainVisibleContentPosition={{ startRenderingFromBottom: true, autoscrollToBottomThreshold: 0.2 }}
+            onStartReached={loadOlder}
+            keyboardShouldPersistTaps="handled"
+            ListHeaderComponent={
+              isLoadingOlder ? (
+                <ActivityIndicator color={colors.mutedForeground} className="py-4" />
+              ) : !hasMore ? (
+                <View className="gap-1.5 px-4 pb-3 pt-8">
+                  <Text className="text-2xl font-black">{title}</Text>
+                  <Text className="text-muted-foreground">
+                    {direct
+                      ? `This is the very beginning of your conversation with ${label}.`
+                      : `This is the very beginning of the ${channelPrefix(channel)}${label} channel.${channel.topic ? ` ${channel.topic}` : ''}`}
+                  </Text>
+                </View>
+              ) : null
+            }
+          />
+        )}
+        <Text className="h-5 px-4 text-xs text-muted-foreground" numberOfLines={1}>
+          {typingText}
+        </Text>
+        <Composer channelId={channelId} placeholder={direct ? `Message ${label}` : `Message ${channelPrefix(channel)}${label}`} onSend={handleSend} onTyping={handleTyping} />
+      </KeyboardAvoidingView>
+
+      {!direct && (
+        <AddChannelMembersSheet visible={showAddPeople} channel={channel} onClose={() => setShowAddPeople(false)} />
+      )}
+      <ImageViewer gallery={gallery} onClose={() => setGallery(null)} />
+      <MessageActionsSheet
+        message={actionTarget}
+        onClose={() => setActionTarget(null)}
+        onReact={handleReaction}
+        onReplyInThread={openThread}
+      />
+    </SafeAreaView>
+  );
+}

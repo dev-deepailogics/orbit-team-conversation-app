@@ -60,6 +60,7 @@ model User {
   role                  String?      @default("employee")
   leaves                Json?        // e.g. { countLeaves: { casual: 10, sick: 8 }, offCountLeaves: { bereavement: 5, hajj: 15, ... } }
   disabled              Boolean      @default(false)
+  isActive              Boolean      @default(true)
   usersCollectionFlags  Json?        // e.g. { disabled: false, isActive: true }
   slackThreadId         String?
   slackThreadExpiry     DateTime?
@@ -75,6 +76,7 @@ model User {
   reactions         Reaction[]
   notifications     Notification[]
   pushSubscriptions PushSubscription[]
+  deviceTokens      DeviceToken[]
   huddlesHosted     Huddle[]          @relation("HuddleHost")
   createdBots       BotApp[]          @relation("BotCreator")
   createdWebhooks   Webhook[]         @relation("WebhookCreator")
@@ -608,3 +610,15 @@ model MediaFile {
   @@index([projectId])
 }
 
+// FCM registration tokens for the mobile app (web uses PushSubscription).
+model DeviceToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  platform  String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}

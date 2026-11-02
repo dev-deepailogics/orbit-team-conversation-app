@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import React, { useState, useRef, useEffect } from 'react';
-import { Workspace, Channel, UserProfile, Project } from '@orbit/types';
+import React, { useState, useRef, useEffect } from "react";
+import { Workspace, Channel, UserProfile, Project } from "@orbit/types";
 import {
   Hash,
   Lock,
@@ -11,23 +11,20 @@ import {
   Bot,
   UserPlus,
   LogOut,
-  Smile,
-  Volume2,
   HardDrive,
   X,
   Search,
   FolderKanban,
-  Kanban,
   Palette,
   Check,
   Building2,
-} from 'lucide-react';
-import { api } from '../../lib/api';
-import { useChatStore } from '../../stores/chatStore';
-import { WorkspaceStorageModal } from '../workspace/WorkspaceStorageModal';
-import { AddWorkspaceMemberDialog } from '../workspace/AddWorkspaceMemberDialog';
-import { ThemeModal } from '../theme/ThemeModal';
-import { OrganizationControlModal } from '../availability/OrganizationControlModal';
+} from "lucide-react";
+import { api } from "../../lib/api";
+import { useChatStore } from "../../stores/chatStore";
+import { WorkspaceStorageModal } from "../workspace/WorkspaceStorageModal";
+import { AddWorkspaceMemberDialog } from "../workspace/AddWorkspaceMemberDialog";
+import { ThemeModal } from "../theme/ThemeModal";
+import { OrganizationControlModal } from "../availability/OrganizationControlModal";
 
 interface ChannelSidebarProps {
   workspace: Workspace;
@@ -79,8 +76,8 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [showThemeModal, setShowThemeModal] = useState(false);
   const [showOrgControlModal, setShowOrgControlModal] = useState(false);
-  const [channelName, setChannelName] = useState('');
-  const [channelTopic, setChannelTopic] = useState('');
+  const [channelName, setChannelName] = useState("");
+  const [channelTopic, setChannelTopic] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
@@ -93,45 +90,51 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (workspaceMenuRef.current && !workspaceMenuRef.current.contains(e.target as Node)) {
+      if (
+        workspaceMenuRef.current &&
+        !workspaceMenuRef.current.contains(e.target as Node)
+      ) {
         setShowWorkspaceMenu(false);
       }
     };
     if (showWorkspaceMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
     }
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [showWorkspaceMenu]);
 
   const currentUserMember = members?.find(
-    (m: any) => m.userId === currentUser?.id || m.user?.id === currentUser?.id
+    (m: any) => m.userId === currentUser?.id || m.user?.id === currentUser?.id,
   );
   const isAdminOrOwner =
-    currentUser?.systemRole === 'SUPER_ADMIN' ||
-    currentUserMember?.role === 'OWNER' ||
-    currentUserMember?.role === 'ADMIN' ||
+    currentUser?.systemRole === "SUPER_ADMIN" ||
+    currentUserMember?.role === "OWNER" ||
+    currentUserMember?.role === "ADMIN" ||
     workspace.ownerId === currentUser?.id;
 
   const handleCreateChannel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!channelName) return;
     try {
-      const res = await api.post(`/api/channels/workspaces/${workspace.id}/channels`, {
-        name: channelName.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
-        topic: channelTopic,
-        type: isPrivate ? 'PRIVATE' : 'PUBLIC',
-        isAnonymous,
-      });
+      const res = await api.post(
+        `/api/channels/workspaces/${workspace.id}/channels`,
+        {
+          name: channelName.toLowerCase().replace(/[^a-z0-9-]/g, "-"),
+          topic: channelTopic,
+          type: isPrivate ? "PRIVATE" : "PUBLIC",
+          isAnonymous,
+        },
+      );
       onChannelCreated(res.data);
       setShowCreateChannel(false);
-      setChannelName('');
-      setChannelTopic('');
+      setChannelName("");
+      setChannelTopic("");
       setIsPrivate(false);
       setIsAnonymous(false);
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to create channel');
+      alert(err.response?.data?.error || "Failed to create channel");
     }
   };
 
@@ -146,8 +149,8 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
     <div
       className="w-64 border-r flex flex-col h-full select-none"
       style={{
-        backgroundColor: 'var(--theme-bg-sidebar)',
-        borderColor: 'var(--theme-border)',
+        backgroundColor: "var(--theme-bg-sidebar)",
+        borderColor: "var(--theme-border)",
       }}
     >
       {/* Workspace Header with Dropdown */}
@@ -155,8 +158,8 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
         ref={workspaceMenuRef}
         className="relative h-14 border-b px-3 sm:px-4 flex items-center justify-between font-bold select-none z-30"
         style={{
-          borderColor: 'var(--theme-border)',
-          color: 'var(--theme-text-primary)',
+          borderColor: "var(--theme-border)",
+          color: "var(--theme-text-primary)",
         }}
       >
         <button
@@ -164,13 +167,15 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           title="Workspace options"
           className="flex items-center gap-1.5 truncate rounded-lg px-2 py-1.5 -ml-1.5 transition hover:bg-black/5 dark:hover:bg-white/10 group text-left min-w-0"
         >
-          <span className="truncate font-bold text-sm sm:text-base">{workspace.name}</span>
+          <span className="truncate font-bold text-sm sm:text-base">
+            {workspace.name}
+          </span>
           <ChevronDown
             size={16}
             className={`shrink-0 transition-transform duration-200 ${
-              showWorkspaceMenu ? 'rotate-180' : ''
+              showWorkspaceMenu ? "rotate-180" : ""
             }`}
-            style={{ color: 'var(--theme-text-muted)' }}
+            style={{ color: "var(--theme-text-muted)" }}
           />
         </button>
 
@@ -178,7 +183,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           <button
             onClick={() => setShowAddMemberModal(true)}
             title="Invite & Add Members"
-            style={{ color: 'var(--theme-text-muted)' }}
+            style={{ color: "var(--theme-text-muted)" }}
             className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
           >
             <UserPlus size={18} />
@@ -187,7 +192,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
             <button
               onClick={onCloseMobile}
               title="Close Menu"
-              style={{ color: 'var(--theme-text-muted)' }}
+              style={{ color: "var(--theme-text-muted)" }}
               className="md:hidden p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
             >
               <X size={18} />
@@ -200,16 +205,24 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           <div
             className="absolute top-full left-3 mt-1.5 w-64 rounded-xl border shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150"
             style={{
-              backgroundColor: 'var(--theme-bg-surface)',
-              borderColor: 'var(--theme-border)',
-              color: 'var(--theme-text-primary)',
+              backgroundColor: "var(--theme-bg-surface)",
+              borderColor: "var(--theme-border)",
+              color: "var(--theme-text-primary)",
             }}
           >
             {/* Header info */}
-            <div className="px-3.5 py-2 border-b" style={{ borderColor: 'var(--theme-border)' }}>
+            <div
+              className="px-3.5 py-2 border-b"
+              style={{ borderColor: "var(--theme-border)" }}
+            >
               <p className="text-xs font-bold truncate">{workspace.name}</p>
-              <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--theme-text-muted)' }}>
-                {isAdminOrOwner ? 'Workspace Administrator' : 'Workspace Member'}
+              <p
+                className="text-[11px] truncate mt-0.5"
+                style={{ color: "var(--theme-text-muted)" }}
+              >
+                {isAdminOrOwner
+                  ? "Workspace Administrator"
+                  : "Workspace Member"}
               </p>
             </div>
 
@@ -228,7 +241,9 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
               >
                 <div className="flex items-center gap-2.5">
                   <Building2 size={15} className="text-blue-400" />
-                  <span className="font-semibold text-blue-300">Organization Control</span>
+                  <span className="font-semibold text-blue-300">
+                    Organization Control
+                  </span>
                 </div>
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400 group-hover:scale-125 transition" />
               </button>
@@ -241,7 +256,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 }}
                 className="w-full px-3.5 py-2 text-left text-xs flex items-center gap-2.5 transition hover:bg-black/5 dark:hover:bg-white/10"
               >
-                <Palette size={15} style={{ color: 'var(--theme-primary)' }} />
+                <Palette size={15} style={{ color: "var(--theme-primary)" }} />
                 <span>Customize Theme & Colors</span>
               </button>
 
@@ -253,7 +268,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 }}
                 className="w-full px-3.5 py-2 text-left text-xs flex items-center gap-2.5 transition hover:bg-black/5 dark:hover:bg-white/10"
               >
-                <Bot size={15} style={{ color: 'var(--theme-primary)' }} />
+                <Bot size={15} style={{ color: "var(--theme-primary)" }} />
                 <span>Chatbot Integrations & Bots</span>
               </button>
 
@@ -265,11 +280,17 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 }}
                 className="w-full px-3.5 py-2 text-left text-xs flex items-center gap-2.5 transition hover:bg-black/5 dark:hover:bg-white/10"
               >
-                <HardDrive size={15} style={{ color: 'var(--theme-primary)' }} />
+                <HardDrive
+                  size={15}
+                  style={{ color: "var(--theme-primary)" }}
+                />
                 <span>Workspace Files & Storage</span>
               </button>
 
-              <div className="h-px my-1" style={{ backgroundColor: 'var(--theme-border)' }} />
+              <div
+                className="h-px my-1"
+                style={{ backgroundColor: "var(--theme-border)" }}
+              />
 
               {/* Copy Invite Link */}
               <button
@@ -279,8 +300,15 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 className="w-full px-3.5 py-2 text-left text-xs flex items-center justify-between transition hover:bg-black/5 dark:hover:bg-white/10"
               >
                 <span className="flex items-center gap-2.5">
-                  <UserPlus size={15} style={{ color: 'var(--theme-primary)' }} />
-                  <span>{copiedInvite ? 'Invite Link Copied!' : 'Copy Workspace Invite Link'}</span>
+                  <UserPlus
+                    size={15}
+                    style={{ color: "var(--theme-primary)" }}
+                  />
+                  <span>
+                    {copiedInvite
+                      ? "Invite Link Copied!"
+                      : "Copy Workspace Invite Link"}
+                  </span>
                 </span>
                 {copiedInvite && <Check size={13} className="text-green-500" />}
               </button>
@@ -299,20 +327,24 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
               title="Search messages (Cmd+K / Ctrl+K)"
               className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs transition group hover:opacity-85"
               style={{
-                backgroundColor: 'var(--theme-bg-surface)',
-                borderColor: 'var(--theme-border)',
-                color: 'var(--theme-text-muted)',
+                backgroundColor: "var(--theme-bg-surface)",
+                borderColor: "var(--theme-border)",
+                color: "var(--theme-text-muted)",
               }}
             >
               <div className="flex items-center gap-2">
-                <Search size={14} style={{ color: 'var(--theme-primary)' }} className="transition" />
+                <Search
+                  size={14}
+                  style={{ color: "var(--theme-primary)" }}
+                  className="transition"
+                />
                 <span>Search messages...</span>
               </div>
               <kbd
                 className="text-[10px] px-1.5 py-0.5 rounded font-mono border"
                 style={{
-                  backgroundColor: 'var(--theme-bg-app)',
-                  borderColor: 'var(--theme-border)',
+                  backgroundColor: "var(--theme-bg-app)",
+                  borderColor: "var(--theme-border)",
                 }}
               >
                 ⌘K
@@ -325,7 +357,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
         <div>
           <div
             className="flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-wider mb-1 select-none"
-            style={{ color: 'var(--theme-text-muted)' }}
+            style={{ color: "var(--theme-text-muted)" }}
           >
             <button
               onClick={() => setIsProjectsCollapsed((prev) => !prev)}
@@ -334,11 +366,14 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
               <ChevronDown
                 size={14}
                 className={`transition-transform duration-200 shrink-0 ${
-                  isProjectsCollapsed ? '-rotate-90' : 'rotate-0'
+                  isProjectsCollapsed ? "-rotate-90" : "rotate-0"
                 }`}
               />
               <span className="flex items-center gap-1.5">
-                <FolderKanban size={13} style={{ color: 'var(--theme-primary)' }} />
+                <FolderKanban
+                  size={13}
+                  style={{ color: "var(--theme-primary)" }}
+                />
                 <span>Projects & Boards</span>
               </span>
             </button>
@@ -356,10 +391,13 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           {!isProjectsCollapsed && (
             <div className="space-y-0.5">
               {projects
-                .filter((p) => (p.status || 'active').toLowerCase() === 'active')
+                .filter(
+                  (p) => (p.status || "active").toLowerCase() === "active",
+                )
                 .map((project) => {
                   const isActive = currentProject?.id === project.id;
-                  const ticketCount = project._count?.tickets ?? project.tickets?.length ?? 0;
+                  const ticketCount =
+                    project._count?.tickets ?? project.tickets?.length ?? 0;
 
                   return (
                     <div
@@ -367,22 +405,24 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                       onClick={() => onSelectProject?.(project)}
                       className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
                         isActive
-                          ? 'shadow font-semibold'
-                          : 'hover:bg-black/5 dark:hover:bg-white/10'
+                          ? "shadow font-semibold"
+                          : "hover:bg-black/5 dark:hover:bg-white/10"
                       }`}
                       style={
                         isActive
                           ? {
-                              backgroundColor: 'var(--theme-primary)',
-                              color: 'var(--theme-primary-text)',
+                              backgroundColor: "var(--theme-primary)",
+                              color: "var(--theme-primary-text)",
                             }
                           : {
-                              color: 'var(--theme-text-primary)',
+                              color: "var(--theme-text-primary)",
                             }
                       }
                     >
                       <div className="flex items-center gap-2 truncate">
-                        <span className="text-sm shrink-0">{project.icon || '📋'}</span>
+                        <span className="text-sm shrink-0">
+                          {project.icon || "📋"}
+                        </span>
                         <span className="truncate">{project.name}</span>
                       </div>
 
@@ -391,12 +431,13 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                         style={
                           isActive
                             ? {
-                                backgroundColor: 'rgba(0, 0, 0, 0.2)',
-                                color: 'inherit',
+                                backgroundColor: "rgba(0, 0, 0, 0.2)",
+                                color: "inherit",
                               }
                             : {
-                                backgroundColor: 'var(--theme-bg-surface-hover)',
-                                color: 'var(--theme-text-muted)',
+                                backgroundColor:
+                                  "var(--theme-bg-surface-hover)",
+                                color: "var(--theme-text-muted)",
                               }
                         }
                       >
@@ -410,7 +451,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 <button
                   onClick={onOpenCreateProject}
                   className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-2 cursor-pointer"
-                  style={{ color: 'var(--theme-text-muted)' }}
+                  style={{ color: "var(--theme-text-muted)" }}
                 >
                   <Plus size={12} />
                   <span>Create a project board...</span>
@@ -424,7 +465,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
         <div>
           <div
             className="flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-wider mb-1 select-none"
-            style={{ color: 'var(--theme-text-muted)' }}
+            style={{ color: "var(--theme-text-muted)" }}
           >
             <button
               onClick={() => setIsChannelsCollapsed((prev) => !prev)}
@@ -433,7 +474,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
               <ChevronDown
                 size={14}
                 className={`transition-transform duration-200 shrink-0 ${
-                  isChannelsCollapsed ? '-rotate-90' : 'rotate-0'
+                  isChannelsCollapsed ? "-rotate-90" : "rotate-0"
                 }`}
               />
               <span>Channels</span>
@@ -448,84 +489,105 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 
           {!isChannelsCollapsed && (
             <div className="space-y-0.5">
-              {channels.filter((c) => c.type !== 'DIRECT').map((channel) => {
-                const isActive = currentChannel?.id === channel.id;
-                const hasHuddle = activeHuddleChannelId === channel.id;
-                const unread = unreadCounts[channel.id] || 0;
+              {channels
+                .filter((c) => c.type !== "DIRECT")
+                .map((channel) => {
+                  const isActive = currentChannel?.id === channel.id;
+                  const hasHuddle = activeHuddleChannelId === channel.id;
+                  const unread = unreadCounts[channel.id] || 0;
 
-                return (
-                  <div
-                    key={channel.id}
-                    onClick={() => onSelectChannel(channel)}
-                    className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
-                      isActive
-                        ? 'shadow font-semibold'
-                        : unread > 0
-                        ? 'font-bold bg-black/5 dark:bg-white/10'
-                        : 'hover:bg-black/5 dark:hover:bg-white/10'
-                    }`}
-                    style={
-                      isActive
-                        ? {
-                            backgroundColor: 'var(--theme-primary)',
-                            color: 'var(--theme-primary-text)',
+                  return (
+                    <div
+                      key={channel.id}
+                      onClick={() => onSelectChannel(channel)}
+                      className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
+                        isActive
+                          ? "shadow font-semibold"
+                          : unread > 0
+                            ? "font-bold bg-black/5 dark:bg-white/10"
+                            : "hover:bg-black/5 dark:hover:bg-white/10"
+                      }`}
+                      style={
+                        isActive
+                          ? {
+                              backgroundColor: "var(--theme-primary)",
+                              color: "var(--theme-primary-text)",
+                            }
+                          : {
+                              color: "var(--theme-text-primary)",
+                            }
+                      }
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        {channel.isAnonymous ? (
+                          <span
+                            className="text-sm shrink-0 leading-none"
+                            title="Anonymous Channel"
+                          >
+                            🎭
+                          </span>
+                        ) : channel.type === "PRIVATE" ? (
+                          <Lock
+                            size={15}
+                            className={`shrink-0 ${unread > 0 ? "" : "opacity-70"}`}
+                          />
+                        ) : (
+                          <Hash
+                            size={16}
+                            className={`shrink-0 ${unread > 0 ? "" : "opacity-70"}`}
+                          />
+                        )}
+                        <span className="truncate">{channel.name}</span>
+                        {channel.isAnonymous && (
+                          <span className="text-[9px] px-1 py-0.2 rounded bg-purple-950/80 border border-purple-700/50 text-purple-300 font-semibold shrink-0">
+                            anon
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        {unread > 0 && (
+                          <span className="px-1.5 py-0.5 bg-slack-green text-white text-[10px] font-bold rounded-full min-w-[18px] text-center leading-none">
+                            {unread}
+                          </span>
+                        )}
+
+                        {/* Active Call Indicator & Avatars */}
+                        {hasHuddle && (
+                          <span className="flex items-center gap-1 bg-slack-green/20 border border-slack-green/40 text-slack-green px-1.5 py-0.5 rounded-full text-[10px] font-bold animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slack-green" />
+                            LIVE
+                          </span>
+                        )}
+
+                        {/* Channel Call Action */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onStartHuddle(channel);
+                          }}
+                          title={
+                            hasHuddle
+                              ? "Active Call - Click to join"
+                              : "Start Call"
                           }
-                        : {
-                            color: 'var(--theme-text-primary)',
+                          style={
+                            hasHuddle
+                              ? undefined
+                              : { color: "var(--theme-text-muted)" }
                           }
-                    }
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      {channel.isAnonymous ? (
-                        <span className="text-sm shrink-0 leading-none" title="Anonymous Channel">🎭</span>
-                      ) : channel.type === 'PRIVATE' ? (
-                        <Lock size={15} className={`shrink-0 ${unread > 0 ? '' : 'opacity-70'}`} />
-                      ) : (
-                        <Hash size={16} className={`shrink-0 ${unread > 0 ? '' : 'opacity-70'}`} />
-                      )}
-                      <span className="truncate">{channel.name}</span>
-                      {channel.isAnonymous && (
-                        <span className="text-[9px] px-1 py-0.2 rounded bg-purple-950/80 border border-purple-700/50 text-purple-300 font-semibold shrink-0">
-                          anon
-                        </span>
-                      )}
+                          className={`p-1 rounded transition ${
+                            hasHuddle
+                              ? "bg-slack-green text-white shadow-sm"
+                              : "opacity-0 group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10"
+                          }`}
+                        >
+                          <PhoneCall size={13} />
+                        </button>
+                      </div>
                     </div>
-
-                    <div className="flex items-center gap-1.5">
-                      {unread > 0 && (
-                        <span className="px-1.5 py-0.5 bg-slack-green text-white text-[10px] font-bold rounded-full min-w-[18px] text-center leading-none">
-                          {unread}
-                        </span>
-                      )}
-
-                      {/* Active Call Indicator & Avatars */}
-                      {hasHuddle && (
-                        <span className="flex items-center gap-1 bg-slack-green/20 border border-slack-green/40 text-slack-green px-1.5 py-0.5 rounded-full text-[10px] font-bold animate-pulse">
-                          <span className="w-1.5 h-1.5 rounded-full bg-slack-green" />
-                          LIVE
-                        </span>
-                      )}
-
-                      {/* Channel Call Action */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onStartHuddle(channel);
-                        }}
-                        title={hasHuddle ? 'Active Call - Click to join' : 'Start Call'}
-                        style={hasHuddle ? undefined : { color: 'var(--theme-text-muted)' }}
-                        className={`p-1 rounded transition ${
-                          hasHuddle
-                            ? 'bg-slack-green text-white shadow-sm'
-                            : 'opacity-0 group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10'
-                        }`}
-                      >
-                        <PhoneCall size={13} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           )}
         </div>
@@ -534,7 +596,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
         <div>
           <div
             className="flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-wider mb-1 select-none"
-            style={{ color: 'var(--theme-text-muted)' }}
+            style={{ color: "var(--theme-text-muted)" }}
           >
             <button
               onClick={() => setIsDmsCollapsed((prev) => !prev)}
@@ -543,7 +605,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
               <ChevronDown
                 size={14}
                 className={`transition-transform duration-200 shrink-0 ${
-                  isDmsCollapsed ? '-rotate-90' : 'rotate-0'
+                  isDmsCollapsed ? "-rotate-90" : "rotate-0"
                 }`}
               />
               <span>Direct Messages</span>
@@ -559,17 +621,25 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 // 1. Add current workspace members
                 members.forEach((m) => {
                   if (m?.user) {
-                    userMap.set(m.user.id, { user: m.user, id: m.id || m.user.id });
+                    userMap.set(m.user.id, {
+                      user: m.user,
+                      id: m.id || m.user.id,
+                    });
                   }
                 });
 
                 // 2. Add any other participant in an existing 1:1 DIRECT channel
                 channels
-                  .filter((c) => c.type === 'DIRECT' && Array.isArray(c.members))
+                  .filter(
+                    (c) => c.type === "DIRECT" && Array.isArray(c.members),
+                  )
                   .forEach((c) => {
                     c.members?.forEach((cm: any) => {
                       if (cm?.user && !userMap.has(cm.user.id)) {
-                        userMap.set(cm.user.id, { user: cm.user, id: `dm-peer-${cm.user.id}` });
+                        userMap.set(cm.user.id, {
+                          user: cm.user,
+                          id: `dm-peer-${cm.user.id}`,
+                        });
                       }
                     });
                   });
@@ -579,78 +649,99 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 return dmList.map((member) => {
                   const user = member.user;
                   if (!user) return null;
-                  const isOnline = user.status === 'ONLINE';
+                  const isOnline = user.status === "ONLINE";
                   const isSelf = user.id === currentUser?.id;
-                  
+
                   // Find matching DM channel to check selection and unread counts
                   const dmChannel = channels.find(
                     (c) =>
-                      c.type === 'DIRECT' &&
+                      c.type === "DIRECT" &&
                       c.members &&
                       (isSelf
-                        ? c.members.length === 1 || c.members.every((m) => m.userId === currentUser?.id)
-                        : c.members.some((m) => m.userId === user.id) && c.members.some((m) => m.userId === currentUser?.id))
+                        ? c.members.length === 1 ||
+                          c.members.every((m) => m.userId === currentUser?.id)
+                        : c.members.some((m) => m.userId === user.id) &&
+                          c.members.some((m) => m.userId === currentUser?.id)),
                   );
 
-                  const isSelectedDM = currentChannel?.type === 'DIRECT' && (
-                    isSelf
-                      ? (!currentChannel.members || currentChannel.members.length <= 1 || currentChannel.members.every((m) => m.userId === currentUser?.id))
-                      : (currentChannel.members?.some((m) => m.userId === user.id) && currentChannel.members?.some((m) => m.userId === currentUser?.id))
-                  );
+                  const isSelectedDM =
+                    currentChannel?.type === "DIRECT" &&
+                    (isSelf
+                      ? !currentChannel.members ||
+                        currentChannel.members.length <= 1 ||
+                        currentChannel.members.every(
+                          (m) => m.userId === currentUser?.id,
+                        )
+                      : currentChannel.members?.some(
+                          (m) => m.userId === user.id,
+                        ) &&
+                        currentChannel.members?.some(
+                          (m) => m.userId === currentUser?.id,
+                        ));
 
-                  const unread = dmChannel ? (unreadCounts[dmChannel.id] || 0) : 0;
+                  const unread = dmChannel
+                    ? unreadCounts[dmChannel.id] || 0
+                    : 0;
 
-                return (
-                  <div
-                    key={member.id}
-                    onClick={() => onSelectUserDM(user)}
-                    className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
-                      isSelectedDM
-                        ? 'shadow font-semibold'
-                        : unread > 0
-                        ? 'font-bold bg-black/5 dark:bg-white/10'
-                        : 'hover:bg-black/5 dark:hover:bg-white/10'
-                    }`}
-                    style={
-                      isSelectedDM
-                        ? {
-                            backgroundColor: 'var(--theme-primary)',
-                            color: 'var(--theme-primary-text)',
-                          }
-                        : {
-                            color: 'var(--theme-text-primary)',
-                          }
-                    }
-                  >
-                    <div className="flex items-center gap-2.5 truncate min-w-0">
-                      <div className="relative shrink-0">
-                        <img
-                          src={user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`}
-                          alt={user.displayName}
-                          className="w-5 h-5 rounded-md object-cover"
-                        />
-                        <span
-                          className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-1 ring-black/40 ${
-                            isOnline ? 'bg-slack-green' : 'bg-gray-500'
-                          }`}
-                        />
+                  return (
+                    <div
+                      key={member.id}
+                      onClick={() => onSelectUserDM(user)}
+                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
+                        isSelectedDM
+                          ? "shadow font-semibold"
+                          : unread > 0
+                            ? "font-bold bg-black/5 dark:bg-white/10"
+                            : "hover:bg-black/5 dark:hover:bg-white/10"
+                      }`}
+                      style={
+                        isSelectedDM
+                          ? {
+                              backgroundColor: "var(--theme-primary)",
+                              color: "var(--theme-primary-text)",
+                            }
+                          : {
+                              color: "var(--theme-text-primary)",
+                            }
+                      }
+                    >
+                      <div className="flex items-center gap-2.5 truncate min-w-0">
+                        <div className="relative shrink-0">
+                          <img
+                            src={
+                              user.avatarUrl ||
+                              `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`
+                            }
+                            alt={user.displayName}
+                            className="w-5 h-5 rounded-md object-cover"
+                          />
+                          <span
+                            className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-1 ring-black/40 ${
+                              isOnline ? "bg-slack-green" : "bg-gray-500"
+                            }`}
+                          />
+                        </div>
+                        <span className="truncate">{user.displayName}</span>
+                        {isSelf && (
+                          <span
+                            className="text-[10px] shrink-0"
+                            style={{ color: "var(--theme-text-muted)" }}
+                          >
+                            you
+                          </span>
+                        )}
                       </div>
-                      <span className="truncate">{user.displayName}</span>
-                      {isSelf && (
-                        <span className="text-[10px] shrink-0" style={{ color: 'var(--theme-text-muted)' }}>you</span>
+
+                      {unread > 0 && (
+                        <span className="px-1.5 py-0.5 bg-slack-green text-white text-[10px] font-bold rounded-full min-w-[18px] text-center leading-none shrink-0 ml-1">
+                          {unread}
+                        </span>
                       )}
                     </div>
-
-                    {unread > 0 && (
-                      <span className="px-1.5 py-0.5 bg-slack-green text-white text-[10px] font-bold rounded-full min-w-[18px] text-center leading-none shrink-0 ml-1">
-                        {unread}
-                      </span>
-                    )}
-                  </div>
-                );
-              });
-            })()}
-          </div>
+                  );
+                });
+              })()}
+            </div>
           )}
         </div>
       </div>
@@ -660,14 +751,17 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
         <div
           className="h-14 border-t px-3 flex items-center justify-between"
           style={{
-            backgroundColor: 'var(--theme-bg-surface)',
-            borderColor: 'var(--theme-border)',
+            backgroundColor: "var(--theme-bg-surface)",
+            borderColor: "var(--theme-border)",
           }}
         >
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="relative">
               <img
-                src={currentUser.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${currentUser.username}`}
+                src={
+                  currentUser.avatarUrl ||
+                  `https://api.dicebear.com/7.x/bottts/svg?seed=${currentUser.username}`
+                }
                 alt={currentUser.displayName}
                 className="w-8 h-8 rounded-lg object-cover"
               />
@@ -676,11 +770,14 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
             <div className="truncate">
               <p
                 className="text-sm font-semibold truncate leading-tight"
-                style={{ color: 'var(--theme-text-primary)' }}
+                style={{ color: "var(--theme-text-primary)" }}
               >
                 {currentUser.displayName}
               </p>
-              <p className="text-xs truncate" style={{ color: 'var(--theme-text-muted)' }}>
+              <p
+                className="text-xs truncate"
+                style={{ color: "var(--theme-text-muted)" }}
+              >
                 @{currentUser.username}
               </p>
             </div>
@@ -689,7 +786,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           <button
             onClick={onLogout}
             title="Log out"
-            style={{ color: 'var(--theme-text-muted)' }}
+            style={{ color: "var(--theme-text-muted)" }}
             className="p-1.5 hover:text-red-400 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition"
           >
             <LogOut size={16} />
@@ -750,13 +847,20 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                     onClick={() => setIsPrivate(false)}
                     className={`p-3 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
                       !isPrivate
-                        ? 'border-slack-green bg-slack-green/10 text-white shadow'
-                        : 'border-gray-700 bg-[#222529] text-gray-400 hover:border-gray-600'
+                        ? "border-slack-green bg-slack-green/10 text-white shadow"
+                        : "border-gray-700 bg-[#222529] text-gray-400 hover:border-gray-600"
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <Hash size={16} className={!isPrivate ? 'text-slack-green' : 'text-gray-400'} />
-                      <span className="font-bold text-xs text-white">Public</span>
+                      <Hash
+                        size={16}
+                        className={
+                          !isPrivate ? "text-slack-green" : "text-gray-400"
+                        }
+                      />
+                      <span className="font-bold text-xs text-white">
+                        Public
+                      </span>
                     </div>
                     <span className="text-[11px] text-gray-400 leading-snug">
                       Anyone in workspace can view &amp; join
@@ -767,13 +871,20 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                     onClick={() => setIsPrivate(true)}
                     className={`p-3 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
                       isPrivate
-                        ? 'border-slack-green bg-slack-green/10 text-white shadow'
-                        : 'border-gray-700 bg-[#222529] text-gray-400 hover:border-gray-600'
+                        ? "border-slack-green bg-slack-green/10 text-white shadow"
+                        : "border-gray-700 bg-[#222529] text-gray-400 hover:border-gray-600"
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <Lock size={16} className={isPrivate ? 'text-slack-green' : 'text-gray-400'} />
-                      <span className="font-bold text-xs text-white">Private</span>
+                      <Lock
+                        size={16}
+                        className={
+                          isPrivate ? "text-slack-green" : "text-gray-400"
+                        }
+                      />
+                      <span className="font-bold text-xs text-white">
+                        Private
+                      </span>
                     </div>
                     <span className="text-[11px] text-gray-400 leading-snug">
                       Only invited people can view &amp; join
@@ -791,26 +902,30 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                   onClick={() => setIsAnonymous(!isAnonymous)}
                   className={`p-3 rounded-xl border cursor-pointer transition flex items-start gap-3 ${
                     isAnonymous
-                      ? 'border-purple-500 bg-purple-950/30 text-white shadow'
-                      : 'border-gray-700 bg-[#222529] text-gray-300 hover:border-gray-600'
+                      ? "border-purple-500 bg-purple-950/30 text-white shadow"
+                      : "border-gray-700 bg-[#222529] text-gray-300 hover:border-gray-600"
                   }`}
                 >
                   <span className="text-2xl shrink-0 select-none">🎭</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs text-white">Anonymous Channel</span>
+                      <span className="font-bold text-xs text-white">
+                        Anonymous Channel
+                      </span>
                       <span
                         className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase transition ${
                           isAnonymous
-                            ? 'bg-purple-600 text-white shadow-xs'
-                            : 'bg-gray-700 text-gray-400'
+                            ? "bg-purple-600 text-white shadow-xs"
+                            : "bg-gray-700 text-gray-400"
                         }`}
                       >
-                        {isAnonymous ? 'Enabled' : 'Disabled'}
+                        {isAnonymous ? "Enabled" : "Disabled"}
                       </span>
                     </div>
                     <p className="text-[11px] text-gray-400 leading-snug mt-1">
-                      Ideal for critical discussions and open-ended feedback. Real names, avatars, and IDs are hidden. Each member gets a customizable pseudonym and emoji icon.
+                      Ideal for critical discussions and open-ended feedback.
+                      Real names, avatars, and IDs are hidden. Each member gets
+                      a customizable pseudonym and emoji icon.
                     </p>
                   </div>
                 </div>

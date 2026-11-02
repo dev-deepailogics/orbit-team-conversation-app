@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { prisma } from '@orbit/db';
 import { SOCKET_EVENTS } from '@orbit/types';
 import { z } from 'zod';
-import { sendSystemNotification } from '../services/systemBot.js';
+import { ACTIVITY_CHANNEL, postActivity, sendSystemNotification } from '../services/systemBot.js';
 import { handleMessageMentions } from '../services/mentionService.js';
 import { generateRandomPersona, getOrCreateAnonProfile, sanitizeMessageForViewer } from '../services/anonymousService.js';
 import { verifyChannelAccess } from '../utils/security.js';
@@ -43,6 +43,11 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     }
 
     const { name, topic, description, type, isAnonymous } = parseResult.data;
+
+    // Activity logging finds the channel by name, so the name is reserved.
+    if (name === ACTIVITY_CHANNEL) {
+      return reply.status(409).send({ error: `#${ACTIVITY_CHANNEL} is a reserved channel name` });
+    }
 
     // Verify workspace membership
     const member = await prisma.workspaceMember.findUnique({
@@ -226,6 +231,28 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     });
 
     return reply.status(201).send(dmChannel);
+  });
+
+  // Unread message counts per channel for the signed-in user (top-level messages from others since lastReadAt).
+  fastify.get('/workspaces/:workspaceId/unread', { preHandler: [fastify.authenticate] }, async (request) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    const userId = (request.user as { id: string }).id;
+    const rows = await prisma.$queryRaw<{ channelId: string; count: number }[]>`
+      SELECT m."channelId", COUNT(*)::int AS count
+      FROM "Message" m
+      JOIN "ChannelMember" cm ON cm."channelId" = m."channelId" AND cm."userId" = ${userId}
+      JOIN "Channel" ch ON ch.id = m."channelId" AND ch."workspaceId" = ${workspaceId}
+      WHERE m."parentMessageId" IS NULL AND m."isDeleted" = false
+        AND m."userId" IS DISTINCT FROM ${userId} AND m."createdAt" > cm."lastReadAt"
+      GROUP BY m."channelId"`;
+    return Object.fromEntries(rows.map((r) => [r.channelId, r.count]));
+  });
+
+  fastify.post('/:channelId/read', { preHandler: [fastify.authenticate] }, async (request) => {
+    const { channelId } = request.params as { channelId: string };
+    const userId = (request.user as { id: string }).id;
+    await prisma.channelMember.updateMany({ where: { channelId, userId }, data: { lastReadAt: new Date() } });
+    return { success: true };
   });
 
   // Get complete details for a channel
@@ -872,8 +899,8 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     if (!access) return;
     const channel = access.channel;
 
-    if (channel.name === 'general') {
-      return reply.status(400).send({ error: 'The default general channel cannot be deleted' });
+    if (channel.name === 'general' || channel.name === ACTIVITY_CHANNEL) {
+      return reply.status(400).send({ error: `The default #${channel.name} channel cannot be deleted` });
     }
 
     const wsMember = await prisma.workspaceMember.findUnique({
@@ -896,6 +923,17 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
     if (fastify.io) {
       fastify.io.to(`workspace:${channel.workspaceId}`).emit('channel:deleted', { channelId });
+    }
+
+    // DMs have no meaningful name; private channel names stay out of the public activity feed.
+    if (channel.type === 'PUBLIC' || channel.type === 'PRIVATE') {
+      const actor = await prisma.user.findUnique({ where: { id: userId }, select: { displayName: true, username: true } });
+      const target = channel.type === 'PUBLIC' ? `#${channel.name}` : 'a private channel';
+      await postActivity(
+        channel.workspaceId,
+        `🗑️ **${actor?.displayName || actor?.username || 'Someone'}** deleted ${target}`,
+        fastify.io,
+      );
     }
 
     return reply.send({ success: true, channelId });
