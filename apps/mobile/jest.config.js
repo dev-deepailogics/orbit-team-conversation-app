@@ -2,7 +2,7 @@ module.exports = {
   preset: '@react-native/jest-preset',
   // Preset only transforms react-native packages; these also ship untranspiled ESM.
   transformIgnorePatterns: [
-    'node_modules/(?!((jest-)?react-native(-[^/]+)?|@react-native(-community|-firebase|-async-storage|-documents)?|@react-navigation|@rn-primitives|@shopify/flash-list|nativewind)/)',
+    'node_modules/(?!((jest-)?react-native(-[^/]+)?|@react-native(-community|-firebase|-async-storage|-documents)?|@react-navigation|@rn-primitives|@shopify/flash-list|@notifee|nativewind)/)',
   ],
   // Mocks the document picker's native module, which doesn't exist under Jest.
   setupFiles: ['<rootDir>/node_modules/@react-native-documents/picker/jest/build/jest/setup.js'],

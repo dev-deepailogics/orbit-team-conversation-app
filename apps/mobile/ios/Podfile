@@ -35,9 +35,10 @@ target 'OrbitMobile' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
-    # Dynamic linkage (needed by react-native-firebase) exposes that this pod uses UTType* without linking the framework.
+    # Dynamic linkage (needed by react-native-firebase) exposes that these pods use UTType*/kUTType* without linking the frameworks.
     installer.pods_project.targets.each do |t|
       t.add_system_framework('UniformTypeIdentifiers') if t.name == 'ReactNativeEnrichedHtml'
+      t.add_system_framework(['UniformTypeIdentifiers', 'MobileCoreServices']) if t.name == 'react-native-image-picker'
     end
   end
 end

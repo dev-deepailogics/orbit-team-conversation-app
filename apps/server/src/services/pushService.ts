@@ -1,6 +1,6 @@
 import webpush from 'web-push';
 import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
-import { getMessaging } from 'firebase-admin/messaging';
+import { getMessaging, type MulticastMessage } from 'firebase-admin/messaging';
 import { prisma } from '@orbit/db';
 
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
@@ -45,39 +45,82 @@ interface MobilePush {
   parentMessageId?: string;
 }
 
-async function sendToDevices(userIds: string[], push: MobilePush) {
+// Batches to FCM's 500-token limit and prunes tokens FCM reports as dead.
+async function multicast(
+  userIds: string[],
+  label: string,
+  message: Omit<MulticastMessage, 'tokens'>,
+  platform?: 'ios' | 'android'
+) {
   if (!initFcm() || userIds.length === 0) return;
-  const tokens = await prisma.deviceToken.findMany({ where: { userId: { in: userIds } }, select: { token: true } });
+  const tokens = await prisma.deviceToken.findMany({
+    where: { userId: { in: userIds }, ...(platform ? { platform } : {}) },
+    select: { token: true },
+  });
   if (tokens.length === 0) {
     console.log('FCM push: recipients have no registered devices');
     return;
   }
-  // Per-thread collapse key so replies stack under one notification, like Slack.
-  const group = push.parentMessageId ? `thread:${push.parentMessageId}` : `channel:${push.channelId}`;
-  // FCM data values must be strings.
-  const data: Record<string, string> = { channelId: push.channelId };
-  if (push.parentMessageId) data.parentMessageId = push.parentMessageId;
   for (let i = 0; i < tokens.length; i += 500) {
     const batch = tokens.slice(i, i + 500).map((t) => t.token);
-    const res = await getMessaging().sendEachForMulticast({
-      tokens: batch,
-      notification: { title: push.title, body: push.body },
-      data,
-      android: { priority: 'high', notification: { tag: group } },
-      apns: { headers: { 'apns-collapse-id': group.slice(0, 64) }, payload: { aps: { threadId: group, sound: 'default' } } },
-    });
+    const res = await getMessaging().sendEachForMulticast({ ...message, tokens: batch });
     // One bad token never throws; surface the reason so silent failures aren't invisible.
     res.responses.forEach((r) => {
       if (r.error && r.error.code !== 'messaging/registration-token-not-registered') {
         console.warn('FCM send failed', r.error.code, r.error.message);
       }
     });
-    console.log(`FCM push ${group}: ${res.successCount} sent, ${res.failureCount} failed`);
+    console.log(`FCM push ${label}: ${res.successCount} sent, ${res.failureCount} failed`);
     const dead = res.responses
       .map((r, j) => (r.error?.code === 'messaging/registration-token-not-registered' ? batch[j] : null))
       .filter((t): t is string => Boolean(t));
     if (dead.length) await prisma.deviceToken.deleteMany({ where: { token: { in: dead } } });
   }
+}
+
+async function sendToDevices(userIds: string[], push: MobilePush) {
+  // Per-thread collapse key so replies stack under one notification, like Slack.
+  const group = push.parentMessageId ? `thread:${push.parentMessageId}` : `channel:${push.channelId}`;
+  // FCM data values must be strings.
+  const data: Record<string, string> = { channelId: push.channelId };
+  if (push.parentMessageId) data.parentMessageId = push.parentMessageId;
+  await multicast(userIds, group, {
+    notification: { title: push.title, body: push.body },
+    data,
+    android: { priority: 'high', notification: { tag: group } },
+    apns: { headers: { 'apns-collapse-id': group.slice(0, 64) }, payload: { aps: { threadId: group, sound: 'default' } } },
+  });
+}
+
+// Call record message (routes/huddles.ts); it rings via notifyCallStarted instead of a message push.
+export const CALL_STARTED = '📞 Started a call';
+
+export interface CallPush {
+  channelId: string;
+  channelName: string;
+  channelType: string;
+  callerName: string;
+  hostUserId: string;
+  workspaceId: string;
+}
+
+// Android gets data only so the app draws its own ringing notification with Answer/Decline (apps/mobile index.js).
+// iOS has no such hook without CallKit/PushKit, so it gets a plain alert; tapping it rings in-app.
+export async function notifyCallStarted(userIds: string[], call: CallPush) {
+  const title = call.channelType === 'DIRECT' ? `Incoming call from ${call.callerName}` : `${call.callerName} started a call in #${call.channelName}`;
+  await multicast(userIds, `call:${call.channelId}`, {
+    data: { type: 'call', ...call },
+    android: { priority: 'high', ttl: 30_000 },
+    apns: {
+      headers: { 'apns-collapse-id': `call:${call.channelId}`.slice(0, 64), 'apns-priority': '10' },
+      payload: { aps: { alert: { title, body: 'Tap to answer' }, sound: 'default' } },
+    },
+  });
+}
+
+// Stops the Android ringing notification for people who never answered.
+export async function notifyCallEnded(userIds: string[], channelId: string) {
+  await multicast(userIds, `call-ended:${channelId}`, { data: { type: 'call_ended', channelId }, android: { priority: 'high' } }, 'android');
 }
 
 async function sendToUser(userId: string, payload: object) {
@@ -113,6 +156,8 @@ async function notifyMessage(io: any, messageId: string) {
     },
   });
   if (!msg || msg.isDeleted) return;
+  // Call records: recipients were already rung by notifyCallStarted.
+  if (msg.userId && msg.content === CALL_STARTED) return;
   console.log(`Push fan-out for message ${msg.id} in ${msg.channel.type} ${msg.channelId}`);
 
   // Thread replies only notify people in the thread (parent author + earlier repliers), like Slack.

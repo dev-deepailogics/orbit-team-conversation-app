@@ -1,4 +1,4 @@
-import { incomingCallTitle, parseCallChat, resolveLiveKitUrl } from '../src/features/calls/utils';
+import { incomingCallTitle, parseCallChat, parseIncomingCall, resolveLiveKitUrl } from '../src/features/calls/utils';
 
 describe('resolveLiveKitUrl', () => {
   const server = 'http://192.168.1.20:4000';
@@ -32,5 +32,24 @@ describe('parseCallChat', () => {
     expect(parseCallChat('hello')).toEqual({ text: 'hello', replyTo: null });
     expect(parseCallChat('{not json}')).toEqual({ text: '{not json}', replyTo: null });
     expect(parseCallChat('{"a":1}')).toEqual({ text: '{"a":1}', replyTo: null });
+  });
+});
+
+describe('parseIncomingCall', () => {
+  const push = { type: 'call', channelId: 'c', channelName: 'general', channelType: 'PUBLIC', callerName: 'Ada', hostUserId: 'u', workspaceId: 'w' };
+  it('reads call pushes', () => {
+    expect(parseIncomingCall(push)).toEqual({ channelId: 'c', channelName: 'general', channelType: 'PUBLIC', callerName: 'Ada', hostUserId: 'u', workspaceId: 'w' });
+  });
+  it('ignores message and call-ended pushes', () => {
+    expect(parseIncomingCall({ channelId: 'c' })).toBeNull();
+    expect(parseIncomingCall({ type: 'call_ended', channelId: 'c' })).toBeNull();
+    expect(parseIncomingCall(undefined)).toBeNull();
+  });
+  it('rejects a call push without a channel or workspace', () => {
+    expect(parseIncomingCall({ ...push, channelId: '' })).toBeNull();
+    expect(parseIncomingCall({ ...push, workspaceId: undefined })).toBeNull();
+  });
+  it('falls back when the caller name is missing', () => {
+    expect(parseIncomingCall({ ...push, callerName: '' })?.callerName).toBe('Someone');
   });
 });

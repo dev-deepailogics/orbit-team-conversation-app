@@ -4,6 +4,6 @@ const DEV_SERVER_URL =
   'https://peak-billing-evanescence-isaac.trycloudflare.com';
 
 // Same domain as DOMAIN / NEXT_PUBLIC_SERVER_URL in docker-compose.prod.yml.
-const PROD_SERVER_URL = 'https://orbit.yourdomain.com';
+const PROD_SERVER_URL = 'https://orbit.wondercraftz.com';
 
 export const SERVER_URL = __DEV__ ? DEV_SERVER_URL : PROD_SERVER_URL;

@@ -4,7 +4,7 @@
 <dict>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.org.reactjs.native.example.OrbitMobile</string>
+		<string>group.com.orbit.mobile</string>
 	</array>
 </dict>
 </plist>

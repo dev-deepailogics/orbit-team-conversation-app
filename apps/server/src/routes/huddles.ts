@@ -3,6 +3,21 @@ import { prisma } from '@orbit/db';
 import { LiveKitService } from '../services/livekit.js';
 import { SOCKET_EVENTS } from '@orbit/types';
 import { verifyChannelAccess } from '../utils/security.js';
+import { CALL_STARTED, notifyCallEnded, notifyCallStarted } from '../services/pushService.js';
+
+// Same shape the channel message routes broadcast, so call records render like any message.
+const messageInclude = {
+  user: { select: { id: true, username: true, displayName: true, avatarUrl: true, status: true } },
+  bot: true,
+  attachments: true,
+  reactions: true,
+} as const;
+
+function formatDuration(ms: number) {
+  const min = Math.round(ms / 60_000);
+  if (min < 1) return 'less than a minute';
+  return min < 60 ? `${min} min` : `${Math.floor(min / 60)} h ${min % 60} min`;
+}
 
 export const huddleRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   // Get LiveKit WebRTC Token for channel huddle
@@ -41,6 +56,7 @@ export const huddleRoutes: FastifyPluginAsync = async (fastify: FastifyInstance)
       where: { channelId, isActive: true },
     });
 
+    const isNew = !huddle;
     if (!huddle) {
       huddle = await prisma.huddle.create({
         data: {
@@ -75,28 +91,76 @@ export const huddleRoutes: FastifyPluginAsync = async (fastify: FastifyInstance)
       fastify.io.to(`channel:${channelId}`).emit(SOCKET_EVENTS.HUDDLE_STARTED, callData);
     }
 
+    // /start also runs for every joiner; only the first one rings and leaves a record in the chat.
+    if (isNew) {
+      const recipients = channel.members.map((m: { userId: string }) => m.userId).filter((id: string) => id !== userPayload.id);
+      notifyCallStarted(recipients, {
+        channelId,
+        channelName: channel.name,
+        channelType: channel.type,
+        callerName: user?.displayName || userPayload.username,
+        hostUserId: userPayload.id,
+        workspaceId: channel.workspaceId,
+      }).catch((err) => console.error('Call push failed', err));
+
+      // Anonymous channels never show who did what.
+      if (!channel.isAnonymous) {
+        const message = await prisma.message.create({
+          data: { channelId, userId: userPayload.id, content: CALL_STARTED },
+          include: messageInclude,
+        });
+        const payload = { ...message, replyCount: 0, workspaceId: channel.workspaceId };
+        if (fastify.io) {
+          if (channel.type === 'PUBLIC') {
+            fastify.io.to(`workspace:${channel.workspaceId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+          } else {
+            for (const m of channel.members) fastify.io.to(`user:${m.userId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+            fastify.io.to(`channel:${channelId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+          }
+        }
+      }
+    }
+
     return reply.send({ success: true, huddle });
   });
 
   // End Huddle
   fastify.post('/:channelId/end', { preHandler: [fastify.authenticate] }, async (request, reply) => {
     const { channelId } = request.params as { channelId: string };
+    const userPayload = request.user as { id: string };
 
-    const channel = await prisma.channel.findUnique({
-      where: { id: channelId },
-    });
+    const access = await verifyChannelAccess(userPayload.id, channelId, reply);
+    if (!access) return;
+    const channel = access.channel;
 
-    if (!channel) {
-      return reply.status(404).send({ error: 'Channel not found' });
-    }
-
+    const endedAt = new Date();
+    const ending = await prisma.huddle.findMany({ where: { channelId, isActive: true } });
     await prisma.huddle.updateMany({
-      where: { channelId, isActive: true },
+      where: { id: { in: ending.map((h) => h.id) } },
       data: {
         isActive: false,
-        endedAt: new Date(),
+        endedAt,
       },
     });
+
+    // Turn each "Started a call" record into "Call ended · duration".
+    for (const h of ending) {
+      const record = await prisma.message.findFirst({
+        where: { channelId, userId: h.hostUserId, content: CALL_STARTED, createdAt: { gte: h.startedAt } },
+        orderBy: { createdAt: 'asc' },
+      });
+      if (!record) continue;
+      const updated = await prisma.message.update({
+        where: { id: record.id },
+        data: { content: `📞 Call ended · lasted ${formatDuration(endedAt.getTime() - h.startedAt.getTime())}` },
+        include: { ...messageInclude, _count: { select: { replies: true } } },
+      });
+      fastify.io?.to(`channel:${channelId}`).emit('message:updated', { ...updated, replyCount: updated._count.replies });
+    }
+    if (ending.length) {
+      const members = channel.members.map((m: { userId: string }) => m.userId);
+      notifyCallEnded(members, channelId).catch((err) => console.error('Call ended push failed', err));
+    }
 
     // Clean up LiveKit room
     await LiveKitService.deleteRoom(`orbit-huddle-${channelId}`);

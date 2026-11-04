@@ -11,6 +11,9 @@ import {
   requestPermission,
 } from '@react-native-firebase/messaging';
 import { useChatStore } from '@/features/chat/store';
+import { cancelIncomingCall } from '@/features/calls/notification';
+import { useCallStore } from '@/features/calls/store';
+import { parseIncomingCall } from '@/features/calls/utils';
 import { useNotificationStore } from '../store';
 import { registerPushToken } from '../services/pushToken';
 import { isViewing, openTarget, parseTarget } from '../utils';
@@ -28,6 +31,14 @@ async function askPermission(m: ReturnType<typeof getMessaging>) {
 
 // Mounted while signed in. Closed/background app: the OS shows the FCM notification and a tap lands here.
 // Foreground: FCM shows nothing, so we draw our own banner (unless that conversation is already open).
+// Call pushes: Android draws its own ringing notification (index.js); iOS gets an OS alert whose tap rings in-app.
+function open(data: Record<string, unknown> | undefined) {
+  const call = parseIncomingCall(data);
+  if (call) return useCallStore.getState().ring(call);
+  const target = parseTarget(data);
+  if (target) openTarget(target);
+}
+
 export function usePushNotifications() {
   useEffect(() => {
     let cancelled = false;
@@ -49,6 +60,11 @@ export function usePushNotifications() {
     const offToken = onTokenRefresh(m, t => registerPushToken(t).catch(() => {}));
 
     const offMessage = onMessage(m, async msg => {
+      // In the foreground the socket already rings (huddle:started); this only stops a ring left over from background.
+      if (msg.data?.type === 'call_ended' && typeof msg.data.channelId === 'string') {
+        return cancelIncomingCall(msg.data.channelId);
+      }
+      if (msg.data?.type === 'call') return;
       const target = parseTarget(msg.data);
       if (!target) return;
       const chat = useChatStore.getState();
@@ -60,15 +76,8 @@ export function usePushNotifications() {
       });
     });
 
-    const offOpened = onNotificationOpenedApp(m, msg => {
-      const target = parseTarget(msg.data);
-      if (target) openTarget(target);
-    });
-
-    getInitialNotification(m).then(msg => {
-      const target = parseTarget(msg?.data);
-      if (target) openTarget(target);
-    });
+    const offOpened = onNotificationOpenedApp(m, msg => open(msg.data));
+    getInitialNotification(m).then(msg => open(msg?.data));
 
     return () => {
       cancelled = true;

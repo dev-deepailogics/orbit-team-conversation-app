@@ -14,6 +14,20 @@ export function incomingCallTitle(call: IncomingCall): string {
     : `${call.callerName} started a call in #${call.channelName}`;
 }
 
+// Push data from notifyCallStarted (apps/server/src/services/pushService.ts); FCM data values are all strings.
+export function parseIncomingCall(data: Record<string, unknown> | undefined): IncomingCall | null {
+  const str = (k: string) => (typeof data?.[k] === 'string' ? (data[k] as string) : '');
+  if (str('type') !== 'call' || !str('channelId') || !str('workspaceId')) return null;
+  return {
+    channelId: str('channelId'),
+    channelName: str('channelName'),
+    channelType: str('channelType') || undefined,
+    callerName: str('callerName') || 'Someone',
+    hostUserId: str('hostUserId'),
+    workspaceId: str('workspaceId'),
+  };
+}
+
 // Web's in-call chat sends replies as JSON {text, replyTo} (ModernMeetingChat.tsx); everything else is plain text.
 export function parseCallChat(message: string): CallChatLine {
   if (message.startsWith('{') && message.endsWith('}')) {

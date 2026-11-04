@@ -39,10 +39,20 @@
 	<string>Orbit uses your microphone so others can hear you in calls.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Orbit lets you attach photos and videos to messages.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
+	<key>RTCAppGroupIdentifier</key>
+	<string>group.com.orbit.mobile</string>
+	<key>RTCScreenSharingExtension</key>
+	<string>com.wondercraftz.orbit.ScreenShare</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>fonts/Rubik-Regular.ttf</string>
+		<string>fonts/Rubik-Medium.ttf</string>
+		<string>fonts/Rubik-SemiBold.ttf</string>
+		<string>fonts/Rubik-Bold.ttf</string>
+		<string>fonts/Rubik-Italic.ttf</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -66,25 +76,14 @@
 		<string>audio</string>
 		<string>voip</string>
 	</array>
-	<!-- Screen sharing: read by @livekit/react-native-webrtc; must match the OrbitScreenShare extension. -->
-	<key>RTCAppGroupIdentifier</key>
-	<string>group.org.reactjs.native.example.OrbitMobile</string>
-	<key>RTCScreenSharingExtension</key>
-	<string>org.reactjs.native.example.OrbitMobile.ScreenShare</string>
-	<key>UIAppFonts</key>
-	<array>
-		<string>fonts/Rubik-Regular.ttf</string>
-		<string>fonts/Rubik-Medium.ttf</string>
-		<string>fonts/Rubik-SemiBold.ttf</string>
-		<string>fonts/Rubik-Bold.ttf</string>
-		<string>fonts/Rubik-Italic.ttf</string>
-	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>arm64</string>
 	</array>
+	<key>UIStatusBarStyle</key>
+	<string></string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

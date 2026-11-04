@@ -32,6 +32,6 @@
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>RTCAppGroupIdentifier</key>
-	<string>group.org.reactjs.native.example.OrbitMobile</string>
+	<string>group.com.orbit.mobile</string>
 </dict>
 </plist>
