@@ -24,7 +24,7 @@ interface NavLinkItem {
 const NAV_LINKS: NavLinkItem[] = [
   { label: 'Features', href: '/features' },
   { label: 'About', href: '/about' },
-  { label: 'Contact', href: '/contact' },
+  { label: 'Contact', href: 'https://wondercraftz.com/contact' },
 ];
 
 export function Navbar() {

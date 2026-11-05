@@ -39,7 +39,7 @@ const FOOTER_COLUMNS = [
     links: [
       { label: 'About Orbit', href: '/about' },
       { label: 'Manifesto', href: '/about#manifesto' },
-      { label: 'Contact Us', href: '/contact' },
+      { label: 'Contact Us', href: 'https://wondercraftz.com/contact' },
       { label: 'Careers', href: '/about#careers' },
       { label: 'Brand Assets', href: '/about' },
     ],
