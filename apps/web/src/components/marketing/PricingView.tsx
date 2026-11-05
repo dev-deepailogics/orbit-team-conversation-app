@@ -80,7 +80,7 @@ export function PricingView() {
               </div>
               <h2 className="font-display font-bold text-2xl text-slate-900 dark:text-white mb-2">Community</h2>
               <p className="text-xs text-slate-600 dark:text-zinc-400 mb-6">
-                Open source core. Deploy on your own VPS with Docker Compose. Full sovereignty.
+                Deploy on your own VPS with Docker Compose. Full data sovereignty.
               </p>
 
               <div className="font-display font-black text-5xl text-slate-900 dark:text-white mb-6">

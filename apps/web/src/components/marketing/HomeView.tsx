@@ -234,11 +234,6 @@ export function HomeView() {
                     {feature.description}
                   </p>
                 </div>
-
-                <div className="pt-6 mt-6 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-xs text-indigo-600 dark:text-indigo-400 font-mono">
-                  <span>Explore Feature</span>
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform" />
-                </div>
               </motion.div>
             );
           })}

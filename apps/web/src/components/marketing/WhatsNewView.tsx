@@ -23,8 +23,8 @@ export function WhatsNewView() {
 
         <div className="max-w-4xl mx-auto">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-xs font-mono mb-6">
-            <Sparkles className="w-3.5 h-3.5 text-cyan-500 dark:text-cyan-400" />
-            <span>CONTINUOUS OPEN-SOURCE RELEASES</span>
+            <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+            <span>CONTINUOUS PRODUCT RELEASES</span>
           </div>
 
           <h1 className="font-display font-black text-4xl sm:text-6xl lg:text-7xl text-slate-900 dark:text-white tracking-tight leading-[1.05] mb-6">

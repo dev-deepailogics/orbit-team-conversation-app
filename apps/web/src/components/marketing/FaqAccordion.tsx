@@ -37,9 +37,9 @@ const FAQ_ITEMS: FaqItem[] = [
   },
   {
     category: 'Sovereignty',
-    question: 'Is the open-source self-hosted version truly free forever?',
+    question: 'Is the self-hosted version truly free forever?',
     answer:
-      'Yes. The open-source community edition includes unlimited users, unlimited channels, full message history retention, and unlimited audio/video calling. Our open-source software gives complete data ownership.',
+      'Yes. The community edition includes unlimited users, unlimited channels, full message history retention, and unlimited audio/video calling. Our software gives complete data ownership.',
   },
   {
     category: 'Clients',

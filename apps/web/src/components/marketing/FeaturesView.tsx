@@ -71,12 +71,7 @@ export function FeaturesView() {
               <span>Explore Architecture Tour</span>
               <ArrowRight className="w-4 h-4" />
             </a>
-            <Link
-              href="/app"
-              className="px-6 py-3 rounded-full bg-white dark:bg-zinc-900 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-800 dark:text-white font-medium text-sm border border-slate-300 dark:border-white/10 shadow-sm transition-colors"
-            >
-              Test Live Demo
-            </Link>
+           
           </div>
         </div>
       </section>

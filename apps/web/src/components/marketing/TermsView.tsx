@@ -36,16 +36,16 @@ export function TermsView() {
             1. Acceptance of Terms
           </h2>
           <p>
-            By downloading, deploying, accessing, or using Orbit (including the open-source codebase, Docker images, and cloud-hosted tiers), you agree to be bound by these Terms of Service. If you are entering into this agreement on behalf of a company or organization, you represent that you have authority to bind that entity.
+            By downloading, deploying, accessing, or using Orbit (including the self-hosted codebase, Docker images, and cloud-hosted tiers), you agree to be bound by these Terms of Service. If you are entering into this agreement on behalf of a company or organization, you represent that you have authority to bind that entity.
           </p>
         </div>
 
         <div className="space-y-4">
           <h2 className="font-display font-bold text-xl text-slate-900 dark:text-white">
-            2. Open-Source Core Licensing
+            2. Platform Licensing & Usage
           </h2>
           <p>
-            The core Orbit repository is licensed under the Apache 2.0 / GNU Affero General Public License (AGPLv3). You are free to inspect, modify, fork, and self-host the software in accordance with the terms of that license.
+            The core Orbit repository is licensed under community licensing guidelines. You are free to inspect, modify, and self-host the software in accordance with the terms of that license.
           </p>
           <p>
             You agree not to remove, alter, or obscure any copyright notices, trademarks, or proprietary markings present in the source distributions.
@@ -80,7 +80,7 @@ export function TermsView() {
             5. Disclaimer of Warranties & Limitation of Liability
           </h2>
           <p>
-            To the maximum extent permitted by applicable law, the open-source self-hosted edition is provided "AS IS", without warranty of any kind. Orbit Inc. shall not be liable for any indirect, incidental, punitive, or consequential damages resulting from data loss or server misconfigurations on self-hosted instances.
+            To the maximum extent permitted by applicable law, the self-hosted edition is provided "AS IS", without warranty of any kind. Orbit Inc. shall not be liable for any indirect, incidental, punitive, or consequential damages resulting from data loss or server misconfigurations on self-hosted instances.
           </p>
         </div>
 

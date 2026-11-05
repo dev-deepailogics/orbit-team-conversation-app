@@ -209,7 +209,7 @@ export function AboutView() {
           <p className="text-sm text-slate-600 dark:text-zinc-400 leading-relaxed mb-8">
             Orbit is maintained by Wondercraftz engineers and contributors across 30+ countries. Whether writing code, reporting bugs, or drafting documentation, your contribution is welcomed.
           </p>
-          <a
+          {/* <a
             href="https://github.com"
             target="_blank"
             rel="noreferrer"
@@ -217,7 +217,7 @@ export function AboutView() {
           >
             <span>Contribute on GitHub</span>
             <ArrowRight className="w-4 h-4" />
-          </a>
+          </a> */}
         </div>
       </section>
 

@@ -17,7 +17,7 @@ export function CtaBanner() {
           {/* Badge */}
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-mono mb-6">
             <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-            <span>COMMUNITY EDITION IS 100% FREE & OPEN SOURCE</span>
+            <span>COMMUNITY EDITION IS 100% FREE</span>
           </div>
 
           <h2 className="font-display font-black text-3xl sm:text-5xl lg:text-6xl text-white tracking-tight max-w-4xl mx-auto leading-tight">
@@ -31,7 +31,7 @@ export function CtaBanner() {
           {/* CTAs */}
           <div className="flex items-center justify-center gap-4">
             <Link
-              href="/app"
+              href="https://wondercraftz.com/contact"
               className="px-8 py-4 rounded-full bg-gradient-to-r from-indigo-500 via-indigo-600 to-cyan-500 text-white font-bold text-sm hover:opacity-95 transition-all shadow-xl shadow-indigo-600/30 flex items-center justify-center gap-2"
             >
               <span>Launch Interactive Web App</span>

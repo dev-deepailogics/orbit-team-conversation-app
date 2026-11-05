@@ -88,7 +88,7 @@ export function Footer() {
             </Link>
 
             <p className="text-slate-600 dark:text-zinc-400 max-w-sm text-sm leading-relaxed">
-              The high-performance, open-source team communication platform. Self-hostable, end-to-end encrypted voice and video calling, and fully Slack-compatible bot engine.
+              The high-performance team communication platform. Self-hostable, end-to-end encrypted voice and video calling, and fully Slack-compatible bot engine.
             </p>
           </div>
 
@@ -155,7 +155,7 @@ export function Footer() {
         {/* Bottom Bar: Copyright & Socials */}
         <div className="pt-8 border-t border-slate-200 dark:border-white/10 flex flex-col md:flex-row items-center justify-between gap-4 text-xs">
           <div className="flex flex-wrap items-center gap-4 text-slate-500 dark:text-zinc-500">
-            <span>© {new Date().getFullYear()} Orbit Inc. Open-source core.</span>
+            <span>© {new Date().getFullYear()} Orbit Inc.</span>
             <span className="hidden sm:inline">•</span>
             <span>Crafted for engineering teams worldwide.</span>
           </div>
