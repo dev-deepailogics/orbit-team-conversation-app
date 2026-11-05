@@ -127,7 +127,7 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     if (!isAuthLoading && (!token || user?.systemRole !== 'SUPER_ADMIN')) {
-      router.push('/');
+      router.push('/app');
     }
   }, [isAuthLoading, token, user, router]);
 

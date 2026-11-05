@@ -30,7 +30,7 @@ export default function RegisterPage() {
         password,
       });
       setAuth(res.data.user, res.data.accessToken);
-      router.push('/');
+      router.push('/app');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Registration failed');
     } finally {

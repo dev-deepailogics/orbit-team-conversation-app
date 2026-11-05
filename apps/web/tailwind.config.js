@@ -51,6 +51,27 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        orbit: {
+          50: '#EEF2FF',
+          100: '#E0E7FF',
+          200: '#C7D2FE',
+          300: '#A5B4FC',
+          400: '#818CF8',
+          500: '#6366F1',
+          600: '#4F46E5',
+          700: '#4338CA',
+          800: '#3730A3',
+          900: '#312E81',
+          950: '#1E1B4B',
+        },
+        cosmic: {
+          950: '#06080E',
+          900: '#090D16',
+          850: '#0E131F',
+          800: '#141A28',
+          750: '#1A2133',
+          700: '#222B40',
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -58,7 +79,28 @@ module.exports = {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        display: ['"Bricolage Grotesque"', '"Space Grotesk"', 'Trap', '-apple-system', 'sans-serif'],
         handwriting: ['Caveat', 'Kalam', 'Patrick Hand', 'Comic Sans MS', 'cursive', 'sans-serif'],
+      },
+      keyframes: {
+        aurora: {
+          '0%, 100%': { transform: 'translate(0, 0) scale(1)', opacity: '0.4' },
+          '50%': { transform: 'translate(20px, -20px) scale(1.1)', opacity: '0.6' },
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%': { transform: 'translateY(-12px)' },
+        },
+        marquee: {
+          '0%': { transform: 'translateX(0%)' },
+          '100%': { transform: 'translateX(-50%)' },
+        },
+      },
+      animation: {
+        aurora: 'aurora 20s ease-in-out infinite',
+        float: 'float 6s ease-in-out infinite',
+        marquee: 'marquee 35s linear infinite',
       },
     },
   },
