@@ -18,13 +18,16 @@ import {
   Palette,
   Check,
   Building2,
-} from "lucide-react";
-import { api } from "../../lib/api";
-import { useChatStore } from "../../stores/chatStore";
-import { WorkspaceStorageModal } from "../workspace/WorkspaceStorageModal";
-import { AddWorkspaceMemberDialog } from "../workspace/AddWorkspaceMemberDialog";
-import { ThemeModal } from "../theme/ThemeModal";
-import { OrganizationControlModal } from "../availability/OrganizationControlModal";
+  LayoutGrid,
+  Video,
+  Sparkles,
+} from 'lucide-react';
+import { api } from '../../lib/api';
+import { useChatStore } from '../../stores/chatStore';
+import { WorkspaceStorageModal } from '../workspace/WorkspaceStorageModal';
+import { AddWorkspaceMemberDialog } from '../workspace/AddWorkspaceMemberDialog';
+import { ThemeModal } from '../theme/ThemeModal';
+import { OrganizationControlModal } from '../availability/OrganizationControlModal';
 
 interface ChannelSidebarProps {
   workspace: Workspace;
@@ -42,6 +45,7 @@ interface ChannelSidebarProps {
   onOpenCreateProject?: () => void;
   onOpenBotPortal: () => void;
   onStartHuddle: (channel: Channel) => void;
+  onOpenGoogleMeet?: () => void;
   onLogout: () => void;
   onOpenSearch?: () => void;
   onOpenOrganizationControl?: () => void;
@@ -65,6 +69,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   onOpenCreateProject,
   onOpenBotPortal,
   onStartHuddle,
+  onOpenGoogleMeet,
   onLogout,
   onOpenSearch,
   onOpenOrganizationControl,
@@ -82,7 +87,9 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
+  const [showAppsMenu, setShowAppsMenu] = useState(false);
   const workspaceMenuRef = useRef<HTMLDivElement>(null);
+  const appsMenuRef = useRef<HTMLDivElement>(null);
   const [isProjectsCollapsed, setIsProjectsCollapsed] = useState(false);
   const [isChannelsCollapsed, setIsChannelsCollapsed] = useState(false);
   const [isDmsCollapsed, setIsDmsCollapsed] = useState(false);
@@ -96,14 +103,17 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
       ) {
         setShowWorkspaceMenu(false);
       }
+      if (appsMenuRef.current && !appsMenuRef.current.contains(e.target as Node)) {
+        setShowAppsMenu(false);
+      }
     };
-    if (showWorkspaceMenu) {
-      document.addEventListener("mousedown", handleClickOutside);
+    if (showWorkspaceMenu || showAppsMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
     }
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [showWorkspaceMenu]);
+  }, [showWorkspaceMenu, showAppsMenu]);
 
   const currentUserMember = members?.find(
     (m: any) => m.userId === currentUser?.id || m.user?.id === currentUser?.id,
@@ -744,6 +754,59 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
             </div>
           )}
         </div>
+      </div>
+
+      {/* Apps Launcher Bar */}
+      <div
+        className="px-3 py-2 border-t flex items-center justify-between relative"
+        style={{
+          backgroundColor: 'var(--theme-bg-surface)',
+          borderColor: 'var(--theme-border)',
+        }}
+        ref={appsMenuRef}
+      >
+        <button
+          onClick={() => setShowAppsMenu((prev) => !prev)}
+          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-black/5 dark:hover:bg-white/5 transition"
+          style={{ color: 'var(--theme-text-primary)' }}
+        >
+          <div className="flex items-center gap-2">
+            <LayoutGrid size={15} className="text-emerald-400" />
+            <span>Apps</span>
+          </div>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono">
+            New
+          </span>
+        </button>
+
+        {/* Apps Dropdown Menu */}
+        {showAppsMenu && (
+          <div
+            className="absolute bottom-full left-3 right-3 mb-1 bg-[#1A1D21] border border-gray-700 rounded-xl shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150"
+          >
+            <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+              Workspace Apps
+            </div>
+            <button
+              onClick={() => {
+                setShowAppsMenu(false);
+                if (onOpenGoogleMeet) onOpenGoogleMeet();
+              }}
+              className="w-full px-2.5 py-2 rounded-lg text-left text-xs font-medium text-white hover:bg-emerald-500/10 hover:text-emerald-300 flex items-center gap-2.5 transition group"
+            >
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <Video size={14} />
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold leading-tight flex items-center gap-1.5">
+                  <span>Google Meet</span>
+                  <Sparkles size={11} className="text-emerald-400" />
+                </p>
+                <p className="text-[10px] text-gray-400 truncate">Create instant meetings & sync Gemini notes</p>
+              </div>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* User Bottom Bar */}

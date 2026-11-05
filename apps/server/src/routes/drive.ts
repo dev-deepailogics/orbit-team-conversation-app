@@ -21,10 +21,11 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
   // GET /api/google/auth - Generate consent URL
   fastify.get('/google/auth', async (request, reply) => {
     const oauth2Client = getOAuthClient();
+    const loginHint = process.env.GOOGLE_DRIVE_ACCOUNT_EMAIL || undefined;
     const url = oauth2Client.generateAuthUrl({
       access_type: 'offline',
       prompt: 'consent',
-      login_hint: 'affansidd1030@gmail.com',
+      ...(loginHint ? { login_hint: loginHint } : {}),
       scope: ['https://www.googleapis.com/auth/drive'],
     });
 
@@ -48,12 +49,12 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       const { google } = await import('googleapis');
       const drive = google.drive({ version: 'v3', auth: oauth2Client });
 
-      // Verify email matches affansidd1030@gmail.com
+      // Verify email if explicitly specified in env
       const about = await drive.about.get({ fields: 'user(emailAddress)' });
       const authedEmail = about.data.user?.emailAddress?.toLowerCase();
-      const requiredEmail = (process.env.GOOGLE_DRIVE_ACCOUNT_EMAIL || 'affansidd1030@gmail.com').toLowerCase();
+      const requiredEmail = process.env.GOOGLE_DRIVE_ACCOUNT_EMAIL ? process.env.GOOGLE_DRIVE_ACCOUNT_EMAIL.toLowerCase() : null;
 
-      if (authedEmail && authedEmail !== requiredEmail) {
+      if (requiredEmail && authedEmail && authedEmail !== requiredEmail) {
         return reply.status(403).send({
           error: `Invalid Google Account. Please sign in with ${requiredEmail} (attempted with ${authedEmail}).`,
         });
@@ -880,6 +881,186 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       });
     } catch (error: any) {
       return reply.status(500).send({ error: error.message || 'Failed to load project media stats' });
+    }
+  });
+
+  // -------------------------------------------------------------
+  // 6. Google Meet & Gemini Meeting Notes Sync
+  // -------------------------------------------------------------
+
+  // GET /api/google/meet-notes - List recent Google Meet notes from Google Drive
+  fastify.get('/google/meet-notes', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    try {
+      const authResult = await getAuthenticatedDrive();
+      if ('error' in authResult) {
+        return reply.status(authResult.status).send({ error: authResult.error, connected: false });
+      }
+
+      const { drive } = authResult;
+
+      // Search Google Docs that match Meet notes patterns or recent docs
+      // Google Meet saves Gemini notes as Google Docs in user drive (frequently titled "Notes:", meeting title, or inside "Meet Recordings"/"Google Meet" folders)
+      const q = "mimeType = 'application/vnd.google-apps.document' and trashed = false";
+      
+      const response = await drive.files.list({
+        q,
+        fields: 'files(id, name, createdTime, modifiedTime, webViewLink, iconLink)',
+        orderBy: 'modifiedTime desc',
+        pageSize: 15,
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
+      });
+
+      return reply.send({
+        success: true,
+        files: response.data.files || [],
+      });
+    } catch (error: any) {
+      console.error('Error fetching Google Meet notes from drive:', error);
+      const authError = getGoogleAuthErrorPayload(error);
+      if (authError) return reply.status(401).send(authError);
+      return reply.status(500).send({ error: getGoogleApiErrorMessage(error) });
+    }
+  });
+
+  // POST /api/google/sync-meet-note - Fetch content from Google Doc and post directly into channel/DM chat
+  fastify.post('/google/sync-meet-note', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    try {
+      const currentUserId = (request.user as { id: string }).id;
+      const body = request.body as {
+        channelId: string;
+        fileId?: string;
+        customSummary?: string;
+        meetingTitle?: string;
+        meetUrl?: string;
+      };
+
+      const { channelId, fileId, customSummary, meetingTitle, meetUrl } = body;
+      if (!channelId) {
+        return reply.status(400).send({ error: 'channelId is required' });
+      }
+
+      const channel = await prisma.channel.findUnique({
+        where: { id: channelId },
+        include: { members: true },
+      });
+
+      if (!channel) {
+        return reply.status(404).send({ error: 'Channel not found' });
+      }
+
+      let noteContent = '';
+      let docTitle = meetingTitle || 'Google Meet';
+      let docLink = meetUrl || '';
+
+      if (fileId) {
+        const authResult = await getAuthenticatedDrive();
+        if ('error' in authResult) {
+          return reply.status(authResult.status).send({ error: authResult.error });
+        }
+
+        const { drive } = authResult;
+
+        // Get file metadata
+        try {
+          const fileMeta = await drive.files.get({
+            fileId,
+            fields: 'id, name, webViewLink',
+            supportsAllDrives: true,
+          });
+          if (fileMeta.data.name) docTitle = fileMeta.data.name;
+          if (fileMeta.data.webViewLink) docLink = fileMeta.data.webViewLink;
+        } catch (metaErr) {
+          console.warn('Could not fetch doc metadata:', metaErr);
+        }
+
+        // Export Google Doc as plain text
+        try {
+          const exportRes = await drive.files.export(
+            {
+              fileId,
+              mimeType: 'text/plain',
+            },
+            { responseType: 'text' }
+          );
+
+          if (typeof exportRes.data === 'string') {
+            noteContent = exportRes.data.trim();
+          }
+        } catch (exportErr: any) {
+          console.error('Error exporting doc text:', exportErr.message);
+          noteContent = customSummary || '(Note content could not be converted from Google Doc directly)';
+        }
+      } else if (customSummary) {
+        noteContent = customSummary;
+      }
+
+      // Format markdown chat message
+      const formattedLines = [
+        `### 📝 Meeting Notes: **${docTitle}**`,
+      ];
+
+      if (docLink) {
+        formattedLines.push(`🔗 [Open Google Meet Document](${docLink})\n`);
+      }
+
+      if (noteContent) {
+        formattedLines.push('---');
+        // Truncate to reasonable length for chat if needed
+        const displayBody = noteContent.length > 3500 ? noteContent.slice(0, 3500) + '\n\n*(Truncated. Click link above to view complete document)*' : noteContent;
+        formattedLines.push(displayBody);
+      } else {
+        formattedLines.push('Meeting concluded. Notes are synced with Google Workspace.');
+      }
+
+      const finalMessageContent = formattedLines.join('\n');
+
+      // Create message in database
+      const message = await prisma.message.create({
+        data: {
+          channelId,
+          userId: currentUserId,
+          content: finalMessageContent,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              displayName: true,
+              avatarUrl: true,
+              username: true,
+              status: true,
+            },
+          },
+          quotedMessage: true,
+          bot: true,
+          attachments: true,
+          reactions: true,
+          _count: { select: { replies: true } },
+        },
+      });
+
+      const payload = {
+        ...message,
+        replyCount: 0,
+        workspaceId: channel.workspaceId,
+      };
+
+      // Realtime broadcast
+      if (fastify.io) {
+        if (channel.type === 'PUBLIC') {
+          fastify.io.to(`workspace:${channel.workspaceId}`).emit('message:new', payload);
+        } else {
+          for (const m of channel.members) {
+            fastify.io.to(`user:${m.userId}`).emit('message:new', payload);
+          }
+        }
+      }
+
+      return reply.send({ success: true, message: payload });
+    } catch (error: any) {
+      console.error('Error syncing meeting note to chat:', error);
+      return reply.status(500).send({ error: error.message || 'Failed to sync meeting note' });
     }
   });
 };

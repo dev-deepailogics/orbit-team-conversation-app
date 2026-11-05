@@ -31,6 +31,7 @@ import {
   CheckSquare,
   Pencil,
   Trash2,
+  Video,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
@@ -48,6 +49,7 @@ import { compressFile } from '../../lib/compression';
 import { EmployeeAvailabilityHeader } from '../availability/EmployeeAvailabilityHeader';
 import { PinnedMessagesModal } from './PinnedMessagesModal';
 import { AnonymousPersonaModal } from '../channel/AnonymousPersonaModal';
+import { GoogleMeetModal } from '../google/GoogleMeetModal';
 
 
 interface ChatAreaProps {
@@ -100,6 +102,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showPinsModal, setShowPinsModal] = useState(false);
   const [showAnonPersonaModal, setShowAnonPersonaModal] = useState(false);
+  const [showGoogleMeetModal, setShowGoogleMeetModal] = useState(false);
   const [anonProfile, setAnonProfile] = useState<{ anonName: string; anonEmoji: string } | null>(
     channel.myAnonProfile || null
   );
@@ -706,14 +709,24 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <span className="hidden sm:inline">Pins</span>
           </button>
 
-          {/* Call / Meet Button */}
+          {/* Orbit Built-in Call Button */}
           <button
             onClick={() => onStartHuddle(channel)}
-            title="Start Audio/Video Call"
-            className="flex items-center gap-1.5 sm:gap-2 p-1.5 sm:px-3.5 sm:py-1.5 rounded-lg bg-slack-green/15 hover:bg-slack-green/25 text-slack-green border border-slack-green/40 text-xs font-semibold transition"
+            title="Start Orbit Built-in Audio/Video Call"
+            className="flex items-center gap-1.5 sm:gap-2 p-1.5 sm:px-3 sm:py-1.5 rounded-lg bg-slack-green/15 hover:bg-slack-green/25 text-slack-green border border-slack-green/40 text-xs font-semibold transition"
           >
             <PhoneCall size={14} />
             <span className="hidden sm:inline">Call</span>
+          </button>
+
+          {/* Google Meet Button (with Gemini Notes Sync) */}
+          <button
+            onClick={() => setShowGoogleMeetModal(true)}
+            title="Open Google Meet & sync meeting notes into chat"
+            className="flex items-center gap-1.5 sm:gap-2 p-1.5 sm:px-3 sm:py-1.5 rounded-lg bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 text-emerald-400 border border-emerald-500/40 text-xs font-semibold transition shadow-sm"
+          >
+            <Video size={14} className="text-emerald-400" />
+            <span className="hidden sm:inline">Google Meet</span>
           </button>
 
           {/* Vertical Three Dots Menu (Most Right Corner) */}
@@ -1663,6 +1676,22 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             fileInputRef.current.value = '';
           }
         }}
+      />
+
+      {/* Google Meet & Gemini Notes Modal */}
+      <GoogleMeetModal
+        isOpen={showGoogleMeetModal}
+        onClose={() => setShowGoogleMeetModal(false)}
+        channelId={channel.id}
+        channelName={getDirectChannelTitle()}
+        targetUser={
+          channel.type === 'DIRECT' && channel.members
+            ? (() => {
+                const other = channel.members.find((m) => m.userId !== currentUser?.id);
+                return other?.user ? { id: other.user.id, displayName: other.user.displayName } : null;
+              })()
+            : null
+        }
       />
     </div>
   );

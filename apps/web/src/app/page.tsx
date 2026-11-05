@@ -23,19 +23,20 @@ import { registerPush } from "../lib/push";
 import { useThemeStore } from "../stores/themeStore";
 
 // Components
-import { WorkspaceSidebar } from "../components/workspace/WorkspaceSidebar";
-import { ChannelSidebar } from "../components/channel/ChannelSidebar";
-import { ChatArea } from "../components/chat/ChatArea";
-import { ThreadSidebar } from "../components/chat/ThreadSidebar";
-import { HuddleModal } from "../components/huddle/HuddleModal";
-import { IncomingCallDialog } from "../components/huddle/IncomingCallDialog";
-import { AddMembersDialog } from "../components/channel/AddMembersDialog";
-import { BotPortalDialog } from "../components/bot/BotPortalDialog";
-import { SearchMessagesDialog } from "../components/chat/SearchMessagesDialog";
-import { ProjectBoardView } from "../components/project/ProjectBoardView";
-import { CreateProjectModal } from "../components/project/CreateProjectModal";
-import { CreateTicketFromMessageDialog } from "../components/project/CreateTicketFromMessageDialog";
-import { OrganizationControlView } from "../components/availability/OrganizationControlView";
+import { WorkspaceSidebar } from '../components/workspace/WorkspaceSidebar';
+import { ChannelSidebar } from '../components/channel/ChannelSidebar';
+import { ChatArea } from '../components/chat/ChatArea';
+import { ThreadSidebar } from '../components/chat/ThreadSidebar';
+import { HuddleModal } from '../components/huddle/HuddleModal';
+import { IncomingCallDialog } from '../components/huddle/IncomingCallDialog';
+import { AddMembersDialog } from '../components/channel/AddMembersDialog';
+import { BotPortalDialog } from '../components/bot/BotPortalDialog';
+import { SearchMessagesDialog } from '../components/chat/SearchMessagesDialog';
+import { ProjectBoardView } from '../components/project/ProjectBoardView';
+import { CreateProjectModal } from '../components/project/CreateProjectModal';
+import { CreateTicketFromMessageDialog } from '../components/project/CreateTicketFromMessageDialog';
+import { OrganizationControlView } from '../components/availability/OrganizationControlView';
+import { GoogleMeetSidebar } from '../components/google/GoogleMeetSidebar';
 import {
   Layers,
   ShieldCheck,
@@ -97,9 +98,8 @@ export default function AppDashboard() {
   const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
   const [showOrgControl, setShowOrgControl] = useState(false);
   const [orgControlResetKey, setOrgControlResetKey] = useState(0);
-  const [messageForTicket, setMessageForTicket] = useState<Message | null>(
-    null,
-  );
+  const [showGoogleMeetSidebar, setShowGoogleMeetSidebar] = useState(false);
+  const [messageForTicket, setMessageForTicket] = useState<Message | null>(null);
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
@@ -846,6 +846,10 @@ export default function AppDashboard() {
                   setIsMobileSidebarOpen(false);
                   handleStartHuddle(ch);
                 }}
+                onOpenGoogleMeet={() => {
+                  setIsMobileSidebarOpen(false);
+                  setShowGoogleMeetSidebar(true);
+                }}
                 onLogout={logout}
                 onOpenSearch={() => {
                   setIsMobileSidebarOpen(false);
@@ -907,6 +911,7 @@ export default function AppDashboard() {
             onOpenCreateProject={() => setShowCreateProjectModal(true)}
             onOpenBotPortal={() => setShowBotPortal(true)}
             onStartHuddle={handleStartHuddle}
+            onOpenGoogleMeet={() => setShowGoogleMeetSidebar(true)}
             onLogout={logout}
             onOpenSearch={() => setShowSearchModal(true)}
             onOpenOrganizationControl={() => {
@@ -1310,6 +1315,16 @@ export default function AppDashboard() {
           onOpenCreateProject={() => setShowCreateProjectModal(true)}
         />
       )}
+
+      {/* 12. Google Meet Apps Right-Side Drawer */}
+      <GoogleMeetSidebar
+        isOpen={showGoogleMeetSidebar}
+        onClose={() => setShowGoogleMeetSidebar(false)}
+        currentChannel={currentChannel}
+        channels={channels}
+        currentUser={user}
+        onSelectChannel={handleSelectChannel}
+      />
     </div>
   );
 }
