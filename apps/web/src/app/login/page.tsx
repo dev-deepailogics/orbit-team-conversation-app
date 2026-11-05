@@ -23,7 +23,7 @@ export default function LoginPage() {
     try {
       const res = await api.post('/api/auth/login', { email, password });
       setAuth(res.data.user, res.data.accessToken);
-      router.push('/');
+      router.push('/app');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Invalid email or password');
     } finally {

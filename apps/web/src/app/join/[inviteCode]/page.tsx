@@ -29,7 +29,7 @@ export default function JoinWorkspacePage() {
       const res = await api.post('/api/workspaces/join', { inviteCode });
       setStatus('success');
       setTimeout(() => {
-        router.push('/');
+        router.push('/app');
       }, 1500);
     } catch (err: any) {
       setStatus('error');
