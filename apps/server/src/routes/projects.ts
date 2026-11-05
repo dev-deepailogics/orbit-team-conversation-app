@@ -4,6 +4,9 @@ import { SOCKET_EVENTS } from "@orbit/types";
 import { z } from "zod";
 import { sendTicketBotNotification } from "../services/systemBot.js";
 
+// User ids are UUIDs for new users but Firebase UIDs for migrated ones — accept both.
+const userIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
+
 const createProjectSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().optional().nullable(),
@@ -64,10 +67,10 @@ const createTicketSchema = z.object({
   description: z.string().optional().nullable(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).default("MEDIUM"),
   dueDate: z.string().optional().nullable(),
-  assigneeId: z.string().uuid().optional().nullable(),
+  assigneeId: userIdSchema.optional().nullable(),
   // Multi-assign: [{ uid: <user id>, name }]. assigneeId mirrors the first entry for older clients.
   assignees: z
-    .array(z.object({ uid: z.string().uuid(), name: z.string() }))
+    .array(z.object({ uid: userIdSchema, name: z.string() }))
     .max(50)
     .optional()
     .nullable(),
@@ -79,10 +82,10 @@ const updateTicketSchema = z.object({
   description: z.string().optional().nullable(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
   dueDate: z.string().optional().nullable(),
-  assigneeId: z.string().uuid().optional().nullable(),
+  assigneeId: userIdSchema.optional().nullable(),
   // Multi-assign: [{ uid: <user id>, name }]. assigneeId mirrors the first entry for older clients.
   assignees: z
-    .array(z.object({ uid: z.string().uuid(), name: z.string() }))
+    .array(z.object({ uid: userIdSchema, name: z.string() }))
     .max(50)
     .optional()
     .nullable(),
@@ -118,7 +121,7 @@ const updateDocumentSchema = z.object({
 });
 
 const shareDocumentSchema = z.object({
-  userId: z.string().uuid(),
+  userId: userIdSchema,
   permission: z.enum(["VIEW", "EDIT"]).default("EDIT"),
 });
 

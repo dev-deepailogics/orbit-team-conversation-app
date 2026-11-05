@@ -88,6 +88,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onSelectChannel,
 }) => {
   const [content, setContent] = useState('');
+  const sendingRef = useRef(false);
   const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
   const [activeEmojiMessageId, setActiveEmojiMessageId] = useState<string | null>(null);
@@ -328,25 +329,35 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       }
     }
 
+    if (sendingRef.current) return;
+    sendingRef.current = true;
+    const sentAttachments = attachments;
+    const sentReplyTo = replyingToMessage;
+    // Clear input immediately so a second Enter can't resend
+    editorRef.current?.clear();
+    setContent('');
+    setAttachments([]);
+    setReplyingToMessage(null);
+
     try {
       const res = await api.post(`/api/channels/${channel.id}/messages`, {
         content: trimmed,
-        attachments,
-        quotedMessageId: replyingToMessage?.id,
+        attachments: sentAttachments,
+        quotedMessageId: sentReplyTo?.id,
       });
 
       // Optimistically append sent message immediately to avoid channel reload delay
       useChatStore.getState().addMessage(res.data);
 
-      editorRef.current?.clear();
-      setContent('');
-      setAttachments([]);
-      setReplyingToMessage(null);
       setShowEmoji(false);
       const socket = getSocket();
       socket.emit('typing:stop', { channelId: channel.id });
     } catch (err) {
       console.error('Failed to send message', err);
+      setAttachments(sentAttachments);
+      setReplyingToMessage(sentReplyTo);
+    } finally {
+      sendingRef.current = false;
     }
   };
 
@@ -500,6 +511,32 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
     return channel.name;
   };
+
+  // Slack-style intro shown at the top of a DM instead of the channel intro
+  const dmPeer = channel.members?.find((m) => m.userId !== currentUser?.id)?.user;
+  const dmName = getDirectChannelTitle();
+  const dmIntro = channel.type === 'DIRECT' && (
+    <div className="py-6 border-b mb-2" style={{ borderColor: 'var(--theme-border)' }}>
+      <img
+        src={(dmPeer ?? currentUser)?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${dmName}`}
+        alt={dmName}
+        className="w-16 h-16 rounded-xl object-cover mb-3"
+      />
+      <h3 className="font-bold text-lg" style={{ color: 'var(--theme-text-primary)' }}>
+        {dmName}
+      </h3>
+      <p className="text-sm mt-1 max-w-md" style={{ color: 'var(--theme-text-muted)' }}>
+        {dmPeer ? (
+          <>
+            This conversation is just between{' '}
+            <span className="text-slack-green font-medium">@{dmPeer.displayName}</span> and you.
+          </>
+        ) : (
+          'This is your space. Draft messages, list your to-dos, or keep links and files handy.'
+        )}
+      </p>
+    </div>
+  );
 
   // Switch back to messages when channel changes
   useEffect(() => {
@@ -854,7 +891,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-4"
       >
         {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center">
+          dmIntro || <div className="h-full flex flex-col items-center justify-center text-center">
             <div
               className="w-12 h-12 rounded-full flex items-center justify-center mb-3"
               style={{ backgroundColor: 'var(--theme-bg-surface)', color: 'var(--theme-text-muted)' }}
@@ -903,7 +940,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
             {/* Start of channel header (only shown when user has scrolled all the way to the beginning) */}
             {!hasMoreMessages && (
-              <div className="py-6 border-b mb-2" style={{ borderColor: 'var(--theme-border)' }}>
+              dmIntro || <div className="py-6 border-b mb-2" style={{ borderColor: 'var(--theme-border)' }}>
                 <div
                   className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3 shadow"
                   style={{ backgroundColor: 'var(--theme-bg-surface)', color: 'var(--theme-text-muted)' }}
@@ -1434,6 +1471,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 ? 'Drop file here to upload to channel...'
                 : channel.isAnonymous
                 ? `Message as ${anonProfile?.anonEmoji || '🎭'} ${anonProfile?.anonName || 'Anonymous'}...`
+                : channel.type === 'DIRECT'
+                ? `Message ${dmName}`
                 : `Message #${channel.name}`
             }
             showToolbar={showFormatting}

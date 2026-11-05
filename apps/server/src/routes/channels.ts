@@ -118,7 +118,8 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     }
 
     // Check if an existing 1:1 DM channel already exists between these users (including history with kicked users)
-    const existingDm = await prisma.channel.findFirst({
+    // Skipped for self-DM: both "some" conditions would match any DM the user is in
+    const existingDm = currentUserId === targetUserId ? null : await prisma.channel.findFirst({
       where: {
         workspaceId,
         type: 'DIRECT',
