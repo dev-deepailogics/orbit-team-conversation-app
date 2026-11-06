@@ -143,12 +143,12 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.send(existingDm);
     }
 
-    // If creating a brand new DM channel, verify target user exists
-    const targetUser = await prisma.user.findUnique({
-      where: { id: targetUserId },
+    // If creating a brand new DM channel, verify target user is in this workspace
+    const targetMember = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId, userId: targetUserId } },
     });
 
-    if (!targetUser) {
+    if (!targetMember) {
       return reply.status(404).send({ error: 'User not found' });
     }
 

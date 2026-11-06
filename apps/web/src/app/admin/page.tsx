@@ -25,6 +25,7 @@ import {
   CheckCircle2,
   Loader2,
   Sparkles,
+  Copy,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
@@ -70,6 +71,7 @@ interface AdminWorkspace {
   inviteCode: string;
   ownerId: string;
   createdAt: string;
+  settings?: { isDemo?: boolean } | null;
   owner?: {
     id: string;
     email: string;
@@ -116,6 +118,15 @@ export default function AdminDashboardPage() {
   const [wsSlug, setWsSlug] = useState('');
   const [wsOwnerEmail, setWsOwnerEmail] = useState('');
   const [isCreatingWs, setIsCreatingWs] = useState(false);
+
+  const [showDemoModal, setShowDemoModal] = useState(false);
+  const [demoName, setDemoName] = useState('');
+  const [isCreatingDemo, setIsCreatingDemo] = useState(false);
+  const [demoResult, setDemoResult] = useState<{
+    workspace: { name: string; slug: string };
+    password: string;
+    accounts: Array<{ name: string; role: string; title: string; email: string }>;
+  } | null>(null);
 
   // Feedback notification
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -250,6 +261,36 @@ export default function AdminDashboardPage() {
       setIsCreatingWs(false);
     }
   };
+
+  const handleCreateDemo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsCreatingDemo(true);
+    try {
+      const res = await api.post('/api/admin/workspaces/demo', { name: demoName });
+      setDemoResult(res.data);
+      setDemoName('');
+      fetchAdminData();
+    } catch (err: any) {
+      showFeedback('error', err.response?.data?.error || 'Failed to create demo workspace');
+    } finally {
+      setIsCreatingDemo(false);
+    }
+  };
+
+  const closeDemoModal = () => {
+    setShowDemoModal(false);
+    setDemoResult(null);
+  };
+
+  const demoCredentialsText = demoResult
+    ? [
+        `Orbit demo workspace: ${demoResult.workspace.name}`,
+        `Login: ${window.location.origin}/login`,
+        `Password (all accounts): ${demoResult.password}`,
+        '',
+        ...demoResult.accounts.map((a) => `${a.role.padEnd(6)}  ${a.email}  (${a.name}, ${a.title})`),
+      ].join('\n')
+    : '';
 
   // Handle Delete Workspace
   const handleDeleteWorkspace = async () => {
@@ -430,6 +471,14 @@ export default function AdminDashboardPage() {
           </div>
 
           {activeTab === 'workspaces' && (
+            <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowDemoModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition shadow"
+            >
+              <Sparkles size={14} />
+              <span>Create Demo Workspace</span>
+            </button>
             <button
               onClick={() => setShowCreateWsModal(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-slack-green hover:bg-[#008a65] text-white rounded-xl text-xs font-bold transition shadow"
@@ -437,6 +486,7 @@ export default function AdminDashboardPage() {
               <Plus size={14} />
               <span>Create Workspace</span>
             </button>
+            </div>
           )}
         </div>
 
@@ -688,6 +738,11 @@ export default function AdminDashboardPage() {
                             {ws.name.substring(0, 2).toUpperCase()}
                           </div>
                           <span>{ws.name}</span>
+                          {ws.settings?.isDemo && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-purple-600/20 border border-purple-500/40 text-purple-300 text-[10px] font-bold uppercase">
+                              Demo
+                            </span>
+                          )}
                         </td>
 
                         <td className="py-3 px-4 font-mono text-[11px] text-gray-300">
@@ -1030,6 +1085,143 @@ export default function AdminDashboardPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3b: CREATE DEMO WORKSPACE */}
+      {showDemoModal && (
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-150"
+          onClick={() => !isCreatingDemo && closeDemoModal()}
+        >
+          <div
+            className="bg-[#1A1D21] border border-gray-700 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Sparkles size={18} className="text-purple-400" />
+                <span>{demoResult ? 'Demo Workspace Ready' : 'Create Demo Workspace'}</span>
+              </h3>
+              <button
+                onClick={closeDemoModal}
+                disabled={isCreatingDemo}
+                className="text-gray-400 hover:text-white p-1 rounded transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            {!demoResult ? (
+              <form onSubmit={handleCreateDemo} className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1">
+                    Workspace Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    minLength={2}
+                    maxLength={50}
+                    autoFocus
+                    placeholder="e.g. Acme Technologies"
+                    value={demoName}
+                    onChange={(e) => setDemoName(e.target.value)}
+                    className="w-full bg-[#222529] border border-gray-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1.5 leading-relaxed">
+                    Creates an isolated workspace with its own users (Owner, Admin, 2 Members, Guest), channels with a
+                    guided feature tour, DMs, 3 projects with tickets &amp; docs, and availability history. Deleting it
+                    later also deletes its demo users.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={closeDemoModal}
+                    className="px-3.5 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-xs font-semibold text-gray-300 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isCreatingDemo}
+                    className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-xs font-bold text-white transition flex items-center gap-1.5 disabled:opacity-60"
+                  >
+                    {isCreatingDemo && <Loader2 size={13} className="animate-spin" />}
+                    <span>{isCreatingDemo ? 'Seeding workspace…' : 'Create Demo'}</span>
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-3.5">
+                <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-950/30 border border-amber-800/50 text-amber-200 text-[11px]">
+                  <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                  <span>
+                    Save these credentials now. The password is shown only once (you can still reset it from User
+                    Management).
+                  </span>
+                </div>
+
+                <div className="text-xs text-gray-300 space-y-1">
+                  <div>
+                    Workspace: <span className="text-white font-bold">{demoResult.workspace.name}</span>{' '}
+                    <span className="font-mono text-gray-400">/{demoResult.workspace.slug}</span>
+                  </div>
+                  <div>
+                    Password (all accounts):{' '}
+                    <span className="font-mono text-white bg-[#222529] px-1.5 py-0.5 rounded">{demoResult.password}</span>
+                  </div>
+                </div>
+
+                <div className="border border-gray-800 rounded-xl overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-[#16181B] text-gray-400 uppercase text-[10px] tracking-wider">
+                      <tr>
+                        <th className="py-2 px-3">Role</th>
+                        <th className="py-2 px-3">User</th>
+                        <th className="py-2 px-3">Email</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-800/60">
+                      {demoResult.accounts.map((a) => (
+                        <tr key={a.email}>
+                          <td className="py-2 px-3 font-bold text-purple-300">{a.role}</td>
+                          <td className="py-2 px-3">
+                            <span className="text-white block">{a.name}</span>
+                            <span className="text-[10px] text-gray-500">{a.title}</span>
+                          </td>
+                          <td className="py-2 px-3 font-mono text-[11px] text-gray-300 select-all">{a.email}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    onClick={() =>
+                      navigator.clipboard
+                        .writeText(demoCredentialsText)
+                        .then(() => showFeedback('success', 'Credentials copied to clipboard'))
+                        .catch(() => showFeedback('error', 'Could not copy. Select the text manually.'))
+                    }
+                    className="px-3.5 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-xs font-semibold text-gray-200 transition flex items-center gap-1.5"
+                  >
+                    <Copy size={13} />
+                    <span>Copy credentials</span>
+                  </button>
+                  <button
+                    onClick={closeDemoModal}
+                    className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-xs font-bold text-white transition"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

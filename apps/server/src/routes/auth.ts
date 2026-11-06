@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@orbit/db';
 import { z } from 'zod';
+import { isDemoEmail } from '../services/demoWorkspace.js';
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -24,6 +25,11 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     }
 
     const { email, password, username, displayName } = parseResult.data;
+
+    // *.demo addresses are reserved for admin-generated demo workspaces.
+    if (isDemoEmail(email)) {
+      return reply.status(400).send({ error: 'This email domain is reserved' });
+    }
 
     const existingUser = await prisma.user.findFirst({
       where: {

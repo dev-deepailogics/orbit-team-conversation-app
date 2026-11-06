@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { prisma } from '@orbit/db';
 import { z } from 'zod';
 import { ACTIVITY_CHANNEL, ACTIVITY_CHANNEL_TOPIC, sendSystemNotification } from '../services/systemBot.js';
+import { isForeignDemoUser } from '../services/demoWorkspace.js';
 
 const createWorkspaceSchema = z.object({
   name: z.string().min(2).max(50),
@@ -241,6 +242,11 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       return reply.status(404).send({ error: 'Invalid invite code' });
     }
 
+    const joiner = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+    if (joiner && isForeignDemoUser(joiner.email, workspace.slug)) {
+      return reply.status(403).send({ error: 'Demo accounts can only access their own demo workspace' });
+    }
+
     // Check if already a member
     const existingMember = await prisma.workspaceMember.findUnique({
       where: {
@@ -347,7 +353,9 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       },
     });
 
-    if (!targetUser) {
+    // Demo users from another demo workspace are reported as not found, so demos never connect.
+    const targetWorkspace = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { slug: true } });
+    if (!targetUser || !targetWorkspace || isForeignDemoUser(targetUser.email, targetWorkspace.slug)) {
       return reply.status(404).send({ error: `User "${emailOrUsername}" not found. Ensure they have signed up first.` });
     }
 

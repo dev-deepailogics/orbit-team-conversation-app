@@ -3,6 +3,7 @@ import { prisma } from '@orbit/db';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { ACTIVITY_CHANNEL, ACTIVITY_CHANNEL_TOPIC } from '../services/systemBot.js';
+import { createDemoWorkspace, demoEmailDomain } from '../services/demoWorkspace.js';
 
 const updateRoleSchema = z.object({
   systemRole: z.enum(['SUPER_ADMIN', 'WORKSPACE_ADMIN', 'USER']),
@@ -357,13 +358,34 @@ export const adminRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
     return reply.status(201).send(workspace);
   });
 
-  // 8. Delete Workspace
+  // 7b. Create a seeded demo workspace with its own isolated users (one per role)
+  fastify.post('/workspaces/demo', { preHandler: [ensureSuperAdmin] }, async (request, reply) => {
+    const parseResult = z.object({ name: z.string().trim().min(2).max(50) }).safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: 'Workspace name must be 2-50 characters' });
+    }
+    return reply.status(201).send(await createDemoWorkspace(parseResult.data.name));
+  });
+
+  // 8. Delete Workspace (demo workspaces also take their demo users with them)
   fastify.delete('/workspaces/:workspaceId', { preHandler: [ensureSuperAdmin] }, async (request, reply) => {
     const { workspaceId } = request.params as { workspaceId: string };
 
-    await prisma.workspace.delete({
+    const workspace = await prisma.workspace.findUnique({
       where: { id: workspaceId },
+      select: { slug: true, settings: true },
     });
+    if (!workspace) {
+      return reply.status(404).send({ error: 'Workspace not found' });
+    }
+
+    const isDemo = (workspace.settings as { isDemo?: boolean } | null)?.isDemo === true;
+    await prisma.$transaction([
+      prisma.workspace.delete({ where: { id: workspaceId } }),
+      ...(isDemo
+        ? [prisma.user.deleteMany({ where: { email: { endsWith: `@${demoEmailDomain(workspace.slug)}` } } })]
+        : []),
+    ]);
 
     return reply.send({ success: true, deletedWorkspaceId: workspaceId });
   });
