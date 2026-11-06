@@ -240,8 +240,8 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 className="w-full px-3.5 py-2 text-left text-xs flex items-center justify-between transition hover:bg-black/5 dark:hover:bg-white/10 group"
               >
                 <div className="flex items-center gap-2.5">
-                  <Building2 size={15} className="text-blue-400" />
-                  <span className="font-semibold text-blue-300">
+                  <Building2 size={15} className="text-blue-600 dark:text-blue-400" />
+                  <span className="font-semibold text-blue-700 dark:text-blue-300">
                     Organization Control
                   </span>
                 </div>
@@ -361,7 +361,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           >
             <button
               onClick={() => setIsProjectsCollapsed((prev) => !prev)}
-              className="flex items-center gap-1.5 hover:text-white transition cursor-pointer text-left focus:outline-none"
+              className="flex items-center gap-1.5 hover:text-[var(--theme-text)] transition cursor-pointer text-left focus:outline-none"
             >
               <ChevronDown
                 size={14}
@@ -469,7 +469,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           >
             <button
               onClick={() => setIsChannelsCollapsed((prev) => !prev)}
-              className="flex items-center gap-1.5 hover:text-white transition cursor-pointer text-left focus:outline-none"
+              className="flex items-center gap-1.5 hover:text-[var(--theme-text)] transition cursor-pointer text-left focus:outline-none"
             >
               <ChevronDown
                 size={14}
@@ -539,7 +539,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                         )}
                         <span className="truncate">{channel.name}</span>
                         {channel.isAnonymous && (
-                          <span className="text-[9px] px-1 py-0.2 rounded bg-purple-950/80 border border-purple-700/50 text-purple-300 font-semibold shrink-0">
+                          <span className="text-[9px] px-1 py-0.2 rounded bg-purple-950/80 border border-purple-700/50 text-purple-700 dark:text-purple-300 font-semibold shrink-0">
                             anon
                           </span>
                         )}
@@ -579,7 +579,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                           className={`p-1 rounded transition ${
                             hasHuddle
                               ? "bg-slack-green text-white shadow-sm"
-                              : "opacity-0 group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10"
+                              : "opacity-0 group-hover:opacity-100 hover:bg-[var(--theme-bg-app)] dark:hover:bg-white/10"
                           }`}
                         >
                           <PhoneCall size={13} />
@@ -600,7 +600,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           >
             <button
               onClick={() => setIsDmsCollapsed((prev) => !prev)}
-              className="flex items-center gap-1.5 hover:text-white transition cursor-pointer text-left focus:outline-none"
+              className="flex items-center gap-1.5 hover:text-[var(--theme-text)] transition cursor-pointer text-left focus:outline-none"
             >
               <ChevronDown
                 size={14}
@@ -797,21 +797,21 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
       {/* Create Channel Modal */}
       {showCreateChannel && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1A1D21] border border-gray-700 rounded-xl w-full max-w-md p-6 shadow-2xl">
-            <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+          <div className="bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-xl w-full max-w-md p-6 shadow-2xl">
+            <h2 className="text-xl font-bold text-[var(--theme-text)] mb-2 flex items-center gap-2">
               <Hash className="text-slack-activeChannel" size={22} />
               Create a channel
             </h2>
-            <p className="text-sm text-gray-400 mb-5">
+            <p className="text-sm text-[var(--theme-text-muted)] mb-5">
               Channels are where conversations happen around a topic.
             </p>
 
             <form onSubmit={handleCreateChannel} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--theme-text)] mb-1">
                   Name
                 </label>
-                <div className="flex items-center bg-[#222529] border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-400">
+                <div className="flex items-center bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-lg px-3 py-2 text-sm text-[var(--theme-text-muted)]">
                   <span>#</span>
                   <input
                     type="text"
@@ -819,13 +819,13 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                     placeholder="e.g. project-updates"
                     value={channelName}
                     onChange={(e) => setChannelName(e.target.value)}
-                    className="flex-1 bg-transparent text-white focus:outline-none ml-1"
+                    className="flex-1 bg-transparent text-[var(--theme-text)] focus:outline-none ml-1"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--theme-text)] mb-1">
                   Topic (optional)
                 </label>
                 <input
@@ -833,13 +833,13 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                   placeholder="What is this channel about?"
                   value={channelTopic}
                   onChange={(e) => setChannelTopic(e.target.value)}
-                  className="w-full bg-[#222529] border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-slack-activeChannel text-sm"
+                  className="w-full bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-lg px-3 py-2 text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-slack-activeChannel text-sm"
                 />
               </div>
 
               {/* Channel Type / Privacy Cards */}
               <div className="space-y-2 pt-1">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--theme-text)]">
                   Channel Privacy
                 </label>
                 <div className="grid grid-cols-2 gap-3">
@@ -848,21 +848,21 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                     className={`p-3 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
                       !isPrivate
                         ? "border-slack-green bg-slack-green/10 text-white shadow"
-                        : "border-gray-700 bg-[#222529] text-gray-400 hover:border-gray-600"
+                        : "border-[var(--theme-border)] bg-[var(--theme-bg-surface)] text-[var(--theme-text-muted)] hover:border-[var(--theme-border)]"
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <Hash
                         size={16}
                         className={
-                          !isPrivate ? "text-slack-green" : "text-gray-400"
+                          !isPrivate ? "text-slack-green" : "text-[var(--theme-text-muted)]"
                         }
                       />
-                      <span className="font-bold text-xs text-white">
+                      <span className="font-bold text-xs text-[var(--theme-text)]">
                         Public
                       </span>
                     </div>
-                    <span className="text-[11px] text-gray-400 leading-snug">
+                    <span className="text-[11px] text-[var(--theme-text-muted)] leading-snug">
                       Anyone in workspace can view &amp; join
                     </span>
                   </div>
@@ -872,21 +872,21 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                     className={`p-3 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
                       isPrivate
                         ? "border-slack-green bg-slack-green/10 text-white shadow"
-                        : "border-gray-700 bg-[#222529] text-gray-400 hover:border-gray-600"
+                        : "border-[var(--theme-border)] bg-[var(--theme-bg-surface)] text-[var(--theme-text-muted)] hover:border-[var(--theme-border)]"
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <Lock
                         size={16}
                         className={
-                          isPrivate ? "text-slack-green" : "text-gray-400"
+                          isPrivate ? "text-slack-green" : "text-[var(--theme-text-muted)]"
                         }
                       />
-                      <span className="font-bold text-xs text-white">
+                      <span className="font-bold text-xs text-[var(--theme-text)]">
                         Private
                       </span>
                     </div>
-                    <span className="text-[11px] text-gray-400 leading-snug">
+                    <span className="text-[11px] text-[var(--theme-text-muted)] leading-snug">
                       Only invited people can view &amp; join
                     </span>
                   </div>
@@ -895,7 +895,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 
               {/* Anonymous Discussion Mode Option */}
               <div className="space-y-1.5 pt-1">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--theme-text)]">
                   Discussion Mode
                 </label>
                 <div
@@ -903,26 +903,26 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                   className={`p-3 rounded-xl border cursor-pointer transition flex items-start gap-3 ${
                     isAnonymous
                       ? "border-purple-500 bg-purple-950/30 text-white shadow"
-                      : "border-gray-700 bg-[#222529] text-gray-300 hover:border-gray-600"
+                      : "border-[var(--theme-border)] bg-[var(--theme-bg-surface)] text-[var(--theme-text)] hover:border-[var(--theme-border)]"
                   }`}
                 >
                   <span className="text-2xl shrink-0 select-none">🎭</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs text-white">
+                      <span className="font-bold text-xs text-[var(--theme-text)]">
                         Anonymous Channel
                       </span>
                       <span
                         className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase transition ${
                           isAnonymous
                             ? "bg-purple-600 text-white shadow-xs"
-                            : "bg-gray-700 text-gray-400"
+                            : "bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)]"
                         }`}
                       >
                         {isAnonymous ? "Enabled" : "Disabled"}
                       </span>
                     </div>
-                    <p className="text-[11px] text-gray-400 leading-snug mt-1">
+                    <p className="text-[11px] text-[var(--theme-text-muted)] leading-snug mt-1">
                       Ideal for critical discussions and open-ended feedback.
                       Real names, avatars, and IDs are hidden. Each member gets
                       a customizable pseudonym and emoji icon.
@@ -935,7 +935,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowCreateChannel(false)}
-                  className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition"
+                  className="px-4 py-2 rounded-lg text-sm text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface)] transition"
                 >
                   Cancel
                 </button>

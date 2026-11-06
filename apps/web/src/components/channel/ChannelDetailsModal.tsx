@@ -149,37 +149,37 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-xl bg-[#1F2326] border border-[#383F45] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh] z-10 animate-in fade-in zoom-in-95 duration-150">
+      <div className="relative w-full max-w-xl bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh] z-10 animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-[#383F45]/60 bg-[#1A1D21] flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-[var(--theme-border)] bg-[var(--theme-bg-app)] flex items-center justify-between">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-lg bg-[#2C3136] flex items-center justify-center shrink-0 text-slack-green border border-gray-700">
+            <div className="w-9 h-9 rounded-lg bg-[var(--theme-bg-surface-hover)] flex items-center justify-center shrink-0 text-slack-green border border-[var(--theme-border)]">
               {channel.type === 'DIRECT' ? (
                 <span className="font-bold text-base">@</span>
               ) : channel.type === 'PRIVATE' ? (
-                <Lock size={18} className="text-gray-300" />
+                <Lock size={18} className="text-[var(--theme-text)]" />
               ) : (
-                <Hash size={18} className="text-gray-300" />
+                <Hash size={18} className="text-[var(--theme-text)]" />
               )}
             </div>
             <div className="min-w-0">
-              <h2 className="text-base sm:text-lg font-bold text-white truncate flex items-center gap-2">
+              <h2 className="text-base sm:text-lg font-bold text-[var(--theme-text)] truncate flex items-center gap-2">
                 <span>{channel.name}</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-semibold bg-[#2C3136] text-gray-300 border border-gray-700">
+                <span className="text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-semibold bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] border border-[var(--theme-border)]">
                   {channel.type}
                 </span>
               </h2>
-              <div className="flex items-center gap-1.5 text-xs text-gray-400 truncate">
+              <div className="flex items-center gap-1.5 text-xs text-[var(--theme-text-muted)] truncate">
                 <span>{details?.workspace?.name || 'Workspace Channel'}</span>
                 <span>•</span>
-                <span className="font-mono text-[11px] text-gray-400 truncate select-all">{channel.id}</span>
+                <span className="font-mono text-[11px] text-[var(--theme-text-muted)] truncate select-all">{channel.id}</span>
               </div>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
+            className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface)] rounded-lg transition"
             title="Close"
           >
             <X size={18} />
@@ -187,13 +187,13 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex border-b border-[#383F45]/60 bg-[#1A1D21]/60 px-4 gap-6 text-xs font-semibold">
+        <div className="flex border-b border-[var(--theme-border)] bg-[var(--theme-bg-app)] px-4 gap-6 text-xs font-semibold">
           <button
             onClick={() => setActiveTab('about')}
             className={`py-2.5 border-b-2 transition flex items-center gap-1.5 ${
               activeTab === 'about'
-                ? 'border-slack-green text-white font-bold'
-                : 'border-transparent text-gray-400 hover:text-gray-200'
+                ? 'border-slack-green text-[var(--theme-text)] font-bold'
+                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
             }`}
           >
             <Info size={14} />
@@ -203,8 +203,8 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
             onClick={() => setActiveTab('members')}
             className={`py-2.5 border-b-2 transition flex items-center gap-1.5 ${
               activeTab === 'members'
-                ? 'border-slack-green text-white font-bold'
-                : 'border-transparent text-gray-400 hover:text-gray-200'
+                ? 'border-slack-green text-[var(--theme-text)] font-bold'
+                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
             }`}
           >
             <Users size={14} />
@@ -215,16 +215,16 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
           {isLoading ? (
-            <div className="py-16 text-center flex flex-col items-center justify-center text-gray-400">
+            <div className="py-16 text-center flex flex-col items-center justify-center text-[var(--theme-text-muted)]">
               <Loader2 className="w-7 h-7 text-slack-green animate-spin mb-2" />
               <p className="text-xs">Loading channel details...</p>
             </div>
           ) : activeTab === 'about' ? (
             <>
               {/* Topic & Description Box */}
-              <div className="bg-[#272B30]/70 border border-gray-700/60 rounded-xl p-4">
+              <div className="bg-[var(--theme-bg-surface-hover)] border border-[var(--theme-border)] rounded-xl p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs uppercase font-bold tracking-wider text-gray-400">
+                  <span className="text-xs uppercase font-bold tracking-wider text-[var(--theme-text-muted)]">
                     Topic & Description
                   </span>
                   {!isEditingTopic && (
@@ -245,12 +245,12 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
                       onChange={(e) => setNewTopic(e.target.value)}
                       rows={3}
                       placeholder="Add a topic or description to explain what this channel is for..."
-                      className="w-full bg-[#1A1D21] border border-gray-700 rounded-lg p-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-slack-green"
+                      className="w-full bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-lg p-2.5 text-xs text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-slack-green"
                     />
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => setIsEditingTopic(false)}
-                        className="px-3 py-1 rounded-md text-xs text-gray-400 hover:text-white"
+                        className="px-3 py-1 rounded-md text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]"
                       >
                         Cancel
                       </button>
@@ -265,31 +265,31 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
                     </div>
                   </div>
                 ) : (
-                  <p className="text-xs sm:text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">
+                  <p className="text-xs sm:text-sm text-[var(--theme-text)] leading-relaxed whitespace-pre-wrap">
                     {details?.topic || details?.description || (
-                      <span className="text-gray-500 italic">No description set. Click Edit to add one.</span>
+                      <span className="text-[var(--theme-text-muted)] italic">No description set. Click Edit to add one.</span>
                     )}
                   </p>
                 )}
               </div>
 
               {/* Channel Metadata Grid */}
-              <div className="bg-[#272B30]/70 border border-gray-700/60 rounded-xl divide-y divide-gray-700/40 text-xs">
+              <div className="bg-[var(--theme-bg-surface-hover)] border border-[var(--theme-border)] rounded-xl divide-y divide-[var(--theme-border)] text-xs">
                 <div className="p-3.5 flex items-center justify-between">
-                  <span className="text-gray-400">Channel Name</span>
-                  <span className="font-semibold text-white">#{channel.name}</span>
+                  <span className="text-[var(--theme-text-muted)]">Channel Name</span>
+                  <span className="font-semibold text-[var(--theme-text)]">#{channel.name}</span>
                 </div>
                 <div className="p-3.5 flex items-center justify-between gap-3">
-                  <span className="text-gray-400 shrink-0">Channel ID</span>
+                  <span className="text-[var(--theme-text-muted)] shrink-0">Channel ID</span>
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-mono text-[11px] text-gray-300 select-all bg-[#1A1D21] px-2 py-0.5 rounded border border-gray-700 truncate max-w-[200px] sm:max-w-xs">
+                    <span className="font-mono text-[11px] text-[var(--theme-text)] select-all bg-[var(--theme-bg-app)] px-2 py-0.5 rounded border border-[var(--theme-border)] truncate max-w-[200px] sm:max-w-xs">
                       {channel.id}
                     </span>
                     <button
                       type="button"
                       onClick={handleCopyChannelId}
                       title="Copy Channel ID"
-                      className="px-2 py-0.5 rounded bg-[#2C3136] hover:bg-[#383F45] text-xs text-gray-200 hover:text-white border border-gray-700 flex items-center gap-1 font-medium transition shrink-0"
+                      className="px-2 py-0.5 rounded bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] text-xs text-[var(--theme-text)] hover:text-[var(--theme-text)] border border-[var(--theme-border)] flex items-center gap-1 font-medium transition shrink-0"
                     >
                       {copiedId ? (
                         <>
@@ -298,7 +298,7 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
                         </>
                       ) : (
                         <>
-                          <Copy size={11} className="text-gray-400" />
+                          <Copy size={11} className="text-[var(--theme-text-muted)]" />
                           <span className="text-[11px]">Copy</span>
                         </>
                       )}
@@ -306,14 +306,14 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
                   </div>
                 </div>
                 <div className="p-3.5 flex items-center justify-between">
-                  <span className="text-gray-400">Created By</span>
-                  <span className="font-medium text-gray-200">
+                  <span className="text-[var(--theme-text-muted)]">Created By</span>
+                  <span className="font-medium text-[var(--theme-text)]">
                     {details?.creator?.displayName || details?.creator?.username || 'Team Admin'}
                   </span>
                 </div>
                 <div className="p-3.5 flex items-center justify-between">
-                  <span className="text-gray-400">Created Date</span>
-                  <span className="text-gray-300">
+                  <span className="text-[var(--theme-text-muted)]">Created Date</span>
+                  <span className="text-[var(--theme-text)]">
                     {new Date(channel.createdAt).toLocaleDateString([], {
                       month: 'short',
                       day: 'numeric',
@@ -322,14 +322,14 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
                   </span>
                 </div>
                 <div className="p-3.5 flex items-center justify-between">
-                  <span className="text-gray-400">Messages Count</span>
+                  <span className="text-[var(--theme-text-muted)]">Messages Count</span>
                   <span className="text-slack-green font-semibold">
                     {details?._count?.messages || 0} messages
                   </span>
                 </div>
                 <div className="p-3.5 flex items-center justify-between">
-                  <span className="text-gray-400">Files & Attachments</span>
-                  <span className="text-gray-300">
+                  <span className="text-[var(--theme-text-muted)]">Files & Attachments</span>
+                  <span className="text-[var(--theme-text)]">
                     {details?._count?.attachments || 0} files
                   </span>
                 </div>
@@ -343,7 +343,7 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
                       onClose();
                       onOpenAddMembers();
                     }}
-                    className="flex items-center justify-center gap-2 p-2.5 rounded-lg bg-[#2C3136] hover:bg-[#383F45] text-gray-200 hover:text-white border border-gray-700 text-xs font-semibold transition"
+                    className="flex items-center justify-center gap-2 p-2.5 rounded-lg bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] hover:text-[var(--theme-text)] border border-[var(--theme-border)] text-xs font-semibold transition"
                   >
                     <UserPlus size={14} className="text-slack-green" />
                     <span>Add People</span>
@@ -356,7 +356,7 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
                       onClose();
                       onOpenStorage();
                     }}
-                    className="flex items-center justify-center gap-2 p-2.5 rounded-lg bg-[#2C3136] hover:bg-[#383F45] text-gray-200 hover:text-white border border-gray-700 text-xs font-semibold transition"
+                    className="flex items-center justify-center gap-2 p-2.5 rounded-lg bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] hover:text-[var(--theme-text)] border border-[var(--theme-border)] text-xs font-semibold transition"
                   >
                     <HardDrive size={14} className="text-slack-green" />
                     <span>Files & Storage</span>
@@ -369,7 +369,7 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
                       onClose();
                       onOpenWhiteboard();
                     }}
-                    className="flex items-center justify-center gap-2 p-2.5 rounded-lg bg-[#2C3136] hover:bg-[#383F45] text-gray-200 hover:text-white border border-gray-700 text-xs font-semibold transition"
+                    className="flex items-center justify-center gap-2 p-2.5 rounded-lg bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] hover:text-[var(--theme-text)] border border-[var(--theme-border)] text-xs font-semibold transition"
                   >
                     <PenTool size={14} className="text-slack-green" />
                     <span>Whiteboard</span>
@@ -379,10 +379,10 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
 
               {canShowDelete && (
                 <div className="border border-red-900/60 bg-red-950/20 rounded-xl p-4 space-y-2.5">
-                  <span className="text-xs uppercase font-bold tracking-wider text-red-400">Delete Channel</span>
-                  <p className="text-xs text-gray-300 leading-relaxed">
-                    This permanently deletes <span className="font-semibold text-white">#{channel.name}</span> and all
-                    of its messages and files. Type <span className="font-mono font-semibold text-white">{channel.name}</span>{' '}
+                  <span className="text-xs uppercase font-bold tracking-wider text-red-600 dark:text-red-400">Delete Channel</span>
+                  <p className="text-xs text-[var(--theme-text)] leading-relaxed">
+                    This permanently deletes <span className="font-semibold text-[var(--theme-text)]">#{channel.name}</span> and all
+                    of its messages and files. Type <span className="font-mono font-semibold text-[var(--theme-text)]">{channel.name}</span>{' '}
                     to confirm.
                   </p>
                   <input
@@ -392,9 +392,9 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
                     onKeyDown={(e) => e.key === 'Enter' && handleDeleteChannel()}
                     placeholder={channel.name}
                     autoComplete="off"
-                    className="w-full bg-[#1A1D21] border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-red-500"
+                    className="w-full bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-lg px-3 py-1.5 text-xs text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-red-500"
                   />
-                  {deleteError && <p className="text-xs text-red-400">{deleteError}</p>}
+                  {deleteError && <p className="text-xs text-red-600 dark:text-red-400">{deleteError}</p>}
                   <button
                     onClick={handleDeleteChannel}
                     disabled={isDeleting || deleteConfirmText !== channel.name}
@@ -415,7 +415,7 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
                   value={memberSearch}
                   onChange={(e) => setMemberSearch(e.target.value)}
                   placeholder="Search members in channel..."
-                  className="flex-1 bg-[#272B30] border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-slack-green"
+                  className="flex-1 bg-[var(--theme-bg-surface-hover)] border border-[var(--theme-border)] rounded-lg px-3 py-1.5 text-xs text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-slack-green"
                 />
                 {channel.type !== 'DIRECT' && onOpenAddMembers && (
                   <button
@@ -431,9 +431,9 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
                 )}
               </div>
 
-              <div className="divide-y divide-gray-700/50 border border-gray-700/60 rounded-xl overflow-hidden bg-[#272B30]/50 max-h-80 overflow-y-auto">
+              <div className="divide-y divide-[var(--theme-border)] border border-[var(--theme-border)] rounded-xl overflow-hidden bg-[var(--theme-bg-surface-hover)] max-h-80 overflow-y-auto">
                 {filteredMembers.length === 0 ? (
-                  <div className="p-6 text-center text-xs text-gray-400">
+                  <div className="p-6 text-center text-xs text-[var(--theme-text-muted)]">
                     No members match &quot;{memberSearch}&quot;
                   </div>
                 ) : (
@@ -444,7 +444,7 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
                     return (
                       <div
                         key={m.id || u.id}
-                        className="p-3 flex items-center justify-between hover:bg-gray-700/20 transition"
+                        className="p-3 flex items-center justify-between hover:bg-[var(--theme-bg-surface-hover)] transition"
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
                           <div className="relative shrink-0">
@@ -464,7 +464,7 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
                             )}
                             {!isAnon && (
                               <div
-                                className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#1F2326] ${
+                                className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[var(--theme-border)] ${
                                   u.status === 'ONLINE'
                                     ? 'bg-slack-green'
                                     : u.status === 'IN_HUDDLE'
@@ -477,26 +477,26 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
 
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-semibold text-white truncate">
+                              <span className="text-xs font-semibold text-[var(--theme-text)] truncate">
                                 {isAnon ? (m.anonName || u.displayName || 'Anonymous Member') : (u.displayName || u.username)}
                               </span>
                               {isAnon && m.isSelf && (
-                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-900/60 text-purple-200 border border-purple-500/40 font-semibold">
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-900/60 text-purple-700 dark:text-purple-200 border border-purple-500/40 font-semibold">
                                   YOU
                                 </span>
                               )}
                               {isCreator && (
-                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-900/50 text-purple-300 border border-purple-700/60 font-semibold">
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-900/50 text-purple-700 dark:text-purple-300 border border-purple-700/60 font-semibold">
                                   CREATOR
                                 </span>
                               )}
                               {!isAnon && u.systemRole === 'SUPER_ADMIN' && (
-                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-red-900/50 text-red-300 border border-red-700/60 font-semibold">
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-red-900/50 text-red-700 dark:text-red-300 border border-red-700/60 font-semibold">
                                   SUPER ADMIN
                                 </span>
                               )}
                             </div>
-                            <span className="text-[11px] text-gray-400 truncate block">
+                            <span className="text-[11px] text-[var(--theme-text-muted)] truncate block">
                               {isAnon
                                 ? m.isSelf
                                   ? `@${u.username || 'user'} • You (Shielded from other members)`
@@ -506,7 +506,7 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
                           </div>
                         </div>
 
-                        <span className="text-[11px] text-gray-400 capitalize shrink-0">
+                        <span className="text-[11px] text-[var(--theme-text-muted)] capitalize shrink-0">
                           {isAnon ? 'anonymous' : (u.status?.toLowerCase().replace('_', ' ') || 'offline')}
                         </span>
                       </div>

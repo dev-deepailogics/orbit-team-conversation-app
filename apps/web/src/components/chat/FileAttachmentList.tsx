@@ -148,49 +148,49 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
     switch (category) {
       case 'pdf':
         return (
-          <div className="w-9 h-9 rounded-lg bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400">
+          <div className="w-9 h-9 rounded-lg bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-600 dark:text-red-400">
             <FileText size={18} />
           </div>
         );
       case 'doc':
         return (
-          <div className="w-9 h-9 rounded-lg bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400">
+          <div className="w-9 h-9 rounded-lg bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
             <FileText size={18} />
           </div>
         );
       case 'sheet':
         return (
-          <div className="w-9 h-9 rounded-lg bg-green-500/15 border border-green-500/30 flex items-center justify-center text-green-400">
+          <div className="w-9 h-9 rounded-lg bg-green-500/15 border border-green-500/30 flex items-center justify-center text-green-600 dark:text-green-400">
             <FileSpreadsheet size={18} />
           </div>
         );
       case 'archive':
         return (
-          <div className="w-9 h-9 rounded-lg bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400">
+          <div className="w-9 h-9 rounded-lg bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-600 dark:text-purple-400">
             <FileArchive size={18} />
           </div>
         );
       case 'code':
         return (
-          <div className="w-9 h-9 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+          <div className="w-9 h-9 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-600 dark:text-amber-400">
             <FileCode size={18} />
           </div>
         );
       case 'video':
         return (
-          <div className="w-9 h-9 rounded-lg bg-pink-500/15 border border-pink-500/30 flex items-center justify-center text-pink-400">
+          <div className="w-9 h-9 rounded-lg bg-pink-500/15 border border-pink-500/30 flex items-center justify-center text-pink-600 dark:text-pink-400">
             <Film size={18} />
           </div>
         );
       case 'audio':
         return (
-          <div className="w-9 h-9 rounded-lg bg-yellow-500/15 border border-yellow-500/30 flex items-center justify-center text-yellow-400">
+          <div className="w-9 h-9 rounded-lg bg-yellow-500/15 border border-yellow-500/30 flex items-center justify-center text-yellow-600 dark:text-yellow-400">
             <Music size={18} />
           </div>
         );
       default:
         return (
-          <div className="w-9 h-9 rounded-lg bg-gray-500/15 border border-gray-500/30 flex items-center justify-center text-gray-400">
+          <div className="w-9 h-9 rounded-lg bg-gray-500/15 border border-gray-500/30 flex items-center justify-center text-[var(--theme-text-muted)]">
             <File size={18} />
           </div>
         );
@@ -213,14 +213,14 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
           {images.map((img) => (
             <div
               key={img.id}
-              className="relative group rounded-xl overflow-hidden border border-gray-700/80 bg-[#1A1D20] shadow-md transition hover:border-slack-green cursor-pointer"
+              className="relative group rounded-xl overflow-hidden border border-[var(--theme-border)] bg-[var(--theme-bg-app)] shadow-md transition hover:border-slack-green cursor-pointer"
               onClick={() => {
                 setLightboxImage(img);
                 setZoomLevel(1);
               }}
             >
               {/* Image Preview */}
-              <div className="relative aspect-video max-h-64 flex items-center justify-center bg-black/40 overflow-hidden">
+              <div className="relative aspect-video max-h-64 flex items-center justify-center bg-[var(--theme-bg-app)] overflow-hidden">
                 <img
                   src={getFullFileUrl(img.fileUrl)}
                   alt={img.fileName}
@@ -254,11 +254,11 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
                   )}
                 </div>
 
-                <div className="flex items-center justify-between text-[11px] text-gray-200">
+                <div className="flex items-center justify-between text-[11px] text-[var(--theme-text)]">
                   <span className="truncate max-w-[150px] font-medium" title={img.fileName}>
                     {img.fileName}
                   </span>
-                  <span className="text-gray-400 font-mono text-[10px]">
+                  <span className="text-[var(--theme-text-muted)] font-mono text-[10px]">
                     {formatFileSize(img.fileSize)}
                   </span>
                 </div>
@@ -276,16 +276,16 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
           return (
             <div
               key={media.id}
-              className="max-w-md bg-[#1F2326] border border-gray-700/80 rounded-xl overflow-hidden shadow-lg p-3"
+              className="max-w-md bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-xl overflow-hidden shadow-lg p-3"
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2 truncate">
                   {renderFileIcon(category)}
                   <div className="flex flex-col truncate">
-                    <span className="text-xs font-semibold text-white truncate" title={media.fileName}>
+                    <span className="text-xs font-semibold text-[var(--theme-text)] truncate" title={media.fileName}>
                       {media.fileName}
                     </span>
-                    <span className="text-[10px] text-gray-400 font-mono">
+                    <span className="text-[10px] text-[var(--theme-text-muted)] font-mono">
                       {formatFileSize(media.fileSize)}
                     </span>
                   </div>
@@ -296,7 +296,7 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
                     href={getDownloadUrl(media)}
                     download={media.fileName}
                     title="Download media"
-                    className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition"
+                    className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition"
                   >
                     <Download size={14} />
                   </a>
@@ -304,7 +304,7 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
                     <button
                       onClick={(e) => handleDeleteFile(e, media)}
                       title="Delete file"
-                      className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition"
+                      className="p-1.5 text-red-600 dark:text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -337,21 +337,21 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
           return (
             <div
               key={file.id}
-              className="flex items-center justify-between gap-3 max-w-sm sm:max-w-md bg-[#1F2326] hover:bg-[#252A2E] border border-gray-700/70 hover:border-gray-600 px-3.5 py-2.5 rounded-xl transition shadow-sm group"
+              className="flex items-center justify-between gap-3 max-w-sm sm:max-w-md bg-[var(--theme-bg-surface)] hover:bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] hover:border-[var(--theme-border)] px-3.5 py-2.5 rounded-xl transition shadow-sm group"
             >
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 {renderFileIcon(category)}
                 <div className="flex flex-col min-w-0 flex-1">
                   <span
-                    className="text-xs font-semibold text-gray-200 group-hover:text-white truncate"
+                    className="text-xs font-semibold text-[var(--theme-text)] group-hover:text-[var(--theme-text)] truncate"
                     title={file.fileName}
                   >
                     {file.fileName}
                   </span>
-                  <div className="flex items-center gap-2 text-[11px] text-gray-400 font-mono">
+                  <div className="flex items-center gap-2 text-[11px] text-[var(--theme-text-muted)] font-mono">
                     <span>{formatFileSize(file.fileSize)}</span>
                     <span>•</span>
-                    <span className="uppercase text-[9px] px-1 py-0.2 bg-gray-800 rounded font-bold text-gray-300">
+                    <span className="uppercase text-[9px] px-1 py-0.2 bg-[var(--theme-bg-surface)] rounded font-bold text-[var(--theme-text)]">
                       {category}
                     </span>
                   </div>
@@ -365,7 +365,7 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
                   target="_blank"
                   rel="noreferrer"
                   title="Open in new tab"
-                  className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/60 rounded-lg transition"
+                  className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition"
                 >
                   <ExternalLink size={14} />
                 </a>
@@ -374,7 +374,7 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
                   href={getDownloadUrl(file)}
                   download={file.fileName}
                   title="Download File"
-                  className="p-1.5 text-slack-green hover:text-white hover:bg-slack-green/20 rounded-lg transition"
+                  className="p-1.5 text-slack-green hover:text-[var(--theme-text)] hover:bg-slack-green/20 rounded-lg transition"
                 >
                   <Download size={14} />
                 </a>
@@ -384,7 +384,7 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
                     onClick={(e) => handleDeleteFile(e, file)}
                     disabled={deletingId === file.id}
                     title="Delete File from Server"
-                    className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition"
+                    className="p-1.5 text-[var(--theme-text-muted)] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition"
                   >
                     <Trash2 size={14} />
                   </button>
@@ -406,12 +406,12 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
         >
           {/* Top Bar */}
           <div
-            className="w-full flex items-center justify-between text-white z-10"
+            className="w-full flex items-center justify-between text-[var(--theme-text)] z-10"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex flex-col">
               <span className="font-bold text-sm truncate max-w-md">{lightboxImage.fileName}</span>
-              <span className="text-xs text-gray-400 font-mono">
+              <span className="text-xs text-[var(--theme-text-muted)] font-mono">
                 {formatFileSize(lightboxImage.fileSize)}
               </span>
             </div>
@@ -420,27 +420,27 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
               <button
                 onClick={() => setZoomLevel((z) => Math.max(0.5, z - 0.25))}
                 title="Zoom Out"
-                className="p-2 text-gray-300 hover:text-white hover:bg-white/10 rounded-xl transition"
+                className="p-2 text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-xl transition"
               >
                 <ZoomOut size={18} />
               </button>
-              <span className="text-xs font-mono text-gray-300">{Math.round(zoomLevel * 100)}%</span>
+              <span className="text-xs font-mono text-[var(--theme-text)]">{Math.round(zoomLevel * 100)}%</span>
               <button
                 onClick={() => setZoomLevel((z) => Math.min(3, z + 0.25))}
                 title="Zoom In"
-                className="p-2 text-gray-300 hover:text-white hover:bg-white/10 rounded-xl transition"
+                className="p-2 text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-xl transition"
               >
                 <ZoomIn size={18} />
               </button>
               <button
                 onClick={() => setZoomLevel(1)}
                 title="Reset Zoom"
-                className="p-2 text-gray-300 hover:text-white hover:bg-white/10 rounded-xl transition"
+                className="p-2 text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-xl transition"
               >
                 <Maximize2 size={18} />
               </button>
 
-              <span className="w-px h-6 bg-gray-700 mx-1" />
+              <span className="w-px h-6 bg-[var(--theme-bg-surface-hover)] mx-1" />
 
               <a
                 href={getDownloadUrl(lightboxImage)}
@@ -455,7 +455,7 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
               <button
                 onClick={() => setLightboxImage(null)}
                 title="Close (Esc)"
-                className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-xl transition"
+                className="p-2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-xl transition"
               >
                 <X size={20} />
               </button>

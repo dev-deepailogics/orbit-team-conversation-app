@@ -319,7 +319,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
             <span>Organization control</span>
           </button>
           <div className="h-4 w-px bg-gray-600/40" />
-          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white">
+          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-[var(--theme-text)]">
             User Availability
           </h1>
         </div>
@@ -329,7 +329,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
             className="hidden sm:inline text-xs"
             style={{ color: "var(--theme-text-muted)" }}
           >
-            Timezone: <strong className="text-white">PKT (UTC+5)</strong>
+            Timezone: <strong className="text-[var(--theme-text)]">PKT (UTC+5)</strong>
           </span>
 
           <button
@@ -361,11 +361,11 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
             style={{ borderColor: "var(--theme-border)" }}
           >
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm font-bold text-white">
-                <Users size={16} className="text-blue-400" />
+              <div className="flex items-center gap-2 text-sm font-bold text-[var(--theme-text)]">
+                <Users size={16} className="text-blue-600 dark:text-blue-400" />
                 <span>Active Users ({teamMembers.length})</span>
               </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
                 ALL PRESENT
               </span>
             </div>
@@ -378,13 +378,13 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                 borderColor: "var(--theme-border)",
               }}
             >
-              <Search size={14} className="text-gray-400" />
+              <Search size={14} className="text-[var(--theme-text-muted)]" />
               <input
                 type="text"
                 placeholder="Filter active users..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-transparent border-none outline-none text-xs w-full text-white placeholder-gray-500"
+                className="bg-transparent border-none outline-none text-xs w-full text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)]"
               />
             </div>
           </div>
@@ -404,7 +404,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                   className={`p-3 rounded-2xl border cursor-pointer transition flex items-center gap-3 ${
                     isSelected
                       ? "border-blue-500 shadow-md ring-1 ring-blue-500/50"
-                      : "hover:border-white/20"
+                      : "hover:border-[var(--theme-border)]"
                   }`}
                   style={{
                     backgroundColor: isSelected
@@ -414,23 +414,23 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                   }}
                 >
                   <div className="relative">
-                    <div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-400/30 flex items-center justify-center font-bold text-blue-300 text-sm">
+                    <div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-400/30 flex items-center justify-center font-bold text-blue-700 dark:text-blue-300 text-sm">
                       {item.user.displayName[0]?.toUpperCase() ||
                         item.user.username[0]?.toUpperCase()}
                     </div>
                     {isOnline && (
-                      <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-[#1E1E1E]" />
+                      <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-[var(--theme-border)]" />
                     )}
                     {isOnBreak && (
-                      <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-amber-500 rounded-full border-2 border-[#1E1E1E]" />
+                      <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-amber-500 rounded-full border-2 border-[var(--theme-border)]" />
                     )}
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-white truncate">
+                    <p className="text-xs font-bold text-[var(--theme-text)] truncate">
                       {item.user.displayName}
                     </p>
-                    <p className="text-[11px] truncate text-gray-400 mt-0.5">
+                    <p className="text-[11px] truncate text-[var(--theme-text-muted)] mt-0.5">
                       {item.user.email}
                     </p>
                   </div>
@@ -448,17 +448,17 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
               <div
                 className="p-5 sm:p-6 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm"
                 style={{
-                  backgroundColor: "#1E293B",
-                  borderColor: "#334155",
+                  backgroundColor: "var(--theme-bg-surface)",
+                  borderColor: "var(--theme-border)",
                 }}
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-blue-600/40 border border-blue-400/40 flex items-center justify-center text-xl font-bold text-blue-200 shadow-inner">
+                  <div className="w-14 h-14 rounded-2xl bg-blue-600/40 border border-blue-400/40 flex items-center justify-center text-xl font-bold text-blue-700 dark:text-blue-200 shadow-inner">
                     {selectedMember.user.displayName[0]?.toUpperCase() ||
                       selectedMember.user.username[0]?.toUpperCase()}
                   </div>
                   <div>
-                    <h2 className="text-lg sm:text-xl font-bold text-white">
+                    <h2 className="text-lg sm:text-xl font-bold text-[var(--theme-text)]">
                       {selectedMember.user.displayName}
                     </h2>
                     <div className="flex items-center gap-2 mt-1">
@@ -471,7 +471,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                               : "bg-slate-500"
                         }`}
                       />
-                      <span className="text-xs text-slate-300">
+                      <span className="text-xs text-[var(--theme-text)]">
                         {isAvailableToday
                           ? "Available & Working"
                           : isOnBreakToday
@@ -487,10 +487,10 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
 
                 <div className="flex flex-col sm:items-end gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-300 flex items-center gap-1.5">
+                    <span className="text-xs text-[var(--theme-text)] flex items-center gap-1.5">
                       <span>✉</span> {selectedMember.user.email}
                     </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-slate-200 border border-white/10">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] border border-[var(--theme-border)]">
                       {selectedMember.role}
                     </span>
                   </div>
@@ -503,12 +503,12 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                         onClick={() => handleKickMember(selectedMember)}
                         disabled={isKicking}
                         title={`Kick ${selectedMember.user.displayName} from this workspace`}
-                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 hover:text-white border border-rose-800/60 shadow-sm transition disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-rose-950/40 hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 hover:text-[var(--theme-text)] border border-rose-800/60 shadow-sm transition disabled:opacity-50"
                       >
                         {isKicking ? (
                           <Loader2 size={13} className="animate-spin" />
                         ) : (
-                          <UserMinus size={13} className="text-rose-400" />
+                          <UserMinus size={13} className="text-rose-600 dark:text-rose-400" />
                         )}
                         <span>Kick from Workspace</span>
                       </button>
@@ -525,8 +525,8 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                   onClick={() => setActiveTab("today")}
                   className={`pb-3 text-sm font-semibold transition border-b-2 ${
                     activeTab === "today"
-                      ? "border-blue-500 text-blue-400"
-                      : "border-transparent text-gray-400 hover:text-gray-200"
+                      ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                      : "border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]"
                   }`}
                 >
                   Today
@@ -535,8 +535,8 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                   onClick={() => setActiveTab("history")}
                   className={`pb-3 text-sm font-semibold transition border-b-2 ${
                     activeTab === "history"
-                      ? "border-blue-500 text-blue-400"
-                      : "border-transparent text-gray-400 hover:text-gray-200"
+                      ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                      : "border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]"
                   }`}
                 >
                   History Calendar
@@ -550,27 +550,27 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                   <div
                     className="rounded-2xl border p-6 space-y-6 shadow-sm"
                     style={{
-                      backgroundColor: "#1E293B",
-                      borderColor: "#334155",
+                      backgroundColor: "var(--theme-bg-surface)",
+                      borderColor: "var(--theme-border)",
                     }}
                   >
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-700/60">
-                      <div className="flex items-center gap-2 font-bold text-sm text-white">
-                        <Clock size={16} className="text-blue-400" />
+                    <div className="flex items-center justify-between pb-3 border-b border-[var(--theme-border)]">
+                      <div className="flex items-center gap-2 font-bold text-sm text-[var(--theme-text)]">
+                        <Clock size={16} className="text-blue-600 dark:text-blue-400" />
                         <span>Working Hours</span>
                       </div>
                       {todayRecord?.isAvailable && !todayRecord?.offTime ? (
-                        <span className="text-xs text-emerald-400 flex items-center gap-1.5 font-medium">
+                        <span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 font-medium">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                           Session in progress
                         </span>
                       ) : todayRecord?.offTime ? (
-                        <span className="text-xs text-slate-300 flex items-center gap-1.5 font-medium">
-                          <CheckCircle2 size={13} className="text-blue-400" />
+                        <span className="text-xs text-[var(--theme-text)] flex items-center gap-1.5 font-medium">
+                          <CheckCircle2 size={13} className="text-blue-600 dark:text-blue-400" />
                           Shift Completed
                         </span>
                       ) : (
-                        <span className="text-xs text-slate-400 flex items-center gap-1.5">
+                        <span className="text-xs text-[var(--theme-text-muted)] flex items-center gap-1.5">
                           <span className="w-2 h-2 rounded-full bg-slate-500" />
                           Not Checked In Today
                         </span>
@@ -579,10 +579,10 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                       <div>
-                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                        <span className="text-[11px] font-bold text-[var(--theme-text-muted)] uppercase tracking-wider block">
                           Date
                         </span>
-                        <p className="text-sm sm:text-base font-bold text-white mt-1">
+                        <p className="text-sm sm:text-base font-bold text-[var(--theme-text)] mt-1">
                           {todayRecord?.availableTime
                             ? new Date(
                                 todayRecord.availableTime,
@@ -600,10 +600,10 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                       </div>
 
                       <div>
-                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                        <span className="text-[11px] font-bold text-[var(--theme-text-muted)] uppercase tracking-wider block">
                           Available From
                         </span>
-                        <p className="text-sm sm:text-base font-bold text-white mt-1">
+                        <p className="text-sm sm:text-base font-bold text-[var(--theme-text)] mt-1">
                           {todayRecord?.availableTime
                             ? new Date(
                                 todayRecord.availableTime,
@@ -616,16 +616,16 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                       </div>
 
                       <div>
-                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                        <span className="text-[11px] font-bold text-[var(--theme-text-muted)] uppercase tracking-wider block">
                           Off Time
                         </span>
                         <p
                           className={`text-sm sm:text-base font-semibold mt-1 ${
                             todayRecord?.offTime
-                              ? "text-white"
+                              ? "text-[var(--theme-text)]"
                               : todayRecord?.isAvailable
-                                ? "text-emerald-400"
-                                : "text-slate-400"
+                                ? "text-emerald-600 dark:text-emerald-400"
+                                : "text-[var(--theme-text-muted)]"
                           }`}
                         >
                           {todayRecord?.offTime
@@ -643,23 +643,23 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                       </div>
 
                       <div>
-                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                        <span className="text-[11px] font-bold text-[var(--theme-text-muted)] uppercase tracking-wider block">
                           Total Hours
                         </span>
-                        <p className="text-sm sm:text-base font-bold text-blue-400 mt-1">
+                        <p className="text-sm sm:text-base font-bold text-blue-600 dark:text-blue-400 mt-1">
                           {todayRecord ? (
                             <>
                               {formatMins(
                                 getEffectiveWorkingMinutes(todayRecord),
                               )}{" "}
-                              <span className="text-xs font-normal text-slate-400">
+                              <span className="text-xs font-normal text-[var(--theme-text-muted)]">
                                 {todayRecord.isAvailable && !todayRecord.offTime
                                   ? "(Net Working Time - ongoing)"
                                   : "(Net Working Time)"}
                               </span>
                             </>
                           ) : (
-                            <span className="text-slate-400 font-normal">
+                            <span className="text-[var(--theme-text-muted)] font-normal">
                               0h 0m
                             </span>
                           )}
@@ -669,7 +669,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
 
                     {/* Calculation Summary Box */}
                     {todayRecord ? (
-                      <div className="pt-4 border-t border-slate-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="pt-4 border-t border-[var(--theme-border)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         {(() => {
                           const breaks = todayRecord?.breaks || [];
                           const breakMins = breaks.reduce(
@@ -709,30 +709,30 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
 
                           return (
                             <>
-                              <div className="space-y-1 text-xs text-slate-300">
+                              <div className="space-y-1 text-xs text-[var(--theme-text)]">
                                 <div className="flex items-center gap-4">
-                                  <span className="text-slate-400">
+                                  <span className="text-[var(--theme-text-muted)]">
                                     Total Time:
                                   </span>
-                                  <strong className="text-white">
+                                  <strong className="text-[var(--theme-text)]">
                                     {formatMins(grossMins)}
                                   </strong>
                                 </div>
                                 <div className="flex items-center gap-4">
-                                  <span className="text-slate-400">
+                                  <span className="text-[var(--theme-text-muted)]">
                                     Break Time:
                                   </span>
-                                  <strong className="text-white">
+                                  <strong className="text-[var(--theme-text)]">
                                     {formatMins(breakMins)}
                                   </strong>
                                 </div>
                               </div>
 
                               <div className="px-4 py-2.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-xs">
-                                <span className="text-[10px] uppercase font-bold text-blue-400 block tracking-wider">
+                                <span className="text-[10px] uppercase font-bold text-blue-600 dark:text-blue-400 block tracking-wider">
                                   Calculation:
                                 </span>
-                                <span className="font-mono font-bold text-blue-200">
+                                <span className="font-mono font-bold text-blue-700 dark:text-blue-200">
                                   {formatMins(grossMins)} –{" "}
                                   {formatMins(breakMins)} ={" "}
                                   {formatMins(computedNetMins)}
@@ -743,12 +743,12 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                         })()}
                       </div>
                     ) : (
-                      <div className="pt-3 border-t border-slate-700/60 flex items-center justify-between text-xs text-slate-400">
+                      <div className="pt-3 border-t border-[var(--theme-border)] flex items-center justify-between text-xs text-[var(--theme-text-muted)]">
                         <span>No working session initiated for today.</span>
                         {selectedMember.latestSession && (
-                          <span className="text-[11px] text-slate-400">
+                          <span className="text-[11px] text-[var(--theme-text-muted)]">
                             Last active on{" "}
-                            <strong className="text-slate-300">
+                            <strong className="text-[var(--theme-text)]">
                               {new Date(
                                 selectedMember.latestSession.availableTime,
                               ).toLocaleDateString("en-US", {
@@ -770,17 +770,17 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                       borderColor: "var(--theme-border)",
                     }}
                   >
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-[var(--theme-text-muted)] block mb-2">
                       Attendance Timeline & Checkpoints
                     </span>
 
                     {todayRecord?.availableTime ? (
                       <div className="space-y-3">
                         {/* Check-in Checkpoint */}
-                        <div className="flex items-center justify-between p-3 rounded-xl bg-black/20 border border-white/5 text-xs">
+                        <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] text-xs">
                           <div className="flex items-center gap-3">
                             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                            <strong className="text-white">
+                            <strong className="text-[var(--theme-text)]">
                               {new Date(
                                 todayRecord.availableTime,
                               ).toLocaleTimeString([], {
@@ -788,11 +788,11 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                                 minute: "2-digit",
                               })}
                             </strong>
-                            <span className="text-gray-300">
+                            <span className="text-[var(--theme-text)]">
                               Logged into workspace via Orbit Desktop / Web
                             </span>
                           </div>
-                          <span className="text-gray-400 text-[11px]">
+                          <span className="text-[var(--theme-text-muted)] text-[11px]">
                             System Verified
                           </span>
                         </div>
@@ -801,25 +801,25 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                         {todayRecord.breaks?.map((b, idx) => (
                           <div
                             key={b.id || idx}
-                            className="flex items-center justify-between p-3 rounded-xl bg-black/20 border border-white/5 text-xs"
+                            className="flex items-center justify-between p-3 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] text-xs"
                           >
                             <div className="flex items-center gap-3">
                               <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-                              <strong className="text-white">
+                              <strong className="text-[var(--theme-text)]">
                                 {new Date(b.breakStartTime).toLocaleTimeString(
                                   [],
                                   { hour: "2-digit", minute: "2-digit" },
                                 )}
                               </strong>
-                              <span className="text-gray-300">
+                              <span className="text-[var(--theme-text)]">
                                 Took Break:{" "}
-                                <span className="capitalize text-amber-300 font-medium">
+                                <span className="capitalize text-amber-700 dark:text-amber-300 font-medium">
                                   {b.breakReason}
                                 </span>{" "}
                                 ({b.breakDurationMinutes} mins)
                               </span>
                             </div>
-                            <span className="text-gray-400 text-[11px]">
+                            <span className="text-[var(--theme-text-muted)] text-[11px]">
                               {b.availableAfterBreak
                                 ? `Resumed: ${new Date(b.availableAfterBreak).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
                                 : "On Break"}
@@ -828,12 +828,12 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                         ))}
 
                         {/* Check-out / Current Status Checkpoint */}
-                        <div className="flex items-center justify-between p-3 rounded-xl bg-black/20 border border-white/5 text-xs">
+                        <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] text-xs">
                           <div className="flex items-center gap-3">
                             <span
                               className={`w-2.5 h-2.5 rounded-full ${todayRecord.offTime ? "bg-blue-400" : "bg-emerald-400 animate-pulse"}`}
                             />
-                            <strong className="text-white">
+                            <strong className="text-[var(--theme-text)]">
                               {todayRecord.offTime
                                 ? new Date(
                                     todayRecord.offTime,
@@ -843,13 +843,13 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                                   })
                                 : "Ongoing"}
                             </strong>
-                            <span className="text-gray-300">
+                            <span className="text-[var(--theme-text)]">
                               {todayRecord.offTime
                                 ? `Checked out (Total Net: ${formatMins(getEffectiveWorkingMinutes(todayRecord))})`
                                 : "Status set to Available & Working"}
                             </span>
                           </div>
-                          <span className="text-emerald-400 font-semibold text-[11px]">
+                          <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
                             {todayRecord.offTime
                               ? "Shift Concluded"
                               : "Active Window"}
@@ -858,7 +858,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                       </div>
                     ) : selectedMember.latestSession ? (
                       <div className="space-y-3">
-                        <div className="p-4 rounded-xl bg-black/20 border border-white/5 text-xs text-gray-400 flex items-center justify-between">
+                        <div className="p-4 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] text-xs text-[var(--theme-text-muted)] flex items-center justify-between">
                           <span>
                             No attendance recorded for today (
                             {new Date().toLocaleDateString("en-US", {
@@ -870,14 +870,14 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                           </span>
                           <button
                             onClick={() => setActiveTab("history")}
-                            className="text-blue-400 hover:text-blue-300 font-semibold underline"
+                            className="text-blue-600 dark:text-blue-400 hover:text-blue-300 font-semibold underline"
                           >
                             View in History Calendar →
                           </button>
                         </div>
                       </div>
                     ) : (
-                      <div className="py-6 text-center text-xs text-gray-400">
+                      <div className="py-6 text-center text-xs text-[var(--theme-text-muted)]">
                         No check-in activity recorded yet.
                       </div>
                     )}
@@ -896,13 +896,13 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                     }}
                   >
                     {/* Calendar Month Selector Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-gray-700/50">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-[var(--theme-border)]">
                       <div>
-                        <h3 className="text-base font-bold text-white">
+                        <h3 className="text-base font-bold text-[var(--theme-text)]">
                           Attendance Log — {monthNames[currentMonth - 1]}{" "}
                           {currentYear}
                         </h3>
-                        <p className="text-xs text-gray-400 mt-0.5">
+                        <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">
                           Overview of worked days, leaves, and calculated net
                           duration. Click any date to view detailed breakdown.
                         </p>
@@ -911,17 +911,17 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                       <div className="flex items-center gap-2 self-start sm:self-auto">
                         <button
                           onClick={handlePrevMonth}
-                          className="p-1.5 rounded-lg border hover:bg-white/10 transition"
+                          className="p-1.5 rounded-lg border hover:bg-[var(--theme-bg-surface-hover)] transition"
                           style={{ borderColor: "var(--theme-border)" }}
                         >
                           <ChevronLeft size={16} />
                         </button>
-                        <span className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-black/20 border border-white/5 min-w-[120px] text-center">
+                        <span className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[var(--theme-bg-app)] border border-[var(--theme-border)] min-w-[120px] text-center">
                           {monthNames[currentMonth - 1]} {currentYear}
                         </span>
                         <button
                           onClick={handleNextMonth}
-                          className="p-1.5 rounded-lg border hover:bg-white/10 transition"
+                          className="p-1.5 rounded-lg border hover:bg-[var(--theme-bg-surface-hover)] transition"
                           style={{ borderColor: "var(--theme-border)" }}
                         >
                           <ChevronRight size={16} />
@@ -930,7 +930,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                     </div>
 
                     {/* Day-of-week Headers (M, T, W, T, F, S, S) */}
-                    <div className="grid grid-cols-7 gap-2.5 mb-2 text-center text-xs font-semibold text-gray-400">
+                    <div className="grid grid-cols-7 gap-2.5 mb-2 text-center text-xs font-semibold text-[var(--theme-text-muted)]">
                       <span>M</span>
                       <span>T</span>
                       <span>W</span>
@@ -977,8 +977,8 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                               isCurrentDay
                                 ? "bg-blue-600 text-white border-blue-400 shadow-md ring-2 ring-blue-400/50"
                                 : hasShift
-                                  ? "bg-emerald-950/30 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/40"
-                                  : "bg-black/20 border-white/5 text-gray-400 hover:bg-white/5"
+                                  ? "bg-emerald-950/30 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-900/40"
+                                  : "bg-[var(--theme-bg-app)] border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:bg-[var(--theme-bg-surface-hover)]"
                             }`}
                           >
                             <div className="flex items-center justify-between">
@@ -986,7 +986,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                                 {dayNum}
                               </span>
                               {isCurrentDay && (
-                                <span className="text-[9px] font-bold px-1 rounded bg-white/20">
+                                <span className="text-[9px] font-bold px-1 rounded bg-[var(--theme-bg-surface-hover)]">
                                   Today
                                 </span>
                               )}
@@ -1012,7 +1012,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
               )}
             </>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-gray-400 text-xs">
+            <div className="h-full flex flex-col items-center justify-center text-[var(--theme-text-muted)] text-xs">
               Select an active user from the left list to inspect availability.
             </div>
           )}
@@ -1025,9 +1025,9 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
           <div
             className="w-full max-w-xl rounded-3xl border shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]"
             style={{
-              backgroundColor: "#FFFFFF",
-              borderColor: "#E2E8F0",
-              color: "#0F172A",
+              backgroundColor: "var(--theme-bg-surface)",
+              borderColor: "var(--theme-border)",
+              color: "var(--theme-text)",
             }}
           >
             {/* Header: Coral / Crimson Red Pill Header */}
@@ -1040,7 +1040,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                   <h3 className="text-sm sm:text-base font-bold tracking-wide">
                     Availability Details - {modalDateLabel}
                   </h3>
-                  <p className="text-[11px] text-white/80">
+                  <p className="text-[11px] text-[var(--theme-text)]/80">
                     {selectedMember?.user.displayName} •{" "}
                     {selectedMember?.user.email}
                   </p>
@@ -1048,7 +1048,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
               </div>
               <button
                 onClick={() => setShowDetailModal(false)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition"
+                className="w-8 h-8 rounded-full bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] flex items-center justify-center text-[var(--theme-text)] transition"
               >
                 <X size={16} />
               </button>
@@ -1118,7 +1118,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                   <div className="space-y-3 flex-1">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <span className="text-[10px] uppercase font-bold text-[#64748B] block tracking-wide">
+                        <span className="text-[10px] uppercase font-bold text-[var(--theme-text-muted)] block tracking-wide">
                           Start Time:
                         </span>
                         <strong className="text-sm font-bold text-[#0F172A] mt-0.5 block">
@@ -1134,7 +1134,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                       </div>
 
                       <div>
-                        <span className="text-[10px] uppercase font-bold text-[#64748B] block tracking-wide">
+                        <span className="text-[10px] uppercase font-bold text-[var(--theme-text-muted)] block tracking-wide">
                           End Time:
                         </span>
                         <strong className="text-sm font-bold text-[#0F172A] mt-0.5 block">
@@ -1189,7 +1189,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                       return (
                         <>
                           <div className="flex items-center justify-between gap-3">
-                            <span className="text-[10px] font-bold uppercase text-[#64748B]">
+                            <span className="text-[10px] font-bold uppercase text-[var(--theme-text-muted)]">
                               Total Time:
                             </span>
                             <strong className="text-xs font-bold text-[#0F172A]">
@@ -1198,7 +1198,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                           </div>
 
                           <div className="flex items-center justify-between gap-3">
-                            <span className="text-[10px] font-bold uppercase text-[#64748B]">
+                            <span className="text-[10px] font-bold uppercase text-[var(--theme-text-muted)]">
                               Break Time:
                             </span>
                             <strong className="text-xs font-bold text-[#0F172A]">
@@ -1230,7 +1230,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                   </h4>
                   {selectedRecordForModal?.breaks &&
                     selectedRecordForModal.breaks.length > 0 && (
-                      <span className="text-[11px] font-semibold text-[#64748B]">
+                      <span className="text-[11px] font-semibold text-[var(--theme-text-muted)]">
                         {selectedRecordForModal.breaks.length} break
                         {selectedRecordForModal.breaks.length > 1
                           ? "s"
@@ -1283,7 +1283,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                           {/* Detailed Start, End, and Reason Rows (Matching user design) */}
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-xs text-[#475569]">
                             <div>
-                              <span className="text-[10px] uppercase font-bold text-[#64748B] block">
+                              <span className="text-[10px] uppercase font-bold text-[var(--theme-text-muted)] block">
                                 Start:
                               </span>
                               <strong className="text-xs text-[#0F172A]">
@@ -1292,7 +1292,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                             </div>
 
                             <div>
-                              <span className="text-[10px] uppercase font-bold text-[#64748B] block">
+                              <span className="text-[10px] uppercase font-bold text-[var(--theme-text-muted)] block">
                                 End:
                               </span>
                               <strong className="text-xs text-[#0F172A]">
@@ -1301,7 +1301,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                             </div>
 
                             <div>
-                              <span className="text-[10px] uppercase font-bold text-[#64748B] block">
+                              <span className="text-[10px] uppercase font-bold text-[var(--theme-text-muted)] block">
                                 Reason:
                               </span>
                               <span className="font-semibold capitalize text-[#0284C7]">
@@ -1314,12 +1314,12 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                     })}
                   </div>
                 ) : (
-                  <div className="py-8 rounded-2xl border border-dashed border-[#CBD5E1] bg-[#F8FAFC] flex flex-col items-center justify-center text-center text-[#94A3B8] text-xs">
+                  <div className="py-8 rounded-2xl border border-dashed border-[#CBD5E1] bg-[#F8FAFC] flex flex-col items-center justify-center text-center text-[var(--theme-text-muted)] text-xs">
                     <Coffee
                       size={32}
-                      className="opacity-35 mb-2 text-[#64748B]"
+                      className="opacity-35 mb-2 text-[var(--theme-text-muted)]"
                     />
-                    <span className="font-medium text-[#64748B]">
+                    <span className="font-medium text-[var(--theme-text-muted)]">
                       No breaks taken on this day
                     </span>
                   </div>

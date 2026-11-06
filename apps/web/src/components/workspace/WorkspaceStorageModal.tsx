@@ -112,21 +112,21 @@ export const WorkspaceStorageModal: React.FC<WorkspaceStorageModalProps> = ({
   const renderFileIcon = (category: string) => {
     switch (category) {
       case 'pdf':
-        return <FileText size={16} className="text-red-400" />;
+        return <FileText size={16} className="text-red-600 dark:text-red-400" />;
       case 'doc':
-        return <FileText size={16} className="text-blue-400" />;
+        return <FileText size={16} className="text-blue-600 dark:text-blue-400" />;
       case 'sheet':
-        return <FileSpreadsheet size={16} className="text-green-400" />;
+        return <FileSpreadsheet size={16} className="text-green-600 dark:text-green-400" />;
       case 'archive':
-        return <FileArchive size={16} className="text-purple-400" />;
+        return <FileArchive size={16} className="text-purple-600 dark:text-purple-400" />;
       case 'code':
-        return <FileCode size={16} className="text-amber-400" />;
+        return <FileCode size={16} className="text-amber-600 dark:text-amber-400" />;
       case 'video':
-        return <Film size={16} className="text-pink-400" />;
+        return <Film size={16} className="text-pink-600 dark:text-pink-400" />;
       case 'audio':
-        return <Music size={16} className="text-yellow-400" />;
+        return <Music size={16} className="text-yellow-600 dark:text-yellow-400" />;
       default:
-        return <File size={16} className="text-gray-400" />;
+        return <File size={16} className="text-[var(--theme-text-muted)]" />;
     }
   };
 
@@ -136,21 +136,21 @@ export const WorkspaceStorageModal: React.FC<WorkspaceStorageModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl bg-[#1F2326] border border-gray-700/80 rounded-2xl shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[85vh] overflow-hidden animate-in zoom-in-95 duration-150"
+        className="w-full max-w-2xl bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-2xl shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[85vh] overflow-hidden animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-3.5 sm:p-5 border-b border-gray-700/80 flex items-center justify-between bg-[#1A1D20]">
+        <div className="p-3.5 sm:p-5 border-b border-[var(--theme-border)] flex items-center justify-between bg-[var(--theme-bg-app)]">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-slack-activeChannel/15 border border-slack-activeChannel/30 flex items-center justify-center text-slack-activeChannel">
               <HardDrive size={20} />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <h2 className="text-base font-bold text-[var(--theme-text)] flex items-center gap-2">
                 <span>{workspace.name}</span>
-                <span className="text-xs font-normal text-gray-400">Workspace Storage</span>
+                <span className="text-xs font-normal text-[var(--theme-text-muted)]">Workspace Storage</span>
               </h2>
-              <p className="text-xs text-gray-400 mt-0.5">
+              <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">
                 Total accumulated storage used across all channels and direct messages
               </p>
             </div>
@@ -160,14 +160,14 @@ export const WorkspaceStorageModal: React.FC<WorkspaceStorageModalProps> = ({
             <button
               onClick={fetchStorage}
               title="Refresh Stats"
-              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition"
+              className="p-2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-xl transition"
             >
               <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
             </button>
             <button
               onClick={onClose}
               title="Close"
-              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition"
+              className="p-2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-xl transition"
             >
               <X size={18} />
             </button>
@@ -175,20 +175,20 @@ export const WorkspaceStorageModal: React.FC<WorkspaceStorageModalProps> = ({
         </div>
 
         {/* Storage Summary */}
-        <div className="p-3.5 sm:p-5 bg-gradient-to-b from-[#22262A] to-[#1F2326] border-b border-gray-700/80">
+        <div className="p-3.5 sm:p-5 bg-[var(--theme-bg-surface)] border-b border-[var(--theme-border)]">
           <div className="flex items-end justify-between mb-2">
             <div>
-              <span className="text-xl sm:text-2xl font-extrabold text-white">
+              <span className="text-xl sm:text-2xl font-extrabold text-[var(--theme-text)]">
                 {stats?.formattedTotal || '0 B'}
               </span>
-              <span className="text-xs text-gray-400 ml-2">
+              <span className="text-xs text-[var(--theme-text-muted)] ml-2">
                 total used across {stats?.fileCount || 0} files
               </span>
             </div>
           </div>
 
           {/* Color-Coded Multi-Segment Storage Bar */}
-          <div className="w-full h-3 bg-gray-800 rounded-full overflow-hidden flex border border-gray-700/60 shadow-inner">
+          <div className="w-full h-3 bg-[var(--theme-bg-surface)] rounded-full overflow-hidden flex border border-[var(--theme-border)] shadow-inner">
             {stats && stats.totalBytes > 0 ? (
               stats.categories
                 .filter((c) => c.bytes > 0)
@@ -207,7 +207,7 @@ export const WorkspaceStorageModal: React.FC<WorkspaceStorageModalProps> = ({
                   );
                 })
             ) : (
-              <div className="w-full h-full bg-gray-700/40" />
+              <div className="w-full h-full bg-[var(--theme-bg-surface-hover)]" />
             )}
           </div>
 
@@ -222,8 +222,8 @@ export const WorkspaceStorageModal: React.FC<WorkspaceStorageModalProps> = ({
                       className="w-2.5 h-2.5 rounded-full"
                       style={{ backgroundColor: cat.color }}
                     />
-                    <span className="text-gray-300 font-medium">{cat.label}:</span>
-                    <span className="text-gray-400 font-mono text-[11px]">
+                    <span className="text-[var(--theme-text)] font-medium">{cat.label}:</span>
+                    <span className="text-[var(--theme-text-muted)] font-mono text-[11px]">
                       {formatFileSize(cat.bytes)}
                     </span>
                   </div>
@@ -233,7 +233,7 @@ export const WorkspaceStorageModal: React.FC<WorkspaceStorageModalProps> = ({
         </div>
 
         {/* Filter Bar & Search */}
-        <div className="px-3.5 sm:px-5 py-3 border-b border-gray-700/70 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-[#1A1D20]">
+        <div className="px-3.5 sm:px-5 py-3 border-b border-[var(--theme-border)] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-[var(--theme-bg-app)]">
           {/* Category Tabs */}
           <div className="flex items-center gap-1 overflow-x-auto py-1 scrollbar-none w-full sm:w-auto">
             {[
@@ -250,7 +250,7 @@ export const WorkspaceStorageModal: React.FC<WorkspaceStorageModalProps> = ({
                 className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-semibold transition shrink-0 ${
                   activeTab === tab.id
                     ? 'bg-slack-activeChannel text-white shadow font-bold'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                    : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface)]'
                 }`}
               >
                 {tab.label}
@@ -260,27 +260,27 @@ export const WorkspaceStorageModal: React.FC<WorkspaceStorageModalProps> = ({
 
           {/* Search Input */}
           <div className="relative w-full sm:w-56 shrink-0">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--theme-text-muted)]" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search files..."
-              className="w-full bg-[#252A2E] border border-gray-700/80 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-slack-activeChannel"
+              className="w-full bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-xl pl-8 pr-3 py-1.5 text-xs text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:ring-1 focus:ring-slack-activeChannel"
             />
           </div>
         </div>
 
         {/* File List */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2 divide-y divide-gray-800">
+        <div className="flex-1 overflow-y-auto p-4 space-y-2 divide-y divide-[var(--theme-border)]">
           {isLoading ? (
-            <div className="flex items-center justify-center py-12 text-gray-400 text-xs gap-2">
+            <div className="flex items-center justify-center py-12 text-[var(--theme-text-muted)] text-xs gap-2">
               <RefreshCw size={16} className="animate-spin" />
               <span>Loading workspace storage...</span>
             </div>
           ) : filteredFiles.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">
-              <p className="text-sm font-semibold text-gray-300">No files found</p>
+            <div className="text-center py-12 text-[var(--theme-text-muted)]">
+              <p className="text-sm font-semibold text-[var(--theme-text)]">No files found</p>
               <p className="text-xs mt-1">
                 {searchQuery
                   ? `No files match "${searchQuery}"`
@@ -295,11 +295,11 @@ export const WorkspaceStorageModal: React.FC<WorkspaceStorageModalProps> = ({
               return (
                 <div
                   key={file.id}
-                  className="flex items-center justify-between gap-3 pt-2 pb-2 px-2 hover:bg-gray-800/40 rounded-xl transition group"
+                  className="flex items-center justify-between gap-3 pt-2 pb-2 px-2 hover:bg-[var(--theme-bg-surface)] rounded-xl transition group"
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     {isImage ? (
-                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-black/40 border border-gray-700 flex-shrink-0">
+                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-[var(--theme-bg-app)] border border-[var(--theme-border)] flex-shrink-0">
                         <img
                           src={file.fileUrl}
                           alt={file.fileName}
@@ -307,24 +307,24 @@ export const WorkspaceStorageModal: React.FC<WorkspaceStorageModalProps> = ({
                         />
                       </div>
                     ) : (
-                      <div className="w-10 h-10 rounded-lg bg-gray-800 border border-gray-700/80 flex items-center justify-center flex-shrink-0">
+                      <div className="w-10 h-10 rounded-lg bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] flex items-center justify-center flex-shrink-0">
                         {renderFileIcon(category)}
                       </div>
                     )}
 
                     <div className="flex flex-col min-w-0 flex-1">
                       <span
-                        className="text-xs font-semibold text-gray-200 group-hover:text-white truncate"
+                        className="text-xs font-semibold text-[var(--theme-text)] group-hover:text-[var(--theme-text)] truncate"
                         title={file.fileName}
                       >
                         {file.fileName}
                       </span>
-                      <div className="flex items-center gap-2 text-[11px] text-gray-400 font-mono mt-0.5">
+                      <div className="flex items-center gap-2 text-[11px] text-[var(--theme-text-muted)] font-mono mt-0.5">
                         <span>{formatFileSize(file.fileSize)}</span>
                         <span>•</span>
                         {file.channel && (
                           <>
-                            <span className="flex items-center gap-0.5 text-blue-400">
+                            <span className="flex items-center gap-0.5 text-blue-600 dark:text-blue-400">
                               <Hash size={10} />
                               {file.channel.name}
                             </span>
@@ -335,7 +335,7 @@ export const WorkspaceStorageModal: React.FC<WorkspaceStorageModalProps> = ({
                         {file.uploader && (
                           <>
                             <span>•</span>
-                            <span className="text-gray-300">{file.uploader.displayName}</span>
+                            <span className="text-[var(--theme-text)]">{file.uploader.displayName}</span>
                           </>
                         )}
                       </div>
@@ -348,7 +348,7 @@ export const WorkspaceStorageModal: React.FC<WorkspaceStorageModalProps> = ({
                       target="_blank"
                       rel="noreferrer"
                       title="Open / View"
-                      className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/60 rounded-lg transition"
+                      className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition"
                     >
                       <ExternalLink size={15} />
                     </a>
@@ -357,7 +357,7 @@ export const WorkspaceStorageModal: React.FC<WorkspaceStorageModalProps> = ({
                       href={`${file.fileUrl}${file.fileUrl.includes('?') ? '&' : '?'}download=1`}
                       download={file.fileName}
                       title="Download file"
-                      className="p-1.5 text-slack-activeChannel hover:text-white hover:bg-slack-activeChannel/20 rounded-lg transition"
+                      className="p-1.5 text-slack-activeChannel hover:text-[var(--theme-text)] hover:bg-slack-activeChannel/20 rounded-lg transition"
                     >
                       <Download size={15} />
                     </a>
@@ -367,7 +367,7 @@ export const WorkspaceStorageModal: React.FC<WorkspaceStorageModalProps> = ({
                         onClick={() => handleDeleteFile(file)}
                         disabled={deletingId === file.id}
                         title="Delete file permanently"
-                        className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition disabled:opacity-50"
+                        className="p-1.5 text-[var(--theme-text-muted)] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition disabled:opacity-50"
                       >
                         <Trash2 size={15} />
                       </button>
@@ -380,11 +380,11 @@ export const WorkspaceStorageModal: React.FC<WorkspaceStorageModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 border-t border-gray-700/80 bg-[#1A1D20] flex items-center justify-between text-xs text-gray-400">
-          <span>Storage Provider: <strong className="text-gray-300">VPS / Local Volume Storage</strong></span>
+        <div className="p-4 border-t border-[var(--theme-border)] bg-[var(--theme-bg-app)] flex items-center justify-between text-xs text-[var(--theme-text-muted)]">
+          <span>Storage Provider: <strong className="text-[var(--theme-text)]">VPS / Local Volume Storage</strong></span>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 bg-gray-700/60 hover:bg-gray-700 text-white rounded-xl transition font-medium"
+            className="px-4 py-1.5 bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] rounded-xl transition font-medium"
           >
             Close
           </button>

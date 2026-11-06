@@ -187,11 +187,11 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
           {/* Live Mini Preview Box */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider flex items-center gap-1.5">
                 <Eye size={13} />
                 <span>Live Preview</span>
               </span>
-              <span className="text-[11px] text-gray-400">
+              <span className="text-[11px] text-[var(--theme-text-muted)]">
                 (Colors update live across the entire interface as you click)
               </span>
             </div>
@@ -220,7 +220,7 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
                 >
                   O
                 </div>
-                <div className="w-6 h-6 rounded-lg bg-white/10 flex items-center justify-center text-[9px] text-gray-400">
+                <div className="w-6 h-6 rounded-lg bg-[var(--theme-bg-surface-hover)] flex items-center justify-center text-[9px] text-[var(--theme-text-muted)]">
                   +
                 </div>
               </div>
@@ -254,13 +254,13 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
                   <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: draftTheme.primaryColor }} />
                 </div>
                 <div
-                  className="px-2 py-1 rounded text-[10px] hover:bg-white/5"
+                  className="px-2 py-1 rounded text-[10px] hover:bg-[var(--theme-bg-surface-hover)]"
                   style={{ color: draftTheme.textMutedColor }}
                 >
                   # announcements
                 </div>
                 <div
-                  className="px-2 py-1 rounded text-[10px] hover:bg-white/5"
+                  className="px-2 py-1 rounded text-[10px] hover:bg-[var(--theme-bg-surface-hover)]"
                   style={{ color: draftTheme.textMutedColor }}
                 >
                   # random
@@ -329,7 +329,7 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
           {/* TAB 1: PRESETS */}
           {activeTab === 'presets' && (
             <div className="space-y-3">
-              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              <div className="text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">
                 Select a Curated Preset
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
@@ -364,7 +364,7 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
 
                       {/* Swatch Previews */}
                       <div className="space-y-1.5 mb-2.5">
-                        <div className="flex h-5 w-full rounded overflow-hidden shadow-xs border border-white/10">
+                        <div className="flex h-5 w-full rounded overflow-hidden shadow-xs border border-[var(--theme-border)]">
                           <div className="w-1/4 h-full" style={{ backgroundColor: preset.workspaceColor }} />
                           <div className="w-2/4 h-full" style={{ backgroundColor: preset.sidebarColor }} />
                           <div className="w-1/4 h-full" style={{ backgroundColor: preset.backgroundColor }} />
@@ -409,7 +409,7 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
           {/* TAB 2: CUSTOM COLOR PICKERS */}
           {activeTab === 'custom' && (
             <div className="space-y-4">
-              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              <div className="text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">
                 Fine-tune Colors
               </div>
 
@@ -436,7 +436,7 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
                       type="text"
                       value={draftTheme.sidebarColor}
                       onChange={(e) => handleCustomColorChange('sidebarColor', e.target.value)}
-                      className="flex-1 bg-black/40 border border-gray-700 rounded-lg px-2 py-1 text-xs font-mono uppercase focus:outline-none focus:border-white"
+                      className="flex-1 bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-lg px-2 py-1 text-xs font-mono uppercase focus:outline-none focus:border-white"
                       style={{ color: draftTheme.textColor }}
                     />
                   </div>
@@ -464,7 +464,7 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
                       type="text"
                       value={draftTheme.workspaceColor}
                       onChange={(e) => handleCustomColorChange('workspaceColor', e.target.value)}
-                      className="flex-1 bg-black/40 border border-gray-700 rounded-lg px-2 py-1 text-xs font-mono uppercase focus:outline-none focus:border-white"
+                      className="flex-1 bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-lg px-2 py-1 text-xs font-mono uppercase focus:outline-none focus:border-white"
                       style={{ color: draftTheme.textColor }}
                     />
                   </div>
@@ -492,7 +492,7 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
                       type="text"
                       value={draftTheme.backgroundColor}
                       onChange={(e) => handleCustomColorChange('backgroundColor', e.target.value)}
-                      className="flex-1 bg-black/40 border border-gray-700 rounded-lg px-2 py-1 text-xs font-mono uppercase focus:outline-none focus:border-white"
+                      className="flex-1 bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-lg px-2 py-1 text-xs font-mono uppercase focus:outline-none focus:border-white"
                       style={{ color: draftTheme.textColor }}
                     />
                   </div>
@@ -520,7 +520,7 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
                       type="text"
                       value={draftTheme.surfaceColor}
                       onChange={(e) => handleCustomColorChange('surfaceColor', e.target.value)}
-                      className="flex-1 bg-black/40 border border-gray-700 rounded-lg px-2 py-1 text-xs font-mono uppercase focus:outline-none focus:border-white"
+                      className="flex-1 bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-lg px-2 py-1 text-xs font-mono uppercase focus:outline-none focus:border-white"
                       style={{ color: draftTheme.textColor }}
                     />
                   </div>
@@ -548,7 +548,7 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
                       type="text"
                       value={draftTheme.primaryColor}
                       onChange={(e) => handleCustomColorChange('primaryColor', e.target.value)}
-                      className="flex-1 bg-black/40 border border-gray-700 rounded-lg px-2 py-1 text-xs font-mono uppercase focus:outline-none focus:border-white"
+                      className="flex-1 bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-lg px-2 py-1 text-xs font-mono uppercase focus:outline-none focus:border-white"
                       style={{ color: draftTheme.textColor }}
                     />
                   </div>
@@ -576,7 +576,7 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
                       type="text"
                       value={draftTheme.secondaryColor}
                       onChange={(e) => handleCustomColorChange('secondaryColor', e.target.value)}
-                      className="flex-1 bg-black/40 border border-gray-700 rounded-lg px-2 py-1 text-xs font-mono uppercase focus:outline-none focus:border-white"
+                      className="flex-1 bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-lg px-2 py-1 text-xs font-mono uppercase focus:outline-none focus:border-white"
                       style={{ color: draftTheme.textColor }}
                     />
                   </div>
@@ -604,7 +604,7 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
                       type="text"
                       value={draftTheme.textColor}
                       onChange={(e) => handleCustomColorChange('textColor', e.target.value)}
-                      className="flex-1 bg-black/40 border border-gray-700 rounded-lg px-2 py-1 text-xs font-mono uppercase focus:outline-none focus:border-white"
+                      className="flex-1 bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-lg px-2 py-1 text-xs font-mono uppercase focus:outline-none focus:border-white"
                       style={{ color: draftTheme.textColor }}
                     />
                   </div>
@@ -632,7 +632,7 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
                       type="text"
                       value={draftTheme.textMutedColor}
                       onChange={(e) => handleCustomColorChange('textMutedColor', e.target.value)}
-                      className="flex-1 bg-black/40 border border-gray-700 rounded-lg px-2 py-1 text-xs font-mono uppercase focus:outline-none focus:border-white"
+                      className="flex-1 bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-lg px-2 py-1 text-xs font-mono uppercase focus:outline-none focus:border-white"
                       style={{ color: draftTheme.textColor }}
                     />
                   </div>
@@ -660,7 +660,7 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
                       type="text"
                       value={draftTheme.borderColor}
                       onChange={(e) => handleCustomColorChange('borderColor', e.target.value)}
-                      className="flex-1 bg-black/40 border border-gray-700 rounded-lg px-2 py-1 text-xs font-mono uppercase focus:outline-none focus:border-white"
+                      className="flex-1 bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-lg px-2 py-1 text-xs font-mono uppercase focus:outline-none focus:border-white"
                       style={{ color: draftTheme.textColor }}
                     />
                   </div>
@@ -682,7 +682,7 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
                 <span className="text-xs font-bold block" style={{ color: draftTheme.textColor }}>
                   Set as Workspace Default
                 </span>
-                <span className="text-[11px] text-gray-400 block">
+                <span className="text-[11px] text-[var(--theme-text-muted)] block">
                   New members who join this workspace will automatically start with this theme.
                 </span>
               </div>
@@ -708,7 +708,7 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
           <button
             type="button"
             onClick={handleResetToDefault}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-white hover:bg-white/5 transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] transition"
           >
             <RotateCcw size={13} />
             <span>Reset to Default</span>
@@ -718,7 +718,7 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
             <button
               type="button"
               onClick={handleClose}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-gray-300 hover:text-white hover:bg-white/5 transition"
+              className="px-4 py-2 rounded-xl text-xs font-medium text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] transition"
             >
               Cancel
             </button>

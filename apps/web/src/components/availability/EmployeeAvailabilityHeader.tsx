@@ -271,7 +271,7 @@ export const EmployeeAvailabilityHeader: React.FC<{
                     : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)] opacity-50'
                 }`}
               >
-                <Play size={16} className="text-white fill-transparent" strokeWidth={2.5} />
+                <Play size={16} className="text-[var(--theme-text)] fill-transparent" strokeWidth={2.5} />
                 <span className="font-medium tracking-tight">Available</span>
               </button>
 
@@ -345,7 +345,7 @@ export const EmployeeAvailabilityHeader: React.FC<{
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-2xl w-full max-w-sm p-5 shadow-2xl">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--theme-border)]">
-              <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
+              <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-bold text-sm">
                 <Coffee size={16} />
                 <span>Select Break Reason</span>
               </div>
@@ -369,8 +369,8 @@ export const EmployeeAvailabilityHeader: React.FC<{
                     onClick={() => setSelectedBreakReason(reason)}
                     className={`px-3 py-2 rounded-xl text-xs font-medium border text-left transition ${
                       selectedBreakReason === reason
-                        ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 font-bold'
-                        : 'bg-white/5 border-[var(--theme-border)] text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]'
+                        ? 'bg-amber-500/20 border-amber-500/50 text-amber-700 dark:text-amber-300 font-bold'
+                        : 'bg-[var(--theme-bg-surface-hover)] border-[var(--theme-border)] text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]'
                     }`}
                   >
                     {reason}
@@ -384,7 +384,7 @@ export const EmployeeAvailabilityHeader: React.FC<{
                   placeholder="Specify break reason..."
                   value={customBreakReason}
                   onChange={(e) => setCustomBreakReason(e.target.value)}
-                  className="w-full mt-2 px-3 py-2 rounded-xl bg-black/40 border border-[var(--theme-border)] text-xs text-white placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-amber-500"
+                  className="w-full mt-2 px-3 py-2 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] text-xs text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-amber-500"
                 />
               )}
             </div>
@@ -411,7 +411,7 @@ export const EmployeeAvailabilityHeader: React.FC<{
       {showCheckoutConfirm && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-[var(--theme-bg-surface)] border border-amber-500/30 rounded-2xl w-full max-w-md p-6 shadow-2xl">
-            <div className="flex items-center gap-3 mb-3 text-amber-400">
+            <div className="flex items-center gap-3 mb-3 text-amber-600 dark:text-amber-400">
               <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
                 <AlertTriangle size={20} />
               </div>
@@ -421,7 +421,7 @@ export const EmployeeAvailabilityHeader: React.FC<{
               </div>
             </div>
 
-            <p className="text-xs text-[var(--theme-text)] leading-relaxed mb-5 bg-white/5 border border-[var(--theme-border)] p-3 rounded-xl">
+            <p className="text-xs text-[var(--theme-text)] leading-relaxed mb-5 bg-[var(--theme-bg-surface-hover)] border border-[var(--theme-border)] p-3 rounded-xl">
               Your total working hours are currently less than 8 hours. Are you sure you want to checkout and end your shift?
             </p>
 

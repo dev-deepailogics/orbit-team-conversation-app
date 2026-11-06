@@ -67,27 +67,27 @@ export const AddWorkspaceMemberDialog: React.FC<AddWorkspaceMemberDialogProps> =
       onClick={onClose}
     >
       <div
-        className="bg-[#1A1D21] border border-gray-700/80 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150"
+        className="bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-gray-800 bg-[#1F2326] flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-[var(--theme-border)] bg-[var(--theme-bg-surface)] flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-slack-green/15 text-slack-green border border-slack-green/30">
               <UserPlus size={18} />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+              <h3 className="text-sm font-bold text-[var(--theme-text)] flex items-center gap-1.5">
                 <span>Add People to {workspace.name}</span>
               </h3>
-              <p className="text-xs text-gray-400 mt-0.5">
+              <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">
                 Invite team members or add existing signed-up users directly
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
+            className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface)] rounded-lg transition"
           >
             <X size={18} />
           </button>
@@ -98,27 +98,27 @@ export const AddWorkspaceMemberDialog: React.FC<AddWorkspaceMemberDialogProps> =
           {/* Direct Add Form */}
           <form onSubmit={handleAddMember} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-semibold text-[var(--theme-text)] uppercase tracking-wider mb-1.5">
                 Email Address or Username
               </label>
               <div className="relative">
-                <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--theme-text-muted)]" />
                 <input
                   type="text"
                   required
                   placeholder="e.g. teammate@company.com or alex"
                   value={emailOrUsername}
                   onChange={(e) => setEmailOrUsername(e.target.value)}
-                  className="w-full bg-[#222529] border border-gray-700/80 rounded-xl pl-9 pr-3.5 py-2.5 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-slack-green"
+                  className="w-full bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-xl pl-9 pr-3.5 py-2.5 text-xs text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:ring-1 focus:ring-slack-green"
                 />
               </div>
-              <p className="text-[11px] text-gray-400 mt-1">
+              <p className="text-[11px] text-[var(--theme-text-muted)] mt-1">
                 The user must have an account on Orbit first.
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-semibold text-[var(--theme-text)] uppercase tracking-wider mb-1.5">
                 Workspace Role
               </label>
               <div className="grid grid-cols-2 gap-2">
@@ -128,11 +128,11 @@ export const AddWorkspaceMemberDialog: React.FC<AddWorkspaceMemberDialogProps> =
                   className={`p-3 rounded-xl border text-left transition flex flex-col gap-0.5 ${
                     role === 'MEMBER'
                       ? 'bg-slack-activeChannel/15 border-slack-activeChannel text-white'
-                      : 'bg-[#222529] border-gray-700 text-gray-400 hover:text-gray-200'
+                      : 'bg-[var(--theme-bg-surface)] border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
                   }`}
                 >
-                  <span className="text-xs font-bold text-white">Regular Member</span>
-                  <span className="text-[10px] text-gray-400 leading-tight">Can chat, start huddles, and share files</span>
+                  <span className="text-xs font-bold text-[var(--theme-text)]">Regular Member</span>
+                  <span className="text-[10px] text-[var(--theme-text-muted)] leading-tight">Can chat, start huddles, and share files</span>
                 </button>
 
                 <button
@@ -141,26 +141,26 @@ export const AddWorkspaceMemberDialog: React.FC<AddWorkspaceMemberDialogProps> =
                   className={`p-3 rounded-xl border text-left transition flex flex-col gap-0.5 ${
                     role === 'ADMIN'
                       ? 'bg-slack-activeChannel/15 border-slack-activeChannel text-white'
-                      : 'bg-[#222529] border-gray-700 text-gray-400 hover:text-gray-200'
+                      : 'bg-[var(--theme-bg-surface)] border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
                   }`}
                 >
-                  <span className="text-xs font-bold text-white flex items-center gap-1">
+                  <span className="text-xs font-bold text-[var(--theme-text)] flex items-center gap-1">
                     <Shield size={12} className="text-slack-green" />
                     <span>Workspace Admin</span>
                   </span>
-                  <span className="text-[10px] text-gray-400 leading-tight">Can manage channels, bots, and add members</span>
+                  <span className="text-[10px] text-[var(--theme-text-muted)] leading-tight">Can manage channels, bots, and add members</span>
                 </button>
               </div>
             </div>
 
             {error && (
-              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs">
+              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-600 dark:text-red-400 text-xs">
                 {error}
               </div>
             )}
 
             {successMsg && (
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400 text-xs flex items-center gap-1.5">
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-600 dark:text-emerald-400 text-xs flex items-center gap-1.5">
                 <Sparkles size={14} className="shrink-0" />
                 <span>{successMsg}</span>
               </div>
@@ -187,21 +187,21 @@ export const AddWorkspaceMemberDialog: React.FC<AddWorkspaceMemberDialogProps> =
 
           {/* Divider */}
           <div className="relative flex items-center justify-center">
-            <span className="w-full h-px bg-gray-800" />
-            <span className="absolute px-3 bg-[#1A1D21] text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+            <span className="w-full h-px bg-[var(--theme-bg-surface)]" />
+            <span className="absolute px-3 bg-[var(--theme-bg-app)] text-[11px] font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">
               Or share invite link
             </span>
           </div>
 
           {/* Shareable Link Box */}
-          <div className="bg-[#222529] border border-gray-700/80 rounded-xl p-3 flex items-center justify-between gap-3">
-            <div className="min-w-0 flex-1 font-mono text-[11px] text-gray-300 truncate">
+          <div className="bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-xl p-3 flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1 font-mono text-[11px] text-[var(--theme-text)] truncate">
               {inviteLink}
             </div>
             <button
               type="button"
               onClick={copyInvite}
-              className="px-3 py-1.5 rounded-lg bg-[#2C3136] hover:bg-[#3E4348] text-xs font-medium text-gray-200 hover:text-white transition shrink-0 flex items-center gap-1.5 border border-gray-700"
+              className="px-3 py-1.5 rounded-lg bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] text-xs font-medium text-[var(--theme-text)] hover:text-[var(--theme-text)] transition shrink-0 flex items-center gap-1.5 border border-[var(--theme-border)]"
             >
               {copiedLink ? (
                 <>

@@ -218,7 +218,7 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
               placeholder="Search projects..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none outline-none text-xs w-full text-white placeholder-gray-500"
+              className="bg-transparent border-none outline-none text-xs w-full text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)]"
             />
           </div>
 
@@ -251,7 +251,7 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
       <div className="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-6">
         {/* Title */}
         <div className="text-center pt-2 pb-1">
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[var(--theme-text)]">
             Project Portfolio
           </h1>
         </div>
@@ -262,8 +262,8 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
             onClick={() => setActiveTab('active')}
             className={`pb-3 text-sm font-semibold transition border-b-2 flex items-center gap-1.5 ${
               activeTab === 'active'
-                ? 'border-blue-500 text-blue-400'
-                : 'border-transparent text-gray-400 hover:text-gray-200'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
             }`}
           >
             <span>Active</span>
@@ -274,8 +274,8 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
             onClick={() => setActiveTab('inactive')}
             className={`pb-3 text-sm font-semibold transition border-b-2 flex items-center gap-1.5 ${
               activeTab === 'inactive'
-                ? 'border-blue-500 text-blue-400'
-                : 'border-transparent text-gray-400 hover:text-gray-200'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
             }`}
           >
             <span>Inactive</span>
@@ -286,8 +286,8 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
             onClick={() => setActiveTab('delivered')}
             className={`pb-3 text-sm font-semibold transition border-b-2 flex items-center gap-1.5 ${
               activeTab === 'delivered'
-                ? 'border-blue-500 text-blue-400'
-                : 'border-transparent text-gray-400 hover:text-gray-200'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
             }`}
           >
             <span>Delivered</span>
@@ -328,16 +328,16 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
                 <div>
                   {/* Card Header: Title & Status Badge */}
                   <div className="flex items-start justify-between gap-3 mb-2">
-                    <h3 className="text-sm sm:text-base font-bold text-white group-hover:text-blue-400 transition truncate flex-1">
+                    <h3 className="text-sm sm:text-base font-bold text-[var(--theme-text)] group-hover:text-blue-400 transition truncate flex-1">
                       {project.name}
                     </h3>
                     <span
                       className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase shrink-0 border ${
                         isDelivered
-                          ? 'bg-purple-500/15 text-purple-300 border-purple-500/30'
+                          ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30'
                           : isInactive
-                          ? 'bg-slate-500/15 text-slate-300 border-slate-500/30'
-                          : 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30'
+                          ? 'bg-slate-500/15 text-[var(--theme-text)] border-slate-500/30'
+                          : 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/30'
                       }`}
                     >
                       {project.status || 'ACTIVE'}
@@ -345,8 +345,8 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
                   </div>
 
                   {/* Manager Name */}
-                  <div className="flex items-center gap-1.5 text-xs mb-3 text-slate-400">
-                    <Users size={13} className="shrink-0 text-slate-400" />
+                  <div className="flex items-center gap-1.5 text-xs mb-3 text-[var(--theme-text-muted)]">
+                    <Users size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
                     <span className="truncate">{managerDisplay}</span>
                   </div>
 
@@ -370,20 +370,20 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
                       <div
                         key={emp.uid || idx}
                         title={emp.name}
-                        className="w-6 h-6 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-200 shrink-0"
+                        className="w-6 h-6 rounded-full bg-[var(--theme-bg-app)] border border-[var(--theme-border)] flex items-center justify-center text-[10px] font-bold text-[var(--theme-text)] shrink-0"
                       >
                         {emp.name?.[0]?.toUpperCase() || 'U'}
                       </div>
                     ))}
                     {assignedList.length > 4 && (
-                      <span className="text-[10px] font-bold text-amber-400 pl-2">
+                      <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 pl-2">
                         +{assignedList.length - 4}
                       </span>
                     )}
                     {assignedList.length === 0 && (
                       <div
                         title={managerDisplay}
-                        className="w-6 h-6 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-200 shrink-0"
+                        className="w-6 h-6 rounded-full bg-[var(--theme-bg-app)] border border-[var(--theme-border)] flex items-center justify-center text-[10px] font-bold text-[var(--theme-text)] shrink-0"
                       >
                         {managerDisplay?.[0]?.toUpperCase() || 'M'}
                       </div>
@@ -398,7 +398,7 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
                         setSelectedEnvProject(project);
                         setShowEnvsModal(true);
                       }}
-                      className="text-xs font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1 transition"
+                      className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-300 flex items-center gap-1 transition"
                     >
                       <Shield size={13} />
                       <span>Envs</span>
@@ -406,7 +406,7 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
 
                     <button
                       onClick={(e) => handleOpenEditModal(project, e)}
-                      className="text-xs font-semibold text-slate-400 hover:text-white flex items-center gap-1 transition"
+                      className="text-xs font-semibold text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 transition"
                     >
                       <Edit2 size={13} />
                       <span>Edit</span>
@@ -438,13 +438,13 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
           >
             {/* Header: Edit Project / Create Project + close 'x' */}
             <div className="flex items-center justify-between pb-1">
-              <h3 className="text-base font-bold text-white tracking-tight">
+              <h3 className="text-base font-bold text-[var(--theme-text)] tracking-tight">
                 {editingProject ? 'Edit Project' : 'New Project'}
               </h3>
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="text-slate-400 hover:text-white transition p-1 rounded-lg hover:bg-white/5"
+                className="text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition p-1 rounded-lg hover:bg-[var(--theme-bg-surface-hover)]"
               >
                 <X size={18} />
               </button>
@@ -453,7 +453,7 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
             <form onSubmit={handleSaveProject} className="space-y-4 text-xs">
               {/* Field 1: Project Title */}
               <div>
-                <label className="block text-xs font-semibold mb-1.5 text-slate-200">
+                <label className="block text-xs font-semibold mb-1.5 text-[var(--theme-text)]">
                   <span className="text-rose-500 mr-1">*</span>Project Title
                 </label>
                 <input
@@ -462,13 +462,13 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="DeepAi Logics"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-black/20 border border-slate-700/80 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition text-xs"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-blue-500 transition text-xs"
                 />
               </div>
 
               {/* Field 2: Project Details */}
               <div>
-                <label className="block text-xs font-semibold mb-1.5 text-slate-200">
+                <label className="block text-xs font-semibold mb-1.5 text-[var(--theme-text)]">
                   <span className="text-rose-500 mr-1">*</span>Project Details
                 </label>
                 <textarea
@@ -477,58 +477,58 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="DeepAi Logics Personal Website"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-black/20 border border-slate-700/80 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition resize-none text-xs"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-blue-500 transition resize-none text-xs"
                 />
               </div>
 
               {/* Field 3: Status */}
               <div>
-                <label className="block text-xs font-semibold mb-1.5 text-slate-200">
+                <label className="block text-xs font-semibold mb-1.5 text-[var(--theme-text)]">
                   <span className="text-rose-500 mr-1">*</span>Status
                 </label>
                 <div className="relative">
                   <select
                     value={status}
                     onChange={(e: any) => setStatus(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-black/20 border border-slate-700/80 text-white focus:outline-none focus:border-blue-500 transition appearance-none cursor-pointer text-xs pr-9"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] text-[var(--theme-text)] focus:outline-none focus:border-blue-500 transition appearance-none cursor-pointer text-xs pr-9"
                   >
-                    <option value="active" className="bg-slate-900 text-white">Active</option>
-                    <option value="inactive" className="bg-slate-900 text-white">Inactive</option>
-                    <option value="delivered" className="bg-slate-900 text-white">Delivered</option>
+                    <option value="active" className="bg-[var(--theme-bg-app)] text-[var(--theme-text)]">Active</option>
+                    <option value="inactive" className="bg-[var(--theme-bg-app)] text-[var(--theme-text)]">Inactive</option>
+                    <option value="delivered" className="bg-[var(--theme-bg-app)] text-[var(--theme-text)]">Delivered</option>
                   </select>
                   <ChevronDown
                     size={16}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--theme-text-muted)] pointer-events-none"
                   />
                 </div>
               </div>
 
               {/* Field 4: Assign Employees */}
               <div className="relative">
-                <label className="block text-xs font-semibold mb-1.5 text-slate-200">
+                <label className="block text-xs font-semibold mb-1.5 text-[var(--theme-text)]">
                   Assign Employees
                 </label>
                 {/* Chip Box */}
                 <div
                   onClick={() => setEmployeeDropdownOpen((prev) => !prev)}
-                  className="min-h-[46px] w-full px-2.5 py-2 rounded-xl bg-black/20 border border-slate-700/80 flex flex-wrap items-center gap-1.5 cursor-pointer hover:border-slate-600 transition pr-8 relative"
+                  className="min-h-[46px] w-full px-2.5 py-2 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] flex flex-wrap items-center gap-1.5 cursor-pointer hover:border-[var(--theme-border)] transition pr-8 relative"
                 >
                   {assignedEmployees.length === 0 ? (
-                    <span className="text-slate-500 text-xs px-1 select-none">
+                    <span className="text-[var(--theme-text-muted)] text-xs px-1 select-none">
                       Select employees to assign...
                     </span>
                   ) : (
                     assignedEmployees.map((emp) => (
                       <span
                         key={emp.name}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-800 text-slate-200 border border-slate-700 shadow-xs"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[var(--theme-bg-surface)] text-[var(--theme-text)] border border-[var(--theme-border)] shadow-xs"
                         onClick={(e) => e.stopPropagation()}
                       >
                         {emp.name}
                         <button
                           type="button"
                           onClick={() => handleRemoveEmployee(emp.name)}
-                          className="text-slate-400 hover:text-rose-400 transition ml-0.5"
+                          className="text-[var(--theme-text-muted)] hover:text-rose-400 transition ml-0.5"
                         >
                           <X size={12} />
                         </button>
@@ -537,7 +537,7 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
                   )}
                   <ChevronDown
                     size={16}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--theme-text-muted)]"
                   />
                 </div>
 
@@ -561,17 +561,17 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
                             onClick={() => handleToggleEmployee(mName, mUid)}
                             className={`flex items-center justify-between px-3 py-1.5 rounded-lg cursor-pointer text-xs transition ${
                               isAssigned
-                                ? 'bg-blue-600/20 text-blue-300 font-semibold'
-                                : 'hover:bg-white/5 text-slate-300'
+                                ? 'bg-blue-600/20 text-blue-700 dark:text-blue-300 font-semibold'
+                                : 'hover:bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)]'
                             }`}
                           >
                             <span>{mName}</span>
-                            {isAssigned && <Check size={14} className="text-blue-400" />}
+                            {isAssigned && <Check size={14} className="text-blue-600 dark:text-blue-400" />}
                           </div>
                         );
                       })
                     ) : (
-                      <div className="px-3 py-2 text-xs text-slate-500 text-center">
+                      <div className="px-3 py-2 text-xs text-[var(--theme-text-muted)] text-center">
                         No team members found in workspace
                       </div>
                     )}
@@ -584,7 +584,7 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold border border-slate-700 bg-transparent text-slate-300 hover:text-white hover:bg-white/5 transition"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold border border-[var(--theme-border)] bg-transparent text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] transition"
                 >
                   Cancel
                 </button>
@@ -614,31 +614,31 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
           >
             <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: 'var(--theme-border)' }}>
               <div className="flex items-center gap-2">
-                <Shield size={18} className="text-blue-400" />
-                <h3 className="text-base font-bold text-white">
+                <Shield size={18} className="text-blue-600 dark:text-blue-400" />
+                <h3 className="text-base font-bold text-[var(--theme-text)]">
                   Environment Keys - {selectedEnvProject.name}
                 </h3>
               </div>
               <button
                 onClick={() => setShowEnvsModal(false)}
-                className="text-gray-400 hover:text-white transition"
+                className="text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition"
               >
                 <X size={16} />
               </button>
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="p-3 rounded-xl bg-black/20 border border-white/5 space-y-1 font-mono text-[11px]">
-                <div className="text-slate-400"># Project Config</div>
-                <div className="text-emerald-400">PROJECT_ID={selectedEnvProject.projectId || selectedEnvProject.id}</div>
-                <div className="text-emerald-400">WORKSPACE_ID={selectedEnvProject.workspaceId}</div>
-                <div className="text-emerald-400">STATUS={selectedEnvProject.status || 'active'}</div>
+              <div className="p-3 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] space-y-1 font-mono text-[11px]">
+                <div className="text-[var(--theme-text-muted)]"># Project Config</div>
+                <div className="text-emerald-600 dark:text-emerald-400">PROJECT_ID={selectedEnvProject.projectId || selectedEnvProject.id}</div>
+                <div className="text-emerald-600 dark:text-emerald-400">WORKSPACE_ID={selectedEnvProject.workspaceId}</div>
+                <div className="text-emerald-600 dark:text-emerald-400">STATUS={selectedEnvProject.status || 'active'}</div>
                 {selectedEnvProject.clientEmail && (
-                  <div className="text-blue-400">CLIENT_EMAIL={selectedEnvProject.clientEmail}</div>
+                  <div className="text-blue-600 dark:text-blue-400">CLIENT_EMAIL={selectedEnvProject.clientEmail}</div>
                 )}
               </div>
 
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-[var(--theme-text-muted)]">
                 Encrypted environment secrets are synced across Orbit production pipelines.
               </p>
             </div>
@@ -646,7 +646,7 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
             <div className="flex justify-end pt-2">
               <button
                 onClick={() => setShowEnvsModal(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white transition"
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-[var(--theme-bg-surface)] hover:bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] transition"
               >
                 Close
               </button>

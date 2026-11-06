@@ -444,11 +444,11 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
                       </div>
                       <div className="flex items-center gap-1.5 text-[10px] opacity-60">
                         {doc.isPublicInProject ? (
-                          <span className="flex items-center gap-0.5 text-emerald-400">
+                          <span className="flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400">
                             <Globe size={10} /> Public
                           </span>
                         ) : (
-                          <span className="flex items-center gap-0.5 text-amber-400">
+                          <span className="flex items-center gap-0.5 text-amber-600 dark:text-amber-400">
                             <Lock size={10} /> Private
                           </span>
                         )}
@@ -467,7 +467,7 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
                         setShowShareModal(true);
                       }}
                       title="Share document"
-                      className="p-1 rounded opacity-70 hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10"
+                      className="p-1 rounded opacity-70 hover:opacity-100 hover:bg-[var(--theme-bg-app)] dark:hover:bg-white/10"
                     >
                       <Share2 size={12} />
                     </button>
@@ -478,7 +478,7 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
                           handleDeleteDoc(doc.id);
                         }}
                         title="Delete document"
-                        className="p-1 rounded text-red-400 opacity-70 hover:opacity-100 hover:bg-red-500/10"
+                        className="p-1 rounded text-red-600 dark:text-red-400 opacity-70 hover:opacity-100 hover:bg-red-500/10"
                       >
                         <Trash2 size={12} />
                       </button>
@@ -590,12 +590,12 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
                 <div className="flex items-center gap-2 text-xs opacity-60">
                   <div className="flex items-center gap-1">
                     {isSaving ? (
-                      <span className="flex items-center gap-1 text-amber-400">
+                      <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
                         <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
                         Saving...
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1 text-emerald-400">
+                      <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
                         <Check size={13} /> Saved
                       </span>
                     )}
@@ -618,9 +618,9 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
                     }}
                   >
                     {currentDocument.isPublicInProject ? (
-                      <Globe size={13} className="text-emerald-400" />
+                      <Globe size={13} className="text-emerald-600 dark:text-emerald-400" />
                     ) : (
-                      <Lock size={13} className="text-amber-400" />
+                      <Lock size={13} className="text-amber-600 dark:text-amber-400" />
                     )}
                     <span>Share</span>
                     {currentDocument.shares && currentDocument.shares.length > 0 && (

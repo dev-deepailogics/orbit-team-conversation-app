@@ -46,7 +46,7 @@ function markdownToHtml(md: string): string {
       .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
       .replace(/\*([^*]+)\*/g, '<i>$1</i>')
       .replace(/~~([^~]+)~~/g, '<s>$1</s>')
-      .replace(/`([^`]+)`/g, '<code class="bg-[#2C3136] text-[#ECB22E] px-1 py-0.5 rounded font-mono text-xs">$1</code>');
+      .replace(/`([^`]+)`/g, '<code class="bg-[var(--theme-bg-surface-hover)] text-[#ECB22E] px-1 py-0.5 rounded font-mono text-xs">$1</code>');
   };
 
   for (let i = 0; i < lines.length; i++) {
@@ -1590,42 +1590,42 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     <div
       ref={containerRef}
       onWheel={handleWheel}
-      className={`relative w-full h-full flex flex-col bg-[#141618] overflow-hidden select-none ${
+      className={`relative w-full h-full flex flex-col bg-[var(--theme-bg-app)] overflow-hidden select-none ${
         isSpacePressed || activeTool === 'hand' ? 'cursor-grab active:cursor-grabbing' : ''
       }`}
     >
       {/* Top Header Bar */}
       <div className="absolute top-2 sm:top-4 left-2 sm:left-4 right-2 sm:right-4 z-30 flex items-center justify-between pointer-events-none gap-2">
         {/* Left: Channel Canvas Info */}
-        <div className="flex items-center gap-2 sm:gap-3 bg-[#1F2326]/90 backdrop-blur border border-gray-700/80 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl shadow-2xl pointer-events-auto min-w-0">
+        <div className="flex items-center gap-2 sm:gap-3 bg-[var(--theme-bg-surface)] backdrop-blur border border-[var(--theme-border)] px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl shadow-2xl pointer-events-auto min-w-0">
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
             <Sparkles size={15} className="text-slack-green animate-pulse shrink-0" />
-            <span className="font-bold text-xs sm:text-sm text-white truncate max-w-[100px] sm:max-w-none">
+            <span className="font-bold text-xs sm:text-sm text-[var(--theme-text)] truncate max-w-[100px] sm:max-w-none">
               #{channel.name} Canvas
             </span>
           </div>
 
           <span className="text-gray-600 hidden xs:inline">|</span>
 
-          <div className="hidden xs:flex items-center gap-1 text-[11px] sm:text-xs text-gray-300 shrink-0">
+          <div className="hidden xs:flex items-center gap-1 text-[11px] sm:text-xs text-[var(--theme-text)] shrink-0">
             <Users size={13} className="text-slack-green" />
             <span>{activeUsersCount} Live</span>
           </div>
 
           {isSaving && (
-            <span className="text-[10px] sm:text-[11px] text-gray-400 italic hidden sm:inline ml-1">
+            <span className="text-[10px] sm:text-[11px] text-[var(--theme-text-muted)] italic hidden sm:inline ml-1">
               Saving...
             </span>
           )}
         </div>
 
         {/* Right: Actions */}
-        <div className="flex items-center gap-1 sm:gap-1.5 bg-[#1F2326]/90 backdrop-blur border border-gray-700/80 p-1 sm:p-1.5 rounded-xl sm:rounded-2xl shadow-2xl pointer-events-auto shrink-0">
+        <div className="flex items-center gap-1 sm:gap-1.5 bg-[var(--theme-bg-surface)] backdrop-blur border border-[var(--theme-border)] p-1 sm:p-1.5 rounded-xl sm:rounded-2xl shadow-2xl pointer-events-auto shrink-0">
           <button
             onClick={handleUndo}
             disabled={historyIndex <= 0}
             title="Undo (Ctrl+Z)"
-            className="p-1.5 sm:p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg sm:rounded-xl transition disabled:opacity-30"
+            className="p-1.5 sm:p-2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg sm:rounded-xl transition disabled:opacity-30"
           >
             <Undo2 size={15} />
           </button>
@@ -1633,28 +1633,28 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
             onClick={handleRedo}
             disabled={historyIndex >= history.length - 1}
             title="Redo (Ctrl+Y)"
-            className="p-1.5 sm:p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg sm:rounded-xl transition disabled:opacity-30"
+            className="p-1.5 sm:p-2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg sm:rounded-xl transition disabled:opacity-30"
           >
             <Redo2 size={15} />
           </button>
 
-          <span className="w-px h-4 sm:h-5 bg-gray-700 mx-0.5" />
+          <span className="w-px h-4 sm:h-5 bg-[var(--theme-bg-surface-hover)] mx-0.5" />
 
           {/* Zoom Controls */}
           <button
             onClick={() => setZoom((z) => Math.min(3, z + 0.15))}
             title="Zoom In"
-            className="p-1.5 sm:p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg sm:rounded-xl transition"
+            className="p-1.5 sm:p-2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg sm:rounded-xl transition"
           >
             <ZoomIn size={15} />
           </button>
-          <span className="text-[11px] sm:text-xs text-gray-400 px-0.5 font-mono hidden sm:inline">
+          <span className="text-[11px] sm:text-xs text-[var(--theme-text-muted)] px-0.5 font-mono hidden sm:inline">
             {Math.round(zoom * 100)}%
           </span>
           <button
             onClick={() => setZoom((z) => Math.max(0.2, z - 0.15))}
             title="Zoom Out"
-            className="p-1.5 sm:p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg sm:rounded-xl transition"
+            className="p-1.5 sm:p-2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg sm:rounded-xl transition"
           >
             <ZoomOut size={15} />
           </button>
@@ -1664,18 +1664,18 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
               setPan({ x: 0, y: 0 });
             }}
             title="Reset View (100%)"
-            className="hidden sm:flex p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-xl transition"
+            className="hidden sm:flex p-2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-xl transition"
           >
             <Maximize2 size={15} />
           </button>
 
-          <span className="w-px h-4 sm:h-5 bg-gray-700 mx-0.5" />
+          <span className="w-px h-4 sm:h-5 bg-[var(--theme-bg-surface-hover)] mx-0.5" />
 
           {/* Export PNG */}
           <button
             onClick={handleExportImage}
             title="Export as PNG"
-            className="p-1.5 sm:p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg sm:rounded-xl transition"
+            className="p-1.5 sm:p-2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg sm:rounded-xl transition"
           >
             <Download size={15} />
           </button>
@@ -1684,18 +1684,18 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           <button
             onClick={handleClearBoard}
             title="Clear Board"
-            className="p-1.5 sm:p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg sm:rounded-xl transition"
+            className="p-1.5 sm:p-2 text-red-600 dark:text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg sm:rounded-xl transition"
           >
             <Trash2 size={15} />
           </button>
 
           {onClose && (
             <>
-              <span className="w-px h-4 sm:h-5 bg-gray-700 mx-0.5" />
+              <span className="w-px h-4 sm:h-5 bg-[var(--theme-bg-surface-hover)] mx-0.5" />
               <button
                 onClick={onClose}
                 title="Back to Chat"
-                className="p-1.5 sm:p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg sm:rounded-xl transition"
+                className="p-1.5 sm:p-2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg sm:rounded-xl transition"
               >
                 <X size={15} />
               </button>
@@ -1712,14 +1712,14 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
               selectedElement.y * zoom + pan.y - 48
             }px)`,
           }}
-          className="absolute top-0 left-0 z-40 flex items-center gap-1 bg-[#1F2326] border border-gray-700 px-2 py-1 rounded-xl shadow-2xl animate-in fade-in zoom-in-95 duration-100"
+          className="absolute top-0 left-0 z-40 flex items-center gap-1 bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] px-2 py-1 rounded-xl shadow-2xl animate-in fade-in zoom-in-95 duration-100"
         >
           {/* Bold */}
           <button
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => executeExecCommand('bold')}
             title="Bold (Ctrl+B)"
-            className="p-1.5 rounded-lg text-xs font-bold transition text-gray-300 hover:text-white hover:bg-gray-700/60 active:scale-95"
+            className="p-1.5 rounded-lg text-xs font-bold transition text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] active:scale-95"
           >
             <Bold size={14} />
           </button>
@@ -1729,7 +1729,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => handleFormatHeading(1)}
             title="Heading 1"
-            className="p-1.5 rounded-lg text-xs font-bold transition text-gray-300 hover:text-white hover:bg-gray-700/60 active:scale-95"
+            className="p-1.5 rounded-lg text-xs font-bold transition text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] active:scale-95"
           >
             <Heading1 size={14} />
           </button>
@@ -1739,7 +1739,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => handleFormatHeading(2)}
             title="Heading 2"
-            className="p-1.5 rounded-lg text-xs font-bold transition text-gray-300 hover:text-white hover:bg-gray-700/60 active:scale-95"
+            className="p-1.5 rounded-lg text-xs font-bold transition text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] active:scale-95"
           >
             <Heading2 size={14} />
           </button>
@@ -1749,7 +1749,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => handleFormatHeading(0)}
             title="Simple Text"
-            className="p-1.5 rounded-lg text-xs font-bold transition text-gray-300 hover:text-white hover:bg-gray-700/60 active:scale-95"
+            className="p-1.5 rounded-lg text-xs font-bold transition text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] active:scale-95"
           >
             <span className="text-[11px] font-bold">T</span>
           </button>
@@ -1759,15 +1759,15 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => executeExecCommand('insertUnorderedList')}
             title="Bullet List (•)"
-            className="p-1.5 rounded-lg text-xs text-gray-300 hover:text-white hover:bg-gray-700/60 transition active:scale-95"
+            className="p-1.5 rounded-lg text-xs text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] transition active:scale-95"
           >
             <List size={14} />
           </button>
 
-          <span className="w-px h-4 bg-gray-700 mx-0.5" />
+          <span className="w-px h-4 bg-[var(--theme-bg-surface-hover)] mx-0.5" />
 
           {/* Text Font Size / Scale Selector */}
-          <div className="flex items-center gap-0.5 bg-gray-800/80 p-0.5 rounded-lg border border-gray-700/60">
+          <div className="flex items-center gap-0.5 bg-[var(--theme-bg-surface)] p-0.5 rounded-lg border border-[var(--theme-border)]">
             {FONT_SIZES.map(({ label, size, tooltip }) => {
               const currentSize =
                 selectedElement.fontSize || (selectedElement.type === 'sticky' ? 14 : 18);
@@ -1781,7 +1781,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
                   className={`px-1.5 py-0.5 rounded text-[11px] font-bold transition active:scale-95 ${
                     isActive
                       ? 'bg-slack-green text-white shadow font-extrabold'
-                      : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                      : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]'
                   }`}
                 >
                   {label}
@@ -1793,7 +1793,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           {/* Color swatches for Sticky Note background */}
           {selectedElement.type === 'sticky' && (
             <>
-              <span className="w-px h-4 bg-gray-700 mx-0.5" />
+              <span className="w-px h-4 bg-[var(--theme-bg-surface-hover)] mx-0.5" />
               {STICKY_COLORS.map((sc) => (
                 <button
                   key={sc.label}
@@ -1813,12 +1813,12 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           )}
 
           {/* Delete Element / Sticky Note Button */}
-          <span className="w-px h-4 bg-gray-700 mx-0.5" />
+          <span className="w-px h-4 bg-[var(--theme-bg-surface-hover)] mx-0.5" />
           <button
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => handleDeleteElement(selectedElement.id)}
             title="Delete (Delete / Backspace)"
-            className="flex items-center gap-1 px-1.5 py-1 rounded-lg text-xs font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/20 transition active:scale-95"
+            className="flex items-center gap-1 px-1.5 py-1 rounded-lg text-xs font-semibold text-red-600 dark:text-red-400 hover:text-red-300 hover:bg-red-500/20 transition active:scale-95"
           >
             <Trash2 size={13} />
             <span className="text-[11px] hidden sm:inline">Delete</span>
@@ -1827,7 +1827,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       )}
 
       {/* Floating Center Bottom Toolbar (Tools & Palettes) */}
-      <div className="absolute bottom-3 sm:bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 sm:gap-2 bg-[#1F2326]/95 backdrop-blur border border-gray-700/80 p-1.5 sm:p-2 rounded-xl sm:rounded-2xl shadow-2xl max-w-[96vw] overflow-x-auto scrollbar-none">
+      <div className="absolute bottom-3 sm:bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 sm:gap-2 bg-[var(--theme-bg-surface)] backdrop-blur border border-[var(--theme-border)] p-1.5 sm:p-2 rounded-xl sm:rounded-2xl shadow-2xl max-w-[96vw] overflow-x-auto scrollbar-none">
         {/* Tool Selector */}
         <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
           {[
@@ -1849,7 +1849,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
               className={`p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl transition flex items-center justify-center shrink-0 ${
                 activeTool === tool
                   ? 'bg-slack-green text-white shadow-lg scale-105 font-bold'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-700/60'
+                  : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]'
               }`}
             >
               <Icon size={16} />
@@ -1857,7 +1857,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           ))}
         </div>
 
-        <span className="w-px h-5 sm:h-6 bg-gray-700 mx-0.5 sm:mx-1 shrink-0" />
+        <span className="w-px h-5 sm:h-6 bg-[var(--theme-bg-surface-hover)] mx-0.5 sm:mx-1 shrink-0" />
 
         {/* Color Palette / Note Color Picker */}
         {activeTool === 'sticky' ? (
@@ -1870,7 +1870,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
                 title={`${sc.label} Pinned Note`}
                 className={`w-5 h-5 sm:w-6 sm:h-6 rounded-md transition transform hover:scale-125 border shrink-0 relative ${
                   stickyColorIdx === idx
-                    ? 'ring-2 ring-slack-green ring-offset-2 ring-offset-[#1F2326] scale-110'
+                    ? 'ring-2 ring-slack-green ring-offset-2 ring-offset-[var(--theme-bg-surface)] scale-110'
                     : 'border-gray-500/50'
                 }`}
               >
@@ -1888,14 +1888,14 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
                   style={{ backgroundColor: c }}
                   className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full transition transform hover:scale-125 border shrink-0 ${
                     activeColor === c
-                      ? 'ring-2 ring-slack-green ring-offset-2 ring-offset-[#1F2326]'
-                      : 'border-gray-700'
+                      ? 'ring-2 ring-slack-green ring-offset-2 ring-offset-[var(--theme-bg-surface)]'
+                      : 'border-[var(--theme-border)]'
                   }`}
                 />
               ))}
             </div>
 
-            <span className="w-px h-5 sm:h-6 bg-gray-700 mx-0.5 sm:mx-1 shrink-0" />
+            <span className="w-px h-5 sm:h-6 bg-[var(--theme-bg-surface-hover)] mx-0.5 sm:mx-1 shrink-0" />
 
             {/* Stroke Width Selector */}
             <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
@@ -1905,8 +1905,8 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
                   onClick={() => setStrokeWidth(w)}
                   className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-mono font-bold transition shrink-0 ${
                     strokeWidth === w
-                      ? 'bg-[#383F45] text-white border border-slack-green'
-                      : 'text-gray-400 hover:text-white'
+                      ? 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] border border-slack-green'
+                      : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
                   }`}
                 >
                   {w}px
@@ -2047,7 +2047,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
             }}
             className={`${
               editingElement.type === 'sticky' ? 'font-handwriting' : 'font-sans'
-            } shadow-2xl focus:ring-2 focus:ring-slack-green selection:bg-slack-green selection:text-white empty:before:content-[attr(data-placeholder)] empty:before:text-gray-500 [&_h1]:text-lg [&_h1]:font-bold [&_h2]:text-base [&_h2]:font-bold [&_b]:font-bold [&_strong]:font-bold [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_li]:leading-normal [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1`}
+            } shadow-2xl focus:ring-2 focus:ring-slack-green selection:bg-slack-green selection:text-[var(--theme-text)] empty:before:content-[attr(data-placeholder)] empty:before:text-[var(--theme-text-muted)] [&_h1]:text-lg [&_h1]:font-bold [&_h2]:text-base [&_h2]:font-bold [&_b]:font-bold [&_strong]:font-bold [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_li]:leading-normal [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1`}
           />
         </div>
       )}
@@ -2110,24 +2110,24 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       {/* Clear Canvas Confirmation Modal */}
       {showClearModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 select-none">
-          <div className="bg-[#1F2326] border border-gray-700/80 rounded-2xl max-w-md w-full p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center gap-3 text-red-400 mb-4">
+          <div className="bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-2xl max-w-md w-full p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-red-600 dark:text-red-400 mb-4">
               <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
-                <AlertTriangle size={22} className="text-red-400" />
+                <AlertTriangle size={22} className="text-red-600 dark:text-red-400" />
               </div>
               <div>
-                <h3 className="font-bold text-white text-base">Clear Entire Whiteboard</h3>
-                <p className="text-xs text-gray-400">Destructive action for all teammates</p>
+                <h3 className="font-bold text-[var(--theme-text)] text-base">Clear Entire Whiteboard</h3>
+                <p className="text-xs text-[var(--theme-text-muted)]">Destructive action for all teammates</p>
               </div>
             </div>
 
-            <p className="text-sm text-gray-300 mb-4 leading-relaxed">
-              This will permanently delete all drawings, shapes, sticky notes, and text for everyone on <span className="font-semibold text-white">#{channel.name}</span>. This action cannot be undone.
+            <p className="text-sm text-[var(--theme-text)] mb-4 leading-relaxed">
+              This will permanently delete all drawings, shapes, sticky notes, and text for everyone on <span className="font-semibold text-[var(--theme-text)]">#{channel.name}</span>. This action cannot be undone.
             </p>
 
-            <div className="bg-[#141618] border border-gray-800 rounded-xl p-3 mb-5">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
-                Type <span className="text-red-400 font-mono font-bold lowercase">clear-canvas</span> to confirm:
+            <div className="bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-xl p-3 mb-5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--theme-text-muted)] mb-2">
+                Type <span className="text-red-600 dark:text-red-400 font-mono font-bold lowercase">clear-canvas</span> to confirm:
               </label>
               <input
                 type="text"
@@ -2140,7 +2140,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
                   }
                 }}
                 placeholder="clear-canvas"
-                className="w-full bg-[#1F2326] border border-gray-700 focus:border-red-500 rounded-lg px-3 py-2 text-sm text-white font-mono placeholder-gray-600 focus:outline-none transition"
+                className="w-full bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] focus:border-red-500 rounded-lg px-3 py-2 text-sm text-[var(--theme-text)] font-mono placeholder:text-[var(--theme-text-muted)] focus:outline-none transition"
               />
             </div>
 
@@ -2152,7 +2152,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
                   setClearConfirmText('');
                 }}
                 disabled={isClearing}
-                className="px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition"
+                className="px-4 py-2 rounded-xl text-sm font-medium text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface)] transition"
               >
                 Cancel
               </button>

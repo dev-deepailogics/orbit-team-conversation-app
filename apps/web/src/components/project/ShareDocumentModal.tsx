@@ -170,7 +170,7 @@ export const ShareDocumentModal: React.FC<ShareDocumentModalProps> = ({
         {/* Modal Body */}
         <div className="p-6 space-y-6 overflow-y-auto">
           {error && (
-            <div className="p-3 text-xs rounded-xl bg-red-500/15 border border-red-500/30 text-red-400">
+            <div className="p-3 text-xs rounded-xl bg-red-500/15 border border-red-500/30 text-red-600 dark:text-red-400">
               {error}
             </div>
           )}
@@ -199,7 +199,7 @@ export const ShareDocumentModal: React.FC<ShareDocumentModalProps> = ({
                 <h4 className="text-xs font-bold flex items-center gap-2">
                   Share with Workspace Project
                   {doc.isPublicInProject && (
-                    <span className="text-[10px] font-semibold text-emerald-400 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
                       Public in Project
                     </span>
                   )}
@@ -395,11 +395,11 @@ export const ShareDocumentModal: React.FC<ShareDocumentModalProps> = ({
                     >
                       {share.permission === 'EDIT' ? (
                         <>
-                          <Edit3 size={11} className="text-blue-400" /> Can edit
+                          <Edit3 size={11} className="text-blue-600 dark:text-blue-400" /> Can edit
                         </>
                       ) : (
                         <>
-                          <Eye size={11} className="text-emerald-400" /> Can view
+                          <Eye size={11} className="text-emerald-600 dark:text-emerald-400" /> Can view
                         </>
                       )}
                     </span>
@@ -408,7 +408,7 @@ export const ShareDocumentModal: React.FC<ShareDocumentModalProps> = ({
                       <button
                         onClick={() => handleRemoveShare(share.userId)}
                         title="Remove access"
-                        className="p-1 rounded text-red-400 opacity-60 hover:opacity-100 hover:bg-red-500/10 transition"
+                        className="p-1 rounded text-red-600 dark:text-red-400 opacity-60 hover:opacity-100 hover:bg-red-500/10 transition"
                       >
                         <Trash2 size={13} />
                       </button>
@@ -437,8 +437,8 @@ export const ShareDocumentModal: React.FC<ShareDocumentModalProps> = ({
                   onClick={handleTogglePublicLink}
                   className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition ${
                     doc.isPublicLinkEnabled
-                      ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
-                      : 'bg-black/10 dark:bg-white/5 border-gray-600 text-gray-400'
+                      ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                      : 'bg-[var(--theme-bg-app)] dark:bg-white/5 border-[var(--theme-border)] text-[var(--theme-text-muted)]'
                   }`}
                 >
                   {doc.isPublicLinkEnabled ? 'Link Enabled' : 'Enable Link'}

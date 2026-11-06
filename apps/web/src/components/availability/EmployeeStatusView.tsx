@@ -159,7 +159,7 @@ export const EmployeeStatusView: React.FC<EmployeeStatusViewProps> = ({
               placeholder="Filter employees..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none outline-none text-xs w-full text-white placeholder-gray-500"
+              className="bg-transparent border-none outline-none text-xs w-full text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)]"
             />
           </div>
 
@@ -174,7 +174,7 @@ export const EmployeeStatusView: React.FC<EmployeeStatusViewProps> = ({
                 color: 'var(--theme-text-primary)',
               }}
             >
-              <Clock size={14} className="text-blue-400" />
+              <Clock size={14} className="text-blue-600 dark:text-blue-400" />
               <span>Detailed Hours</span>
             </button>
           )}
@@ -198,7 +198,7 @@ export const EmployeeStatusView: React.FC<EmployeeStatusViewProps> = ({
       <div className="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-6">
         {/* Title */}
         <div className="text-center pt-2 pb-1">
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[var(--theme-text)]">
             Employee Status Dashboard
           </h1>
         </div>
@@ -217,14 +217,14 @@ export const EmployeeStatusView: React.FC<EmployeeStatusViewProps> = ({
               color: '#FFFFFF',
             }}
           >
-            <div className="w-13 h-13 rounded-2xl bg-white/15 backdrop-blur-xs flex items-center justify-center shrink-0 shadow-inner">
-              <Users size={24} className="text-white" />
+            <div className="w-13 h-13 rounded-2xl bg-[var(--theme-bg-surface-hover)] backdrop-blur-xs flex items-center justify-center shrink-0 shadow-inner">
+              <Users size={24} className="text-[var(--theme-text)]" />
             </div>
             <div>
               <span className="text-3xl sm:text-4xl font-extrabold block leading-none">
                 {activeCount}
               </span>
-              <span className="text-xs sm:text-sm font-semibold tracking-wide block mt-1 text-white/95">
+              <span className="text-xs sm:text-sm font-semibold tracking-wide block mt-1 text-[var(--theme-text)]/95">
                 Active Employees
               </span>
             </div>
@@ -242,14 +242,14 @@ export const EmployeeStatusView: React.FC<EmployeeStatusViewProps> = ({
               color: '#FFFFFF',
             }}
           >
-            <div className="w-13 h-13 rounded-2xl bg-white/15 backdrop-blur-xs flex items-center justify-center shrink-0 shadow-inner">
-              <Coffee size={24} className="text-white" />
+            <div className="w-13 h-13 rounded-2xl bg-[var(--theme-bg-surface-hover)] backdrop-blur-xs flex items-center justify-center shrink-0 shadow-inner">
+              <Coffee size={24} className="text-[var(--theme-text)]" />
             </div>
             <div>
               <span className="text-3xl sm:text-4xl font-extrabold block leading-none">
                 {onBreakCount}
               </span>
-              <span className="text-xs sm:text-sm font-semibold tracking-wide block mt-1 text-white/95">
+              <span className="text-xs sm:text-sm font-semibold tracking-wide block mt-1 text-[var(--theme-text)]/95">
                 On Break
               </span>
             </div>
@@ -274,13 +274,13 @@ export const EmployeeStatusView: React.FC<EmployeeStatusViewProps> = ({
                 borderColor: 'var(--theme-border)',
               }}
             >
-              <LogOut size={22} className="text-slate-400" />
+              <LogOut size={22} className="text-[var(--theme-text-muted)]" />
             </div>
             <div>
-              <span className="text-3xl sm:text-4xl font-extrabold block leading-none text-white">
+              <span className="text-3xl sm:text-4xl font-extrabold block leading-none text-[var(--theme-text)]">
                 {offlineCount}
               </span>
-              <span className="text-xs sm:text-sm font-semibold tracking-wide block mt-1 text-slate-400">
+              <span className="text-xs sm:text-sm font-semibold tracking-wide block mt-1 text-[var(--theme-text-muted)]">
                 Offline
               </span>
             </div>
@@ -299,7 +299,7 @@ export const EmployeeStatusView: React.FC<EmployeeStatusViewProps> = ({
               className={`px-3 py-1.5 rounded-full font-bold transition border ${
                 filterTab === 'all'
                   ? 'bg-blue-600 text-white border-blue-400 shadow-sm'
-                  : 'text-gray-400 border-white/5 hover:border-white/20'
+                  : 'text-[var(--theme-text-muted)] border-[var(--theme-border)] hover:border-[var(--theme-border)]'
               }`}
               style={{
                 backgroundColor: filterTab === 'all' ? undefined : 'var(--theme-bg-surface)',
@@ -314,7 +314,7 @@ export const EmployeeStatusView: React.FC<EmployeeStatusViewProps> = ({
               className={`px-3 py-1.5 rounded-full font-bold transition border ${
                 filterTab === 'active'
                   ? 'bg-emerald-600 text-white border-emerald-400 shadow-sm'
-                  : 'text-emerald-400 hover:border-emerald-500/30'
+                  : 'text-emerald-600 dark:text-emerald-400 hover:border-emerald-500/30'
               }`}
               style={{
                 backgroundColor: filterTab === 'active' ? undefined : 'var(--theme-bg-surface)',
@@ -329,7 +329,7 @@ export const EmployeeStatusView: React.FC<EmployeeStatusViewProps> = ({
               className={`px-3 py-1.5 rounded-full font-bold transition border ${
                 filterTab === 'break'
                   ? 'bg-amber-500 text-black border-amber-400 shadow-sm'
-                  : 'text-amber-400 hover:border-amber-500/30'
+                  : 'text-amber-600 dark:text-amber-400 hover:border-amber-500/30'
               }`}
               style={{
                 backgroundColor: filterTab === 'break' ? undefined : 'var(--theme-bg-surface)',
@@ -343,8 +343,8 @@ export const EmployeeStatusView: React.FC<EmployeeStatusViewProps> = ({
               onClick={() => setFilterTab('offline')}
               className={`px-3 py-1.5 rounded-full font-bold transition border ${
                 filterTab === 'offline'
-                  ? 'bg-slate-700 text-white border-slate-500 shadow-sm'
-                  : 'text-gray-400 hover:border-white/20'
+                  ? 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] border-slate-500 shadow-sm'
+                  : 'text-[var(--theme-text-muted)] hover:border-[var(--theme-border)]'
               }`}
               style={{
                 backgroundColor: filterTab === 'offline' ? undefined : 'var(--theme-bg-surface)',
@@ -394,12 +394,12 @@ export const EmployeeStatusView: React.FC<EmployeeStatusViewProps> = ({
                 {/* Card Top: Avatar + Name + Email */}
                 <div className="flex items-center gap-3 pt-1">
                   <div className="relative shrink-0">
-                    <div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-400/30 flex items-center justify-center font-bold text-blue-300 text-sm shadow-inner">
+                    <div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-400/30 flex items-center justify-center font-bold text-blue-700 dark:text-blue-300 text-sm shadow-inner">
                       {item.user.displayName?.[0]?.toUpperCase() || item.user.username?.[0]?.toUpperCase()}
                     </div>
                     {/* Status dot */}
                     <span
-                      className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-[#1E293B] ${
+                      className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-[var(--theme-border)] ${
                         isOnlineWorking
                           ? 'bg-emerald-500 animate-pulse'
                           : isOnMemberBreak
@@ -410,7 +410,7 @@ export const EmployeeStatusView: React.FC<EmployeeStatusViewProps> = ({
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-xs sm:text-sm font-bold text-white truncate group-hover:text-blue-400 transition">
+                    <h3 className="text-xs sm:text-sm font-bold text-[var(--theme-text)] truncate group-hover:text-blue-400 transition">
                       {item.user.displayName}
                     </h3>
                     <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--theme-text-muted)' }}>
@@ -422,17 +422,17 @@ export const EmployeeStatusView: React.FC<EmployeeStatusViewProps> = ({
                 {/* Card Bottom: Status Pill Badge + Arrow */}
                 <div className="flex items-center justify-between pt-3 mt-3 border-t" style={{ borderColor: 'var(--theme-border)' }}>
                   {isOnlineWorking ? (
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                       Active
                     </span>
                   ) : isOnMemberBreak ? (
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1.5">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                       On Break
                     </span>
                   ) : (
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/5 text-slate-400 border border-white/10 flex items-center gap-1.5">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] border border-[var(--theme-border)] flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
                       Offline
                     </span>
@@ -440,7 +440,7 @@ export const EmployeeStatusView: React.FC<EmployeeStatusViewProps> = ({
 
                   <ChevronRight
                     size={15}
-                    className="text-gray-400 group-hover:text-blue-400 group-hover:translate-x-0.5 transition"
+                    className="text-[var(--theme-text-muted)] group-hover:text-blue-400 group-hover:translate-x-0.5 transition"
                   />
                 </div>
               </div>

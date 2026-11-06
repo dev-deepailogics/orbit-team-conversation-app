@@ -104,7 +104,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           <Link
             href="/admin"
             title="Super Admin Control Center"
-            className="w-11 h-11 rounded-xl bg-purple-900/30 border border-purple-500/40 text-purple-400 hover:bg-purple-600 hover:text-white flex items-center justify-center transition-all duration-200 shadow-lg group relative"
+            className="w-11 h-11 rounded-xl bg-purple-900/30 border border-purple-500/40 text-purple-600 dark:text-purple-400 hover:bg-purple-600 hover:text-white flex items-center justify-center transition-all duration-200 shadow-lg group relative"
           >
             <ShieldCheck size={20} className="transition group-hover:scale-110" />
             <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-purple-500 rounded-full animate-ping" />
@@ -115,18 +115,18 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
       {/* Create Workspace Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1A1D21] border border-gray-700 rounded-xl w-full max-w-md p-6 shadow-2xl">
-            <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+          <div className="bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-xl w-full max-w-md p-6 shadow-2xl">
+            <h2 className="text-xl font-bold text-[var(--theme-text)] mb-2 flex items-center gap-2">
               <Layers className="text-slack-activeChannel" size={22} />
               Create a new workspace
             </h2>
-            <p className="text-sm text-gray-400 mb-5">
+            <p className="text-sm text-[var(--theme-text-muted)] mb-5">
               Workspaces are shared hubs for your company, team, or project.
             </p>
 
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--theme-text)] mb-1">
                   Workspace Name
                 </label>
                 <input
@@ -140,15 +140,15 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                       setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '-'));
                     }
                   }}
-                  className="w-full bg-[#222529] border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-slack-activeChannel text-sm"
+                  className="w-full bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-lg px-3 py-2 text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-slack-activeChannel text-sm"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--theme-text)] mb-1">
                   Workspace URL Slug
                 </label>
-                <div className="flex items-center bg-[#222529] border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-400">
+                <div className="flex items-center bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-lg px-3 py-2 text-sm text-[var(--theme-text-muted)]">
                   <span>orbit.app/</span>
                   <input
                     type="text"
@@ -156,7 +156,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                     placeholder="acme-corp"
                     value={slug}
                     onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                    className="flex-1 bg-transparent text-white focus:outline-none ml-0.5"
+                    className="flex-1 bg-transparent text-[var(--theme-text)] focus:outline-none ml-0.5"
                   />
                 </div>
               </div>
@@ -165,7 +165,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition"
+                  className="px-4 py-2 rounded-lg text-sm text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface)] transition"
                 >
                   Cancel
                 </button>

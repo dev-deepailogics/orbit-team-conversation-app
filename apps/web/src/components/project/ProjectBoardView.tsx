@@ -64,25 +64,25 @@ const PRIORITY_BADGES: Record<
   LOW: {
     label: "Low",
     bg: "bg-slate-500/20",
-    text: "text-slate-400",
+    text: "text-[var(--theme-text-muted)]",
     icon: CheckCircle2,
   },
   MEDIUM: {
     label: "Medium",
     bg: "bg-blue-500/20",
-    text: "text-blue-400",
+    text: "text-blue-600 dark:text-blue-400",
     icon: Clock,
   },
   HIGH: {
     label: "High",
     bg: "bg-amber-500/20",
-    text: "text-amber-400",
+    text: "text-amber-600 dark:text-amber-400",
     icon: AlertCircle,
   },
   URGENT: {
     label: "Urgent",
     bg: "bg-red-500/20",
-    text: "text-red-400",
+    text: "text-red-600 dark:text-red-400",
     icon: AlertTriangle,
   },
 };
@@ -706,7 +706,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                     className="w-full px-3 py-2 text-xs text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/10 transition"
                     style={{ color: "var(--theme-text-primary)" }}
                   >
-                    <Edit2 size={14} className="text-blue-400" />
+                    <Edit2 size={14} className="text-blue-600 dark:text-blue-400" />
                     <span>Edit Project</span>
                   </button>
                   <button
@@ -1086,7 +1086,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                           handleDeleteColumn(column.id, column.name);
                         }}
                         title="Delete column"
-                        className="p-1 hover:bg-red-500/20 rounded text-red-400 transition"
+                        className="p-1 hover:bg-red-500/20 rounded text-red-600 dark:text-red-400 transition"
                       >
                         <Trash2 size={13} />
                       </button>
@@ -1129,9 +1129,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                             setShowTicketModal(true);
                           }}
                           className={`border rounded-2xl p-3.5 shadow-sm transition-all duration-150 cursor-grab active:cursor-grabbing hover:shadow-md relative group ${
-                            isOverdue
-                              ? "ring-2 ring-rose-500/80 border-rose-500/80"
-                              : ""
+                            isOverdue ? "border-t-[3px]" : ""
                           } ${
                             isBeingDragged
                               ? "opacity-40 scale-95 border-dashed ring-2 ring-slack-green"
@@ -1139,9 +1137,8 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                           }`}
                           style={{
                             backgroundColor: "var(--theme-bg-surface-hover)",
-                            borderColor: isOverdue
-                              ? "#ef4444"
-                              : "var(--theme-border)",
+                            borderColor: "var(--theme-border)",
+                            ...(isOverdue && { borderTopColor: "#ef4444" }),
                           }}
                         >
                           {/* Top Header: ID badge on left & 4 Action Buttons on right */}
@@ -1158,7 +1155,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                               {ticket.labels &&
                                 Array.isArray(ticket.labels) &&
                                 ticket.labels.length > 0 && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
                                     <Tag size={10} />
                                     {typeof ticket.labels[0] === "string"
                                       ? ticket.labels[0]
@@ -1177,7 +1174,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                                   e.stopPropagation();
                                   setViewingDetailTicket(ticket);
                                 }}
-                                className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition"
+                                className="p-1 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] transition"
                               >
                                 <Eye size={13} />
                               </button>
@@ -1190,7 +1187,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                                   e.stopPropagation();
                                   setChatTicket(ticket);
                                 }}
-                                className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition relative"
+                                className="p-1 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] transition relative"
                               >
                                 <MessageSquare size={13} />
                                 {commentCount > 0 && (
@@ -1208,7 +1205,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                                   e.stopPropagation();
                                   setTimelineTicket(ticket);
                                 }}
-                                className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition"
+                                className="p-1 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] transition"
                               >
                                 <Clock size={13} />
                               </button>
@@ -1220,7 +1217,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                                 onClick={(e) =>
                                   handleDeleteTicketDirect(ticket, e)
                                 }
-                                className="p-1 rounded-full text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition"
+                                className="p-1 rounded-full text-[var(--theme-text-muted)] hover:text-rose-400 hover:bg-rose-500/10 transition"
                               >
                                 <Trash2 size={13} />
                               </button>
@@ -1228,13 +1225,13 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                           </div>
 
                           {/* Ticket Title */}
-                          <h4 className="text-xs font-bold leading-snug mb-1.5 break-words text-white">
+                          <h4 className="text-xs font-bold leading-snug mb-1.5 break-words text-[var(--theme-text)]">
                             {ticket.title}
                           </h4>
 
                           {/* Description Preview */}
                           {ticket.description && (
-                            <p className="text-[11px] line-clamp-2 mb-2 leading-relaxed text-slate-400">
+                            <p className="text-[11px] line-clamp-2 mb-2 leading-relaxed text-[var(--theme-text-muted)]">
                               {ticket.description}
                             </p>
                           )}
@@ -1242,10 +1239,10 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                           {/* Git Branch Badge */}
                           {ticket.gitbranch && (
                             <div className="mb-2.5">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black/40 border border-slate-700/60 font-mono text-[10px] text-slate-300 max-w-full truncate">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--theme-bg-app)] border border-[var(--theme-border)] font-mono text-[10px] text-[var(--theme-text)] max-w-full truncate">
                                 <GitBranch
                                   size={10}
-                                  className="shrink-0 text-slate-400"
+                                  className="shrink-0 text-[var(--theme-text-muted)]"
                                 />
                                 <span className="truncate">
                                   {ticket.gitbranch}
@@ -1264,16 +1261,16 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                               <div
                                 className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
                                   isOverdue
-                                    ? "bg-rose-500/10 text-rose-400 border-rose-500/40"
-                                    : "bg-slate-800/80 text-slate-300 border-slate-700"
+                                    ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/40"
+                                    : "bg-[var(--theme-bg-surface)] text-[var(--theme-text)] border-[var(--theme-border)]"
                                 }`}
                               >
                                 <Calendar
                                   size={11}
                                   className={
                                     isOverdue
-                                      ? "text-rose-400"
-                                      : "text-slate-400"
+                                      ? "text-rose-600 dark:text-rose-400"
+                                      : "text-[var(--theme-text-muted)]"
                                   }
                                 />
                                 <span>
@@ -1289,7 +1286,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                                 {isOverdue && (
                                   <AlertCircle
                                     size={12}
-                                    className="text-rose-400 ml-0.5"
+                                    className="text-rose-600 dark:text-rose-400 ml-0.5"
                                   />
                                 )}
                               </div>
@@ -1319,7 +1316,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                                 </span>
                               </div>
                             ) : (
-                              <span className="text-[10px] flex items-center gap-1 text-slate-500">
+                              <span className="text-[10px] flex items-center gap-1 text-[var(--theme-text-muted)]">
                                 <User size={11} />
                                 Unassigned
                               </span>
@@ -1541,12 +1538,12 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
               style={{ borderColor: "var(--theme-border)" }}
             >
               <div className="flex items-center gap-2">
-                <Edit2 size={18} className="text-blue-400" />
-                <h3 className="text-base font-bold text-white">Edit Project</h3>
+                <Edit2 size={18} className="text-blue-600 dark:text-blue-400" />
+                <h3 className="text-base font-bold text-[var(--theme-text)]">Edit Project</h3>
               </div>
               <button
                 onClick={() => setShowEditProjectModal(false)}
-                className="text-gray-400 hover:text-white transition"
+                className="text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition"
               >
                 <X size={16} />
               </button>
@@ -1558,7 +1555,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
             >
               {/* Field 1: Project Title */}
               <div>
-                <label className="block text-xs font-semibold mb-1.5 text-slate-200">
+                <label className="block text-xs font-semibold mb-1.5 text-[var(--theme-text)]">
                   <span className="text-rose-500 mr-1">*</span>Project Title
                 </label>
                 <input
@@ -1567,13 +1564,13 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                   value={editProjectName}
                   onChange={(e) => setEditProjectName(e.target.value)}
                   placeholder="Project name"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-black/20 border border-slate-700/80 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition text-xs"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-blue-500 transition text-xs"
                 />
               </div>
 
               {/* Field 2: Project Details */}
               <div>
-                <label className="block text-xs font-semibold mb-1.5 text-slate-200">
+                <label className="block text-xs font-semibold mb-1.5 text-[var(--theme-text)]">
                   Project Details
                 </label>
                 <textarea
@@ -1581,62 +1578,62 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                   value={editProjectDesc}
                   onChange={(e) => setEditProjectDesc(e.target.value)}
                   placeholder="Project description and notes..."
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-black/20 border border-slate-700/80 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition resize-none text-xs"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-blue-500 transition resize-none text-xs"
                 />
               </div>
 
               {/* Field 3: Status */}
               <div>
-                <label className="block text-xs font-semibold mb-1.5 text-slate-200">
+                <label className="block text-xs font-semibold mb-1.5 text-[var(--theme-text)]">
                   Status
                 </label>
                 <div className="relative">
                   <select
                     value={editProjectStatus}
                     onChange={(e: any) => setEditProjectStatus(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-black/20 border border-slate-700/80 text-white focus:outline-none focus:border-blue-500 transition appearance-none cursor-pointer text-xs pr-9"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] text-[var(--theme-text)] focus:outline-none focus:border-blue-500 transition appearance-none cursor-pointer text-xs pr-9"
                   >
-                    <option value="active" className="bg-slate-900 text-white">
+                    <option value="active" className="bg-[var(--theme-bg-app)] text-[var(--theme-text)]">
                       Active
                     </option>
                     <option
                       value="inactive"
-                      className="bg-slate-900 text-white"
+                      className="bg-[var(--theme-bg-app)] text-[var(--theme-text)]"
                     >
                       Inactive
                     </option>
                     <option
                       value="delivered"
-                      className="bg-slate-900 text-white"
+                      className="bg-[var(--theme-bg-app)] text-[var(--theme-text)]"
                     >
                       Delivered
                     </option>
                   </select>
                   <ChevronDown
                     size={16}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--theme-text-muted)] pointer-events-none"
                   />
                 </div>
               </div>
 
               {/* Field 4: Assign Employees */}
               <div className="relative">
-                <label className="block text-xs font-semibold mb-1.5 text-slate-200">
+                <label className="block text-xs font-semibold mb-1.5 text-[var(--theme-text)]">
                   Assign Employees
                 </label>
                 <div
                   onClick={() => setEditEmployeeDropdownOpen((prev) => !prev)}
-                  className="min-h-[46px] w-full px-2.5 py-2 rounded-xl bg-black/20 border border-slate-700/80 flex flex-wrap items-center gap-1.5 cursor-pointer hover:border-slate-600 transition pr-8 relative"
+                  className="min-h-[46px] w-full px-2.5 py-2 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] flex flex-wrap items-center gap-1.5 cursor-pointer hover:border-[var(--theme-border)] transition pr-8 relative"
                 >
                   {editAssignedEmployees.length === 0 ? (
-                    <span className="text-slate-500 text-xs px-1 select-none">
+                    <span className="text-[var(--theme-text-muted)] text-xs px-1 select-none">
                       Select employees to assign...
                     </span>
                   ) : (
                     editAssignedEmployees.map((emp) => (
                       <span
                         key={emp.name}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-800 text-slate-200 border border-slate-700 shadow-xs"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[var(--theme-bg-surface)] text-[var(--theme-text)] border border-[var(--theme-border)] shadow-xs"
                         onClick={(e) => e.stopPropagation()}
                       >
                         {emp.name}
@@ -1647,7 +1644,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                               prev.filter((e) => e.name !== emp.name),
                             )
                           }
-                          className="text-slate-400 hover:text-rose-400 transition ml-0.5"
+                          className="text-[var(--theme-text-muted)] hover:text-rose-400 transition ml-0.5"
                         >
                           <X size={12} />
                         </button>
@@ -1656,7 +1653,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                   )}
                   <ChevronDown
                     size={16}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--theme-text-muted)]"
                   />
                 </div>
 
@@ -1689,19 +1686,19 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                             }
                             className={`flex items-center justify-between px-3 py-1.5 rounded-lg cursor-pointer text-xs transition ${
                               isAssigned
-                                ? "bg-blue-600/20 text-blue-300 font-semibold"
-                                : "hover:bg-white/5 text-slate-300"
+                                ? "bg-blue-600/20 text-blue-700 dark:text-blue-300 font-semibold"
+                                : "hover:bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)]"
                             }`}
                           >
                             <span>{mName}</span>
                             {isAssigned && (
-                              <Check size={14} className="text-blue-400" />
+                              <Check size={14} className="text-blue-600 dark:text-blue-400" />
                             )}
                           </div>
                         );
                       })
                     ) : (
-                      <div className="px-3 py-2 text-xs text-slate-500 text-center">
+                      <div className="px-3 py-2 text-xs text-[var(--theme-text-muted)] text-center">
                         No team members found in workspace
                       </div>
                     )}
@@ -1717,7 +1714,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowEditProjectModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold border border-slate-700 bg-transparent text-slate-300 hover:text-white hover:bg-white/5 transition"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold border border-[var(--theme-border)] bg-transparent text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] transition"
                 >
                   Cancel
                 </button>

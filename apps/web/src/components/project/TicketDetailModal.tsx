@@ -114,12 +114,12 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
   const priority = (ticket.priority || 'MEDIUM').toUpperCase();
   const priorityBadge =
     priority === 'URGENT'
-      ? { text: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/30' }
+      ? { text: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/30' }
       : priority === 'HIGH'
-      ? { text: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/30' }
+      ? { text: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/30' }
       : priority === 'LOW'
-      ? { text: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-500/30' }
-      : { text: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/30' };
+      ? { text: 'text-[var(--theme-text-muted)]', bg: 'bg-slate-500/10', border: 'border-slate-500/30' }
+      : { text: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/30' };
 
   // Resolve assignee display
   const assigneeName = ticket.assignee?.displayName || ticket.assignee?.username || null;
@@ -160,7 +160,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
           style={{ borderColor: 'var(--theme-border, #334155)' }}
         >
           <div className="flex-1 min-w-0 pr-2">
-            <h3 className="text-base font-bold text-white leading-snug break-words">
+            <h3 className="text-base font-bold text-[var(--theme-text)] leading-snug break-words">
               {ticket.title}
             </h3>
           </div>
@@ -170,9 +170,9 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
             <button
               onClick={() => handleCopyLinkOrTitle(ticket.title)}
               title="Copy Title"
-              className="p-1.5 rounded-lg border border-slate-700/80 hover:bg-white/5 text-slate-400 hover:text-white transition"
+              className="p-1.5 rounded-lg border border-[var(--theme-border)] hover:bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition"
             >
-              {copiedTitle ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+              {copiedTitle ? <Check size={14} className="text-emerald-600 dark:text-emerald-400" /> : <Copy size={14} />}
             </button>
 
             {/* Edit button */}
@@ -190,7 +190,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
             {/* Close 'X' */}
             <button
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition ml-1"
+              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] rounded-lg hover:bg-[var(--theme-bg-surface-hover)] transition ml-1"
             >
               <X size={18} />
             </button>
@@ -202,14 +202,14 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
           {/* Row: Git Branch */}
           {ticket.gitbranch && (
             <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-              <span className="font-semibold text-slate-400">Git Branch</span>
+              <span className="font-semibold text-[var(--theme-text-muted)]">Git Branch</span>
               <div className="flex items-center gap-2">
-                <span className="px-3 py-1.5 rounded-lg bg-black/30 border border-slate-700/80 font-mono text-xs text-slate-200 break-all select-all">
+                <span className="px-3 py-1.5 rounded-lg bg-[var(--theme-bg-app)] border border-[var(--theme-border)] font-mono text-xs text-[var(--theme-text)] break-all select-all">
                   {ticket.gitbranch}
                 </span>
                 <button
                   onClick={() => handleCopyBranch(ticket.gitbranch)}
-                  className="px-2.5 py-1.5 rounded-lg border border-slate-700/80 text-xs font-medium hover:bg-white/5 text-slate-300 hover:text-white transition shrink-0"
+                  className="px-2.5 py-1.5 rounded-lg border border-[var(--theme-border)] text-xs font-medium hover:bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] hover:text-[var(--theme-text)] transition shrink-0"
                 >
                   {copiedBranch ? 'Copied!' : 'Copy'}
                 </button>
@@ -219,20 +219,20 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
 
           {/* Row: Description / Summary / Test Plan */}
           <div className="grid grid-cols-[120px_1fr] items-start gap-4 pt-1">
-            <span className="font-semibold text-slate-400 pt-1">Description</span>
+            <span className="font-semibold text-[var(--theme-text-muted)] pt-1">Description</span>
             <div className="space-y-3 min-w-0">
               {ticket.description ? (
-                <div className="text-slate-200 leading-relaxed whitespace-pre-wrap font-sans text-xs bg-black/10 p-3 rounded-xl border border-white/5">
+                <div className="text-[var(--theme-text)] leading-relaxed whitespace-pre-wrap font-sans text-xs bg-[var(--theme-bg-app)] p-3 rounded-xl border border-[var(--theme-border)]">
                   {ticket.description}
                 </div>
               ) : (
-                <p className="text-slate-500 italic">No description provided.</p>
+                <p className="text-[var(--theme-text-muted)] italic">No description provided.</p>
               )}
 
               {ticket.testPlan && (
                 <div className="pt-2">
-                  <h5 className="font-bold text-white text-xs mb-1">Test plan</h5>
-                  <div className="text-slate-300 whitespace-pre-wrap bg-black/10 p-3 rounded-xl border border-white/5">
+                  <h5 className="font-bold text-[var(--theme-text)] text-xs mb-1">Test plan</h5>
+                  <div className="text-[var(--theme-text)] whitespace-pre-wrap bg-[var(--theme-bg-app)] p-3 rounded-xl border border-[var(--theme-border)]">
                     {ticket.testPlan}
                   </div>
                 </div>
@@ -244,15 +244,15 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
 
           {/* Row: Ticket ID */}
           <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-            <span className="font-semibold text-slate-400">Ticket ID</span>
-            <span className="font-semibold text-white">
+            <span className="font-semibold text-[var(--theme-text-muted)]">Ticket ID</span>
+            <span className="font-semibold text-[var(--theme-text)]">
               {ticket.issueNumber || ticket.customId || ticket.id.slice(0, 8)}
             </span>
           </div>
 
           {/* Row: Checklist */}
           <div className="grid grid-cols-[120px_1fr] items-start gap-4">
-            <span className="font-semibold text-slate-400 pt-1.5">Checklist</span>
+            <span className="font-semibold text-[var(--theme-text-muted)] pt-1.5">Checklist</span>
             <div className="space-y-2.5">
               <form onSubmit={handleAddChecklistItem} className="flex items-center gap-2">
                 <input
@@ -260,7 +260,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
                   value={newChecklistItem}
                   onChange={(e) => setNewChecklistItem(e.target.value)}
                   placeholder="Add checklist item..."
-                  className="flex-1 px-3 py-1.5 rounded-xl bg-black/20 border border-slate-700/80 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-blue-500 transition"
+                  className="flex-1 px-3 py-1.5 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] text-xs focus:outline-none focus:border-blue-500 transition"
                 />
                 <button
                   type="submit"
@@ -272,24 +272,24 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
               </form>
 
               {checklist.length === 0 ? (
-                <p className="text-slate-500 text-xs py-1">No checklist items yet.</p>
+                <p className="text-[var(--theme-text-muted)] text-xs py-1">No checklist items yet.</p>
               ) : (
                 <div className="space-y-1.5 pt-1">
                   {checklist.map((item) => (
                     <div
                       key={item.id}
-                      className="flex items-center justify-between p-2 rounded-lg bg-black/20 border border-slate-800 text-xs group"
+                      className="flex items-center justify-between p-2 rounded-lg bg-[var(--theme-bg-app)] border border-[var(--theme-border)] text-xs group"
                     >
                       <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
                         <input
                           type="checkbox"
                           checked={item.completed}
                           onChange={() => handleToggleChecklist(item.id)}
-                          className="rounded border-slate-600 text-blue-600 focus:ring-0 cursor-pointer"
+                          className="rounded border-[var(--theme-border)] text-blue-600 focus:ring-0 cursor-pointer"
                         />
                         <span
                           className={`truncate ${
-                            item.completed ? 'line-through text-slate-500' : 'text-slate-200'
+                            item.completed ? 'line-through text-[var(--theme-text-muted)]' : 'text-[var(--theme-text)]'
                           }`}
                         >
                           {item.text}
@@ -298,7 +298,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
                       <button
                         type="button"
                         onClick={() => handleDeleteChecklistItem(item.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1 text-slate-500 hover:text-rose-400 transition"
+                        className="opacity-0 group-hover:opacity-100 p-1 text-[var(--theme-text-muted)] hover:text-rose-400 transition"
                       >
                         <Trash2 size={12} />
                       </button>
@@ -313,7 +313,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
 
           {/* Row: Priority */}
           <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-            <span className="font-semibold text-slate-400">Priority</span>
+            <span className="font-semibold text-[var(--theme-text-muted)]">Priority</span>
             <div>
               <span
                 className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold border ${priorityBadge.bg} ${priorityBadge.text} ${priorityBadge.border}`}
@@ -325,7 +325,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
 
           {/* Row: Labels */}
           <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-            <span className="font-semibold text-slate-400">Labels</span>
+            <span className="font-semibold text-[var(--theme-text-muted)]">Labels</span>
             <div className="flex items-center gap-1.5 flex-wrap">
               {labels.length > 0 ? (
                 labels.map((lbl: any, idx: number) => {
@@ -333,7 +333,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
                   return (
                     <span
                       key={idx}
-                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
                     >
                       <Tag size={11} />
                       {labelText}
@@ -341,14 +341,14 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
                   );
                 })
               ) : (
-                <span className="text-slate-500">-</span>
+                <span className="text-[var(--theme-text-muted)]">-</span>
               )}
             </div>
           </div>
 
           {/* Row: Assignees */}
           <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-            <span className="font-semibold text-slate-400">Assignees</span>
+            <span className="font-semibold text-[var(--theme-text-muted)]">Assignees</span>
             <div className="flex items-center gap-2">
               {ticket.assignee ? (
                 <div className="flex items-center gap-2">
@@ -360,42 +360,42 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
                     alt={ticket.assignee.displayName}
                     className="w-6 h-6 rounded-full object-cover ring-1 ring-white/10"
                   />
-                  <span className="text-slate-200 font-medium">
+                  <span className="text-[var(--theme-text)] font-medium">
                     {ticket.assignee.displayName}
                   </span>
                 </div>
               ) : assigneeInitial ? (
-                <div className="w-6 h-6 rounded-full bg-slate-700 text-slate-200 font-bold flex items-center justify-center text-xs">
+                <div className="w-6 h-6 rounded-full bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] font-bold flex items-center justify-center text-xs">
                   {assigneeInitial}
                 </div>
               ) : (
-                <span className="text-slate-500">Unassigned</span>
+                <span className="text-[var(--theme-text-muted)]">Unassigned</span>
               )}
             </div>
           </div>
 
           {/* Row: Story Points */}
           <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-            <span className="font-semibold text-slate-400">Story Points</span>
-            <span className="text-slate-300 font-medium">
+            <span className="font-semibold text-[var(--theme-text-muted)]">Story Points</span>
+            <span className="text-[var(--theme-text)] font-medium">
               {ticket.storyPoints !== null && ticket.storyPoints !== undefined ? ticket.storyPoints : '-'}
             </span>
           </div>
 
           {/* Row: Due Date */}
           <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-            <span className="font-semibold text-slate-400">Due Date</span>
-            <div className="flex items-center gap-1.5 text-slate-300">
-              <Calendar size={13} className="text-slate-400" />
+            <span className="font-semibold text-[var(--theme-text-muted)]">Due Date</span>
+            <div className="flex items-center gap-1.5 text-[var(--theme-text)]">
+              <Calendar size={13} className="text-[var(--theme-text-muted)]" />
               <span>{dueDateFormatted || '-'}</span>
             </div>
           </div>
 
           {/* Row: Created Date */}
           <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-            <span className="font-semibold text-slate-400">Created</span>
-            <div className="flex items-center gap-1.5 text-slate-300">
-              <Calendar size={13} className="text-slate-400" />
+            <span className="font-semibold text-[var(--theme-text-muted)]">Created</span>
+            <div className="flex items-center gap-1.5 text-[var(--theme-text)]">
+              <Calendar size={13} className="text-[var(--theme-text-muted)]" />
               <span>{createdDateFormatted || '-'}</span>
             </div>
           </div>

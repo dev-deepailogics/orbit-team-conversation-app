@@ -32,7 +32,7 @@ interface TicketModalProps {
 }
 
 const PRIORITIES: { value: TicketPriority; label: string; color: string; icon: any }[] = [
-  { value: 'LOW', label: 'Low', color: '#64748B', icon: CheckCircle2 },
+  { value: 'LOW', label: 'Low', color: 'var(--theme-text-muted)', icon: CheckCircle2 },
   { value: 'MEDIUM', label: 'Medium', color: '#3B82F6', icon: Clock },
   { value: 'HIGH', label: 'High', color: '#F59E0B', icon: AlertCircle },
   { value: 'URGENT', label: 'Urgent', color: '#EF4444', icon: AlertTriangle },
@@ -164,7 +164,7 @@ export const TicketModal: React.FC<TicketModalProps> = ({
         </div>
 
         {error && (
-          <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400">
+          <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-600 dark:text-red-400">
             {error}
           </div>
         )}
@@ -176,7 +176,7 @@ export const TicketModal: React.FC<TicketModalProps> = ({
               className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
               style={{ color: 'var(--theme-text-muted)' }}
             >
-              Title <span className="text-red-400">*</span>
+              Title <span className="text-red-600 dark:text-red-400">*</span>
             </label>
             <input
               type="text"

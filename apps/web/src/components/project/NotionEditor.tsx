@@ -660,7 +660,7 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
               title="Add To-do Task at cursor"
               className="p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-1 text-xs"
             >
-              <CheckSquare size={15} className="text-emerald-400" />
+              <CheckSquare size={15} className="text-emerald-600 dark:text-emerald-400" />
               <span className="hidden md:inline text-[11px]">To-do</span>
             </button>
 
@@ -679,7 +679,7 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
               title="Add Interactive Table at cursor"
               className="p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-1 text-xs"
             >
-              <TableIcon size={15} className="text-blue-400" />
+              <TableIcon size={15} className="text-blue-600 dark:text-blue-400" />
               <span className="hidden md:inline text-[11px]">Table</span>
             </button>
 
@@ -689,7 +689,7 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
               title="Add Picture / Image at cursor"
               className="p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-1 text-xs"
             >
-              <ImageIcon size={15} className="text-pink-400" />
+              <ImageIcon size={15} className="text-pink-600 dark:text-pink-400" />
               <span className="hidden md:inline text-[11px]">Picture</span>
             </button>
 
@@ -699,7 +699,7 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
               title="Add Callout Box at cursor"
               className="p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-1 text-xs"
             >
-              <Sparkles size={15} className="text-amber-400" />
+              <Sparkles size={15} className="text-amber-600 dark:text-amber-400" />
               <span className="hidden md:inline text-[11px]">Callout</span>
             </button>
 
@@ -735,7 +735,7 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
             style={{ color: 'var(--theme-text-muted)' }}
           >
             <span>Type</span>
-            <kbd className="px-1.5 py-0.5 rounded border text-[10px] bg-black/10 dark:bg-white/10">/</kbd>
+            <kbd className="px-1.5 py-0.5 rounded border text-[10px] bg-[var(--theme-bg-app)] dark:bg-white/10">/</kbd>
             <span>anywhere to insert blocks</span>
           </div>
         </div>
@@ -770,7 +770,7 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
                     insertBlockAfter(block.id, 'p');
                   }}
                   title="Add block below"
-                  className="p-0.5 rounded opacity-60 hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10"
+                  className="p-0.5 rounded opacity-60 hover:opacity-100 hover:bg-[var(--theme-bg-app)] dark:hover:bg-white/10"
                 >
                   <Plus size={13} />
                 </button>
@@ -780,7 +780,7 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
                     deleteBlock(block.id);
                   }}
                   title="Delete block"
-                  className="p-0.5 rounded text-red-400 opacity-60 hover:opacity-100 hover:bg-red-500/10"
+                  className="p-0.5 rounded text-red-600 dark:text-red-400 opacity-60 hover:opacity-100 hover:bg-red-500/10"
                 >
                   <Trash2 size={12} />
                 </button>
@@ -1310,7 +1310,7 @@ const InteractiveSheetTable: React.FC<InteractiveSheetTableProps> = ({
                   <button
                     onClick={() => deleteRow(rIdx)}
                     title="Delete row"
-                    className="p-1 text-red-400 hover:bg-red-500/10 rounded"
+                    className="p-1 text-red-600 dark:text-red-400 hover:bg-red-500/10 rounded"
                   >
                     <Trash2 size={11} />
                   </button>
@@ -1483,7 +1483,7 @@ const InteractiveSheetImage: React.FC<InteractiveSheetImageProps> = ({
       <img
         src={imageUrl}
         alt={caption || 'Picture'}
-        className="w-full max-h-[500px] object-contain bg-black/10 dark:bg-black/30"
+        className="w-full max-h-[500px] object-contain bg-[var(--theme-bg-app)] dark:bg-black/30"
       />
 
       {/* Delete / Replace Controls */}

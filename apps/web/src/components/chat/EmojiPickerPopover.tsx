@@ -119,11 +119,11 @@ export const EmojiPickerPopover: React.FC<EmojiPickerPopoverProps> = ({
     <div
       ref={containerRef}
       style={adjustedStyle}
-      className={`absolute z-50 bg-[#1F2326] border border-gray-700 rounded-2xl shadow-2xl overflow-hidden w-80 max-w-[calc(100vw-2rem)] max-h-[min(500px,calc(100vh-100px))] overflow-y-auto animate-in fade-in zoom-in-95 duration-150 ${positionClass}`}
+      className={`absolute z-50 bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-2xl shadow-2xl overflow-hidden w-80 max-w-[calc(100vw-2rem)] max-h-[min(500px,calc(100vh-100px))] overflow-y-auto animate-in fade-in zoom-in-95 duration-150 ${positionClass}`}
     >
       {/* Header */}
-      <div className="sticky top-0 z-10 flex items-center justify-between px-3.5 py-2.5 border-b border-gray-800 bg-[#181B1E]">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-gray-200">
+      <div className="sticky top-0 z-10 flex items-center justify-between px-3.5 py-2.5 border-b border-[var(--theme-border)] bg-[var(--theme-bg-app)]">
+        <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--theme-text)]">
           <Sparkles size={14} className="text-slack-green" />
           <span>{title}</span>
         </div>
@@ -134,7 +134,7 @@ export const EmojiPickerPopover: React.FC<EmojiPickerPopoverProps> = ({
             className={`p-1 rounded text-xs transition flex items-center gap-1 ${
               showFullPicker
                 ? 'bg-slack-green text-white font-semibold px-2'
-                : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]'
             }`}
           >
             <Grid size={13} />
@@ -142,7 +142,7 @@ export const EmojiPickerPopover: React.FC<EmojiPickerPopoverProps> = ({
           </button>
           <button
             onClick={onClose}
-            className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
+            className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded transition"
           >
             <X size={14} />
           </button>
@@ -150,7 +150,7 @@ export const EmojiPickerPopover: React.FC<EmojiPickerPopoverProps> = ({
       </div>
 
       {showFullPicker ? (
-        <div className="p-1 bg-[#1A1D21]">
+        <div className="p-1 bg-[var(--theme-bg-app)]">
           <EmojiPicker
             theme={Theme.DARK}
             width="100%"
@@ -167,12 +167,12 @@ export const EmojiPickerPopover: React.FC<EmojiPickerPopoverProps> = ({
             <div className="text-[10px] font-bold uppercase tracking-wider text-slack-green mb-1.5 flex items-center gap-1">
               <span>Frequently Used</span>
             </div>
-            <div className="grid grid-cols-5 gap-1.5 bg-[#141618] p-1.5 rounded-xl border border-gray-800">
+            <div className="grid grid-cols-5 gap-1.5 bg-[var(--theme-bg-app)] p-1.5 rounded-xl border border-[var(--theme-border)]">
               {topEmojis.map((emoji, idx) => (
                 <button
                   key={`top-${idx}-${emoji}`}
                   onClick={() => handlePickEmoji(emoji)}
-                  className="h-10 text-xl flex items-center justify-center hover:bg-[#2C3136] rounded-lg transition hover:scale-125 duration-100"
+                  className="h-10 text-xl flex items-center justify-center hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition hover:scale-125 duration-100"
                 >
                   {emoji}
                 </button>
@@ -182,19 +182,19 @@ export const EmojiPickerPopover: React.FC<EmojiPickerPopoverProps> = ({
 
           {/* Search Box for Quick Reactions */}
           <div className="relative">
-            <Search size={13} className="absolute left-2.5 top-2.5 text-gray-500" />
+            <Search size={13} className="absolute left-2.5 top-2.5 text-[var(--theme-text-muted)]" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Filter quick emojis..."
-              className="w-full bg-[#141618] border border-gray-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-gray-600"
+              className="w-full bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-lg pl-8 pr-3 py-1.5 text-xs text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-[var(--theme-border)]"
             />
           </div>
 
           {/* Popular Reactions Grid */}
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--theme-text-muted)] mb-1.5">
               Popular Reactions
             </div>
             <div className="grid grid-cols-8 gap-1 max-h-40 overflow-y-auto pr-1">
@@ -202,7 +202,7 @@ export const EmojiPickerPopover: React.FC<EmojiPickerPopoverProps> = ({
                 <button
                   key={`pop-${idx}-${emoji}`}
                   onClick={() => handlePickEmoji(emoji)}
-                  className="h-8 text-base flex items-center justify-center hover:bg-[#2C3136] rounded-md transition hover:scale-125 duration-100"
+                  className="h-8 text-base flex items-center justify-center hover:bg-[var(--theme-bg-surface-hover)] rounded-md transition hover:scale-125 duration-100"
                 >
                   {emoji}
                 </button>
@@ -213,7 +213,7 @@ export const EmojiPickerPopover: React.FC<EmojiPickerPopoverProps> = ({
           {/* Bottom Button to View Full Library */}
           <button
             onClick={() => setShowFullPicker(true)}
-            className="w-full py-1.5 text-center text-xs font-medium text-gray-300 hover:text-white bg-[#25292D] hover:bg-[#2E3338] border border-gray-700/60 rounded-lg transition flex items-center justify-center gap-1.5"
+            className="w-full py-1.5 text-center text-xs font-medium text-[var(--theme-text)] hover:text-[var(--theme-text)] bg-[var(--theme-bg-surface)] hover:bg-[var(--theme-bg-surface-hover)] border border-[var(--theme-border)] rounded-lg transition flex items-center justify-center gap-1.5"
           >
             <Grid size={13} className="text-slack-green" />
             <span>Open All 3,000+ Emojis</span>

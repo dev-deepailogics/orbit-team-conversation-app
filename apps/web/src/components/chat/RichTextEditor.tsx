@@ -535,7 +535,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         if (selectedText) {
           document.execCommand('createLink', false, url);
         } else {
-          document.execCommand('insertHTML', false, `<a href="${url}" target="_blank" class="text-blue-400 hover:underline">${url}</a>`);
+          document.execCommand('insertHTML', false, `<a href="${url}" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline">${url}</a>`);
         }
       }
       if (onTyping) onTyping(editor.innerText.replace(/\u200B/g, ''));

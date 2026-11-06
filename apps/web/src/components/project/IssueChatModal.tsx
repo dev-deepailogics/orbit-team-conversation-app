@@ -97,7 +97,7 @@ export const IssueChatModal: React.FC<IssueChatModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white transition p-1 rounded-lg hover:bg-white/5 shrink-0"
+            className="text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition p-1 rounded-lg hover:bg-[var(--theme-bg-surface-hover)] shrink-0"
           >
             <X size={18} />
           </button>
@@ -106,13 +106,13 @@ export const IssueChatModal: React.FC<IssueChatModalProps> = ({
         {/* Message Thread */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {loading ? (
-            <div className="flex items-center justify-center h-full text-xs text-slate-400">
+            <div className="flex items-center justify-center h-full text-xs text-[var(--theme-text-muted)]">
               Loading comments...
             </div>
           ) : comments.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center p-6 text-slate-400">
+            <div className="flex flex-col items-center justify-center h-full text-center p-6 text-[var(--theme-text-muted)]">
               <p className="text-xs">No discussion messages on this issue yet.</p>
-              <p className="text-[11px] text-slate-500 mt-1">Start the conversation below.</p>
+              <p className="text-[11px] text-[var(--theme-text-muted)] mt-1">Start the conversation below.</p>
             </div>
           ) : (
             comments.map((comment) => {
@@ -138,8 +138,8 @@ export const IssueChatModal: React.FC<IssueChatModalProps> = ({
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold text-blue-400">{authorName}</span>
-                      <span className="text-[11px] text-slate-400">{timeFormatted}</span>
+                      <span className="font-semibold text-blue-600 dark:text-blue-400">{authorName}</span>
+                      <span className="text-[11px] text-[var(--theme-text-muted)]">{timeFormatted}</span>
                     </div>
 
                     <div
@@ -169,7 +169,7 @@ export const IssueChatModal: React.FC<IssueChatModalProps> = ({
             <button
               type="button"
               title="Voice recording"
-              className="p-2.5 rounded-xl border border-slate-700/80 text-slate-400 hover:text-white hover:bg-white/5 transition shrink-0"
+              className="p-2.5 rounded-xl border border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] transition shrink-0"
             >
               <Mic size={16} />
             </button>
@@ -180,13 +180,13 @@ export const IssueChatModal: React.FC<IssueChatModalProps> = ({
               onChange={(e) => setNewText(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Type your message... (Press Enter to send, Shift+Enter for new line)"
-              className="flex-1 px-3.5 py-2.5 rounded-xl bg-black/20 border border-slate-700/80 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-blue-500 transition resize-none max-h-24"
+              className="flex-1 px-3.5 py-2.5 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] text-xs focus:outline-none focus:border-blue-500 transition resize-none max-h-24"
             />
 
             <button
               type="submit"
               disabled={!newText.trim() || isSending}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs transition disabled:opacity-40 shrink-0 shadow-sm"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[var(--theme-bg-surface)] hover:bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] font-semibold text-xs transition disabled:opacity-40 shrink-0 shadow-sm"
             >
               <Send size={14} />
               <span>Send</span>

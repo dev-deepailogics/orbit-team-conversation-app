@@ -85,27 +85,27 @@ export const PinnedMessagesModal: React.FC<PinnedMessagesModalProps> = ({
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-xl bg-[#1F2326] border border-[#383F45] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] z-10 animate-in fade-in zoom-in-95 duration-150">
+      <div className="relative w-full max-w-xl bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] z-10 animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-[#383F45]/60 bg-[#1A1D21] flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-[var(--theme-border)] bg-[var(--theme-bg-app)] flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-amber-500/15 border border-amber-500/40 flex items-center justify-center text-amber-400">
+            <div className="w-9 h-9 rounded-lg bg-amber-500/15 border border-amber-500/40 flex items-center justify-center text-amber-600 dark:text-amber-400">
               <Pin size={18} className="fill-amber-400" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+              <h2 className="text-base sm:text-lg font-bold text-[var(--theme-text)] flex items-center gap-2">
                 <span>Pinned Messages</span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/40">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-semibold border border-amber-500/40">
                   {pinnedMessages.length}
                 </span>
               </h2>
-              <p className="text-xs text-gray-400">#{channel.name}</p>
+              <p className="text-xs text-[var(--theme-text-muted)]">#{channel.name}</p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
+            className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface)] rounded-lg transition"
             title="Close"
           >
             <X size={18} />
@@ -115,17 +115,17 @@ export const PinnedMessagesModal: React.FC<PinnedMessagesModalProps> = ({
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3">
           {isLoading ? (
-            <div className="py-16 text-center flex flex-col items-center justify-center text-gray-400">
-              <Loader2 className="w-7 h-7 text-amber-400 animate-spin mb-2" />
+            <div className="py-16 text-center flex flex-col items-center justify-center text-[var(--theme-text-muted)]">
+              <Loader2 className="w-7 h-7 text-amber-600 dark:text-amber-400 animate-spin mb-2" />
               <p className="text-xs">Loading pinned messages...</p>
             </div>
           ) : pinnedMessages.length === 0 ? (
-            <div className="py-14 text-center flex flex-col items-center justify-center text-gray-400">
-              <div className="w-12 h-12 rounded-full bg-gray-800/80 border border-gray-700 flex items-center justify-center mb-3 text-amber-400/80">
+            <div className="py-14 text-center flex flex-col items-center justify-center text-[var(--theme-text-muted)]">
+              <div className="w-12 h-12 rounded-full bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] flex items-center justify-center mb-3 text-amber-600 dark:text-amber-400/80">
                 <Pin size={22} />
               </div>
-              <h3 className="text-white font-semibold text-sm mb-1">No pinned messages</h3>
-              <p className="text-xs text-gray-400 max-w-sm">
+              <h3 className="text-[var(--theme-text)] font-semibold text-sm mb-1">No pinned messages</h3>
+              <p className="text-xs text-[var(--theme-text-muted)] max-w-sm">
                 Keep important announcements, docs, and notes accessible for everyone in #{channel.name}. Hover over any message and click the Pin icon to pin it here.
               </p>
             </div>
@@ -140,7 +140,7 @@ export const PinnedMessagesModal: React.FC<PinnedMessagesModalProps> = ({
               return (
                 <div
                   key={msg.id}
-                  className="bg-[#272B30]/70 hover:bg-[#2F343A] border border-amber-500/30 rounded-xl p-3.5 transition flex flex-col gap-2.5"
+                  className="bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] border border-amber-500/30 rounded-xl p-3.5 transition flex flex-col gap-2.5"
                 >
                   {/* Top Bar: Author, Time */}
                   <div className="flex items-center justify-between text-xs">
@@ -151,10 +151,10 @@ export const PinnedMessagesModal: React.FC<PinnedMessagesModalProps> = ({
                         className="w-7 h-7 rounded-md object-cover shrink-0"
                       />
                       <div className="min-w-0">
-                        <span className="font-bold text-white text-xs truncate block">
+                        <span className="font-bold text-[var(--theme-text)] text-xs truncate block">
                           {authorName}
                         </span>
-                        <span className="text-[11px] text-gray-400">
+                        <span className="text-[11px] text-[var(--theme-text-muted)]">
                           {formatTime(msg.createdAt)}
                         </span>
                       </div>
@@ -166,7 +166,7 @@ export const PinnedMessagesModal: React.FC<PinnedMessagesModalProps> = ({
                         onClick={() => handleUnpin(msg)}
                         disabled={unpinningId === msg.id}
                         title="Unpin message"
-                        className="flex items-center gap-1 px-2 py-1 rounded bg-[#1F2326] hover:bg-red-900/30 text-gray-400 hover:text-red-400 border border-gray-700 text-xs transition"
+                        className="flex items-center gap-1 px-2 py-1 rounded bg-[var(--theme-bg-surface)] hover:bg-red-900/30 text-[var(--theme-text-muted)] hover:text-red-400 border border-[var(--theme-border)] text-xs transition"
                       >
                         {unpinningId === msg.id ? (
                           <Loader2 size={12} className="animate-spin" />
@@ -181,7 +181,7 @@ export const PinnedMessagesModal: React.FC<PinnedMessagesModalProps> = ({
                           onJumpToMessage(msg);
                           onClose();
                         }}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-semibold transition"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 border border-amber-500/40 text-xs font-semibold transition"
                       >
                         <span>Jump to</span>
                         <ArrowRight size={12} />
@@ -190,19 +190,19 @@ export const PinnedMessagesModal: React.FC<PinnedMessagesModalProps> = ({
                   </div>
 
                   {/* Message Content */}
-                  <div className="text-xs sm:text-sm text-gray-200 break-words leading-relaxed pl-1">
+                  <div className="text-xs sm:text-sm text-[var(--theme-text)] break-words leading-relaxed pl-1">
                     <MarkdownRenderer content={msg.content} />
                   </div>
 
                   {/* Attachments if any */}
                   {msg.attachments && msg.attachments.length > 0 && (
-                    <div className="pt-1 flex flex-wrap gap-2 text-[11px] text-gray-400">
+                    <div className="pt-1 flex flex-wrap gap-2 text-[11px] text-[var(--theme-text-muted)]">
                       {msg.attachments.map((att: any) => (
                         <span
                           key={att.id}
-                          className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#1F2326] border border-gray-700 text-gray-300"
+                          className="flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] text-[var(--theme-text)]"
                         >
-                          <Paperclip size={11} className="text-amber-400" />
+                          <Paperclip size={11} className="text-amber-600 dark:text-amber-400" />
                           <span className="truncate max-w-xs">{att.fileName}</span>
                         </span>
                       ))}

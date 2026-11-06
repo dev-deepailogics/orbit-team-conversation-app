@@ -132,12 +132,12 @@ export const IssueTimelineModal: React.FC<IssueTimelineModalProps> = ({
           style={{ borderColor: 'var(--theme-border, #334155)' }}
         >
           <div className="flex items-center gap-2">
-            <Clock size={18} className="text-blue-400" />
-            <h3 className="text-base font-bold text-white">Issue Timeline</h3>
+            <Clock size={18} className="text-blue-600 dark:text-blue-400" />
+            <h3 className="text-base font-bold text-[var(--theme-text)]">Issue Timeline</h3>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white transition p-1 rounded-lg hover:bg-white/5"
+            className="text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition p-1 rounded-lg hover:bg-[var(--theme-bg-surface-hover)]"
           >
             <X size={18} />
           </button>
@@ -167,18 +167,18 @@ export const IssueTimelineModal: React.FC<IssueTimelineModalProps> = ({
               >
                 {/* Vertical connecting line */}
                 {!isLast && (
-                  <div className="absolute left-[138px] top-4 bottom-[-24px] w-0.5 bg-slate-700/60" />
+                  <div className="absolute left-[138px] top-4 bottom-[-24px] w-0.5 bg-[var(--theme-bg-surface-hover)]" />
                 )}
 
                 {/* Left Timestamp */}
-                <div className="w-[124px] text-right font-medium text-slate-400 shrink-0 select-none text-[11px] pt-0.5">
+                <div className="w-[124px] text-right font-medium text-[var(--theme-text-muted)] shrink-0 select-none text-[11px] pt-0.5">
                   {timeFormatted}
                 </div>
 
                 {/* Colored Timeline Node */}
                 <div className="relative z-10 shrink-0 pt-0.5">
                   <div
-                    className="w-3.5 h-3.5 rounded-full border-2 bg-slate-900 flex items-center justify-center ring-2 ring-slate-900"
+                    className="w-3.5 h-3.5 rounded-full border-2 bg-[var(--theme-bg-app)] flex items-center justify-center ring-2 ring-slate-900"
                     style={{
                       borderColor: item.color,
                       backgroundColor: item.color,
@@ -187,10 +187,10 @@ export const IssueTimelineModal: React.FC<IssueTimelineModalProps> = ({
                 </div>
 
                 {/* Right Description */}
-                <div className="flex-1 min-w-0 pt-0.5 leading-relaxed text-slate-200">
-                  <span className="font-bold text-white">{item.action}</span>
-                  <span className="text-slate-400"> by </span>
-                  <span className="font-semibold text-white">{item.user}</span>
+                <div className="flex-1 min-w-0 pt-0.5 leading-relaxed text-[var(--theme-text)]">
+                  <span className="font-bold text-[var(--theme-text)]">{item.action}</span>
+                  <span className="text-[var(--theme-text-muted)]"> by </span>
+                  <span className="font-semibold text-[var(--theme-text)]">{item.user}</span>
                 </div>
               </div>
             );
@@ -204,7 +204,7 @@ export const IssueTimelineModal: React.FC<IssueTimelineModalProps> = ({
         >
           <button
             onClick={onClose}
-            className="px-5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white transition"
+            className="px-5 py-2 rounded-xl text-xs font-semibold bg-[var(--theme-bg-surface)] hover:bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] transition"
           >
             Close
           </button>

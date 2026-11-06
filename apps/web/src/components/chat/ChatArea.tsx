@@ -599,7 +599,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               {getDirectChannelTitle()}
             </span>
             {channel.isAnonymous && (
-              <span className="text-[10px] font-semibold uppercase bg-purple-900/60 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded ml-1 shrink-0">
+              <span className="text-[10px] font-semibold uppercase bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded ml-1 shrink-0">
                 Anonymous
               </span>
             )}
@@ -693,11 +693,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <button
               onClick={() => setShowAnonPersonaModal(true)}
               title="Change your Anonymous Persona"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-950/70 hover:bg-purple-900/80 border border-purple-500/50 text-purple-200 text-xs font-medium transition shrink-0 group shadow-sm"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-950/70 hover:bg-purple-900/80 border border-purple-500/50 text-purple-700 dark:text-purple-200 text-xs font-medium transition shrink-0 group shadow-sm"
             >
               <span className="text-sm">{anonProfile.anonEmoji}</span>
               <span className="hidden sm:inline font-semibold">{anonProfile.anonName}</span>
-              <span className="text-[10px] text-purple-400 group-hover:text-purple-200 ml-0.5">Edit</span>
+              <span className="text-[10px] text-purple-600 dark:text-purple-400 group-hover:text-purple-200 ml-0.5">Edit</span>
             </button>
           )}
 
@@ -739,7 +739,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             }}
             className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border text-xs font-medium transition hover:opacity-85"
           >
-            <Pin size={14} className="text-amber-400 fill-amber-400/30" />
+            <Pin size={14} className="text-amber-600 dark:text-amber-400 fill-amber-400/30" />
             <span className="hidden sm:inline">Pins</span>
           </button>
 
@@ -795,7 +795,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   }}
                   className="w-full px-3.5 py-2 text-left text-xs text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] flex items-center gap-2.5 transition"
                 >
-                  <Pin size={14} className="text-amber-400 fill-amber-400" />
+                  <Pin size={14} className="text-amber-600 dark:text-amber-400 fill-amber-400" />
                   <span>Pinned Messages</span>
                 </button>
 
@@ -855,7 +855,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
       {/* Anonymous Discussion Info Banner */}
       {channel.isAnonymous && (
-        <div className="bg-gradient-to-r from-purple-950/80 via-indigo-950/60 to-purple-950/80 border-b border-purple-500/30 px-3 sm:px-6 py-2 flex items-center justify-between text-xs text-purple-200 shrink-0">
+        <div className="bg-gradient-to-r from-purple-950/80 via-indigo-950/60 to-purple-950/80 border-b border-purple-500/30 px-3 sm:px-6 py-2 flex items-center justify-between text-xs text-purple-700 dark:text-purple-200 shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-base shrink-0">🎭</span>
             <span className="truncate">
@@ -865,7 +865,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           {anonProfile && (
             <button
               onClick={() => setShowAnonPersonaModal(true)}
-              className="ml-3 text-xs font-semibold underline text-purple-300 hover:text-[var(--theme-text)] shrink-0"
+              className="ml-3 text-xs font-semibold underline text-purple-700 dark:text-purple-300 hover:text-[var(--theme-text)] shrink-0"
             >
               Change Persona ({anonProfile.anonEmoji} {anonProfile.anonName})
             </button>
@@ -993,7 +993,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
                 <div className="flex-1 min-w-0">
                   {msg.isPinned && (
-                    <div className="flex items-center gap-1 text-[11px] text-amber-400 font-semibold mb-1">
+                    <div className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-semibold mb-1">
                       <Pin size={11} className="fill-amber-400" />
                       <span>Pinned to channel</span>
                     </div>
@@ -1008,7 +1008,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         <span
                           className={`text-[10px] font-semibold px-1.5 py-0.2 rounded uppercase ${
                             isSelf
-                              ? 'bg-purple-900/70 text-purple-200 border border-purple-500/40'
+                              ? 'bg-purple-900/70 text-purple-700 dark:text-purple-200 border border-purple-500/40'
                               : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] border border-[var(--theme-border)]'
                           }`}
                         >
@@ -1221,7 +1221,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   {(msg.replyCount || 0) > 0 && (
                     <button
                       onClick={() => onOpenThread(msg)}
-                      className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-blue-400 hover:text-blue-300 transition"
+                      className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-300 transition"
                     >
                       <MessageSquare size={13} />
                       <span>{msg.replyCount} {msg.replyCount === 1 ? 'reply' : 'replies'}</span>
@@ -1272,7 +1272,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       title={msg.isPinned ? 'Unpin message' : 'Pin message to channel'}
                       className={`p-1 rounded transition ${
                         msg.isPinned
-                          ? 'text-amber-400 hover:text-amber-300'
+                          ? 'text-amber-600 dark:text-amber-400 hover:text-amber-300'
                           : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]'
                       }`}
                     >
@@ -1303,7 +1303,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       <button
                         onClick={() => setDeleteConfirmMessage(msg)}
                         title="Delete message"
-                        className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded transition"
+                        className="p-1 text-red-600 dark:text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded transition"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -1424,7 +1424,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     className="flex items-center gap-2 bg-[var(--theme-bg-surface-hover)] border border-[var(--theme-border)] px-2.5 py-1 rounded-lg text-xs text-[var(--theme-text)] shadow-sm animate-in fade-in zoom-in-95 duration-100"
                   >
                     {isImage ? (
-                      <div className="w-4 h-4 rounded overflow-hidden bg-black/40">
+                      <div className="w-4 h-4 rounded overflow-hidden bg-[var(--theme-bg-app)]">
                         <img
                           src={att.fileUrl}
                           alt=""
@@ -1432,7 +1432,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         />
                       </div>
                     ) : (
-                      <FileText size={14} className="text-blue-400" />
+                      <FileText size={14} className="text-blue-600 dark:text-blue-400" />
                     )}
                     <span className="truncate max-w-[140px] font-medium" title={att.fileName}>
                       {att.fileName}
@@ -1631,7 +1631,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             }}
           >
             <div className="flex items-start gap-3">
-              <div className="p-2.5 rounded-xl bg-red-500/10 text-red-400 shrink-0 mt-0.5">
+              <div className="p-2.5 rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 shrink-0 mt-0.5">
                 <Trash2 size={20} />
               </div>
               <div className="flex-1">

@@ -934,13 +934,13 @@ export default function AppDashboard() {
           <div className="max-w-md w-full flex flex-col items-center animate-in fade-in zoom-in-95 duration-200">
             {user?.systemRole === "SUPER_ADMIN" ? (
               <>
-                <div className="w-16 h-16 rounded-2xl bg-purple-900/30 border border-purple-500/40 flex items-center justify-center mb-6 shadow-xl text-purple-400">
+                <div className="w-16 h-16 rounded-2xl bg-purple-900/30 border border-purple-500/40 flex items-center justify-center mb-6 shadow-xl text-purple-600 dark:text-purple-400">
                   <ShieldCheck size={36} />
                 </div>
-                <h1 className="text-2xl font-bold text-white mb-2">
+                <h1 className="text-2xl font-bold text-[var(--theme-text)] mb-2">
                   Orbit Super Admin
                 </h1>
-                <p className="text-sm text-gray-400 mb-6 leading-relaxed">
+                <p className="text-sm text-[var(--theme-text-muted)] mb-6 leading-relaxed">
                   You are signed in as Developer & Super Administrator. You can
                   monitor the system, assign roles, reset user passwords, or
                   launch workspaces.
@@ -955,7 +955,7 @@ export default function AppDashboard() {
                   </Link>
                   <button
                     onClick={() => setShowCreateWsModal(true)}
-                    className="w-full sm:w-auto px-5 py-2.5 bg-[#2C3136] hover:bg-[#3E4348] text-gray-200 hover:text-white text-sm font-semibold rounded-xl border border-gray-700 flex items-center justify-center gap-2 transition"
+                    className="w-full sm:w-auto px-5 py-2.5 bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] hover:text-[var(--theme-text)] text-sm font-semibold rounded-xl border border-[var(--theme-border)] flex items-center justify-center gap-2 transition"
                   >
                     <Plus size={18} />
                     Create Workspace
@@ -967,10 +967,10 @@ export default function AppDashboard() {
                 <div className="w-16 h-16 rounded-2xl bg-slack-activeChannel/20 border border-slack-activeChannel/40 flex items-center justify-center mb-6 shadow-xl text-slack-activeChannel">
                   <Building2 size={36} />
                 </div>
-                <h1 className="text-2xl font-bold text-white mb-2">
+                <h1 className="text-2xl font-bold text-[var(--theme-text)] mb-2">
                   Welcome, {user?.displayName || "Admin"}!
                 </h1>
-                <p className="text-sm text-gray-400 mb-6 leading-relaxed">
+                <p className="text-sm text-[var(--theme-text-muted)] mb-6 leading-relaxed">
                   You have been designated as a Company Administrator. Create
                   your organization workspace to start adding channels and
                   inviting your team members.
@@ -987,23 +987,23 @@ export default function AppDashboard() {
               </>
             ) : (
               <>
-                <div className="w-16 h-16 rounded-2xl bg-[#222529] border border-gray-700/60 flex items-center justify-center mb-6 shadow-xl text-gray-400">
+                <div className="w-16 h-16 rounded-2xl bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] flex items-center justify-center mb-6 shadow-xl text-[var(--theme-text-muted)]">
                   <Building2 size={36} />
                 </div>
-                <h1 className="text-2xl font-bold text-white mb-2">
+                <h1 className="text-2xl font-bold text-[var(--theme-text)] mb-2">
                   Welcome to Orbit, {user?.displayName}!
                 </h1>
-                <p className="text-sm text-gray-400 mb-6 leading-relaxed">
+                <p className="text-sm text-[var(--theme-text-muted)] mb-6 leading-relaxed">
                   You are not a member of any workspace yet. Orbit workspaces
                   are private organizations. Ask your company CEO or workspace
                   admin to add you using your account email:
                 </p>
-                <div className="w-full bg-[#19171D] border border-gray-800 rounded-xl p-4 mb-6 text-left">
-                  <span className="text-xs uppercase tracking-wider font-semibold text-gray-500 block mb-1">
+                <div className="w-full bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-xl p-4 mb-6 text-left">
+                  <span className="text-xs uppercase tracking-wider font-semibold text-[var(--theme-text-muted)] block mb-1">
                     Your Account Email
                   </span>
-                  <div className="flex items-center justify-between gap-2 bg-[#222529] border border-gray-700/50 rounded-lg px-3 py-2">
-                    <span className="text-sm font-mono text-gray-200 truncate">
+                  <div className="flex items-center justify-between gap-2 bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-lg px-3 py-2">
+                    <span className="text-sm font-mono text-[var(--theme-text)] truncate">
                       {user?.email}
                     </span>
                     <button
@@ -1014,10 +1014,10 @@ export default function AppDashboard() {
                           setTimeout(() => setCopiedEmail(false), 2000);
                         }
                       }}
-                      className="px-2.5 py-1 text-xs font-medium rounded bg-gray-700 hover:bg-gray-600 text-white flex items-center gap-1.5 transition shrink-0"
+                      className="px-2.5 py-1 text-xs font-medium rounded bg-[var(--theme-bg-surface-hover)] hover:bg-gray-600 text-[var(--theme-text)] flex items-center gap-1.5 transition shrink-0"
                     >
                       {copiedEmail ? (
-                        <Check size={13} className="text-green-400" />
+                        <Check size={13} className="text-green-600 dark:text-green-400" />
                       ) : (
                         <Copy size={13} />
                       )}
@@ -1046,7 +1046,7 @@ export default function AppDashboard() {
               </button>
               <button
                 onClick={logout}
-                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-semibold rounded-lg transition flex items-center gap-2"
+                className="px-4 py-2 bg-[var(--theme-bg-surface)] hover:bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] hover:text-[var(--theme-text)] text-xs font-semibold rounded-lg transition flex items-center gap-2"
               >
                 <LogOut size={14} />
                 Log out
@@ -1103,11 +1103,11 @@ export default function AppDashboard() {
           onSelectChannel={handleSelectChannel}
         />
       ) : (
-        <div className="flex-1 flex flex-col items-center justify-center text-gray-500 p-4 text-center">
-          <p className="text-base font-semibold text-gray-300">
+        <div className="flex-1 flex flex-col items-center justify-center text-[var(--theme-text-muted)] p-4 text-center">
+          <p className="text-base font-semibold text-[var(--theme-text)]">
             No channel or project selected
           </p>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-[var(--theme-text-muted)] mt-1">
             Select a channel, direct message, or project board to begin
           </p>
           <button
@@ -1122,17 +1122,17 @@ export default function AppDashboard() {
       {/* Workspace Creation Modal for Admins */}
       {showCreateWsModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in">
-          <div className="bg-[#222529] border border-gray-700/60 rounded-xl p-6 w-full max-w-md shadow-2xl">
-            <h3 className="text-lg font-bold text-white mb-1">
+          <div className="bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-xl p-6 w-full max-w-md shadow-2xl">
+            <h3 className="text-lg font-bold text-[var(--theme-text)] mb-1">
               Create a New Workspace
             </h3>
-            <p className="text-xs text-gray-400 mb-5">
+            <p className="text-xs text-[var(--theme-text-muted)] mb-5">
               Set up a dedicated workspace for your company or team.
             </p>
 
             <form onSubmit={handleCreateWorkspace} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+                <label className="block text-xs font-semibold text-[var(--theme-text)] mb-1.5">
                   Workspace Name
                 </label>
                 <input
@@ -1152,16 +1152,16 @@ export default function AppDashboard() {
                       );
                     }
                   }}
-                  className="w-full bg-[#1A1D21] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-hidden focus:border-slack-activeChannel"
+                  className="w-full bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-lg px-3 py-2 text-sm text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-hidden focus:border-slack-activeChannel"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+                <label className="block text-xs font-semibold text-[var(--theme-text)] mb-1.5">
                   Workspace URL Slug
                 </label>
-                <div className="flex items-center bg-[#1A1D21] border border-gray-700 rounded-lg px-3 py-2">
-                  <span className="text-xs text-gray-500 select-none mr-1">
+                <div className="flex items-center bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-lg px-3 py-2">
+                  <span className="text-xs text-[var(--theme-text-muted)] select-none mr-1">
                     orbit.chat/
                   </span>
                   <input
@@ -1174,7 +1174,7 @@ export default function AppDashboard() {
                         e.target.value.toLowerCase().replace(/[^a-z0-9]/g, "-"),
                       )
                     }
-                    className="w-full bg-transparent text-sm text-white placeholder-gray-500 focus:outline-hidden"
+                    className="w-full bg-transparent text-sm text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-hidden"
                   />
                 </div>
               </div>
@@ -1183,7 +1183,7 @@ export default function AppDashboard() {
                 <button
                   type="button"
                   onClick={() => setShowCreateWsModal(false)}
-                  className="px-4 py-2 text-sm text-gray-400 hover:text-white transition"
+                  className="px-4 py-2 text-sm text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition"
                 >
                   Cancel
                 </button>

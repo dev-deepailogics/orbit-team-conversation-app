@@ -92,31 +92,31 @@ export const CompressFileConfirmModal: React.FC<CompressFileConfirmModalProps> =
   const isSingle = files.length === 1;
 
   const getFileIcon = (file: File) => {
-    if (isImageFile(file)) return <ImageIcon className="w-5 h-5 text-emerald-400" />;
-    if (isVideoFile(file)) return <VideoIcon className="w-5 h-5 text-violet-400" />;
+    if (isImageFile(file)) return <ImageIcon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />;
+    if (isVideoFile(file)) return <VideoIcon className="w-5 h-5 text-violet-600 dark:text-violet-400" />;
     if (file.type.includes('pdf') || file.type.includes('document') || file.type.includes('text')) {
-      return <FileText className="w-5 h-5 text-blue-400" />;
+      return <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />;
     }
-    return <FileArchive className="w-5 h-5 text-amber-400" />;
+    return <FileArchive className="w-5 h-5 text-amber-600 dark:text-amber-400" />;
   };
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div
-        className="w-full max-w-lg rounded-2xl border border-white/10 shadow-2xl p-6 text-slate-100 flex flex-col gap-5 animate-in zoom-in-95 duration-200"
-        style={{ backgroundColor: '#1E222B' }}
+        className="w-full max-w-lg rounded-2xl border border-[var(--theme-border)] shadow-2xl p-6 text-[var(--theme-text)] flex flex-col gap-5 animate-in zoom-in-95 duration-200"
+        style={{ backgroundColor: 'var(--theme-bg-surface)' }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/10 pb-4">
+        <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-inner">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-inner">
               <Sparkles className="w-5 h-5 animate-pulse" />
             </div>
             <div>
-              <h3 className="font-semibold text-base text-white tracking-tight">
+              <h3 className="font-semibold text-base text-[var(--theme-text)] tracking-tight">
                 Compress Media & Files
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-[var(--theme-text-muted)]">
                 Speed up uploads and save bandwidth
               </p>
             </div>
@@ -125,7 +125,7 @@ export const CompressFileConfirmModal: React.FC<CompressFileConfirmModalProps> =
             type="button"
             disabled={isCompressing}
             onClick={onCancel}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition"
+            className="p-1 rounded-lg text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] transition"
             title="Cancel"
           >
             <X size={18} />
@@ -133,13 +133,13 @@ export const CompressFileConfirmModal: React.FC<CompressFileConfirmModalProps> =
         </div>
 
         {/* Question prompt */}
-        <div className="flex items-start gap-3 bg-white/[0.03] p-3.5 rounded-xl border border-white/5">
-          <AlertCircle className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 bg-[var(--theme-bg-surface-hover)] p-3.5 rounded-xl border border-[var(--theme-border)]">
+          <AlertCircle className="w-5 h-5 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
           <div className="text-sm">
-            <span className="font-semibold text-white">
+            <span className="font-semibold text-[var(--theme-text)]">
               Do you want to compress {isSingle ? 'this file' : `these ${files.length} files`}?
             </span>
-            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+            <p className="text-xs text-[var(--theme-text-muted)] mt-1 leading-relaxed">
               Compressing optimizes high-resolution images and packages documents into lightweight archives before uploading.
             </p>
           </div>
@@ -159,15 +159,15 @@ export const CompressFileConfirmModal: React.FC<CompressFileConfirmModalProps> =
             return (
               <div
                 key={`${file.name}-${idx}`}
-                className="flex items-center justify-between p-3 rounded-xl bg-[#171A21] border border-white/5 text-xs hover:border-white/10 transition gap-3"
+                className="flex items-center justify-between p-3 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] text-xs hover:border-[var(--theme-border)] transition gap-3"
               >
                 <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                  <div className="p-2 rounded-lg bg-white/5 shrink-0">
+                  <div className="p-2 rounded-lg bg-[var(--theme-bg-surface-hover)] shrink-0">
                     {getFileIcon(file)}
                   </div>
                   <div className="truncate">
-                    <p className="truncate text-slate-200 font-medium text-xs">{file.name}</p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
+                    <p className="truncate text-[var(--theme-text)] font-medium text-xs">{file.name}</p>
+                    <p className="text-[11px] text-[var(--theme-text-muted)] mt-0.5">
                       {isImageFile(file)
                         ? 'Image optimization (WebP/JPEG)'
                         : isVideoFile(file)
@@ -181,32 +181,32 @@ export const CompressFileConfirmModal: React.FC<CompressFileConfirmModalProps> =
                 <div className="flex items-center gap-2 shrink-0">
                   {/* Current Size */}
                   <div className="text-right">
-                    <div className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Current</div>
-                    <span className="font-mono text-[12px] text-slate-300 bg-white/5 px-2 py-0.5 rounded inline-block mt-0.5">
+                    <div className="text-[10px] text-[var(--theme-text-muted)] uppercase tracking-wider font-semibold">Current</div>
+                    <span className="font-mono text-[12px] text-[var(--theme-text)] bg-[var(--theme-bg-surface-hover)] px-2 py-0.5 rounded inline-block mt-0.5">
                       {formatBytes(file.size)}
                     </span>
                   </div>
 
-                  <ArrowRight size={13} className="text-slate-500 shrink-0 mt-3" />
+                  <ArrowRight size={13} className="text-[var(--theme-text-muted)] shrink-0 mt-3" />
 
                   {/* After Compress Size */}
                   <div className="text-right">
-                    <div className="text-[10px] text-emerald-400/90 uppercase tracking-wider font-semibold">After</div>
+                    <div className="text-[10px] text-emerald-600 dark:text-emerald-400/90 uppercase tracking-wider font-semibold">After</div>
                     {compSize === undefined ? (
-                      <span className="inline-flex items-center gap-1 font-mono text-[11px] text-slate-500 bg-white/5 px-2 py-0.5 rounded mt-0.5">
+                      <span className="inline-flex items-center gap-1 font-mono text-[11px] text-[var(--theme-text-muted)] bg-[var(--theme-bg-surface-hover)] px-2 py-0.5 rounded mt-0.5">
                         <Loader2 size={10} className="animate-spin" />
                       </span>
                     ) : (
                       <span
                         className={`font-mono text-[12px] font-semibold px-2 py-0.5 rounded inline-block mt-0.5 ${
                           hasSaved
-                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                            : 'bg-white/5 text-slate-400'
+                            ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                            : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)]'
                         }`}
                       >
                         {formatBytes(compSize)}
                         {singlePercent > 0 && (
-                          <span className="ml-1 text-[10px] font-normal text-emerald-300">
+                          <span className="ml-1 text-[10px] font-normal text-emerald-700 dark:text-emerald-300">
                             (-{singlePercent}%)
                           </span>
                         )}
@@ -220,27 +220,27 @@ export const CompressFileConfirmModal: React.FC<CompressFileConfirmModalProps> =
         </div>
 
         {/* Total Summary Comparison */}
-        <div className="p-3 rounded-xl bg-black/20 border border-white/5 flex items-center justify-between text-xs">
+        <div className="p-3 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
-            <TrendingDown className="w-4 h-4 text-emerald-400" />
-            <span className="text-slate-300 font-medium">Estimated Total:</span>
+            <TrendingDown className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span className="text-[var(--theme-text)] font-medium">Estimated Total:</span>
           </div>
 
           <div className="flex items-center gap-2.5">
-            <span className="text-slate-400 line-through font-mono">
+            <span className="text-[var(--theme-text-muted)] line-through font-mono">
               {formatBytes(totalOriginalSize)}
             </span>
-            <ArrowRight size={12} className="text-slate-500" />
+            <ArrowRight size={12} className="text-[var(--theme-text-muted)]" />
             {isCalculating ? (
-              <span className="inline-flex items-center gap-1 text-slate-400 font-mono">
+              <span className="inline-flex items-center gap-1 text-[var(--theme-text-muted)] font-mono">
                 <Loader2 size={12} className="animate-spin" />
                 <span>Calculating...</span>
               </span>
             ) : (
-              <span className="text-emerald-400 font-mono font-bold text-sm">
+              <span className="text-emerald-600 dark:text-emerald-400 font-mono font-bold text-sm">
                 {formatBytes(totalCompressedSize)}
                 {percentSaved > 0 && (
-                  <span className="ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
+                  <span className="ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
                     Save {percentSaved}%
                   </span>
                 )}
@@ -250,13 +250,13 @@ export const CompressFileConfirmModal: React.FC<CompressFileConfirmModalProps> =
         </div>
 
         {/* Actions */}
-        <div className="flex items-center justify-end gap-3 pt-2 border-t border-white/10">
+        <div className="flex items-center justify-end gap-3 pt-2 border-t border-[var(--theme-border)]">
           {/* Skip option */}
           <button
             type="button"
             disabled={isCompressing}
             onClick={onSkip}
-            className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-[#262B36] hover:bg-[#313745] border border-white/10 active:scale-95 transition disabled:opacity-50"
+            className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--theme-text)] hover:text-[var(--theme-text)] bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] border border-[var(--theme-border)] active:scale-95 transition disabled:opacity-50"
           >
             Skip
           </button>
@@ -270,7 +270,7 @@ export const CompressFileConfirmModal: React.FC<CompressFileConfirmModalProps> =
           >
             {isCompressing ? (
               <>
-                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <div className="w-3.5 h-3.5 border-2 border-[var(--theme-border)] border-t-white rounded-full animate-spin" />
                 <span>Compressing...</span>
               </>
             ) : (

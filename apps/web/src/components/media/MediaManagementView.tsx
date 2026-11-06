@@ -534,7 +534,7 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
               Google Drive Workspace
             </span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight mt-1 text-white">Media Upload</h1>
+          <h1 className="text-2xl font-bold tracking-tight mt-1 text-[var(--theme-text)]">Media Upload</h1>
           <p className="text-xs mt-1" style={{ color: 'var(--theme-text-muted)' }}>
             Organize project folders, prepare upload metadata, and manage Drive media from one focused workspace.
           </p>
@@ -554,10 +554,10 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
               Checking Drive...
             </span>
           ) : isDriveConnected ? (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-xs font-semibold">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-xs font-semibold">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span>Connected:</span>
-              <span className="text-white font-normal underline">{connectedEmail || 'affansidd1030@gmail.com'}</span>
+              <span className="text-[var(--theme-text)] font-normal underline">{connectedEmail || 'affansidd1030@gmail.com'}</span>
             </div>
           ) : (
             <a
@@ -589,15 +589,15 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
               <div
                 className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
                   isDriveConnected
-                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-white/5 text-gray-500 border border-white/10'
+                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                    : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] border border-[var(--theme-border)]'
                 }`}
               >
                 {isDriveConnected ? <Check size={14} /> : '1'}
               </div>
               <div>
-                <div className="font-bold text-white">Drive</div>
-                <div className="text-[11px] text-emerald-400">
+                <div className="font-bold text-[var(--theme-text)]">Drive</div>
+                <div className="text-[11px] text-emerald-600 dark:text-emerald-400">
                   {isDriveConnected ? 'Connected' : 'Needs connection'}
                 </div>
               </div>
@@ -613,14 +613,14 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
               <div
                 className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
                   selectedProjectId
-                    ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
-                    : 'bg-white/5 text-gray-500 border border-white/10'
+                    ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30'
+                    : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] border border-[var(--theme-border)]'
                 }`}
               >
                 {selectedProjectId ? <Check size={14} /> : '2'}
               </div>
               <div>
-                <div className="font-bold text-white">Project</div>
+                <div className="font-bold text-[var(--theme-text)]">Project</div>
                 <div className="text-[11px]" style={{ color: 'var(--theme-text-muted)' }}>
                   {selectedProjectId ? activeProject?.name || 'Selected' : 'Choose project'}
                 </div>
@@ -637,14 +637,14 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
               <div
                 className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
                   currentFolder
-                    ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30'
-                    : 'bg-white/5 text-gray-500 border border-white/10'
+                    ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30'
+                    : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] border border-[var(--theme-border)]'
                 }`}
               >
                 3
               </div>
               <div>
-                <div className="font-bold text-white">Folder</div>
+                <div className="font-bold text-[var(--theme-text)]">Folder</div>
                 <div className="text-[11px]" style={{ color: 'var(--theme-text-muted)' }}>
                   {currentFolder ? currentFolder.name : 'Open target folder'}
                 </div>
@@ -661,14 +661,14 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
               <div
                 className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
                   fileList.length > 0
-                    ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
-                    : 'bg-white/5 text-gray-500 border border-white/10'
+                    ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30'
+                    : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] border border-[var(--theme-border)]'
                 }`}
               >
                 4
               </div>
               <div>
-                <div className="font-bold text-white">Files</div>
+                <div className="font-bold text-[var(--theme-text)]">Files</div>
                 <div className="text-[11px]" style={{ color: 'var(--theme-text-muted)' }}>
                   {fileList.length > 0 ? `${fileList.length} staged` : 'Add media'}
                 </div>
@@ -689,11 +689,11 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
           >
             <div>
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                   <Database size={19} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">Project</h3>
+                  <h3 className="text-sm font-bold text-[var(--theme-text)]">Project</h3>
                   <p className="text-[11px]" style={{ color: 'var(--theme-text-muted)' }}>
                     Choose where this media belongs
                   </p>
@@ -708,24 +708,24 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
                   <select
                     value={selectedProjectId}
                     onChange={(e) => setSelectedProjectId(e.target.value)}
-                    className="w-full h-11 px-3.5 pr-9 rounded-xl border text-xs font-semibold text-white focus:outline-none appearance-none transition"
+                    className="w-full h-11 px-3.5 pr-9 rounded-xl border text-xs font-semibold text-[var(--theme-text)] focus:outline-none appearance-none transition"
                     style={{
                       backgroundColor: 'var(--theme-bg-app)',
                       borderColor: 'var(--theme-border)',
                     }}
                   >
-                    <option value="" className="bg-[#1A1D21] text-gray-300">
+                    <option value="" className="bg-[var(--theme-bg-app)] text-[var(--theme-text)]">
                       Search and select a project
                     </option>
                     {projects.map((p) => (
-                      <option key={p.id} value={p.id} className="bg-[#1A1D21] text-white">
+                      <option key={p.id} value={p.id} className="bg-[var(--theme-bg-app)] text-[var(--theme-text)]">
                         {p.name}
                       </option>
                     ))}
                   </select>
                   <ChevronDown
                     size={16}
-                    className="absolute right-3.5 top-3.5 text-gray-400 pointer-events-none"
+                    className="absolute right-3.5 top-3.5 text-[var(--theme-text-muted)] pointer-events-none"
                   />
                 </div>
               </div>
@@ -751,7 +751,7 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
                 <span className="text-[11px] font-medium block" style={{ color: 'var(--theme-text-muted)' }}>
                   Total folders
                 </span>
-                <strong className="text-xl font-bold text-white mt-1 block">
+                <strong className="text-xl font-bold text-[var(--theme-text)] mt-1 block">
                   {projectStats?.folderCount || 0}
                 </strong>
               </div>
@@ -766,7 +766,7 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
                 <span className="text-[11px] font-medium block" style={{ color: 'var(--theme-text-muted)' }}>
                   Total files
                 </span>
-                <strong className="text-xl font-bold text-white mt-1 block">
+                <strong className="text-xl font-bold text-[var(--theme-text)] mt-1 block">
                   {projectStats?.fileCount || 0}
                 </strong>
               </div>
@@ -781,7 +781,7 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
                 <span className="text-[11px] font-medium block" style={{ color: 'var(--theme-text-muted)' }}>
                   Project file size
                 </span>
-                <strong className="text-xl font-bold text-white mt-1 block truncate">
+                <strong className="text-xl font-bold text-[var(--theme-text)] mt-1 block truncate">
                   {projectStats ? formatBytes(projectStats.totalSize) : '0 B'}
                 </strong>
               </div>
@@ -791,7 +791,7 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
               className="mt-4 pt-3.5 border-t flex items-center justify-between text-xs"
               style={{ borderColor: 'var(--theme-border)' }}
             >
-              <span className="font-bold text-white">Files inside each folder</span>
+              <span className="font-bold text-[var(--theme-text)]">Files inside each folder</span>
               <span className="text-[11px]" style={{ color: 'var(--theme-text-muted)' }}>
                 {selectedProjectId ? activeProject?.name : 'Select a project'}
               </span>
@@ -813,7 +813,7 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
                       borderColor: 'var(--theme-border)',
                     }}
                   >
-                    <span className="font-medium text-white truncate max-w-xs">{f.name}</span>
+                    <span className="font-medium text-[var(--theme-text)] truncate max-w-xs">{f.name}</span>
                     <span className="text-[11px]" style={{ color: 'var(--theme-text-muted)' }}>
                       Folder
                     </span>
@@ -836,11 +836,11 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                   <FolderOpen size={16} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">Drive Folders</h3>
+                  <h3 className="text-sm font-bold text-[var(--theme-text)]">Drive Folders</h3>
                   <p className="text-[11px]" style={{ color: 'var(--theme-text-muted)' }}>
                     Choose the upload destination
                   </p>
@@ -868,16 +868,16 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
             >
               <button
                 onClick={() => handleOpenBreadcrumb(-1)}
-                className="hover:underline font-semibold text-blue-400"
+                className="hover:underline font-semibold text-blue-600 dark:text-blue-400"
               >
                 Project Root
               </button>
               {folderStack.map((f, i) => (
                 <React.Fragment key={f.id}>
-                  <ChevronRight size={12} className="text-gray-500" />
+                  <ChevronRight size={12} className="text-[var(--theme-text-muted)]" />
                   <button
                     onClick={() => handleOpenBreadcrumb(i)}
-                    className="hover:underline font-semibold text-blue-400"
+                    className="hover:underline font-semibold text-blue-600 dark:text-blue-400"
                   >
                     {f.name}
                   </button>
@@ -898,7 +898,7 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
                   disabled={!selectedProjectId || creatingFolder}
                   onChange={(e) => setNewFolderName(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
-                  className="flex-1 h-9 px-3 rounded-xl border text-xs text-white focus:outline-none transition"
+                  className="flex-1 h-9 px-3 rounded-xl border text-xs text-[var(--theme-text)] focus:outline-none transition"
                   style={{
                     backgroundColor: 'var(--theme-bg-app)',
                     borderColor: 'var(--theme-border)',
@@ -913,7 +913,7 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
                     borderColor: 'var(--theme-border)',
                   }}
                 >
-                  <FolderPlus size={13} className="text-blue-400" />
+                  <FolderPlus size={13} className="text-blue-600 dark:text-blue-400" />
                   <span>Create</span>
                 </button>
               </div>
@@ -922,12 +922,12 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
             {/* Folders List or Empty State */}
             {folderLoading ? (
               <div className="py-12 text-center text-xs flex items-center justify-center gap-2" style={{ color: 'var(--theme-text-muted)' }}>
-                <RefreshCw size={14} className="animate-spin text-blue-400" />
+                <RefreshCw size={14} className="animate-spin text-blue-600 dark:text-blue-400" />
                 <span>Loading folders...</span>
               </div>
             ) : folders.length === 0 ? (
               <div className="py-16 text-center" style={{ color: 'var(--theme-text-muted)' }}>
-                <Folder size={36} className="mx-auto mb-2 opacity-30 text-amber-400" />
+                <Folder size={36} className="mx-auto mb-2 opacity-30 text-amber-600 dark:text-amber-400" />
                 <span className="text-xs">
                   {selectedProjectId ? 'No subfolders created yet' : 'Select a project to load folders'}
                 </span>
@@ -947,9 +947,9 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
                       onClick={() => handleOpenFolder(folder)}
                       className="flex items-center gap-2.5 cursor-pointer min-w-0 flex-1"
                     >
-                      <Folder size={17} className="text-amber-400 shrink-0" />
+                      <Folder size={17} className="text-amber-600 dark:text-amber-400 shrink-0" />
                       <div className="min-w-0">
-                        <span className="text-xs font-bold text-white block truncate">
+                        <span className="text-xs font-bold text-[var(--theme-text)] block truncate">
                           {folder.name}
                         </span>
                         <span className="text-[10px]" style={{ color: 'var(--theme-text-muted)' }}>
@@ -961,13 +961,13 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => handleOpenFolder(folder)}
-                        className="px-2 py-0.5 text-xs text-blue-400 hover:underline font-semibold"
+                        className="px-2 py-0.5 text-xs text-blue-600 dark:text-blue-400 hover:underline font-semibold"
                       >
                         Open
                       </button>
                       <button
                         onClick={() => handleDeleteFolder(folder)}
-                        className="p-1.5 text-gray-400 hover:text-rose-400 transition"
+                        className="p-1.5 text-[var(--theme-text-muted)] hover:text-rose-400 transition"
                         title="Delete folder"
                       >
                         <Trash2 size={13} />
@@ -991,10 +991,10 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] font-bold text-blue-400 tracking-wider uppercase block">
+                  <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 tracking-wider uppercase block">
                     Upload Target
                   </span>
-                  <h3 className="text-base font-bold text-white">
+                  <h3 className="text-base font-bold text-[var(--theme-text)]">
                     {currentFolder ? currentFolder.name : 'No folder selected'}
                   </h3>
                   <p className="text-[11px]" style={{ color: 'var(--theme-text-muted)' }}>
@@ -1015,11 +1015,11 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
               </div>
 
               {/* Info banner */}
-              <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/25 text-blue-300 text-xs flex items-start gap-2.5">
-                <Info size={16} className="text-blue-400 shrink-0 mt-0.5" />
+              <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/25 text-blue-700 dark:text-blue-300 text-xs flex items-start gap-2.5">
+                <Info size={16} className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                 <div>
-                  <strong className="block font-semibold text-blue-200">Open a Drive folder to enable uploads</strong>
-                  <span className="text-[11px] text-blue-300/80">
+                  <strong className="block font-semibold text-blue-700 dark:text-blue-200">Open a Drive folder to enable uploads</strong>
+                  <span className="text-[11px] text-blue-700 dark:text-blue-300/80">
                     Select a project, open an existing folder or create a new one, then drop files into the upload area.
                   </span>
                 </div>
@@ -1036,10 +1036,10 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
                   backgroundColor: 'var(--theme-bg-app)',
                 }}
               >
-                <div className="w-12 h-12 rounded-2xl bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center mb-2">
+                <div className="w-12 h-12 rounded-2xl bg-blue-500/15 border border-blue-500/30 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-2">
                   <UploadCloud size={24} />
                 </div>
-                <h4 className="text-sm font-bold text-white">Select or drop files</h4>
+                <h4 className="text-sm font-bold text-[var(--theme-text)]">Select or drop files</h4>
                 <p className="text-xs mt-0.5" style={{ color: 'var(--theme-text-muted)' }}>
                   Upload up to 20 media files to the selected Google Drive folder.
                 </p>
@@ -1055,7 +1055,7 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
               {/* Upload Queue List */}
               {fileList.length > 0 && (
                 <div className="space-y-3 pt-2">
-                  <span className="text-xs font-bold text-white block">
+                  <span className="text-xs font-bold text-[var(--theme-text)] block">
                     Upload Queue ({fileList.length} files)
                   </span>
 
@@ -1070,14 +1070,14 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 truncate max-w-sm">
-                          <File size={14} className="text-blue-400 shrink-0" />
-                          <span className="font-semibold text-white truncate">
+                          <File size={14} className="text-blue-600 dark:text-blue-400 shrink-0" />
+                          <span className="font-semibold text-[var(--theme-text)] truncate">
                             {item.fileNamePrefix ? `${item.fileNamePrefix}_` : ''}
                             {item.originalFileName}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-[11px] font-semibold text-blue-400">
+                          <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">
                             {item.status === 'uploading'
                               ? `${item.progress}% (${formatBytes(item.speed)}/s)`
                               : item.status === 'complete'
@@ -1089,7 +1089,7 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
                           {item.status !== 'uploading' && item.status !== 'complete' && (
                             <button
                               onClick={() => setFileList((q) => q.filter((x) => x.id !== item.id))}
-                              className="text-gray-400 hover:text-rose-400 transition"
+                              className="text-[var(--theme-text-muted)] hover:text-rose-400 transition"
                             >
                               <X size={13} />
                             </button>
@@ -1108,7 +1108,7 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
                               q.map((x) => (x.id === item.id ? { ...x, fileNamePrefix: val } : x))
                             );
                           }}
-                          className="px-2.5 py-1.5 rounded-lg border text-xs font-semibold text-white focus:outline-none transition"
+                          className="px-2.5 py-1.5 rounded-lg border text-xs font-semibold text-[var(--theme-text)] focus:outline-none transition"
                           style={{
                             backgroundColor: 'var(--theme-bg-surface)',
                             borderColor: 'var(--theme-border)',
@@ -1124,7 +1124,7 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
                               q.map((x) => (x.id === item.id ? { ...x, description: val } : x))
                             );
                           }}
-                          className="px-2.5 py-1.5 rounded-lg border text-xs text-white focus:outline-none transition"
+                          className="px-2.5 py-1.5 rounded-lg border text-xs text-[var(--theme-text)] focus:outline-none transition"
                           style={{
                             backgroundColor: 'var(--theme-bg-surface)',
                             borderColor: 'var(--theme-border)',
@@ -1133,7 +1133,7 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
                       </div>
 
                       {/* Progress Bar */}
-                      <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                      <div className="w-full bg-[var(--theme-bg-surface-hover)] rounded-full h-1.5 overflow-hidden">
                         <div
                           className={`h-full transition-all duration-300 ${
                             item.status === 'complete'
@@ -1145,14 +1145,14 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
                           style={{ width: `${item.progress}%` }}
                         />
                       </div>
-                      {item.error && <span className="text-[11px] text-rose-400">{item.error}</span>}
+                      {item.error && <span className="text-[11px] text-rose-600 dark:text-rose-400">{item.error}</span>}
                     </div>
                   ))}
                 </div>
               )}
 
               {uploadError && (
-                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-400 text-xs font-medium">
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-600 dark:text-rose-400 text-xs font-medium">
                   {uploadError}
                 </div>
               )}
@@ -1195,11 +1195,11 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                  <div className="w-8 h-8 rounded-lg bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
                     <File size={16} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-white">Files in Folder</h3>
+                    <h3 className="text-sm font-bold text-[var(--theme-text)]">Files in Folder</h3>
                     <p className="text-[11px]" style={{ color: 'var(--theme-text-muted)' }}>
                       Open Drive links, rename, or remove media
                     </p>
@@ -1215,7 +1215,7 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
                     borderColor: 'var(--theme-border)',
                   }}
                 >
-                  <RefreshCw size={12} className={fileLoading ? 'animate-spin text-blue-400' : ''} />
+                  <RefreshCw size={12} className={fileLoading ? 'animate-spin text-blue-600 dark:text-blue-400' : ''} />
                   <span>Refresh</span>
                 </button>
               </div>
@@ -1223,12 +1223,12 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
               {/* Files List */}
               {fileLoading ? (
                 <div className="py-12 text-center text-xs flex items-center justify-center gap-2" style={{ color: 'var(--theme-text-muted)' }}>
-                  <RefreshCw size={14} className="animate-spin text-blue-400" />
+                  <RefreshCw size={14} className="animate-spin text-blue-600 dark:text-blue-400" />
                   <span>Loading files...</span>
                 </div>
               ) : driveFiles.length === 0 ? (
                 <div className="py-14 text-center" style={{ color: 'var(--theme-text-muted)' }}>
-                  <File size={34} className="mx-auto mb-2 opacity-30 text-blue-400" />
+                  <File size={34} className="mx-auto mb-2 opacity-30 text-blue-600 dark:text-blue-400" />
                   <span className="text-xs">
                     {currentFolder ? 'No files in this folder' : 'Select a folder to see files'}
                   </span>
@@ -1256,24 +1256,24 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
                             <img
                               src={file.thumbnailLink}
                               alt={file.name}
-                              className="w-9 h-9 object-cover rounded-lg shrink-0 border border-white/10"
+                              className="w-9 h-9 object-cover rounded-lg shrink-0 border border-[var(--theme-border)]"
                             />
                           ) : isVideo ? (
-                            <div className="w-9 h-9 rounded-lg bg-purple-500/15 text-purple-400 border border-purple-500/30 flex items-center justify-center shrink-0">
+                            <div className="w-9 h-9 rounded-lg bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30 flex items-center justify-center shrink-0">
                               <FileVideo size={18} />
                             </div>
                           ) : isImage ? (
-                            <div className="w-9 h-9 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                            <div className="w-9 h-9 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
                               <FileImage size={18} />
                             </div>
                           ) : (
-                            <div className="w-9 h-9 rounded-lg bg-blue-500/15 text-blue-400 border border-blue-500/30 flex items-center justify-center shrink-0">
+                            <div className="w-9 h-9 rounded-lg bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 flex items-center justify-center shrink-0">
                               <File size={18} />
                             </div>
                           )}
 
                           <div className="min-w-0">
-                            <span className="font-bold text-white block truncate max-w-sm">
+                            <span className="font-bold text-[var(--theme-text)] block truncate max-w-sm">
                               {file.name}
                             </span>
                             <span className="text-[11px]" style={{ color: 'var(--theme-text-muted)' }}>
@@ -1294,7 +1294,7 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
                               navigator.clipboard.writeText(link);
                               alert('Drive view link copied!');
                             }}
-                            className="p-1.5 text-gray-400 hover:text-white transition"
+                            className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition"
                             title="Copy link"
                           >
                             <Copy size={13} />
@@ -1303,7 +1303,7 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
                             href={file.webViewLink || '#'}
                             target="_blank"
                             rel="noreferrer"
-                            className="p-1.5 text-gray-400 hover:text-blue-400 transition"
+                            className="p-1.5 text-[var(--theme-text-muted)] hover:text-blue-400 transition"
                             title="Open in Drive"
                           >
                             <ExternalLink size={13} />
@@ -1322,17 +1322,17 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
       {/* Media Preview Modal */}
       {previewMediaFile && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-xs flex items-center justify-center z-60 p-4">
-          <div className="w-full max-w-3xl rounded-2xl border border-white/10 bg-black/90 text-white overflow-hidden shadow-2xl">
-            <div className="p-4 border-b border-white/10 flex items-center justify-between">
+          <div className="w-full max-w-3xl rounded-2xl border border-[var(--theme-border)] bg-black/90 text-white overflow-hidden shadow-2xl">
+            <div className="p-4 border-b border-[var(--theme-border)] flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-bold">{previewMediaFile.name}</h3>
-                <span className="text-[11px] text-gray-400">
+                <span className="text-[11px] text-[var(--theme-text-muted)]">
                   {formatBytes(previewMediaFile.size)} • {previewMediaFile.mimeType}
                 </span>
               </div>
               <button
                 onClick={() => setPreviewMediaFile(null)}
-                className="p-1.5 text-gray-400 hover:text-white"
+                className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]"
               >
                 <X size={18} />
               </button>
@@ -1352,7 +1352,7 @@ export const MediaManagementView: React.FC<MediaManagerProps> = ({
                   className="max-h-[60vh] object-contain rounded"
                 />
               ) : (
-                <div className="text-center p-6 text-gray-400 text-xs">
+                <div className="text-center p-6 text-[var(--theme-text-muted)] text-xs">
                   <File size={36} className="mx-auto mb-2 text-[#0091FF]" />
                   <span>Preview not available for this format</span>
                 </div>

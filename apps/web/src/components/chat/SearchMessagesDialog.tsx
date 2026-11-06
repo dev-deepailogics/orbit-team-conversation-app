@@ -159,7 +159,7 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
       regex.test(part) ? (
         <mark
           key={index}
-          className="bg-slack-green/30 text-emerald-300 font-semibold px-0.5 rounded"
+          className="bg-slack-green/30 text-emerald-700 dark:text-emerald-300 font-semibold px-0.5 rounded"
         >
           {part}
         </mark>
@@ -194,15 +194,15 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
       />
 
       {/* Dialog Window */}
-      <div className="relative w-full max-w-2xl bg-[#1F2326] border border-[#383F45] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] z-10 animate-in fade-in zoom-in-95 duration-150">
+      <div className="relative w-full max-w-2xl bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] z-10 animate-in fade-in zoom-in-95 duration-150">
         {/* If viewing a single full message */}
         {selectedFullMessage ? (
           <div className="flex flex-col h-full overflow-hidden">
             {/* Full Message View Header */}
-            <div className="p-3.5 sm:p-4 border-b border-[#383F45]/60 bg-[#1A1D21] flex items-center justify-between">
+            <div className="p-3.5 sm:p-4 border-b border-[var(--theme-border)] bg-[var(--theme-bg-app)] flex items-center justify-between">
               <button
                 onClick={() => setSelectedFullMessage(null)}
-                className="flex items-center gap-1.5 text-xs font-semibold text-gray-300 hover:text-white bg-[#272B30] hover:bg-[#343940] px-2.5 py-1.5 rounded-lg border border-gray-700 transition"
+                className="flex items-center gap-1.5 text-xs font-semibold text-[var(--theme-text)] hover:text-[var(--theme-text)] bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] px-2.5 py-1.5 rounded-lg border border-[var(--theme-border)] transition"
               >
                 <ArrowLeft size={14} />
                 <span>Back to results</span>
@@ -221,7 +221,7 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
                 </button>
                 <button
                   onClick={onClose}
-                  className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
+                  className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface)] rounded-lg transition"
                 >
                   <X size={16} />
                 </button>
@@ -231,26 +231,26 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
             {/* Full Message Body */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
               {/* Channel and Time Info */}
-              <div className="flex items-center justify-between text-xs pb-3 border-b border-gray-800">
-                <div className="flex items-center gap-1.5 font-medium text-gray-300">
+              <div className="flex items-center justify-between text-xs pb-3 border-b border-[var(--theme-border)]">
+                <div className="flex items-center gap-1.5 font-medium text-[var(--theme-text)]">
                   {selectedFullMessage.channel?.type === 'DIRECT' ? (
                     <span className="text-slack-green font-bold text-xs">@</span>
                   ) : selectedFullMessage.channel?.type === 'PRIVATE' ? (
-                    <Lock size={13} className="text-gray-400" />
+                    <Lock size={13} className="text-[var(--theme-text-muted)]" />
                   ) : (
-                    <Hash size={14} className="text-gray-400" />
+                    <Hash size={14} className="text-[var(--theme-text-muted)]" />
                   )}
-                  <span className="text-white font-semibold">
+                  <span className="text-[var(--theme-text)] font-semibold">
                     {selectedFullMessage.channel?.name || 'channel'}
                   </span>
                   {selectedFullMessage.parentMessageId && (
-                    <span className="flex items-center gap-1 ml-2 px-1.5 py-0.5 rounded bg-gray-800 text-[10px] text-slack-green border border-gray-700">
+                    <span className="flex items-center gap-1 ml-2 px-1.5 py-0.5 rounded bg-[var(--theme-bg-surface)] text-[10px] text-slack-green border border-[var(--theme-border)]">
                       <MessageSquare size={10} />
                       <span>Thread Reply</span>
                     </span>
                   )}
                 </div>
-                <span className="text-gray-400 text-xs">
+                <span className="text-[var(--theme-text-muted)] text-xs">
                   {new Date(selectedFullMessage.createdAt).toLocaleString([], {
                     dateStyle: 'medium',
                     timeStyle: 'short',
@@ -275,45 +275,45 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
                 />
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-white">
+                    <span className="font-bold text-sm text-[var(--theme-text)]">
                       {selectedFullMessage.bot?.name ||
                         selectedFullMessage.user?.displayName ||
                         selectedFullMessage.user?.username ||
                         'Teammate'}
                     </span>
                     {selectedFullMessage.bot && (
-                      <span className="text-[10px] font-semibold bg-[#2C3136] text-gray-300 px-1.5 py-0.2 rounded uppercase">
+                      <span className="text-[10px] font-semibold bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] px-1.5 py-0.2 rounded uppercase">
                         APP
                       </span>
                     )}
                   </div>
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-[var(--theme-text-muted)]">
                     @{selectedFullMessage.user?.username || 'user'}
                   </span>
                 </div>
               </div>
 
               {/* Message Content (Full Markdown) */}
-              <div className="bg-[#272B30]/70 border border-gray-700/60 rounded-xl p-4 text-sm text-gray-100 break-words leading-relaxed">
+              <div className="bg-[var(--theme-bg-surface-hover)] border border-[var(--theme-border)] rounded-xl p-4 text-sm text-[var(--theme-text)] break-words leading-relaxed">
                 <MarkdownRenderer content={selectedFullMessage.content} />
               </div>
 
               {/* Attachments */}
               {selectedFullMessage.attachments && selectedFullMessage.attachments.length > 0 && (
                 <div className="space-y-2 pt-2">
-                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">
+                  <span className="text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider block">
                     Attachments ({selectedFullMessage.attachments.length})
                   </span>
                   <div className="space-y-2">
                     {selectedFullMessage.attachments.map((att: any) => (
                       <div
                         key={att.id}
-                        className="flex items-center justify-between p-3 rounded-lg bg-[#272B30] border border-gray-700 text-xs"
+                        className="flex items-center justify-between p-3 rounded-lg bg-[var(--theme-bg-surface-hover)] border border-[var(--theme-border)] text-xs"
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
                           <Paperclip size={16} className="text-slack-green shrink-0" />
-                          <span className="text-gray-200 font-medium truncate">{att.fileName}</span>
-                          <span className="text-gray-500 text-[11px] shrink-0">
+                          <span className="text-[var(--theme-text)] font-medium truncate">{att.fileName}</span>
+                          <span className="text-[var(--theme-text-muted)] text-[11px] shrink-0">
                             ({Math.round(att.fileSize / 1024)} KB)
                           </span>
                         </div>
@@ -322,7 +322,7 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
                           target="_blank"
                           rel="noreferrer"
                           download={att.fileName}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#383F45] hover:bg-[#454D54] text-white text-xs font-medium transition shrink-0 ml-3"
+                          className="flex items-center gap-1 px-2.5 py-1 rounded bg-[var(--theme-bg-surface-hover)] hover:bg-[#454D54] text-white text-xs font-medium transition shrink-0 ml-3"
                         >
                           <Download size={12} />
                           <span>Download</span>
@@ -336,17 +336,17 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
               {/* Reactions list */}
               {selectedFullMessage.reactions && selectedFullMessage.reactions.length > 0 && (
                 <div className="pt-2">
-                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
+                  <span className="text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider block mb-2">
                     Reactions
                   </span>
                   <div className="flex flex-wrap gap-1.5">
                     {selectedFullMessage.reactions.map((r: any) => (
                       <span
                         key={r.id}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#272B30] border border-gray-700 text-xs text-gray-200"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--theme-bg-surface-hover)] border border-[var(--theme-border)] text-xs text-[var(--theme-text)]"
                       >
                         <span>{r.emoji}</span>
-                        <span className="text-[11px] text-gray-400">{r.user?.displayName || '1'}</span>
+                        <span className="text-[11px] text-[var(--theme-text-muted)]">{r.user?.displayName || '1'}</span>
                       </span>
                     ))}
                   </div>
@@ -355,10 +355,10 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
             </div>
 
             {/* Full Message Footer Actions */}
-            <div className="p-3 bg-[#1A1D21] border-t border-[#383F45]/60 flex items-center justify-between">
+            <div className="p-3 bg-[var(--theme-bg-app)] border-t border-[var(--theme-border)] flex items-center justify-between">
               <button
                 onClick={() => setSelectedFullMessage(null)}
-                className="px-3 py-1.5 text-xs text-gray-400 hover:text-white transition"
+                className="px-3 py-1.5 text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition"
               >
                 ← Back to search results
               </button>
@@ -378,12 +378,12 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
           /* Normal Search Mode */
           <>
             {/* Search Header Bar */}
-            <div className="p-3 sm:p-4 border-b border-[#383F45]/60 flex items-center gap-2.5 bg-[#1A1D21]">
+            <div className="p-3 sm:p-4 border-b border-[var(--theme-border)] flex items-center gap-2.5 bg-[var(--theme-bg-app)]">
               <div className="relative flex-1 flex items-center">
                 {isLoading ? (
                   <Loader2 className="absolute left-3 w-5 h-5 text-slack-green animate-spin pointer-events-none" />
                 ) : (
-                  <Search className="absolute left-3 w-5 h-5 text-gray-400 pointer-events-none" />
+                  <Search className="absolute left-3 w-5 h-5 text-[var(--theme-text-muted)] pointer-events-none" />
                 )}
                 <input
                   ref={inputRef}
@@ -395,12 +395,12 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
                       ? `Search in #${currentChannel.name}...`
                       : `Search messages in ${workspace.name}...`
                   }
-                  className="w-full bg-[#272B30] text-white pl-10 pr-9 py-2.5 rounded-lg border border-gray-700/70 focus:border-slack-green focus:outline-none focus:ring-1 focus:ring-slack-green text-sm placeholder-gray-500 transition"
+                  className="w-full bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] pl-10 pr-9 py-2.5 rounded-lg border border-[var(--theme-border)] focus:border-slack-green focus:outline-none focus:ring-1 focus:ring-slack-green text-sm placeholder:text-[var(--theme-text-muted)] transition"
                 />
                 {query && (
                   <button
                     onClick={() => setQuery('')}
-                    className="absolute right-2.5 p-1 text-gray-400 hover:text-white rounded-md transition"
+                    className="absolute right-2.5 p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] rounded-md transition"
                   >
                     <X size={15} />
                   </button>
@@ -409,7 +409,7 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
 
               <button
                 onClick={onClose}
-                className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
+                className="p-2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface)] rounded-lg transition"
                 title="Close (Esc)"
               >
                 <X size={18} />
@@ -417,14 +417,14 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
             </div>
 
             {/* Filter Pills Bar */}
-            <div className="px-3 sm:px-4 py-2 bg-[#22262A] border-b border-[#383F45]/40 flex items-center gap-2 overflow-x-auto text-xs no-scrollbar">
-              <span className="text-gray-400 shrink-0 font-medium">Filter by:</span>
+            <div className="px-3 sm:px-4 py-2 bg-[var(--theme-bg-surface)] border-b border-[var(--theme-border)] flex items-center gap-2 overflow-x-auto text-xs no-scrollbar">
+              <span className="text-[var(--theme-text-muted)] shrink-0 font-medium">Filter by:</span>
 
               {/* Channel selector */}
               <select
                 value={selectedChannelId}
                 onChange={(e) => setSelectedChannelId(e.target.value)}
-                className="bg-[#1A1D21] text-gray-200 border border-gray-700 rounded-md px-2 py-1 text-xs focus:outline-none focus:border-slack-green transition cursor-pointer"
+                className="bg-[var(--theme-bg-app)] text-[var(--theme-text)] border border-[var(--theme-border)] rounded-md px-2 py-1 text-xs focus:outline-none focus:border-slack-green transition cursor-pointer"
               >
                 {currentChannel && (
                   <option value={currentChannel.id}>
@@ -447,7 +447,7 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
                 <select
                   value={selectedUserId}
                   onChange={(e) => setSelectedUserId(e.target.value)}
-                  className="bg-[#1A1D21] text-gray-200 border border-gray-700 rounded-md px-2 py-1 text-xs focus:outline-none focus:border-slack-green transition cursor-pointer"
+                  className="bg-[var(--theme-bg-app)] text-[var(--theme-text)] border border-[var(--theme-border)] rounded-md px-2 py-1 text-xs focus:outline-none focus:border-slack-green transition cursor-pointer"
                 >
                   <option value="all">From: Anyone</option>
                   {members.map((m) => {
@@ -467,7 +467,7 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
                 className={`flex items-center gap-1 px-2.5 py-1 rounded-md border text-xs transition shrink-0 ${
                   hasAttachmentOnly
                     ? 'bg-slack-green/20 border-slack-green text-slack-green font-medium'
-                    : 'bg-[#1A1D21] border-gray-700 text-gray-400 hover:text-gray-200'
+                    : 'bg-[var(--theme-bg-app)] border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
                 }`}
               >
                 <Paperclip size={12} />
@@ -481,7 +481,7 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
                     setSelectedUserId('all');
                     setHasAttachmentOnly(false);
                   }}
-                  className="text-gray-400 hover:text-white underline text-[11px] ml-auto shrink-0"
+                  className="text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] underline text-[11px] ml-auto shrink-0"
                 >
                   Reset filters
                 </button>
@@ -492,16 +492,16 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
             <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2.5 min-h-[220px]">
               {/* Initial State / Prompt */}
               {!hasSearched && !isLoading && (
-                <div className="py-10 text-center flex flex-col items-center justify-center text-gray-400">
-                  <div className="w-12 h-12 rounded-full bg-gray-800/80 border border-gray-700 flex items-center justify-center mb-3 text-slack-green">
+                <div className="py-10 text-center flex flex-col items-center justify-center text-[var(--theme-text-muted)]">
+                  <div className="w-12 h-12 rounded-full bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] flex items-center justify-center mb-3 text-slack-green">
                     <Search size={22} />
                   </div>
-                  <h3 className="text-white font-semibold text-sm mb-1">
+                  <h3 className="text-[var(--theme-text)] font-semibold text-sm mb-1">
                     {selectedChannelId !== 'all' && currentChannel?.id === selectedChannelId
                       ? `Search in #${currentChannel.name}`
                       : `Search messages in ${workspace.name}`}
                   </h3>
-                  <p className="text-xs text-gray-400 max-w-sm mb-4">
+                  <p className="text-xs text-[var(--theme-text-muted)] max-w-sm mb-4">
                     {selectedChannelId !== 'all'
                       ? `Searching messages inside #${currentChannel?.name}. You can switch to search across all channels anytime.`
                       : 'Type keywords, usernames, or questions to search across all public channels and conversations.'}
@@ -515,10 +515,10 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
                         Search across all channels instead
                       </button>
                     )}
-                    <span className="px-2 py-1 bg-[#2C3136] rounded text-gray-300 border border-gray-700">
+                    <span className="px-2 py-1 bg-[var(--theme-bg-surface-hover)] rounded text-[var(--theme-text)] border border-[var(--theme-border)]">
                       <span className="text-slack-green font-mono">⌘K</span> or <span className="text-slack-green font-mono">Ctrl+K</span>
                     </span>
-                    <span className="px-2 py-1 bg-[#2C3136] rounded text-gray-300 border border-gray-700">
+                    <span className="px-2 py-1 bg-[var(--theme-bg-surface-hover)] rounded text-[var(--theme-text)] border border-[var(--theme-border)]">
                       Filter by files
                     </span>
                   </div>
@@ -527,21 +527,21 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
 
               {/* Loading State */}
               {isLoading && (
-                <div className="py-12 text-center flex flex-col items-center justify-center text-gray-400">
+                <div className="py-12 text-center flex flex-col items-center justify-center text-[var(--theme-text-muted)]">
                   <Loader2 className="w-7 h-7 text-slack-green animate-spin mb-2" />
-                  <p className="text-xs text-gray-400">Searching conversations...</p>
+                  <p className="text-xs text-[var(--theme-text-muted)]">Searching conversations...</p>
                 </div>
               )}
 
               {/* Empty Results State */}
               {hasSearched && !isLoading && results.length === 0 && (
-                <div className="py-10 text-center flex flex-col items-center justify-center text-gray-400">
-                  <div className="w-12 h-12 rounded-full bg-gray-800/60 border border-gray-700 flex items-center justify-center mb-3 text-gray-400">
+                <div className="py-10 text-center flex flex-col items-center justify-center text-[var(--theme-text-muted)]">
+                  <div className="w-12 h-12 rounded-full bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] flex items-center justify-center mb-3 text-[var(--theme-text-muted)]">
                     <MessageSquare size={22} />
                   </div>
-                  <h3 className="text-white font-semibold text-sm mb-1">No messages found</h3>
-                  <p className="text-xs text-gray-400 max-w-sm">
-                    No matching messages found for <span className="text-white font-medium">&quot;{query}&quot;</span>. Try checking for typos or resetting your filters.
+                  <h3 className="text-[var(--theme-text)] font-semibold text-sm mb-1">No messages found</h3>
+                  <p className="text-xs text-[var(--theme-text-muted)] max-w-sm">
+                    No matching messages found for <span className="text-[var(--theme-text)] font-medium">&quot;{query}&quot;</span>. Try checking for typos or resetting your filters.
                   </p>
                 </div>
               )}
@@ -549,12 +549,12 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
               {/* Results List */}
               {hasSearched && !isLoading && results.length > 0 && (
                 <>
-                  <div className="flex items-center justify-between text-xs text-gray-400 px-1 pb-1">
+                  <div className="flex items-center justify-between text-xs text-[var(--theme-text-muted)] px-1 pb-1">
                     <span>
-                      Found <strong className="text-white">{total}</strong> message{total === 1 ? '' : 's'}
+                      Found <strong className="text-[var(--theme-text)]">{total}</strong> message{total === 1 ? '' : 's'}
                     </span>
                     {total > results.length && (
-                      <span className="text-[11px] text-gray-500">Showing top {results.length}</span>
+                      <span className="text-[11px] text-[var(--theme-text-muted)]">Showing top {results.length}</span>
                     )}
                   </div>
 
@@ -570,31 +570,31 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
                     return (
                       <div
                         key={msg.id}
-                        className="group bg-[#272B30]/60 hover:bg-[#2F343A] border border-gray-700/60 hover:border-gray-600 rounded-lg p-3 transition flex flex-col gap-2.5 relative"
+                        className="group bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] border border-[var(--theme-border)] hover:border-[var(--theme-border)] rounded-lg p-3 transition flex flex-col gap-2.5 relative"
                       >
                         {/* Top Row: Channel & Timestamp & Quick Jump */}
                         <div className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-1.5 font-medium text-gray-300">
+                          <div className="flex items-center gap-1.5 font-medium text-[var(--theme-text)]">
                             {channelType === 'DIRECT' ? (
                               <span className="text-slack-green font-bold text-xs">@</span>
                             ) : channelType === 'PRIVATE' ? (
-                              <Lock size={12} className="text-gray-400" />
+                              <Lock size={12} className="text-[var(--theme-text-muted)]" />
                             ) : (
-                              <Hash size={13} className="text-gray-400" />
+                              <Hash size={13} className="text-[var(--theme-text-muted)]" />
                             )}
-                            <span className="text-white font-semibold">
+                            <span className="text-[var(--theme-text)] font-semibold">
                               {channelName}
                             </span>
 
                             {msg.parentMessageId && (
-                              <span className="flex items-center gap-1 ml-1.5 px-1.5 py-0.5 rounded bg-gray-800 text-[10px] text-slack-green border border-gray-700">
+                              <span className="flex items-center gap-1 ml-1.5 px-1.5 py-0.5 rounded bg-[var(--theme-bg-surface)] text-[10px] text-slack-green border border-[var(--theme-border)]">
                                 <MessageSquare size={10} />
                                 <span>Thread</span>
                               </span>
                             )}
                           </div>
 
-                          <span className="text-[11px] text-gray-400">
+                          <span className="text-[11px] text-[var(--theme-text-muted)]">
                             {formatMessageTime(msg.createdAt)}
                           </span>
                         </div>
@@ -602,7 +602,7 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
                         {/* Middle Row: Author & Content Preview (Clicking previews full message) */}
                         <div
                           onClick={() => setSelectedFullMessage(msg)}
-                          className="flex gap-2.5 items-start cursor-pointer hover:bg-black/10 -mx-1 p-1 rounded transition"
+                          className="flex gap-2.5 items-start cursor-pointer hover:bg-[var(--theme-bg-app)] -mx-1 p-1 rounded transition"
                           title="Click to view full message"
                         >
                           <img
@@ -612,24 +612,24 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 mb-0.5">
-                              <span className="text-xs font-bold text-gray-200">{authorName}</span>
+                              <span className="text-xs font-bold text-[var(--theme-text)]">{authorName}</span>
                               {msg.bot && (
-                                <span className="text-[9px] font-semibold bg-[#2C3136] text-gray-400 px-1 py-0.2 rounded uppercase">
+                                <span className="text-[9px] font-semibold bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] px-1 py-0.2 rounded uppercase">
                                   APP
                                 </span>
                               )}
                             </div>
-                            <div className="text-xs text-gray-300 line-clamp-3 break-words whitespace-pre-wrap leading-relaxed">
+                            <div className="text-xs text-[var(--theme-text)] line-clamp-3 break-words whitespace-pre-wrap leading-relaxed">
                               {renderHighlightedContent(msg.content, query)}
                             </div>
                           </div>
                         </div>
 
                         {/* Bottom Row: Attachments & Action Buttons */}
-                        <div className="flex items-center justify-between pt-1 border-t border-gray-700/40 text-[11px] gap-2">
-                          <div className="flex items-center gap-2 text-gray-400 truncate">
+                        <div className="flex items-center justify-between pt-1 border-t border-[var(--theme-border)] text-[11px] gap-2">
+                          <div className="flex items-center gap-2 text-[var(--theme-text-muted)] truncate">
                             {msg.attachments?.length > 0 && (
-                              <span className="flex items-center gap-1 text-gray-300">
+                              <span className="flex items-center gap-1 text-[var(--theme-text)]">
                                 <Paperclip size={11} className="text-slack-green" />
                                 <span>
                                   {msg.attachments.length} file{msg.attachments.length > 1 ? 's' : ''}
@@ -637,7 +637,7 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
                               </span>
                             )}
                             {msg._count?.replies > 0 && (
-                              <span className="flex items-center gap-1 text-gray-400">
+                              <span className="flex items-center gap-1 text-[var(--theme-text-muted)]">
                                 <MessageSquare size={11} />
                                 <span>{msg._count.replies}</span>
                               </span>
@@ -648,7 +648,7 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
                           <div className="flex items-center gap-1.5 shrink-0 ml-auto">
                             <button
                               onClick={() => setSelectedFullMessage(msg)}
-                              className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#383F45]/70 hover:bg-[#434B52] text-gray-200 hover:text-white text-xs font-medium transition border border-gray-700/60"
+                              className="flex items-center gap-1 px-2.5 py-1 rounded bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] hover:text-[var(--theme-text)] text-xs font-medium transition border border-[var(--theme-border)]"
                               title="Open and read full message"
                             >
                               <Eye size={12} className="text-slack-green" />
@@ -676,22 +676,22 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
             </div>
 
             {/* Footer / Shortcuts */}
-            <div className="px-4 py-2.5 bg-[#1A1D21] border-t border-[#383F45]/60 flex items-center justify-between text-[11px] text-gray-400">
+            <div className="px-4 py-2.5 bg-[var(--theme-bg-app)] border-t border-[var(--theme-border)] flex items-center justify-between text-[11px] text-[var(--theme-text-muted)]">
               <div className="flex items-center gap-3">
                 <span className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 bg-gray-800 border border-gray-700 rounded text-gray-300 font-mono text-[10px]">
+                  <kbd className="px-1.5 py-0.5 bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded text-[var(--theme-text)] font-mono text-[10px]">
                     ESC
                   </kbd>
                   <span>to close</span>
                 </span>
                 <span className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 bg-gray-800 border border-gray-700 rounded text-gray-300 font-mono text-[10px]">
+                  <kbd className="px-1.5 py-0.5 bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded text-[var(--theme-text)] font-mono text-[10px]">
                     Open Message
                   </kbd>
                   <span>to view full</span>
                 </span>
               </div>
-              <span className="text-gray-500 hidden sm:inline">Orbit Search</span>
+              <span className="text-[var(--theme-text-muted)] hidden sm:inline">Orbit Search</span>
             </div>
           </>
         )}

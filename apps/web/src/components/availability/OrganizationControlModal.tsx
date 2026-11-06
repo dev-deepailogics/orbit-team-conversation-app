@@ -275,33 +275,33 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
       <div
         className="w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
         style={{
-          backgroundColor: '#303030',
-          borderColor: '#424242',
-          color: '#F0F0F0',
+          backgroundColor: 'var(--theme-bg-surface-hover)',
+          borderColor: 'var(--theme-border)',
+          color: 'var(--theme-text)',
         }}
       >
         {/* Modal Header */}
         <div
           className="flex items-center justify-between px-6 py-4 border-b shrink-0"
           style={{
-            backgroundColor: '#262626',
-            borderColor: '#3D3D3D',
+            backgroundColor: 'var(--theme-bg-surface)',
+            borderColor: 'var(--theme-border)',
           }}
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-400">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
               <Building2 size={22} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base sm:text-lg font-bold text-white tracking-wide">
+                <h2 className="text-base sm:text-lg font-bold text-[var(--theme-text)] tracking-wide">
                   Organization Control
                 </h2>
-                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/30">
                   {workspace.name}
                 </span>
               </div>
-              <p className="text-xs text-gray-400 mt-0.5">
+              <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">
                 Manage employee shift availability, breaks, active working hours, and team presence.
               </p>
             </div>
@@ -309,7 +309,7 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition"
+            className="p-2 rounded-xl text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] transition"
             title="Close"
           >
             <X size={20} />
@@ -320,19 +320,19 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
         <div
           className="flex items-center gap-2 px-6 pt-3 border-b shrink-0 text-xs font-semibold"
           style={{
-            backgroundColor: '#2A2A2A',
-            borderColor: '#3D3D3D',
+            backgroundColor: 'var(--theme-bg-surface-hover)',
+            borderColor: 'var(--theme-border)',
           }}
         >
           <button
             onClick={() => setActiveTab('self')}
             className={`flex items-center gap-2 px-4 py-2.5 border-b-2 transition ${
               activeTab === 'self'
-                ? 'border-blue-500 text-white'
-                : 'border-transparent text-gray-400 hover:text-gray-200'
+                ? 'border-blue-500 text-[var(--theme-text)]'
+                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
             }`}
           >
-            <Clock size={15} className={activeTab === 'self' ? 'text-blue-400' : ''} />
+            <Clock size={15} className={activeTab === 'self' ? 'text-blue-600 dark:text-blue-400' : ''} />
             <span>My Shift & Availability</span>
           </button>
 
@@ -340,13 +340,13 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
             onClick={() => setActiveTab('team')}
             className={`flex items-center gap-2 px-4 py-2.5 border-b-2 transition ${
               activeTab === 'team'
-                ? 'border-blue-500 text-white'
-                : 'border-transparent text-gray-400 hover:text-gray-200'
+                ? 'border-blue-500 text-[var(--theme-text)]'
+                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
             }`}
           >
-            <Users size={15} className={activeTab === 'team' ? 'text-blue-400' : ''} />
+            <Users size={15} className={activeTab === 'team' ? 'text-blue-600 dark:text-blue-400' : ''} />
             <span>Team Live Attendance</span>
-            <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-white/10 text-gray-300">
+            <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)]">
               {teamMembers.length}
             </span>
           </button>
@@ -360,23 +360,23 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
               <div
                 className="p-6 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-lg"
                 style={{
-                  backgroundColor: '#262626',
-                  borderColor: '#404040',
+                  backgroundColor: 'var(--theme-bg-surface)',
+                  borderColor: 'var(--theme-border)',
                 }}
               >
                 <div>
-                  <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-blue-400 uppercase">
+                  <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-blue-600 dark:text-blue-400 uppercase">
                     <Activity size={14} />
                     <span>Active Employee Availability Controls</span>
                   </div>
-                  <h3 className="text-xl font-bold text-white mt-1">
+                  <h3 className="text-xl font-bold text-[var(--theme-text)] mt-1">
                     {isAvailable
                       ? isOnBreak
                         ? 'You are currently on break'
                         : 'You are currently working'
                       : 'You are currently offline'}
                   </h3>
-                  <p className="text-xs text-gray-400 mt-1 max-w-md">
+                  <p className="text-xs text-[var(--theme-text-muted)] mt-1 max-w-md">
                     {isAvailable
                       ? isOnBreak
                         ? 'Stopwatch is paused while you are on break. Click "Available after Break" to resume shift.'
@@ -389,8 +389,8 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
                 <div
                   className="p-3.5 rounded-xl border flex flex-wrap items-center gap-2 shrink-0 self-start md:self-center shadow-inner"
                   style={{
-                    backgroundColor: '#1E1E1E',
-                    borderColor: '#383838',
+                    backgroundColor: 'var(--theme-bg-app)',
+                    borderColor: 'var(--theme-border)',
                   }}
                 >
                   {/* 1. Available Button */}
@@ -403,7 +403,7 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
                         ? 'bg-[#007A5A] text-white cursor-default ring-1 ring-emerald-400'
                         : !isAvailable
                         ? 'bg-[#0091FF] hover:bg-[#007AE6] text-white active:scale-95'
-                        : 'bg-white/5 text-slate-500 cursor-not-allowed border border-white/5'
+                        : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)]'
                     }`}
                   >
                     <Play size={13} className={!isAvailable ? 'fill-current' : ''} />
@@ -417,10 +417,10 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
                     title="Take a break (Lunch, Namaz, Tea)"
                     className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
                       isOnBreak
-                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 cursor-default'
+                        ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 cursor-default'
                         : isAvailable
-                        ? 'bg-[#2A2F35] hover:bg-[#343B42] text-slate-200 border border-white/10 active:scale-95'
-                        : 'bg-white/5 text-slate-500 cursor-not-allowed border border-white/5'
+                        ? 'bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] border border-[var(--theme-border)] active:scale-95'
+                        : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)]'
                     }`}
                   >
                     <Coffee size={13} />
@@ -435,7 +435,7 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
                     className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
                       isOnBreak
                         ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg animate-pulse active:scale-95'
-                        : 'bg-white/5 text-slate-500 cursor-not-allowed border border-white/5'
+                        : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)]'
                     }`}
                   >
                     <CheckCircle2 size={13} />
@@ -449,8 +449,8 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
                     title="End shift and checkout"
                     className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
                       isAvailable && !isOnBreak
-                        ? 'bg-[#2A2F35] hover:bg-rose-950/40 text-slate-200 hover:text-rose-300 border border-white/10 hover:border-rose-500/40 active:scale-95'
-                        : 'bg-white/5 text-slate-500 cursor-not-allowed border border-white/5'
+                        ? 'bg-[var(--theme-bg-surface-hover)] hover:bg-rose-950/40 text-[var(--theme-text)] hover:text-rose-300 border border-[var(--theme-border)] hover:border-rose-500/40 active:scale-95'
+                        : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)]'
                     }`}
                   >
                     <LogOut size={13} />
@@ -462,10 +462,10 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
                     title="Live calculated net active working time"
                     className={`px-3.5 py-2 rounded-lg text-xs font-mono font-bold flex items-center gap-2 border shadow-sm transition ${
                       isOnBreak
-                        ? 'bg-amber-950/30 text-amber-300 border-amber-500/30'
+                        ? 'bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-500/30'
                         : isAvailable
                         ? 'bg-[#0091FF]/20 text-[#38B6FF] border-[#0091FF]/40'
-                        : 'bg-white/5 text-slate-500 border-white/5'
+                        : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] border-[var(--theme-border)]'
                     }`}
                   >
                     <Clock size={13} className={isAvailable && !isOnBreak ? 'animate-spin' : ''} />
@@ -478,18 +478,18 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
               <div
                 className="p-5 rounded-2xl border"
                 style={{
-                  backgroundColor: '#262626',
-                  borderColor: '#404040',
+                  backgroundColor: 'var(--theme-bg-surface)',
+                  borderColor: 'var(--theme-border)',
                 }}
               >
                 <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                    <Calendar size={16} className="text-blue-400" />
+                  <h4 className="text-sm font-bold text-[var(--theme-text)] flex items-center gap-2">
+                    <Calendar size={16} className="text-blue-600 dark:text-blue-400" />
                     <span>Today's Shift Activity & Break History</span>
                   </h4>
                   <button
                     onClick={loadAvailability}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition"
+                    className="p-1.5 rounded-lg text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] transition"
                     title="Refresh status"
                   >
                     <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
@@ -499,9 +499,9 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
                 {availability ? (
                   <div className="space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div className="p-3.5 rounded-xl bg-black/20 border border-white/5">
-                        <span className="text-[11px] text-gray-400 font-medium">Initial Check-in</span>
-                        <p className="text-sm font-semibold text-white mt-0.5">
+                      <div className="p-3.5 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)]">
+                        <span className="text-[11px] text-[var(--theme-text-muted)] font-medium">Initial Check-in</span>
+                        <p className="text-sm font-semibold text-[var(--theme-text)] mt-0.5">
                           {new Date(availability.availableTime).toLocaleTimeString([], {
                             hour: '2-digit',
                             minute: '2-digit',
@@ -510,28 +510,28 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
                         </p>
                       </div>
 
-                      <div className="p-3.5 rounded-xl bg-black/20 border border-white/5">
-                        <span className="text-[11px] text-gray-400 font-medium">Current Status</span>
+                      <div className="p-3.5 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)]">
+                        <span className="text-[11px] text-[var(--theme-text-muted)] font-medium">Current Status</span>
                         <p className="text-sm font-semibold mt-0.5">
                           {isOnBreak ? (
-                            <span className="text-amber-400 flex items-center gap-1.5">
+                            <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
                               <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
                               On Break
                             </span>
                           ) : isAvailable ? (
-                            <span className="text-emerald-400 flex items-center gap-1.5">
+                            <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                               <span className="w-2 h-2 rounded-full bg-emerald-400" />
                               Working
                             </span>
                           ) : (
-                            <span className="text-gray-400">Checked Out / Offline</span>
+                            <span className="text-[var(--theme-text-muted)]">Checked Out / Offline</span>
                           )}
                         </p>
                       </div>
 
-                      <div className="p-3.5 rounded-xl bg-black/20 border border-white/5">
-                        <span className="text-[11px] text-gray-400 font-medium">Recorded Breaks</span>
-                        <p className="text-sm font-semibold text-white mt-0.5">
+                      <div className="p-3.5 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)]">
+                        <span className="text-[11px] text-[var(--theme-text-muted)] font-medium">Recorded Breaks</span>
+                        <p className="text-sm font-semibold text-[var(--theme-text)] mt-0.5">
                           {availability.breaks?.length || 0} breaks taken
                         </p>
                       </div>
@@ -540,33 +540,33 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
                     {/* Break Items List */}
                     {availability.breaks && availability.breaks.length > 0 && (
                       <div className="mt-4">
-                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
+                        <span className="text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider block mb-2">
                           Break Details
                         </span>
                         <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                           {availability.breaks.map((b, idx) => (
                             <div
                               key={b.id || idx}
-                              className="flex items-center justify-between p-2.5 rounded-xl bg-black/30 border border-white/5 text-xs"
+                              className="flex items-center justify-between p-2.5 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] text-xs"
                             >
                               <div className="flex items-center gap-2.5">
-                                <span className="w-6 h-6 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold text-[11px]">
+                                <span className="w-6 h-6 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-[11px]">
                                   {idx + 1}
                                 </span>
                                 <div>
-                                  <span className="font-semibold text-gray-200">{b.breakReason}</span>
-                                  <span className="text-[11px] text-gray-400 ml-2">
+                                  <span className="font-semibold text-[var(--theme-text)]">{b.breakReason}</span>
+                                  <span className="text-[11px] text-[var(--theme-text-muted)] ml-2">
                                     Started: {new Date(b.breakStartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                   </span>
                                 </div>
                               </div>
                               <div className="text-right">
                                 {b.availableAfterBreak ? (
-                                  <span className="text-gray-300 font-medium">
+                                  <span className="text-[var(--theme-text)] font-medium">
                                     {b.breakDurationMinutes} min
                                   </span>
                                 ) : (
-                                  <span className="text-amber-400 font-medium animate-pulse">
+                                  <span className="text-amber-600 dark:text-amber-400 font-medium animate-pulse">
                                     In progress...
                                   </span>
                                 )}
@@ -578,9 +578,9 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
                     )}
                   </div>
                 ) : (
-                  <div className="py-8 text-center text-gray-400 text-xs">
+                  <div className="py-8 text-center text-[var(--theme-text-muted)] text-xs">
                     No active availability record found for today. Click{' '}
-                    <strong className="text-blue-400">Available</strong> above to start your day.
+                    <strong className="text-blue-600 dark:text-blue-400">Available</strong> above to start your day.
                   </div>
                 )}
               </div>
@@ -590,24 +590,24 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="text-sm font-bold text-white">Live Workspace Attendance</h4>
-                  <p className="text-xs text-gray-400">
+                  <h4 className="text-sm font-bold text-[var(--theme-text)]">Live Workspace Attendance</h4>
+                  <p className="text-xs text-[var(--theme-text-muted)]">
                     Real-time status of all members in {workspace.name}.
                   </p>
                 </div>
                 <button
                   onClick={loadTeamAvailability}
-                  className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 text-xs flex items-center gap-1.5 transition border border-white/5"
+                  className="px-3 py-1.5 rounded-lg bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] text-xs flex items-center gap-1.5 transition border border-[var(--theme-border)]"
                 >
                   <RefreshCw size={13} className={isLoadingTeam ? 'animate-spin' : ''} />
                   <span>Refresh</span>
                 </button>
               </div>
 
-              <div className="border rounded-2xl overflow-hidden" style={{ borderColor: '#404040' }}>
+              <div className="border rounded-2xl overflow-hidden" style={{ borderColor: 'var(--theme-border)' }}>
                 <table className="w-full text-left text-xs">
-                  <thead style={{ backgroundColor: '#262626', color: '#A0A0A0' }}>
-                    <tr className="border-b" style={{ borderColor: '#383838' }}>
+                  <thead style={{ backgroundColor: 'var(--theme-bg-surface)', color: 'var(--theme-text-muted)' }}>
+                    <tr className="border-b" style={{ borderColor: 'var(--theme-border)' }}>
                       <th className="py-3 px-4 font-semibold">Employee</th>
                       <th className="py-3 px-4 font-semibold">Role</th>
                       <th className="py-3 px-4 font-semibold">Availability Status</th>
@@ -615,7 +615,7 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
                       <th className="py-3 px-4 font-semibold text-right">Logged Time</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y" style={{ borderColor: '#333333' }}>
+                  <tbody className="divide-y" style={{ borderColor: 'var(--theme-border)' }}>
                     {teamMembers.map((item) => {
                       const avail = item.availability;
                       const isOnlineWorking = avail?.isAvailable && !avail?.isOnBreak;
@@ -624,41 +624,41 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
                       return (
                         <tr
                           key={item.user.id}
-                          className="hover:bg-white/5 transition"
-                          style={{ backgroundColor: '#2A2A2A' }}
+                          className="hover:bg-[var(--theme-bg-surface-hover)] transition"
+                          style={{ backgroundColor: 'var(--theme-bg-surface-hover)' }}
                         >
                           <td className="py-3 px-4 flex items-center gap-2.5">
-                            <div className="w-7 h-7 rounded-lg bg-blue-600/30 border border-blue-400/30 flex items-center justify-center font-bold text-blue-300">
+                            <div className="w-7 h-7 rounded-lg bg-blue-600/30 border border-blue-400/30 flex items-center justify-center font-bold text-blue-700 dark:text-blue-300">
                               {item.user.displayName[0]?.toUpperCase() || item.user.username[0]?.toUpperCase()}
                             </div>
                             <div>
-                              <p className="font-semibold text-white">{item.user.displayName}</p>
-                              <p className="text-[11px] text-gray-400">@{item.user.username}</p>
+                              <p className="font-semibold text-[var(--theme-text)]">{item.user.displayName}</p>
+                              <p className="text-[11px] text-[var(--theme-text-muted)]">@{item.user.username}</p>
                             </div>
                           </td>
                           <td className="py-3 px-4">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-white/10 text-gray-300">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)]">
                               {item.role}
                             </span>
                           </td>
                           <td className="py-3 px-4">
                             {isOnMemberBreak ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
                                 <Coffee size={12} />
                                 On Break
                               </span>
                             ) : isOnlineWorking ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                                 Available & Working
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-gray-500/10 text-gray-400 border border-white/5">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-gray-500/10 text-[var(--theme-text-muted)] border border-[var(--theme-border)]">
                                 Offline
                               </span>
                             )}
                           </td>
-                          <td className="py-3 px-4 text-gray-300">
+                          <td className="py-3 px-4 text-[var(--theme-text)]">
                             {avail?.availableTime
                               ? new Date(avail.availableTime).toLocaleTimeString([], {
                                   hour: '2-digit',
@@ -666,7 +666,7 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
                                 })
                               : '—'}
                           </td>
-                          <td className="py-3 px-4 text-right font-mono font-medium text-gray-200">
+                          <td className="py-3 px-4 text-right font-mono font-medium text-[var(--theme-text)]">
                             {avail?.totalWorkingMinutes ? `${Math.floor(avail.totalWorkingMinutes / 60)}h ${avail.totalWorkingMinutes % 60}m` : '—'}
                           </td>
                         </tr>
@@ -683,13 +683,13 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
         <div
           className="flex items-center justify-end px-6 py-3.5 border-t shrink-0"
           style={{
-            backgroundColor: '#262626',
-            borderColor: '#3D3D3D',
+            backgroundColor: 'var(--theme-bg-surface)',
+            borderColor: 'var(--theme-border)',
           }}
         >
           <button
             onClick={onClose}
-            className="px-5 py-2 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/15 text-white transition"
+            className="px-5 py-2 rounded-xl text-xs font-semibold bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] transition"
           >
             Close
           </button>
@@ -702,19 +702,19 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
           <div
             className="w-full max-w-sm rounded-2xl border p-5 shadow-2xl animate-in zoom-in-95 duration-150"
             style={{
-              backgroundColor: '#262626',
-              borderColor: '#454545',
-              color: '#F0F0F0',
+              backgroundColor: 'var(--theme-bg-surface)',
+              borderColor: 'var(--theme-border)',
+              color: 'var(--theme-text)',
             }}
           >
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Coffee size={18} className="text-amber-400" />
-                <h3 className="text-sm font-bold text-white">Select Break Reason</h3>
+                <Coffee size={18} className="text-amber-600 dark:text-amber-400" />
+                <h3 className="text-sm font-bold text-[var(--theme-text)]">Select Break Reason</h3>
               </div>
               <button
                 onClick={() => setShowBreakModal(false)}
-                className="text-gray-400 hover:text-white"
+                className="text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]"
               >
                 <X size={16} />
               </button>
@@ -727,12 +727,12 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
                   onClick={() => setSelectedBreakReason(reason)}
                   className={`w-full px-3.5 py-2.5 rounded-xl text-xs text-left font-medium transition flex items-center justify-between border ${
                     selectedBreakReason === reason
-                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
-                      : 'bg-black/20 text-gray-300 border-white/5 hover:bg-white/5'
+                      ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/50'
+                      : 'bg-[var(--theme-bg-app)] text-[var(--theme-text)] border-[var(--theme-border)] hover:bg-[var(--theme-bg-surface-hover)]'
                   }`}
                 >
                   <span>{reason}</span>
-                  {selectedBreakReason === reason && <CheckCircle2 size={14} className="text-amber-400" />}
+                  {selectedBreakReason === reason && <CheckCircle2 size={14} className="text-amber-600 dark:text-amber-400" />}
                 </button>
               ))}
             </div>
@@ -744,7 +744,7 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
                   placeholder="Specify other reason..."
                   value={customBreakReason}
                   onChange={(e) => setCustomBreakReason(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-black/40 border border-gray-600 text-xs text-white placeholder-gray-400 focus:outline-none focus:border-amber-400"
+                  className="w-full px-3.5 py-2 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] text-xs text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-amber-400"
                 />
               </div>
             )}
@@ -752,7 +752,7 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
             <div className="flex items-center justify-end gap-2">
               <button
                 onClick={() => setShowBreakModal(false)}
-                className="px-3.5 py-2 rounded-xl text-xs font-medium text-gray-400 hover:text-white hover:bg-white/5"
+                className="px-3.5 py-2 rounded-xl text-xs font-medium text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]"
               >
                 Cancel
               </button>
@@ -773,28 +773,28 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
           <div
             className="w-full max-w-sm rounded-2xl border p-5 shadow-2xl animate-in zoom-in-95 duration-150"
             style={{
-              backgroundColor: '#262626',
-              borderColor: '#454545',
-              color: '#F0F0F0',
+              backgroundColor: 'var(--theme-bg-surface)',
+              borderColor: 'var(--theme-border)',
+              color: 'var(--theme-text)',
             }}
           >
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center mx-auto mb-3">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto mb-3">
               <AlertTriangle size={24} />
             </div>
 
-            <h3 className="text-base font-bold text-center text-white mb-2">
+            <h3 className="text-base font-bold text-center text-[var(--theme-text)] mb-2">
               Less Than 8 Hours Active
             </h3>
 
-            <p className="text-xs text-center text-gray-300 leading-relaxed mb-5">
+            <p className="text-xs text-center text-[var(--theme-text)] leading-relaxed mb-5">
               Your calculated active working time today is{' '}
-              <strong className="text-amber-300">{checkoutWarningHours} hours</strong>, which is less than the standard 8 hours. Are you sure you want to checkout now?
+              <strong className="text-amber-700 dark:text-amber-300">{checkoutWarningHours} hours</strong>, which is less than the standard 8 hours. Are you sure you want to checkout now?
             </p>
 
             <div className="flex items-center justify-end gap-2">
               <button
                 onClick={() => setShowCheckoutConfirm(false)}
-                className="flex-1 px-3.5 py-2 rounded-xl text-xs font-medium text-gray-300 bg-white/5 hover:bg-white/10 transition"
+                className="flex-1 px-3.5 py-2 rounded-xl text-xs font-medium text-[var(--theme-text)] bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] transition"
               >
                 Continue Working
               </button>
