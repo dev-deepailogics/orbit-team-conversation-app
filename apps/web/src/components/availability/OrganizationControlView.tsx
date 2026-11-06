@@ -556,7 +556,7 @@ export const OrganizationControlView: React.FC<
               <SlidersHorizontal size={20} />
             </div>
             <div>
-              <h2 className="text-sm sm:text-base font-bold text-white">
+              <h2 className="text-sm sm:text-base font-bold text-[var(--theme-text)]">
                 Workspace Master Configuration
               </h2>
               <p
@@ -618,23 +618,23 @@ export const OrganizationControlView: React.FC<
               <div>
                 <div className="flex items-center justify-between gap-2 mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center text-blue-400">
+                    <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center text-blue-700 dark:text-blue-400">
                       <Clock size={19} />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-white">
+                      <h3 className="text-sm font-bold text-[var(--theme-text)]">
                         Availability
                       </h3>
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 inline-block mt-0.5">
+                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 inline-block mt-0.5">
                         Active • 9:00 - 18:00
                       </span>
                     </div>
                   </div>
                   <ChevronDown
                     size={17}
-                    className={`text-gray-400 transition-transform ${
+                    className={`text-[var(--theme-text-muted)] transition-transform ${
                       selectedModule === "availability" && availabilityExpanded
-                        ? "rotate-180 text-blue-400"
+                        ? "rotate-180 text-blue-700 dark:text-blue-400"
                         : ""
                     }`}
                   />
@@ -668,21 +668,21 @@ export const OrganizationControlView: React.FC<
               <div>
                 <div className="flex items-center justify-between gap-2 mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-400/30 flex items-center justify-center text-purple-400">
+                    <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-400/30 flex items-center justify-center text-purple-700 dark:text-purple-400">
                       <Shield size={19} />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-white">
+                      <h3 className="text-sm font-bold text-[var(--theme-text)]">
                         Roles & Permissions
                       </h3>
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/30 inline-block mt-0.5">
+                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 inline-block mt-0.5">
                         4 Custom Roles
                       </span>
                     </div>
                   </div>
                   <ChevronRight
                     size={17}
-                    className="text-gray-400 group-hover:translate-x-0.5 transition"
+                    className="text-[var(--theme-text-muted)] group-hover:translate-x-0.5 transition"
                   />
                 </div>
                 <p
@@ -714,21 +714,21 @@ export const OrganizationControlView: React.FC<
               <div>
                 <div className="flex items-center justify-between gap-2 mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center text-emerald-400">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400">
                       <Users size={19} />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-white">
+                      <h3 className="text-sm font-bold text-[var(--theme-text)]">
                         Members & Invites
                       </h3>
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30 inline-block mt-0.5">
+                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30 inline-block mt-0.5">
                         {teamMembers.length || members.length} Active / 50 Seats
                       </span>
                     </div>
                   </div>
                   <ChevronRight
                     size={17}
-                    className="text-gray-400 group-hover:translate-x-0.5 transition"
+                    className="text-[var(--theme-text-muted)] group-hover:translate-x-0.5 transition"
                   />
                 </div>
                 <p
@@ -756,21 +756,21 @@ export const OrganizationControlView: React.FC<
               <div>
                 <div className="flex items-center justify-between gap-2 mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center text-emerald-400">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400">
                       <Activity size={19} />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-white">
+                      <h3 className="text-sm font-bold text-[var(--theme-text)]">
                         Employee Status
                       </h3>
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 inline-block mt-0.5">
+                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 inline-block mt-0.5">
                         {onlineCount} Active Live
                       </span>
                     </div>
                   </div>
                   <ChevronRight
                     size={17}
-                    className="text-gray-400 group-hover:translate-x-0.5 transition"
+                    className="text-[var(--theme-text-muted)] group-hover:translate-x-0.5 transition"
                   />
                 </div>
                 <p
@@ -798,21 +798,21 @@ export const OrganizationControlView: React.FC<
               <div>
                 <div className="flex items-center justify-between gap-2 mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-400/30 flex items-center justify-center text-purple-400">
+                    <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-400/30 flex items-center justify-center text-purple-700 dark:text-purple-400">
                       <FolderKanban size={19} />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-white">
+                      <h3 className="text-sm font-bold text-[var(--theme-text)]">
                         View Projects
                       </h3>
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/30 inline-block mt-0.5">
+                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 inline-block mt-0.5">
                         Project Portfolio
                       </span>
                     </div>
                   </div>
                   <ChevronRight
                     size={17}
-                    className="text-gray-400 group-hover:translate-x-0.5 transition"
+                    className="text-[var(--theme-text-muted)] group-hover:translate-x-0.5 transition"
                   />
                 </div>
                 <p
@@ -840,21 +840,21 @@ export const OrganizationControlView: React.FC<
               <div>
                 <div className="flex items-center justify-between gap-2 mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center text-blue-400">
+                    <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center text-blue-700 dark:text-blue-400">
                       <HardDrive size={19} />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-white">
+                      <h3 className="text-sm font-bold text-[var(--theme-text)]">
                         Media Management
                       </h3>
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30 inline-block mt-0.5">
+                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30 inline-block mt-0.5">
                         Google Drive Sync
                       </span>
                     </div>
                   </div>
                   <ChevronRight
                     size={17}
-                    className="text-gray-400 group-hover:translate-x-0.5 transition"
+                    className="text-[var(--theme-text-muted)] group-hover:translate-x-0.5 transition"
                   />
                 </div>
                 <p
@@ -881,11 +881,11 @@ export const OrganizationControlView: React.FC<
               }}
             >
               <div>
-                <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-blue-400 uppercase">
+                <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-blue-700 dark:text-blue-400 uppercase">
                   <Activity size={14} />
                   <span>Employee Availability Control Suite</span>
                 </div>
-                <h3 className="text-lg sm:text-xl font-bold text-white mt-1">
+                <h3 className="text-lg sm:text-xl font-bold text-[var(--theme-text)] mt-1">
                   {isAvailable
                     ? isOnBreak
                       ? "You are currently on break"
@@ -926,7 +926,7 @@ export const OrganizationControlView: React.FC<
                       ? "bg-[#007A5A] text-white cursor-default ring-1 ring-emerald-400"
                       : !isAvailable
                         ? "bg-[#0091FF] hover:bg-[#007AE6] text-white active:scale-95"
-                        : "bg-white/5 text-slate-500 cursor-not-allowed border border-white/5"
+                        : "bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)]"
                   }`}
                 >
                   <Play
@@ -943,10 +943,10 @@ export const OrganizationControlView: React.FC<
                   title="Take a break (Lunch, Namaz, Tea)"
                   className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
                     isOnBreak
-                      ? "bg-amber-500/20 text-amber-400 border border-amber-500/30 cursor-default"
+                      ? "bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30 cursor-default"
                       : isAvailable
-                        ? "bg-[#2A2F35] hover:bg-[#343B42] text-slate-200 border border-white/10 active:scale-95"
-                        : "bg-white/5 text-slate-500 cursor-not-allowed border border-white/5"
+                        ? "bg-[var(--theme-bg-surface-hover)] hover:brightness-95 text-[var(--theme-text)] border border-[var(--theme-border)] active:scale-95"
+                        : "bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)]"
                   }`}
                 >
                   <Coffee size={13} />
@@ -961,7 +961,7 @@ export const OrganizationControlView: React.FC<
                   className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
                     isOnBreak
                       ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg animate-pulse active:scale-95"
-                      : "bg-white/5 text-slate-500 cursor-not-allowed border border-white/5"
+                      : "bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)]"
                   }`}
                 >
                   <CheckCircle2 size={13} />
@@ -975,8 +975,8 @@ export const OrganizationControlView: React.FC<
                   title="End shift and checkout"
                   className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
                     isAvailable && !isOnBreak
-                      ? "bg-[#2A2F35] hover:bg-rose-950/40 text-slate-200 hover:text-rose-300 border border-white/10 hover:border-rose-500/40 active:scale-95"
-                      : "bg-white/5 text-slate-500 cursor-not-allowed border border-white/5"
+                      ? "bg-[var(--theme-bg-surface-hover)] hover:bg-rose-950/40 text-[var(--theme-text)] hover:text-rose-300 border border-[var(--theme-border)] hover:border-rose-500/40 active:scale-95"
+                      : "bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)]"
                   }`}
                 >
                   <LogOut size={13} />
@@ -988,10 +988,10 @@ export const OrganizationControlView: React.FC<
                   title="Live calculated net active working time"
                   className={`px-3.5 py-2 rounded-lg text-xs font-mono font-bold flex items-center gap-2 border shadow-sm transition ${
                     isOnBreak
-                      ? "bg-amber-950/30 text-amber-300 border-amber-500/30"
+                      ? "bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-500/30"
                       : isAvailable
                         ? "bg-[#0091FF]/20 text-[#38B6FF] border-[#0091FF]/40"
-                        : "bg-white/5 text-slate-500 border-white/5"
+                        : "bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] border-[var(--theme-border)]"
                   }`}
                 >
                   <Clock
@@ -1013,8 +1013,8 @@ export const OrganizationControlView: React.FC<
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                 <div>
-                  <h4 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-                    <Users size={17} className="text-blue-400" />
+                  <h4 className="text-sm sm:text-base font-bold text-[var(--theme-text)] flex items-center gap-2">
+                    <Users size={17} className="text-blue-700 dark:text-blue-400" />
                     <span>Live Team Attendance & Shift Tracker</span>
                   </h4>
                   <p
@@ -1086,18 +1086,18 @@ export const OrganizationControlView: React.FC<
                         return (
                           <tr
                             key={item.user.id}
-                            className="hover:bg-white/5 transition"
+                            className="hover:bg-[var(--theme-bg-surface-hover)] transition"
                             style={{
                               backgroundColor: "var(--theme-bg-surface)",
                             }}
                           >
                             <td className="py-3 px-4 flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-lg bg-blue-600/25 border border-blue-400/30 flex items-center justify-center font-bold text-blue-300">
+                              <div className="w-8 h-8 rounded-lg bg-blue-600/25 border border-blue-400/30 flex items-center justify-center font-bold text-blue-700 dark:text-blue-300">
                                 {item.user.displayName[0]?.toUpperCase() ||
                                   item.user.username[0]?.toUpperCase()}
                               </div>
                               <div>
-                                <p className="font-semibold text-white">
+                                <p className="font-semibold text-[var(--theme-text)]">
                                   {item.user.displayName}
                                 </p>
                                 <p
@@ -1109,23 +1109,23 @@ export const OrganizationControlView: React.FC<
                               </div>
                             </td>
                             <td className="py-3 px-4">
-                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-white/10 text-gray-300">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)]">
                                 {item.role}
                               </span>
                             </td>
                             <td className="py-3 px-4">
                               {isOnMemberBreak ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
                                   <Coffee size={12} />
                                   On Break
                                 </span>
                               ) : isOnlineWorking ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                                   Available & Working
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/5 text-gray-400 border border-white/5">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] border border-[var(--theme-border)]">
                                   Offline
                                 </span>
                               )}
@@ -1143,7 +1143,7 @@ export const OrganizationControlView: React.FC<
                                   })
                                 : "—"}
                             </td>
-                            <td className="py-3 px-4 text-right font-mono font-medium text-white">
+                            <td className="py-3 px-4 text-right font-mono font-medium text-[var(--theme-text)]">
                               {avail?.totalWorkingMinutes
                                 ? `${Math.floor(avail.totalWorkingMinutes / 60)}h ${avail.totalWorkingMinutes % 60}m`
                                 : isOnlineWorking
@@ -1170,7 +1170,7 @@ export const OrganizationControlView: React.FC<
               borderColor: "var(--theme-border)",
             }}
           >
-            <h4 className="text-base font-bold text-white mb-2">
+            <h4 className="text-base font-bold text-[var(--theme-text)] mb-2">
               Workspace Roles & Permission Levels
             </h4>
             <p
@@ -1207,7 +1207,7 @@ export const OrganizationControlView: React.FC<
                     borderColor: "var(--theme-border)",
                   }}
                 >
-                  <span className="font-bold text-xs text-blue-400 mb-1">
+                  <span className="font-bold text-xs text-blue-700 dark:text-blue-400 mb-1">
                     {r.name}
                   </span>
                   <p
@@ -1232,7 +1232,7 @@ export const OrganizationControlView: React.FC<
             }}
           >
             <div>
-              <h4 className="text-base font-bold text-white">
+              <h4 className="text-base font-bold text-[var(--theme-text)]">
                 Team Roster & Invitations
               </h4>
               <p
@@ -1270,14 +1270,14 @@ export const OrganizationControlView: React.FC<
           >
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Coffee size={18} className="text-amber-400" />
-                <h3 className="text-sm font-bold text-white">
+                <Coffee size={18} className="text-amber-700 dark:text-amber-400" />
+                <h3 className="text-sm font-bold text-[var(--theme-text)]">
                   Select Break Reason
                 </h3>
               </div>
               <button
                 onClick={() => setShowBreakModal(false)}
-                className="text-gray-400 hover:text-white"
+                className="text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]"
               >
                 <X size={16} />
               </button>
@@ -1290,13 +1290,13 @@ export const OrganizationControlView: React.FC<
                   onClick={() => setSelectedBreakReason(reason)}
                   className={`w-full px-3.5 py-2.5 rounded-xl text-xs text-left font-medium transition flex items-center justify-between border ${
                     selectedBreakReason === reason
-                      ? "bg-amber-500/20 text-amber-300 border-amber-500/50"
-                      : "bg-black/20 text-gray-300 border-white/5 hover:bg-white/5"
+                      ? "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/50"
+                      : "bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] border-[var(--theme-border)] hover:bg-[var(--theme-bg-surface-hover)]"
                   }`}
                 >
                   <span>{reason}</span>
                   {selectedBreakReason === reason && (
-                    <CheckCircle2 size={14} className="text-amber-400" />
+                    <CheckCircle2 size={14} className="text-amber-700 dark:text-amber-400" />
                   )}
                 </button>
               ))}
@@ -1309,7 +1309,7 @@ export const OrganizationControlView: React.FC<
                   placeholder="Specify other reason..."
                   value={customBreakReason}
                   onChange={(e) => setCustomBreakReason(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-black/40 border border-gray-600 text-xs text-white placeholder-gray-400 focus:outline-none focus:border-amber-400"
+                  className="w-full px-3.5 py-2 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] text-xs text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-amber-400"
                 />
               </div>
             )}
@@ -1317,7 +1317,7 @@ export const OrganizationControlView: React.FC<
             <div className="flex items-center justify-end gap-2">
               <button
                 onClick={() => setShowBreakModal(false)}
-                className="px-3.5 py-2 rounded-xl text-xs font-medium text-gray-400 hover:text-white hover:bg-white/5"
+                className="px-3.5 py-2 rounded-xl text-xs font-medium text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]"
               >
                 Cancel
               </button>
@@ -1343,11 +1343,11 @@ export const OrganizationControlView: React.FC<
               color: "var(--theme-text-primary)",
             }}
           >
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center mx-auto mb-3">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-700 dark:text-amber-400 flex items-center justify-center mx-auto mb-3">
               <AlertTriangle size={24} />
             </div>
 
-            <h3 className="text-base font-bold text-center text-white mb-2">
+            <h3 className="text-base font-bold text-center text-[var(--theme-text)] mb-2">
               Less Than 8 Hours Active
             </h3>
 
@@ -1356,7 +1356,7 @@ export const OrganizationControlView: React.FC<
               style={{ color: "var(--theme-text-muted)" }}
             >
               Your calculated active working time today is{" "}
-              <strong className="text-amber-300">
+              <strong className="text-amber-700 dark:text-amber-300">
                 {checkoutWarningHours} hours
               </strong>
               , which is less than the standard 8 hours. Are you sure you want
@@ -1366,7 +1366,7 @@ export const OrganizationControlView: React.FC<
             <div className="flex items-center justify-end gap-2">
               <button
                 onClick={() => setShowCheckoutConfirm(false)}
-                className="flex-1 px-3.5 py-2 rounded-xl text-xs font-medium text-gray-300 bg-white/5 hover:bg-white/10 transition"
+                className="flex-1 px-3.5 py-2 rounded-xl text-xs font-medium text-[var(--theme-text)] bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] transition"
               >
                 Continue Working
               </button>

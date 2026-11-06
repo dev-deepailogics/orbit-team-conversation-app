@@ -571,7 +571,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <button
               onClick={onToggleMobileSidebar}
               title="Open Navigation"
-              className="md:hidden p-1.5 -ml-1 text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-lg transition shrink-0"
+              className="md:hidden p-1.5 -ml-1 text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition shrink-0"
             >
               <Menu size={20} />
             </button>
@@ -581,16 +581,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           <button
             onClick={() => setShowDetailsModal(true)}
             title="Click to view channel details"
-            className="flex items-center gap-1.5 hover:bg-white/5 px-2 py-1 rounded-lg transition group min-w-0"
+            className="flex items-center gap-1.5 hover:bg-[var(--theme-bg-surface-hover)] px-2 py-1 rounded-lg transition group min-w-0"
           >
             {channel.isAnonymous ? (
               <span className="text-lg leading-none shrink-0" title="Anonymous Channel">🎭</span>
             ) : channel.type === 'DIRECT' ? (
               <span className="font-bold text-slack-green text-base shrink-0">@</span>
             ) : channel.type === 'PRIVATE' ? (
-              <Lock size={18} className="text-gray-400 group-hover:text-white shrink-0" />
+              <Lock size={18} className="text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] shrink-0" />
             ) : (
-              <Hash size={20} className="text-gray-400 group-hover:text-white shrink-0" />
+              <Hash size={20} className="text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] shrink-0" />
             )}
             <span
               className="font-bold text-sm sm:text-base truncate group-hover:underline"
@@ -617,7 +617,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-xs transition-all duration-150 shrink-0 ${
                 activeView === 'messages'
                   ? 'shadow-sm font-bold'
-                  : 'opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'
+                  : 'opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-[var(--theme-bg-surface-hover)]'
               }`}
               style={{
                 backgroundColor:
@@ -651,7 +651,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-xs transition-all duration-150 shrink-0 ${
                 activeView === 'whiteboard'
                   ? 'shadow-sm font-bold'
-                  : 'opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'
+                  : 'opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-[var(--theme-bg-surface-hover)]'
               }`}
               style={{
                 backgroundColor:
@@ -774,14 +774,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
             {/* Dropdown Menu */}
             {showMoreMenu && (
-              <div className="absolute right-0 mt-1.5 w-56 bg-[#222529] border border-gray-700 rounded-xl shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+              <div className="absolute right-0 mt-1.5 w-56 bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-xl shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
                 {channel.type !== 'DIRECT' && onOpenAddMembers && (
                   <button
                     onClick={() => {
                       setShowMoreMenu(false);
                       onOpenAddMembers();
                     }}
-                    className="w-full px-3.5 py-2 text-left text-xs text-gray-200 hover:text-white hover:bg-white/5 flex items-center gap-2.5 transition"
+                    className="w-full px-3.5 py-2 text-left text-xs text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] flex items-center gap-2.5 transition"
                   >
                     <UserPlus size={14} className="text-slack-green" />
                     <span>Add People</span>
@@ -793,7 +793,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     setShowMoreMenu(false);
                     setShowPinsModal(true);
                   }}
-                  className="w-full px-3.5 py-2 text-left text-xs text-gray-200 hover:text-white hover:bg-white/5 flex items-center gap-2.5 transition"
+                  className="w-full px-3.5 py-2 text-left text-xs text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] flex items-center gap-2.5 transition"
                 >
                   <Pin size={14} className="text-amber-400 fill-amber-400" />
                   <span>Pinned Messages</span>
@@ -804,7 +804,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     setShowMoreMenu(false);
                     setShowDetailsModal(true);
                   }}
-                  className="w-full px-3.5 py-2 text-left text-xs text-gray-200 hover:text-white hover:bg-white/5 flex items-center gap-2.5 transition"
+                  className="w-full px-3.5 py-2 text-left text-xs text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] flex items-center gap-2.5 transition"
                 >
                   <Info size={14} className="text-slack-green" />
                   <span>Channel Details & Info</span>
@@ -815,7 +815,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     setShowMoreMenu(false);
                     setShowStorageModal(true);
                   }}
-                  className="w-full px-3.5 py-2 text-left text-xs text-gray-200 hover:text-white hover:bg-white/5 flex items-center gap-2.5 transition"
+                  className="w-full px-3.5 py-2 text-left text-xs text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] flex items-center gap-2.5 transition"
                 >
                   <HardDrive size={14} className="text-slack-green" />
                   <span>Channel Files & Storage</span>
@@ -826,20 +826,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     setShowMoreMenu(false);
                     setActiveView(activeView === 'whiteboard' ? 'messages' : 'whiteboard');
                   }}
-                  className="w-full px-3.5 py-2 text-left text-xs text-gray-200 hover:text-white hover:bg-white/5 flex items-center gap-2.5 transition"
+                  className="w-full px-3.5 py-2 text-left text-xs text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] flex items-center gap-2.5 transition"
                 >
                   <PenTool size={14} className="text-slack-green" />
                   <span>{activeView === 'whiteboard' ? 'Back to Chat' : 'Whiteboard & Canvas'}</span>
                 </button>
 
-                <div className="h-px bg-gray-700/60 my-1" />
+                <div className="h-px bg-[var(--theme-bg-surface-hover)] my-1" />
 
                 <button
                   onClick={() => {
                     setShowMoreMenu(false);
                     handleCopyChannelId();
                   }}
-                  className="w-full px-3.5 py-2 text-left text-xs text-gray-400 hover:text-white hover:bg-white/5 flex items-center justify-between transition"
+                  className="w-full px-3.5 py-2 text-left text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] flex items-center justify-between transition"
                 >
                   <span className="flex items-center gap-2.5">
                     <Copy size={14} />
@@ -865,7 +865,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           {anonProfile && (
             <button
               onClick={() => setShowAnonPersonaModal(true)}
-              className="ml-3 text-xs font-semibold underline text-purple-300 hover:text-white shrink-0"
+              className="ml-3 text-xs font-semibold underline text-purple-300 hover:text-[var(--theme-text)] shrink-0"
             >
               Change Persona ({anonProfile.anonEmoji} {anonProfile.anonName})
             </button>
@@ -976,7 +976,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               <div
                 key={msg.id}
                 id={`msg-${msg.id}`}
-                className={`group flex gap-2.5 sm:gap-3 hover:bg-black/5 dark:hover:bg-white/5 -mx-3 sm:-mx-6 px-3 sm:px-6 py-2 rounded-lg transition-all duration-300 relative ${
+                className={`group flex gap-2.5 sm:gap-3 hover:bg-black/5 dark:hover:bg-[var(--theme-bg-surface-hover)] -mx-3 sm:-mx-6 px-3 sm:px-6 py-2 rounded-lg transition-all duration-300 relative ${
                   msg.isPinned ? 'bg-amber-500/5 border-l-2 border-amber-400/80 pl-2 sm:pl-5' : ''
                 }`}
               >
@@ -1009,7 +1009,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           className={`text-[10px] font-semibold px-1.5 py-0.2 rounded uppercase ${
                             isSelf
                               ? 'bg-purple-900/70 text-purple-200 border border-purple-500/40'
-                              : 'bg-gray-800 text-gray-300 border border-gray-700'
+                              : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] border border-[var(--theme-border)]'
                           }`}
                         >
                           {isSelf ? 'You (Anon)' : 'Anonymous'}
@@ -1082,7 +1082,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                             type="button"
                             onClick={handleCancelEdit}
                             disabled={isSavingEdit}
-                            className="px-3 py-1 rounded text-xs font-medium border hover:bg-black/5 dark:hover:bg-white/5 transition"
+                            className="px-3 py-1 rounded text-xs font-medium border hover:bg-black/5 dark:hover:bg-[var(--theme-bg-surface-hover)] transition"
                             style={{
                               borderColor: 'var(--theme-border)',
                               color: 'var(--theme-text-primary)',
@@ -1196,7 +1196,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                                 className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition border ${
                                   data.hasReacted
                                     ? 'bg-slack-activeChannel/20 border-slack-activeChannel text-slack-activeChannel font-bold'
-                                    : 'bg-[#2C3136]/80 hover:bg-[#3E4348] border-gray-700/60 text-gray-300'
+                                    : 'bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] border-[var(--theme-border)] text-[var(--theme-text)]'
                                 }`}
                               >
                                 <span>{emoji}</span>
@@ -1207,7 +1207,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                             <button
                               onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === msg.id ? null : msg.id)}
                               title="Add reaction"
-                              className="flex items-center justify-center w-6 h-6 rounded-full bg-[#2C3136]/60 hover:bg-[#3E4348] border border-gray-700/50 text-gray-400 hover:text-white transition"
+                              className="flex items-center justify-center w-6 h-6 rounded-full bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition"
                             >
                               <SmilePlus size={12} />
                             </button>
@@ -1231,14 +1231,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
                 {/* Floating Hover Bubble Layer */}
                 {!msg.isDeleted && (
-                  <div className="absolute right-2 sm:right-4 -top-3.5 hidden group-hover:flex items-center bg-[#222529] border border-gray-700/90 rounded-xl shadow-2xl px-1.5 py-1 gap-1 z-20">
+                  <div className="absolute right-2 sm:right-4 -top-3.5 hidden group-hover:flex items-center bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-xl shadow-2xl px-1.5 py-1 gap-1 z-20">
                     {/* Top 4 Quick Reaction Emojis */}
-                    <div className="flex items-center gap-0.5 pr-1 border-r border-gray-700/80 mr-0.5">
+                    <div className="flex items-center gap-0.5 pr-1 border-r border-[var(--theme-border)] mr-0.5">
                       {topEmojis.slice(0, 4).map((em) => (
                         <button
                           key={em}
                           onClick={() => handleReaction(msg.id, em)}
-                          className="hover:scale-125 transition text-xs p-1 rounded hover:bg-gray-700/50"
+                          className="hover:scale-125 transition text-xs p-1 rounded hover:bg-[var(--theme-bg-surface-hover)]"
                           title={`React with ${em}`}
                         >
                           {em}
@@ -1249,21 +1249,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     <button
                       onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === msg.id ? null : msg.id)}
                       title="More emojis..."
-                      className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
+                      className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded transition"
                     >
                       <SmilePlus size={14} />
                     </button>
                     <button
                       onClick={() => setReplyingToMessage(msg)}
                       title="Quote Reply"
-                      className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
+                      className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded transition"
                     >
                       <CornerUpLeft size={14} />
                     </button>
                     <button
                       onClick={() => onOpenThread(msg)}
                       title="Reply in thread"
-                      className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
+                      className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded transition"
                     >
                       <MessageSquare size={14} />
                     </button>
@@ -1273,7 +1273,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       className={`p-1 rounded transition ${
                         msg.isPinned
                           ? 'text-amber-400 hover:text-amber-300'
-                          : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                          : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]'
                       }`}
                     >
                       <Pin size={14} className={msg.isPinned ? 'fill-amber-400' : ''} />
@@ -1282,7 +1282,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       <button
                         onClick={() => onCreateTicketFromMessage(msg)}
                         title="Create Ticket from message"
-                        className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
+                        className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded transition"
                       >
                         <CheckSquare size={14} />
                       </button>
@@ -1294,7 +1294,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           setEditContent(msg.content);
                         }}
                         title="Edit message"
-                        className="p-1 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded transition"
+                        className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded transition"
                       >
                         <Pencil size={14} />
                       </button>
@@ -1335,7 +1335,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
       {/* Typing Indicator */}
       {typingUsers.length > 0 && (
-        <div className="px-3 sm:px-6 py-1 text-xs text-gray-400 italic flex items-center gap-1.5">
+        <div className="px-3 sm:px-6 py-1 text-xs text-[var(--theme-text-muted)] italic flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" />
           <span>{typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...</span>
         </div>
@@ -1345,7 +1345,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       <div className="px-3 sm:px-6 pb-3 sm:pb-6 pt-1">
         {/* Quote Reply Banner */}
         {replyingToMessage && (
-          <div className="mb-2 bg-[#222529] border-l-4 border-slack-green rounded-r-xl px-3.5 py-2 flex items-center justify-between shadow-lg">
+          <div className="mb-2 bg-[var(--theme-bg-surface)] border-l-4 border-slack-green rounded-r-xl px-3.5 py-2 flex items-center justify-between shadow-lg">
             <div className="min-w-0 flex-1 mr-2">
               <span className="text-[11px] font-bold text-slack-green flex items-center gap-1.5">
                 <CornerUpLeft size={12} />
@@ -1356,14 +1356,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     : 'Anonymous'
                   : replyingToMessage.user?.displayName || 'Teammate'}
               </span>
-              <p className="text-xs text-gray-300 truncate mt-0.5 max-w-2xl">
+              <p className="text-xs text-[var(--theme-text)] truncate mt-0.5 max-w-2xl">
                 {replyingToMessage.content}
               </p>
             </div>
             <button
               type="button"
               onClick={() => setReplyingToMessage(null)}
-              className="p-1 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition"
+              className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition"
             >
               <X size={14} />
             </button>
@@ -1371,8 +1371,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         )}
         {/* Slash Command Suggestions */}
         {content.startsWith('/') && !content.includes(' ') && (
-          <div className="mb-2 bg-[#1F2326] border border-gray-700 rounded-xl p-2 shadow-2xl space-y-1">
-            <div className="text-[10px] font-bold uppercase text-gray-400 px-2 py-1 tracking-wider">
+          <div className="mb-2 bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-xl p-2 shadow-2xl space-y-1">
+            <div className="text-[10px] font-bold uppercase text-[var(--theme-text-muted)] px-2 py-1 tracking-wider">
               Available Slash Commands
             </div>
             {[
@@ -1386,10 +1386,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 <div
                   key={i}
                   onClick={() => setContent(c.cmd.split(' ')[0] + ' ')}
-                  className="flex items-center justify-between px-3 py-1.5 hover:bg-[#2C3136] rounded-lg cursor-pointer text-xs transition"
+                  className="flex items-center justify-between px-3 py-1.5 hover:bg-[var(--theme-bg-surface-hover)] rounded-lg cursor-pointer text-xs transition"
                 >
                   <span className="font-mono text-slack-green font-semibold">{c.cmd}</span>
-                  <span className="text-gray-400">{c.desc}</span>
+                  <span className="text-[var(--theme-text-muted)]">{c.desc}</span>
                 </div>
               ))}
           </div>
@@ -1415,13 +1415,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         >
           {/* File Attachments Preview & Upload Indicator */}
           {(attachments.length > 0 || isUploading) && (
-            <div className="px-3 pt-2.5 flex flex-wrap gap-2 border-b border-gray-800/80 pb-2.5 bg-[#1B1E22]/60 rounded-t-xl">
+            <div className="px-3 pt-2.5 flex flex-wrap gap-2 border-b border-[var(--theme-border)] pb-2.5 bg-[var(--theme-bg-surface)] rounded-t-xl">
               {attachments.map((att, idx) => {
                 const isImage = getFileCategory(att.fileType, att.fileName) === 'image';
                 return (
                   <div
                     key={att.id || idx}
-                    className="flex items-center gap-2 bg-[#2C3136] border border-gray-700/80 px-2.5 py-1 rounded-lg text-xs text-white shadow-sm animate-in fade-in zoom-in-95 duration-100"
+                    className="flex items-center gap-2 bg-[var(--theme-bg-surface-hover)] border border-[var(--theme-border)] px-2.5 py-1 rounded-lg text-xs text-[var(--theme-text)] shadow-sm animate-in fade-in zoom-in-95 duration-100"
                   >
                     {isImage ? (
                       <div className="w-4 h-4 rounded overflow-hidden bg-black/40">
@@ -1437,14 +1437,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     <span className="truncate max-w-[140px] font-medium" title={att.fileName}>
                       {att.fileName}
                     </span>
-                    <span className="text-[10px] text-gray-400 font-mono">
+                    <span className="text-[10px] text-[var(--theme-text-muted)] font-mono">
                       ({formatFileSize(att.fileSize)})
                     </span>
                     <button
                       type="button"
                       onClick={() => setAttachments(attachments.filter((_, i) => i !== idx))}
                       title="Remove attachment"
-                      className="text-gray-400 hover:text-red-400 p-0.5 rounded transition"
+                      className="text-[var(--theme-text-muted)] hover:text-red-400 p-0.5 rounded transition"
                     >
                       <X size={13} />
                     </button>
@@ -1453,7 +1453,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               })}
 
               {isUploading && (
-                <div className="flex items-center gap-1.5 bg-[#2C3136] px-2.5 py-1 rounded-lg text-xs text-slack-green border border-slack-green/40 animate-pulse">
+                <div className="flex items-center gap-1.5 bg-[var(--theme-bg-surface-hover)] px-2.5 py-1 rounded-lg text-xs text-slack-green border border-slack-green/40 animate-pulse">
                   <Loader2 size={13} className="animate-spin" />
                   <span>Uploading file...</span>
                 </div>
@@ -1482,7 +1482,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           />
 
           {/* Action Bar */}
-          <div className="flex items-center justify-between px-3 py-2 bg-[#1C1F23]/60 border-t border-gray-800/40 rounded-b-xl">
+          <div className="flex items-center justify-between px-3 py-2 bg-[var(--theme-bg-surface)] border-t border-[var(--theme-border)] rounded-b-xl">
             <div className="flex items-center gap-1">
               <input
                 type="file"
@@ -1495,7 +1495,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 title="Attach files (images, docs, code, zip...)"
-                className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition"
+                className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition"
               >
                 <Paperclip size={16} />
               </button>
@@ -1505,7 +1505,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 onClick={() => setShowFormatting(!showFormatting)}
                 title={showFormatting ? 'Hide formatting toolbar' : 'Show formatting toolbar'}
                 className={`p-1.5 rounded-lg transition ${
-                  showFormatting ? 'bg-[#383F45] text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                  showFormatting ? 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)]' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]'
                 }`}
               >
                 <Type size={16} />
@@ -1515,7 +1515,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 type="button"
                 onClick={() => setShowEmoji(!showEmoji)}
                 title="Add emoji"
-                className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg transition relative"
+                className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition relative"
               >
                 <Smile size={16} />
               </button>
@@ -1660,7 +1660,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 type="button"
                 onClick={() => setDeleteConfirmMessage(null)}
                 disabled={isDeleting}
-                className="px-4 py-2 rounded-xl text-xs font-medium border hover:bg-black/5 dark:hover:bg-white/5 transition"
+                className="px-4 py-2 rounded-xl text-xs font-medium border hover:bg-black/5 dark:hover:bg-[var(--theme-bg-surface-hover)] transition"
                 style={{
                   borderColor: 'var(--theme-border)',
                   color: 'var(--theme-text-primary)',

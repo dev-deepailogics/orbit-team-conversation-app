@@ -458,7 +458,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         } else {
           const codeEl = document.createElement('code');
           codeEl.className =
-            'bg-[#2C3136] text-[#ECB22E] px-1.5 py-0.5 rounded font-mono text-xs border border-gray-700/60 font-medium';
+            'bg-[var(--theme-bg-surface-hover)] text-amber-700 dark:text-[#ECB22E] px-1.5 py-0.5 rounded font-mono text-xs border border-[var(--theme-border)] font-medium';
           codeEl.textContent = selectedText;
           range.deleteContents();
           range.insertNode(codeEl);
@@ -475,7 +475,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       } else {
         const codeEl = document.createElement('code');
         codeEl.className =
-          'bg-[#2C3136] text-[#ECB22E] px-1.5 py-0.5 rounded font-mono text-xs border border-gray-700/60 font-medium';
+          'bg-[var(--theme-bg-surface-hover)] text-amber-700 dark:text-[#ECB22E] px-1.5 py-0.5 rounded font-mono text-xs border border-[var(--theme-border)] font-medium';
         codeEl.textContent = 'code';
         range.insertNode(codeEl);
 
@@ -503,7 +503,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
 
       const pre = document.createElement('pre');
       pre.className =
-        'bg-[#141618] border border-gray-700/80 rounded-lg p-2.5 my-1.5 font-mono text-xs text-gray-200 block overflow-x-auto';
+        'bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-lg p-2.5 my-1.5 font-mono text-xs text-[var(--theme-text)] block overflow-x-auto';
       const code = document.createElement('code');
       code.textContent = selectedText || '// type code here';
       pre.appendChild(code);
@@ -619,7 +619,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
 
                 const codeEl = document.createElement('code');
                 codeEl.className =
-                  'bg-[#2C3136] text-[#ECB22E] px-1.5 py-0.5 rounded font-mono text-xs border border-gray-700/60 font-medium';
+                  'bg-[var(--theme-bg-surface-hover)] text-amber-700 dark:text-[#ECB22E] px-1.5 py-0.5 rounded font-mono text-xs border border-[var(--theme-border)] font-medium';
                 codeEl.textContent = codeText;
 
                 const parent = textNode.parentNode;
@@ -826,13 +826,13 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       <div className={`relative flex flex-col w-full ${className}`}>
         {/* Live Format Toolbar */}
         {showToolbar && (
-          <div className="flex items-center gap-0.5 px-2.5 py-1.5 bg-[#1C1F23]/90 border-b border-gray-800/60 overflow-x-auto select-none">
+          <div className="flex items-center gap-0.5 px-2.5 py-1.5 bg-[var(--theme-bg-surface)] border-b border-[var(--theme-border)] overflow-x-auto select-none">
             <button
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => executeCommand('bold')}
               title="Bold (Ctrl+B)"
-              className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/60 rounded-lg transition active:scale-95"
+              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition active:scale-95"
             >
               <Bold size={14} />
             </button>
@@ -842,7 +842,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => executeCommand('italic')}
               title="Italic (Ctrl+I)"
-              className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/60 rounded-lg transition active:scale-95"
+              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition active:scale-95"
             >
               <Italic size={14} />
             </button>
@@ -852,19 +852,19 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => executeCommand('strikeThrough')}
               title="Strikethrough"
-              className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/60 rounded-lg transition active:scale-95"
+              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition active:scale-95"
             >
               <Strikethrough size={14} />
             </button>
 
-            <span className="w-px h-4 bg-gray-700/60 mx-1 shrink-0" />
+            <span className="w-px h-4 bg-[var(--theme-bg-surface-hover)] mx-1 shrink-0" />
 
             <button
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleFormatHeading(1)}
               title="Heading 1"
-              className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/60 rounded-lg transition active:scale-95"
+              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition active:scale-95"
             >
               <Heading1 size={14} />
             </button>
@@ -874,19 +874,19 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleFormatHeading(2)}
               title="Heading 2"
-              className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/60 rounded-lg transition active:scale-95"
+              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition active:scale-95"
             >
               <Heading2 size={14} />
             </button>
 
-            <span className="w-px h-4 bg-gray-700/60 mx-1 shrink-0" />
+            <span className="w-px h-4 bg-[var(--theme-bg-surface-hover)] mx-1 shrink-0" />
 
             <button
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => executeCommand('insertUnorderedList')}
               title="Bullet List"
-              className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/60 rounded-lg transition active:scale-95"
+              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition active:scale-95"
             >
               <List size={14} />
             </button>
@@ -896,7 +896,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => executeCommand('insertOrderedList')}
               title="Numbered List"
-              className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/60 rounded-lg transition active:scale-95"
+              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition active:scale-95"
             >
               <ListOrdered size={14} />
             </button>
@@ -906,19 +906,19 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => executeCommand('formatBlock', '<blockquote>')}
               title="Blockquote"
-              className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/60 rounded-lg transition active:scale-95"
+              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition active:scale-95"
             >
               <Quote size={14} />
             </button>
 
-            <span className="w-px h-4 bg-gray-700/60 mx-1 shrink-0" />
+            <span className="w-px h-4 bg-[var(--theme-bg-surface-hover)] mx-1 shrink-0" />
 
             <button
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={handleFormatInlineCode}
               title="Inline Code"
-              className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/60 rounded-lg transition active:scale-95"
+              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition active:scale-95"
             >
               <Code size={14} />
             </button>
@@ -928,7 +928,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
               onMouseDown={(e) => e.preventDefault()}
               onClick={handleFormatCodeBlock}
               title="Code Block"
-              className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/60 rounded-lg transition active:scale-95"
+              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition active:scale-95"
             >
               <FileCode size={14} />
             </button>
@@ -938,7 +938,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
               onMouseDown={(e) => e.preventDefault()}
               onClick={handleFormatLink}
               title="Link"
-              className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/60 rounded-lg transition active:scale-95"
+              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition active:scale-95"
             >
               <LinkIcon size={14} />
             </button>
@@ -949,17 +949,17 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         <div className="relative w-full">
           {/* Floating Mention Autocomplete Popover */}
           {mentionState.isOpen && filteredMentionUsers.length > 0 && (
-            <div className="absolute bottom-full mb-2 left-2 sm:left-4 z-50 w-72 max-h-56 bg-[#1F2326] border border-gray-700/80 rounded-xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100">
-              <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-800 bg-[#181B1E] flex items-center justify-between">
+            <div className="absolute bottom-full mb-2 left-2 sm:left-4 z-50 w-72 max-h-56 bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100">
+              <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--theme-text-muted)] border-b border-[var(--theme-border)] bg-[var(--theme-bg-surface)] flex items-center justify-between">
                 <span className="flex items-center gap-1.5 text-slack-green">
                   <AtSign size={12} />
                   Members
                 </span>
-                <span className="text-[9px] text-gray-500 font-normal">
+                <span className="text-[9px] text-[var(--theme-text-muted)] font-normal">
                   ↑↓ to navigate • ↵ to select
                 </span>
               </div>
-              <div className="flex-1 overflow-y-auto max-h-48 py-1 divide-y divide-gray-800/40">
+              <div className="flex-1 overflow-y-auto max-h-48 py-1 divide-y divide-[var(--theme-border)]">
                 {filteredMentionUsers.map((u, idx) => (
                   <div
                     key={u.id}
@@ -970,7 +970,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
                     className={`flex items-center gap-2.5 px-3 py-1.5 cursor-pointer text-xs transition ${
                       idx === selectedMentionIdx
                         ? 'bg-slack-activeChannel text-white font-semibold'
-                        : 'text-gray-200 hover:bg-[#2C3136]'
+                        : 'text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]'
                     }`}
                   >
                     <div className="relative shrink-0">
@@ -980,7 +980,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
                         className="w-5 h-5 rounded-md object-cover"
                       />
                       <span
-                        className={`absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full ring-1 ring-[#1F2326] ${
+                        className={`absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full ring-1 ring-[var(--theme-bg-surface)] ${
                           u.status === 'ONLINE' ? 'bg-slack-green' : 'bg-gray-500'
                         }`}
                       />
@@ -989,7 +989,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
                       <span className="truncate font-medium">{u.displayName}</span>
                       <span
                         className={`text-[10px] truncate ${
-                          idx === selectedMentionIdx ? 'text-gray-200' : 'text-gray-400'
+                          idx === selectedMentionIdx ? 'text-[var(--theme-text)]' : 'text-[var(--theme-text-muted)]'
                         }`}
                       >
                         @{u.username}
@@ -1010,7 +1010,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
             onClick={checkMentionTrigger}
             style={{ minHeight, color: 'var(--theme-text-primary)' }}
             data-placeholder={placeholder}
-            className="w-full bg-transparent px-4 py-3 text-sm focus:outline-none overflow-y-auto max-h-60 leading-relaxed font-sans empty:before:content-[attr(data-placeholder)] empty:before:text-gray-500 empty:before:pointer-events-none [&_h1]:text-lg [&_h1]:font-bold [&_h1]:my-1 [&_h2]:text-base [&_h2]:font-bold [&_h2]:my-1 [&_b]:font-bold [&_strong]:font-bold [&_i]:italic [&_ul]:list-disc [&_ul]:list-inside [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:list-inside [&_ol]:my-1 [&_blockquote]:border-l-4 [&_blockquote]:border-slack-green [&_blockquote]:px-2.5 [&_blockquote]:py-1 [&_blockquote]:my-1 [&_blockquote]:rounded-r [&_blockquote]:italic [&_a]:text-blue-500 [&_a]:underline"
+            className="w-full bg-transparent px-4 py-3 text-sm focus:outline-none overflow-y-auto max-h-60 leading-relaxed font-sans empty:before:content-[attr(data-placeholder)] empty:before:text-[var(--theme-text-muted)] empty:before:pointer-events-none [&_h1]:text-lg [&_h1]:font-bold [&_h1]:my-1 [&_h2]:text-base [&_h2]:font-bold [&_h2]:my-1 [&_b]:font-bold [&_strong]:font-bold [&_i]:italic [&_ul]:list-disc [&_ul]:list-inside [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:list-inside [&_ol]:my-1 [&_blockquote]:border-l-4 [&_blockquote]:border-slack-green [&_blockquote]:px-2.5 [&_blockquote]:py-1 [&_blockquote]:my-1 [&_blockquote]:rounded-r [&_blockquote]:italic [&_a]:text-blue-500 [&_a]:underline"
           />
         </div>
       </div>

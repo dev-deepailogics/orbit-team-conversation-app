@@ -231,22 +231,13 @@ export const EmployeeAvailabilityHeader: React.FC<{
             title="Click to change availability status"
             className={`px-3.5 py-1.5 rounded-xl text-[13px] font-mono font-bold flex items-center gap-2 border shadow-sm transition-all duration-150 cursor-pointer select-none active:scale-95 focus:outline-none ${
               isOnBreak
-                ? 'bg-[#2A241C] text-[#F59E0B] border-[#F59E0B]/50 shadow-[0_0_12px_rgba(245,158,11,0.15)] animate-pulse'
+                ? 'bg-amber-500/10 text-amber-600 dark:text-[#F59E0B] border-[#F59E0B]/50 shadow-[0_0_12px_rgba(245,158,11,0.15)] animate-pulse'
                 : isAvailable
-                ? 'bg-[#152A22] text-[#10B981] border-[#10B981]/50 shadow-[0_0_12px_rgba(16,185,129,0.15)]'
-                : 'bg-[#182334] text-[#38BDF8] border-[#38BDF8]/40 shadow-[0_0_12px_rgba(56,189,248,0.12)]'
+                ? 'bg-emerald-500/10 text-emerald-700 dark:text-[#10B981] border-[#10B981]/50 shadow-[0_0_12px_rgba(16,185,129,0.15)]'
+                : 'bg-sky-500/10 text-sky-700 dark:text-[#38BDF8] border-[#38BDF8]/40 shadow-[0_0_12px_rgba(56,189,248,0.12)]'
             }`}
           >
-            <Clock
-              size={14}
-              className={
-                isOnBreak
-                  ? 'text-[#F59E0B]'
-                  : isAvailable
-                  ? 'text-[#10B981]'
-                  : 'text-[#38BDF8]'
-              }
-            />
+            <Clock size={14} />
             <span className="tracking-wide">{formattedTime}</span>
             <ChevronDown
               size={12}
@@ -259,9 +250,9 @@ export const EmployeeAvailabilityHeader: React.FC<{
           {/* Availability Status Dropdown Menu (Strictly Matching Image 1 & User Screenshot) */}
           {showStatusDropdown && (
             <div
-              className="absolute right-0 top-full mt-3 z-50 rounded-[28px] p-3 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.85)] border border-[#2B303C] flex items-center gap-3.5 animate-in fade-in zoom-in-95 duration-150"
+              className="absolute right-0 top-full mt-3 z-50 rounded-[28px] p-3 shadow-2xl border border-[var(--theme-border)] flex items-center gap-3.5 animate-in fade-in zoom-in-95 duration-150"
               style={{
-                backgroundColor: '#191C24',
+                backgroundColor: "var(--theme-bg-surface)",
               }}
             >
               {/* Option 1: Available */}
@@ -277,7 +268,7 @@ export const EmployeeAvailabilityHeader: React.FC<{
                     ? 'bg-[#007A5A] text-white border-2 border-[#00B074] shadow-[0_0_15px_rgba(0,176,116,0.3)] cursor-default'
                     : !isAvailable
                     ? 'bg-[#007A5A] text-white border-2 border-[#00B074] hover:brightness-110 active:scale-95 cursor-pointer shadow-[0_0_15px_rgba(0,176,116,0.3)]'
-                    : 'bg-[#262B36] text-[#6B7280] cursor-not-allowed border border-white/5 opacity-50'
+                    : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)] opacity-50'
                 }`}
               >
                 <Play size={16} className="text-white fill-transparent" strokeWidth={2.5} />
@@ -294,13 +285,13 @@ export const EmployeeAvailabilityHeader: React.FC<{
                 disabled={!isAvailable || isOnBreak || isActionLocked}
                 className={`h-14 px-5 rounded-[18px] text-[15px] font-semibold flex items-center gap-2.5 transition duration-150 shrink-0 select-none ${
                   isOnBreak
-                    ? 'bg-[#2E281C] text-[#F59E0B] border-2 border-[#F59E0B] cursor-default'
+                    ? 'bg-amber-500/10 text-[#F59E0B] border-2 border-[#F59E0B] cursor-default'
                     : isAvailable
-                    ? 'bg-[#262B36] hover:bg-[#313745] text-[#D1D5DB] border border-white/5 active:scale-95 cursor-pointer'
-                    : 'bg-[#262B36] text-[#6B7280] cursor-not-allowed border border-white/5 opacity-50'
+                    ? 'bg-[var(--theme-bg-surface-hover)] hover:brightness-95 text-[var(--theme-text)] border border-[var(--theme-border)] active:scale-95 cursor-pointer'
+                    : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)] opacity-50'
                 }`}
               >
-                <Coffee size={16} className="text-[#D1D5DB]" strokeWidth={2.2} />
+                <Coffee size={16} className="text-[var(--theme-text)]" strokeWidth={2.2} />
                 <span className="font-medium tracking-tight">Break</span>
               </button>
 
@@ -315,11 +306,11 @@ export const EmployeeAvailabilityHeader: React.FC<{
                 className={`h-14 px-4 rounded-[18px] text-[14px] font-medium flex items-center justify-center gap-2 text-center leading-tight transition duration-150 shrink-0 select-none ${
                   isOnBreak
                     ? 'bg-[#007A5A] hover:bg-[#00916B] text-white border-2 border-[#00B074] shadow-[0_0_15px_rgba(0,176,116,0.3)] active:scale-95 cursor-pointer animate-pulse'
-                    : 'bg-[#222733] text-[#555E6D] cursor-not-allowed border border-white/5 opacity-90'
+                    : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)] opacity-90'
                 }`}
               >
-                <div className="w-3.5 h-3.5 rounded-full border border-dashed border-[#555E6D] flex items-center justify-center shrink-0">
-                  <div className="w-1 h-1 rounded-full bg-[#555E6D]" />
+                <div className="w-3.5 h-3.5 rounded-full border border-dashed border-[var(--theme-text-muted)] flex items-center justify-center shrink-0">
+                  <div className="w-1 h-1 rounded-full bg-[var(--theme-text-muted)]" />
                 </div>
                 <div className="flex flex-col items-center justify-center leading-4 text-center">
                   <span>Available</span>
@@ -338,8 +329,8 @@ export const EmployeeAvailabilityHeader: React.FC<{
                 disabled={!isAvailable || isOnBreak || isActionLocked}
                 className={`h-14 px-6 rounded-[18px] text-[15px] font-medium flex items-center gap-2 transition duration-150 shrink-0 select-none ${
                   isAvailable && !isOnBreak
-                    ? 'bg-[#262B36] hover:bg-rose-950/40 hover:text-rose-300 hover:border-rose-500/40 text-[#D1D5DB] border border-white/5 active:scale-95 cursor-pointer'
-                    : 'bg-[#262B36] text-[#6B7280] cursor-not-allowed border border-white/5 opacity-50'
+                    ? 'bg-[var(--theme-bg-surface-hover)] hover:bg-rose-950/40 hover:text-rose-300 hover:border-rose-500/40 text-[var(--theme-text)] border border-[var(--theme-border)] active:scale-95 cursor-pointer'
+                    : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)] opacity-50'
                 }`}
               >
                 <span className="font-medium tracking-tight">Checkout</span>
@@ -352,22 +343,22 @@ export const EmployeeAvailabilityHeader: React.FC<{
       {/* Break Reason Modal */}
       {showBreakModal && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-[#1C2026] border border-white/10 rounded-2xl w-full max-w-sm p-5 shadow-2xl">
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
+          <div className="bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-2xl w-full max-w-sm p-5 shadow-2xl">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--theme-border)]">
               <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
                 <Coffee size={16} />
                 <span>Select Break Reason</span>
               </div>
               <button
                 onClick={() => setShowBreakModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10"
+                className="p-1 rounded-lg text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]"
               >
                 <X size={16} />
               </button>
             </div>
 
             <div className="space-y-3 mb-5">
-              <label className="text-xs font-semibold text-slate-300 block">
+              <label className="text-xs font-semibold text-[var(--theme-text)] block">
                 Choose reason for your break:
               </label>
               <div className="grid grid-cols-2 gap-2">
@@ -379,7 +370,7 @@ export const EmployeeAvailabilityHeader: React.FC<{
                     className={`px-3 py-2 rounded-xl text-xs font-medium border text-left transition ${
                       selectedBreakReason === reason
                         ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 font-bold'
-                        : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                        : 'bg-white/5 border-[var(--theme-border)] text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]'
                     }`}
                   >
                     {reason}
@@ -393,7 +384,7 @@ export const EmployeeAvailabilityHeader: React.FC<{
                   placeholder="Specify break reason..."
                   value={customBreakReason}
                   onChange={(e) => setCustomBreakReason(e.target.value)}
-                  className="w-full mt-2 px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
+                  className="w-full mt-2 px-3 py-2 rounded-xl bg-black/40 border border-[var(--theme-border)] text-xs text-white placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-amber-500"
                 />
               )}
             </div>
@@ -401,7 +392,7 @@ export const EmployeeAvailabilityHeader: React.FC<{
             <div className="flex items-center justify-end gap-2">
               <button
                 onClick={() => setShowBreakModal(false)}
-                className="px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white"
+                className="px-3.5 py-1.5 rounded-xl text-xs font-medium text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]"
               >
                 Cancel
               </button>
@@ -419,25 +410,25 @@ export const EmployeeAvailabilityHeader: React.FC<{
       {/* Checkout 8-Hour Warning Confirmation Modal */}
       {showCheckoutConfirm && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-[#1C2026] border border-amber-500/30 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+          <div className="bg-[var(--theme-bg-surface)] border border-amber-500/30 rounded-2xl w-full max-w-md p-6 shadow-2xl">
             <div className="flex items-center gap-3 mb-3 text-amber-400">
               <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
                 <AlertTriangle size={20} />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-white">Under 8 Hours Shift Warning</h4>
-                <p className="text-xs text-slate-400">Total active working time: {checkoutWarningHours} hours</p>
+                <h4 className="text-sm font-bold text-[var(--theme-text)]">Under 8 Hours Shift Warning</h4>
+                <p className="text-xs text-[var(--theme-text-muted)]">Total active working time: {checkoutWarningHours} hours</p>
               </div>
             </div>
 
-            <p className="text-xs text-slate-300 leading-relaxed mb-5 bg-white/5 border border-white/5 p-3 rounded-xl">
+            <p className="text-xs text-[var(--theme-text)] leading-relaxed mb-5 bg-white/5 border border-[var(--theme-border)] p-3 rounded-xl">
               Your total working hours are currently less than 8 hours. Are you sure you want to checkout and end your shift?
             </p>
 
             <div className="flex items-center justify-end gap-2.5">
               <button
                 onClick={() => setShowCheckoutConfirm(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 transition"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] transition"
               >
                 Stay Checked In
               </button>

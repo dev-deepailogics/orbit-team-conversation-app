@@ -32,18 +32,19 @@
     --radius: 0.5rem;
 
     /* Orbit Theme Dynamic Variables */
-    --theme-bg-sidebar: #1F2326;
-    --theme-bg-workspace: #19171D;
-    --theme-bg-app: #1A1D21;
-    --theme-bg-surface: #222529;
-    --theme-bg-surface-hover: #2C3136;
-    --theme-text-primary: #FFFFFF;
-    --theme-text-muted: #9CA3AF;
-    --theme-primary: #007A5A;
-    --theme-primary-hover: #00664B;
+    --theme-bg-sidebar: #F8F4F8;
+    --theme-bg-workspace: #EDE6EE;
+    --theme-bg-app: #FFFFFF;
+    --theme-bg-surface: #F8F8F8;
+    --theme-bg-surface-hover: #EFEFEF;
+    --theme-text-primary: #1D1C1D;
+    --theme-text: #1D1C1D;
+    --theme-text-muted: #616061;
+    --theme-primary: #611F69;
+    --theme-primary-hover: #4A154B;
     --theme-primary-text: #FFFFFF;
-    --theme-secondary: #1164A3;
-    --theme-border: #383F45;
+    --theme-secondary: #1264A3;
+    --theme-border: #DDDDDD;
   }
 
   .dark {
