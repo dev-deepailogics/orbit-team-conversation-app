@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import { Project, ProjectColumn, Ticket, ProjectDocument } from '@orbit/types';
 
+// Board shows newest first (highest orderIndex on top); keep inserts in that order.
+export const insertByRecency = (tickets: Ticket[], ticket: Ticket): Ticket[] => {
+  const rest = tickets.filter((t) => t.id !== ticket.id);
+  const i = rest.findIndex((t) => t.orderIndex < ticket.orderIndex);
+  return i === -1 ? [...rest, ticket] : [...rest.slice(0, i), ticket, ...rest.slice(i)];
+};
+
 export type ProjectSection = 'board' | 'docs' | string;
 
 interface ProjectState {
@@ -38,6 +45,7 @@ interface ProjectState {
 
   // Real-time Ticket mutations on currentProject
   addTicket: (ticket: Ticket) => void;
+  appendTickets: (columnId: string, tickets: Ticket[]) => void;
   updateTicket: (ticket: Ticket) => void;
   removeTicket: (ticketId: string) => void;
   moveTicket: (ticket: Ticket, fromColumnId: string, toColumnId: string, newOrderIndex: number) => void;
@@ -130,7 +138,13 @@ export const useProjectStore = create<ProjectState>((set) => ({
       return {
         currentProject: {
           ...state.currentProject,
-          columns,
+          // Reorder payloads carry no tickets; keep the pages already loaded.
+          columns: columns.map((col) => ({
+            ...col,
+            tickets:
+              state.currentProject!.columns?.find((c) => c.id === col.id)?.tickets ??
+              col.tickets,
+          })),
         },
       };
     }),
@@ -184,10 +198,26 @@ export const useProjectStore = create<ProjectState>((set) => ({
               if (existing.some((t) => t.id === ticket.id)) return col;
               return {
                 ...col,
-                tickets: [...existing, ticket],
+                tickets: insertByRecency(existing, ticket),
               };
             }
             return col;
+          }),
+        },
+      };
+    }),
+
+  appendTickets: (columnId, tickets) =>
+    set((state) => {
+      if (!state.currentProject || !state.currentProject.columns) return state;
+      return {
+        currentProject: {
+          ...state.currentProject,
+          columns: state.currentProject.columns.map((col) => {
+            if (col.id !== columnId) return col;
+            const existing = col.tickets || [];
+            const seen = new Set(existing.map((t) => t.id));
+            return { ...col, tickets: [...existing, ...tickets.filter((t) => !seen.has(t.id))] };
           }),
         },
       };
@@ -231,38 +261,23 @@ export const useProjectStore = create<ProjectState>((set) => ({
       };
     }),
 
+  // newOrderIndex is the ticket's new orderIndex; position follows from it.
   moveTicket: (ticket, fromColumnId, toColumnId, newOrderIndex) =>
     set((state) => {
       if (!state.currentProject || !state.currentProject.columns) return state;
-
-      const newCols = state.currentProject.columns.map((col) => {
-        if (col.id === fromColumnId && fromColumnId === toColumnId) {
-          // Reorder within same column
-          const filtered = (col.tickets || []).filter((t) => t.id !== ticket.id);
-          filtered.splice(newOrderIndex, 0, ticket);
-          return { ...col, tickets: filtered };
-        } else if (col.id === fromColumnId) {
-          // Remove from old column
-          return {
-            ...col,
-            tickets: (col.tickets || []).filter((t) => t.id !== ticket.id),
-          };
-        } else if (col.id === toColumnId) {
-          // Insert into new column
-          const filtered = (col.tickets || []).filter((t) => t.id !== ticket.id);
-          filtered.splice(newOrderIndex, 0, { ...ticket, columnId: toColumnId });
-          return {
-            ...col,
-            tickets: filtered,
-          };
-        }
-        return col;
-      });
-
+      const moved = { ...ticket, columnId: toColumnId, orderIndex: newOrderIndex };
       return {
         currentProject: {
           ...state.currentProject,
-          columns: newCols,
+          columns: state.currentProject.columns.map((col) => {
+            if (col.id === toColumnId) {
+              return { ...col, tickets: insertByRecency(col.tickets || [], moved) };
+            }
+            if (col.id === fromColumnId) {
+              return { ...col, tickets: (col.tickets || []).filter((t) => t.id !== ticket.id) };
+            }
+            return col;
+          }),
         },
       };
     }),

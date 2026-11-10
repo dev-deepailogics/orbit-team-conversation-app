@@ -103,6 +103,92 @@ const moveTicketSchema = z.object({
   orderIndex: z.number().int().default(0),
 });
 
+const ticketPageSchema = z.coerce.number().int().min(1).max(100);
+
+const ticketUserSelect = {
+  select: { id: true, username: true, displayName: true, avatarUrl: true },
+};
+const ticketListInclude = {
+  creator: ticketUserSelect,
+  assignee: ticketUserSelect,
+  _count: { select: { comments: true } },
+};
+// Newest first: tickets join a column with orderIndex = max + 1, so the highest
+// orderIndex is the ticket most recently created in / moved into the column.
+const recentTicketOrder: Array<
+  { orderIndex: "desc" } | { createdAt: "desc" } | { id: "desc" }
+> = [{ orderIndex: "desc" }, { createdAt: "desc" }, { id: "desc" }];
+
+// Returns the error to send, or null when the user may view the project.
+async function projectAccessError(
+  project: {
+    workspaceId: string;
+    createdById: string;
+    assignedEmployees: unknown;
+    selectedManagers: unknown;
+  },
+  userId: string,
+): Promise<{ status: number; error: string } | null> {
+  const membership = await prisma.workspaceMember.findUnique({
+    where: {
+      workspaceId_userId: { workspaceId: project.workspaceId, userId },
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          systemRole: true,
+          displayName: true,
+          username: true,
+        },
+      },
+    },
+  });
+  if (!membership) {
+    return { status: 403, error: "You are not a member of this workspace" };
+  }
+
+  const isAdmin =
+    membership.role === "OWNER" ||
+    membership.role === "ADMIN" ||
+    membership.user.systemRole === "SUPER_ADMIN" ||
+    membership.user.systemRole === "WORKSPACE_ADMIN";
+  if (isAdmin || project.createdById === userId) return null;
+
+  const userName = (
+    membership.user.displayName ||
+    membership.user.username ||
+    ""
+  ).toLowerCase();
+  const assigned = Array.isArray(project.assignedEmployees)
+    ? (project.assignedEmployees as any[])
+    : [];
+  const managers = Array.isArray(project.selectedManagers)
+    ? (project.selectedManagers as any[])
+    : [];
+
+  const isAssigned = assigned.some((e: any) => {
+    if (!e) return false;
+    if (typeof e === "string") return e.toLowerCase() === userName;
+    if (e.uid && e.uid === userId) return true;
+    if (e.name && e.name.toLowerCase() === userName) return true;
+    return false;
+  });
+
+  const isManager = managers.some((m: any) => {
+    if (!m) return false;
+    if (typeof m === "string") return m.toLowerCase() === userName;
+    if (m.uid && m.uid === userId) return true;
+    if (m.name && m.name.toLowerCase() === userName) return true;
+    return false;
+  });
+
+  if (!isAssigned && !isManager) {
+    return { status: 403, error: "You are not assigned to this project" };
+  }
+  return null;
+}
+
 const createDocumentSchema = z.object({
   title: z.string().min(1).max(255).default("Untitled Document"),
   content: z.string().default(""),
@@ -355,25 +441,31 @@ export const projectRoutes: FastifyPluginAsync = async (
     },
   );
 
-  // 3. Get project details with full columns & tickets
+  // 3. Get project details with columns & tickets.
+  // ?ticketLimit=N returns only the N most recent tickets per column (newest
+  // first); page further with GET /:projectId/columns/:columnId/tickets.
+  // Without it, every ticket is returned in board order (mobile relies on this).
   fastify.get(
     "/:projectId",
     { preHandler: [fastify.authenticate] },
     async (request, reply) => {
       const { projectId } = request.params as { projectId: string };
       const userId = (request.user as { id: string }).id;
+      const { ticketLimit } = request.query as { ticketLimit?: string };
+
+      let limit: number | undefined;
+      if (ticketLimit !== undefined) {
+        const parsed = ticketPageSchema.safeParse(ticketLimit);
+        if (!parsed.success) {
+          return reply.status(400).send({ error: "Invalid ticketLimit" });
+        }
+        limit = parsed.data;
+      }
 
       const project = await prisma.project.findUnique({
         where: { id: projectId },
         include: {
-          creator: {
-            select: {
-              id: true,
-              username: true,
-              displayName: true,
-              avatarUrl: true,
-            },
-          },
+          creator: ticketUserSelect,
           notificationChannel: {
             select: {
               id: true,
@@ -384,32 +476,16 @@ export const projectRoutes: FastifyPluginAsync = async (
           columns: {
             orderBy: { orderIndex: "asc" },
             include: {
-              tickets: {
-                orderBy: { orderIndex: "asc" },
-                include: {
-                  creator: {
-                    select: {
-                      id: true,
-                      username: true,
-                      displayName: true,
-                      avatarUrl: true,
-                    },
+              tickets: limit
+                ? {
+                    orderBy: recentTicketOrder,
+                    take: limit,
+                    include: ticketListInclude,
+                  }
+                : {
+                    orderBy: { orderIndex: "asc" },
+                    include: ticketListInclude,
                   },
-                  assignee: {
-                    select: {
-                      id: true,
-                      username: true,
-                      displayName: true,
-                      avatarUrl: true,
-                    },
-                  },
-                  _count: {
-                    select: {
-                      comments: true,
-                    },
-                  },
-                },
-              },
             },
           },
           _count: {
@@ -426,70 +502,51 @@ export const projectRoutes: FastifyPluginAsync = async (
         return reply.status(404).send({ error: "Project not found" });
       }
 
-      const membership = await prisma.workspaceMember.findUnique({
-        where: {
-          workspaceId_userId: { workspaceId: project.workspaceId, userId },
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              systemRole: true,
-              displayName: true,
-              username: true,
-            },
-          },
-        },
-      });
-      if (!membership) {
-        return reply
-          .status(403)
-          .send({ error: "You are not a member of this workspace" });
-      }
-
-      const isAdmin =
-        membership.role === "OWNER" ||
-        membership.role === "ADMIN" ||
-        membership.user.systemRole === "SUPER_ADMIN" ||
-        membership.user.systemRole === "WORKSPACE_ADMIN";
-
-      if (!isAdmin && project.createdById !== userId) {
-        const userName = (
-          membership.user.displayName ||
-          membership.user.username ||
-          ""
-        ).toLowerCase();
-        const assigned = Array.isArray(project.assignedEmployees)
-          ? (project.assignedEmployees as any[])
-          : [];
-        const managers = Array.isArray(project.selectedManagers)
-          ? (project.selectedManagers as any[])
-          : [];
-
-        const isAssigned = assigned.some((e: any) => {
-          if (!e) return false;
-          if (typeof e === "string") return e.toLowerCase() === userName;
-          if (e.uid && e.uid === userId) return true;
-          if (e.name && e.name.toLowerCase() === userName) return true;
-          return false;
-        });
-
-        const isManager = managers.some((m: any) => {
-          if (!m) return false;
-          if (typeof m === "string") return m.toLowerCase() === userName;
-          if (m.uid && m.uid === userId) return true;
-          if (m.name && m.name.toLowerCase() === userName) return true;
-          return false;
-        });
-
-        if (!isAssigned && !isManager) {
-          return reply
-            .status(403)
-            .send({ error: "You are not assigned to this project" });
-        }
-      }
+      const denied = await projectAccessError(project, userId);
+      if (denied) return reply.status(denied.status).send({ error: denied.error });
 
       return reply.send(project);
+    },
+  );
+
+  // 3b. Next page of a column's tickets, newest first (pairs with ?ticketLimit)
+  fastify.get(
+    "/:projectId/columns/:columnId/tickets",
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const { projectId, columnId } = request.params as {
+        projectId: string;
+        columnId: string;
+      };
+      const userId = (request.user as { id: string }).id;
+      const query = request.query as { skip?: string; take?: string };
+
+      const skip = z.coerce.number().int().min(0).safeParse(query.skip ?? 0);
+      const take = ticketPageSchema.safeParse(query.take ?? 20);
+      if (!skip.success || !take.success) {
+        return reply.status(400).send({ error: "Invalid skip/take" });
+      }
+
+      const project = await prisma.project.findUnique({
+        where: { id: projectId },
+      });
+      if (!project)
+        return reply.status(404).send({ error: "Project not found" });
+
+      const denied = await projectAccessError(project, userId);
+      if (denied) return reply.status(denied.status).send({ error: denied.error });
+
+      // ponytail: offset paging; concurrent inserts/deletes can shift a page by
+      // a ticket (client dedupes by id). Switch to a keyset cursor if that bites.
+      const tickets = await prisma.ticket.findMany({
+        where: { columnId, projectId },
+        orderBy: recentTicketOrder,
+        skip: skip.data,
+        take: take.data,
+        include: ticketListInclude,
+      });
+
+      return reply.send(tickets);
     },
   );
 
@@ -758,32 +815,10 @@ export const projectRoutes: FastifyPluginAsync = async (
         ),
       );
 
+      // Columns only: clients keep the tickets they already loaded.
       const updatedColumns = await prisma.projectColumn.findMany({
         where: { projectId },
         orderBy: { orderIndex: "asc" },
-        include: {
-          tickets: {
-            orderBy: { orderIndex: "asc" },
-            include: {
-              creator: {
-                select: {
-                  id: true,
-                  username: true,
-                  displayName: true,
-                  avatarUrl: true,
-                },
-              },
-              assignee: {
-                select: {
-                  id: true,
-                  username: true,
-                  displayName: true,
-                  avatarUrl: true,
-                },
-              },
-            },
-          },
-        },
       });
 
       fastify.io
@@ -837,8 +872,12 @@ export const projectRoutes: FastifyPluginAsync = async (
       if (!column)
         return reply.status(400).send({ error: "Invalid column ID" });
 
-      // Order index at bottom of column
-      const ticketCount = await prisma.ticket.count({ where: { columnId } });
+      // New tickets go on top of the column (highest orderIndex = most recent)
+      const { _max } = await prisma.ticket.aggregate({
+        where: { columnId },
+        _max: { orderIndex: true },
+      });
+      const nextOrderIndex = (_max.orderIndex ?? -1) + 1;
 
       // Fetch creator name for initial event log & notifications
       const actor = await prisma.user.findUnique({
@@ -865,7 +904,7 @@ export const projectRoutes: FastifyPluginAsync = async (
           title,
           description,
           priority,
-          orderIndex: ticketCount,
+          orderIndex: nextOrderIndex,
           dueDate: dueDate ? new Date(dueDate) : null,
           createdById: userId,
           assigneeId: assigneeId || null,

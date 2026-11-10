@@ -59,6 +59,7 @@ export interface ThemeConfig {
   primaryTextColor?: string;
   secondaryColor: string;
   borderColor: string;
+  fontFamily?: string; // CSS font-family stack; falls back to Inter
 }
 
 export interface WorkspaceSettings {

@@ -481,12 +481,12 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
                                 {isAnon ? (m.anonName || u.displayName || 'Anonymous Member') : (u.displayName || u.username)}
                               </span>
                               {isAnon && m.isSelf && (
-                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-900/60 text-purple-700 dark:text-purple-200 border border-purple-500/40 font-semibold">
+                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-200 border border-purple-500/40 font-semibold">
                                   YOU
                                 </span>
                               )}
                               {isCreator && (
-                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-900/50 text-purple-700 dark:text-purple-300 border border-purple-700/60 font-semibold">
+                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 border border-purple-700/60 font-semibold">
                                   CREATOR
                                 </span>
                               )}

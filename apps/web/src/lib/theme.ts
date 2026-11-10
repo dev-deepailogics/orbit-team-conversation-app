@@ -20,6 +20,38 @@ const ORBIT_DARK: ThemeConfig = {
 export const THEME_PRESETS: ThemeConfig[] = [
   ORBIT_DARK,
   {
+    id: 'navy-glass',
+    name: 'Navy Glass',
+    sidebarColor: '#1F4468',
+    workspaceColor: '#183858',
+    backgroundColor: '#24507A',
+    surfaceColor: '#2E5D8A', // glass rgba(58,95,133,.5) flattened onto navy
+    surfaceHoverColor: '#3A6A98',
+    textColor: '#F4F7FB',
+    textMutedColor: '#A9BED4', // lifted from #8FA6BF for 4.5:1 contrast on bg
+    primaryColor: '#F2B53A',
+    primaryHoverColor: '#E0A22A',
+    primaryTextColor: '#14284A',
+    secondaryColor: '#CBD5F0',
+    borderColor: '#3B6690',
+  },
+  {
+    id: 'navy-glass-light',
+    name: 'Navy Glass (Light)',
+    sidebarColor: '#DCE4F2',
+    workspaceColor: '#CBD7EA',
+    backgroundColor: '#E9EEF7', // soft blue-grey, no pure white glare
+    surfaceColor: '#F4F7FB',
+    surfaceHoverColor: '#D3DEEE',
+    textColor: '#14284A',
+    textMutedColor: '#4A6082', // ≥4.5:1 on sidebar + bg
+    primaryColor: '#2A5A86', // navy, not yellow: primary is also used as text/icon color
+    primaryHoverColor: '#1F4468',
+    primaryTextColor: '#FFFFFF',
+    secondaryColor: '#F2B53A',
+    borderColor: '#C3CFE3',
+  },
+  {
     id: 'aubergine-classic',
     name: 'Aubergine Classic',
     sidebarColor: '#3F0E40',
@@ -146,6 +178,7 @@ export const THEME_PRESETS: ThemeConfig[] = [
     primaryTextColor: '#FFFFFF',
     secondaryColor: '#2BAC76',
     borderColor: '#35373B',
+    fontFamily: "'Lato'",
   },
   {
     id: 'slack-light',
@@ -162,6 +195,7 @@ export const THEME_PRESETS: ThemeConfig[] = [
     primaryTextColor: '#FFFFFF',
     secondaryColor: '#1264A3',
     borderColor: '#DDDDDD',
+    fontFamily: "'Lato'",
   },
   {
     id: 'teams-dark',
@@ -178,6 +212,8 @@ export const THEME_PRESETS: ThemeConfig[] = [
     primaryTextColor: '#FFFFFF',
     secondaryColor: '#7F85F5',
     borderColor: '#424242',
+    // ponytail: Segoe UI is Microsoft-licensed (no webfont); Mac/Linux get the fallbacks. Self-host a licensed copy if exact match matters.
+    fontFamily: "'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif",
   },
   {
     id: 'teams-light',
@@ -194,6 +230,7 @@ export const THEME_PRESETS: ThemeConfig[] = [
     primaryTextColor: '#FFFFFF',
     secondaryColor: '#0F6CBD',
     borderColor: '#E0E0E0',
+    fontFamily: "'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif",
   },
   {
     id: 'primer-dark',
@@ -260,6 +297,8 @@ export function applyTheme(theme: ThemeConfig) {
   root.style.setProperty('--theme-primary-text', theme.primaryTextColor || '#FFFFFF');
   root.style.setProperty('--theme-secondary', theme.secondaryColor);
   root.style.setProperty('--theme-border', theme.borderColor);
+  if (theme.fontFamily) root.style.setProperty('--theme-font', theme.fontFamily);
+  else root.style.removeProperty('--theme-font');
 
   // 2. Synchronize Light / Dark theme class on document element
   const isLight = isLightColor(theme.backgroundColor) || isLightColor(theme.sidebarColor);
