@@ -233,6 +233,23 @@ export const THEME_PRESETS: ThemeConfig[] = [
     fontFamily: "'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif",
   },
   {
+    id: 'clickup-light',
+    name: 'ClickUp Light',
+    sidebarColor: '#FFFFFF',
+    workspaceColor: '#0F0F10', // black nav rail against white panels
+    backgroundColor: '#FFFFFF',
+    surfaceColor: '#F7F8F9',
+    surfaceHoverColor: '#EEEFF2',
+    textColor: '#202020',
+    textMutedColor: '#646464',
+    primaryColor: '#6A57E3', // brand violet deepened from #7B68EE for 4.5:1 as text on white
+    primaryHoverColor: '#5B47D6',
+    primaryTextColor: '#FFFFFF',
+    secondaryColor: '#1090E0',
+    borderColor: '#E8E8EA',
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  },
+  {
     id: 'primer-dark',
     name: 'Primer Dark',
     sidebarColor: '#010409',

@@ -88,7 +88,10 @@ export default function AppDashboard() {
     updateProject,
     removeProject,
     addTicket,
+    activeSection,
+    setActiveSection,
   } = useProjectStore();
+  const [chatView, setChatView] = useState<"messages" | "whiteboard">("messages");
 
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [members, setMembers] = useState<any[]>([]);
@@ -136,6 +139,11 @@ export default function AppDashboard() {
   useEffect(() => {
     currentChannelRef.current = currentChannel;
   }, [currentChannel]);
+
+  // Switch back to messages when channel changes
+  useEffect(() => {
+    setChatView("messages");
+  }, [currentChannel?.id]);
 
   // 1. Check Auth
   useEffect(() => {
@@ -780,6 +788,28 @@ export default function AppDashboard() {
     );
   }
 
+  // Workspace rail feature shortcuts (Canvas / Docs)
+  const canvasActive = !!currentChannel && !currentProject && !showOrgControl && chatView === "whiteboard";
+  const docsActive = !!currentProject && !showOrgControl && activeSection === "docs";
+  const docsProject = currentProject ?? projects[0];
+  const railProps = {
+    activeFeature: canvasActive ? ("canvas" as const) : docsActive ? ("docs" as const) : null,
+    onOpenCanvas: currentChannel
+      ? () => {
+          if (canvasActive) return setChatView("messages");
+          if (currentProject || showOrgControl) handleSelectChannel(currentChannel);
+          setChatView("whiteboard");
+        }
+      : undefined,
+    onOpenDocs: docsProject
+      ? () => {
+          if (docsActive) return setActiveSection("board");
+          if (docsProject !== currentProject || showOrgControl) handleSelectProject(docsProject);
+          setActiveSection("docs");
+        }
+      : undefined,
+  };
+
   return (
     <div
       className="flex h-screen w-screen overflow-hidden relative"
@@ -794,6 +824,7 @@ export default function AppDashboard() {
           />
           <div className="relative flex h-full max-w-[92vw] shadow-2xl z-10 animate-in slide-in-from-left duration-200">
             <WorkspaceSidebar
+              {...railProps}
               workspaces={workspaces}
               currentWorkspace={currentWorkspace}
               currentUser={user}
@@ -825,11 +856,6 @@ export default function AppDashboard() {
                   handleSelectUserDM(u);
                   setIsMobileSidebarOpen(false);
                 }}
-                onChannelCreated={(ch) => {
-                  setChannels([...channels, ch]);
-                  handleSelectChannel(ch);
-                  setIsMobileSidebarOpen(false);
-                }}
                 onSelectProject={(proj) => {
                   handleSelectProject(proj);
                   setIsMobileSidebarOpen(false);
@@ -837,6 +863,11 @@ export default function AppDashboard() {
                 onOpenCreateProject={() => {
                   setIsMobileSidebarOpen(false);
                   setShowCreateProjectModal(true);
+                }}
+                onChannelCreated={(ch) => {
+                  setChannels([...channels, ch]);
+                  handleSelectChannel(ch);
+                  setIsMobileSidebarOpen(false);
                 }}
                 onOpenBotPortal={() => {
                   setIsMobileSidebarOpen(false);
@@ -874,6 +905,7 @@ export default function AppDashboard() {
       {/* 1. Workspaces Left-most Sidebar (Desktop) */}
       <div className="hidden md:flex shrink-0 h-full">
         <WorkspaceSidebar
+          {...railProps}
           workspaces={workspaces}
           currentWorkspace={currentWorkspace}
           currentUser={user}
@@ -899,12 +931,12 @@ export default function AppDashboard() {
             activeHuddleChannelId={activeHuddleChannel || activeHuddleChannelId}
             onSelectChannel={handleSelectChannel}
             onSelectUserDM={handleSelectUserDM}
+            onSelectProject={handleSelectProject}
+            onOpenCreateProject={() => setShowCreateProjectModal(true)}
             onChannelCreated={(ch) => {
               setChannels([...channels, ch]);
               handleSelectChannel(ch);
             }}
-            onSelectProject={handleSelectProject}
-            onOpenCreateProject={() => setShowCreateProjectModal(true)}
             onOpenBotPortal={() => setShowBotPortal(true)}
             onStartHuddle={handleStartHuddle}
             onLogout={logout}
@@ -1101,6 +1133,8 @@ export default function AppDashboard() {
           members={members}
           onSelectUserDM={handleSelectUserDM}
           onSelectChannel={handleSelectChannel}
+          activeView={chatView}
+          onChangeView={setChatView}
         />
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center text-[var(--theme-text-muted)] p-4 text-center">

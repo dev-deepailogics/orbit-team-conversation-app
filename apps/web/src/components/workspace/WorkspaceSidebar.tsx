@@ -3,8 +3,9 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { Workspace, UserProfile } from '@orbit/types';
-import { Plus, Hash, Layers, ShieldCheck } from 'lucide-react';
+import { Plus, Hash, Layers, ShieldCheck, PenTool, FileText } from 'lucide-react';
 import { api } from '../../lib/api';
+import { EmployeeAvailabilityHeader } from '../availability/EmployeeAvailabilityHeader';
 
 interface WorkspaceSidebarProps {
   workspaces: Workspace[];
@@ -12,6 +13,10 @@ interface WorkspaceSidebarProps {
   currentUser?: UserProfile | null;
   onSelectWorkspace: (workspace: Workspace) => void;
   onWorkspaceCreated: (workspace: Workspace) => void;
+  activeFeature?: 'canvas' | 'docs' | null;
+  // Handlers are undefined when the feature has no target (no channel / no project)
+  onOpenCanvas?: () => void;
+  onOpenDocs?: () => void;
 }
 
 export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
@@ -20,6 +25,9 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   currentUser,
   onSelectWorkspace,
   onWorkspaceCreated,
+  activeFeature,
+  onOpenCanvas,
+  onOpenDocs,
 }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [name, setName] = useState('');
@@ -52,7 +60,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
       }}
     >
       {/* Workspace Icons */}
-      <div className="flex-1 flex flex-col items-center gap-3 overflow-y-auto w-full px-2">
+      <div className="min-h-0 shrink flex flex-col items-center gap-3 overflow-y-auto w-full px-2">
         {workspaces.map((ws) => {
           const isActive = currentWorkspace?.id === ws.id;
           return (
@@ -111,6 +119,35 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           </Link>
         )}
       </div>
+
+      {/* Feature Shortcuts */}
+      {currentWorkspace && (
+        <div className="flex flex-col items-center gap-3 w-full px-2 pt-3 border-t" style={{ borderColor: 'var(--theme-border)' }}>
+          {([
+            { key: 'canvas', label: 'Canvas', Icon: PenTool, onClick: onOpenCanvas },
+            { key: 'docs', label: 'Docs', Icon: FileText, onClick: onOpenDocs },
+          ] as const).map(({ key, label, Icon, onClick }) => {
+            const isActive = activeFeature === key;
+            return (
+              <button
+                key={key}
+                onClick={onClick}
+                disabled={!onClick}
+                title={label}
+                className="w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 hover:rounded-2xl disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: isActive ? 'var(--theme-primary)' : 'var(--theme-bg-surface)',
+                  color: isActive ? 'var(--theme-primary-text)' : 'var(--theme-text-primary)',
+                }}
+              >
+                <Icon size={20} />
+              </button>
+            );
+          })}
+
+          <EmployeeAvailabilityHeader compact currentUserId={currentUser?.id} />
+        </div>
+      )}
 
       {/* Create Workspace Modal */}
       {showCreateModal && (

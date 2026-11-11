@@ -25,7 +25,8 @@ const BREAK_REASONS = [
 
 export const EmployeeAvailabilityHeader: React.FC<{
   currentUserId?: string;
-}> = ({ currentUserId }) => {
+  compact?: boolean;
+}> = ({ currentUserId, compact }) => {
   const [availability, setAvailability] = useState<UserAvailabilityRecord | null>(null);
   const [serverTimeOffset, setServerTimeOffset] = useState<number>(0);
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
@@ -228,8 +229,8 @@ export const EmployeeAvailabilityHeader: React.FC<{
           <button
             type="button"
             onClick={() => setShowStatusDropdown((prev) => !prev)}
-            title="Click to change availability status"
-            className={`px-3.5 py-1.5 rounded-xl text-[13px] font-mono font-bold flex items-center gap-2 border shadow-sm transition-all duration-150 cursor-pointer select-none active:scale-95 focus:outline-none ${
+            title={compact ? `Availability · ${formattedTime}` : 'Click to change availability status'}
+            className={`${compact ? 'w-11 h-11 justify-center' : 'px-3.5 py-1.5'} rounded-xl text-[13px] font-mono font-bold flex items-center gap-2 border shadow-sm transition-all duration-150 cursor-pointer select-none active:scale-95 focus:outline-none ${
               isOnBreak
                 ? 'bg-amber-500/10 text-amber-600 dark:text-[#F59E0B] border-[#F59E0B]/50 shadow-[0_0_12px_rgba(245,158,11,0.15)] animate-pulse'
                 : isAvailable
@@ -237,20 +238,20 @@ export const EmployeeAvailabilityHeader: React.FC<{
                 : 'bg-sky-500/10 text-sky-700 dark:text-[#38BDF8] border-[#38BDF8]/40 shadow-[0_0_12px_rgba(56,189,248,0.12)]'
             }`}
           >
-            <Clock size={14} />
-            <span className="tracking-wide">{formattedTime}</span>
-            <ChevronDown
+            <Clock size={compact ? 20 : 14} />
+            {!compact && <span className="tracking-wide">{formattedTime}</span>}
+            {!compact && <ChevronDown
               size={12}
               className={`transition-transform duration-200 opacity-60 ${
                 showStatusDropdown ? 'rotate-180' : 'rotate-0'
               }`}
-            />
+            />}
           </button>
 
           {/* Availability Status Dropdown Menu (Strictly Matching Image 1 & User Screenshot) */}
           {showStatusDropdown && (
             <div
-              className="absolute right-0 top-full mt-3 z-50 rounded-[28px] p-3 shadow-2xl border border-[var(--theme-border)] flex items-center gap-3.5 animate-in fade-in zoom-in-95 duration-150"
+              className={`absolute ${compact ? 'left-full top-0 ml-3' : 'right-0 top-full mt-3'} z-50 rounded-[28px] p-3 shadow-2xl border border-[var(--theme-border)] flex items-center gap-3.5 animate-in fade-in zoom-in-95 duration-150`}
               style={{
                 backgroundColor: "var(--theme-bg-surface)",
               }}

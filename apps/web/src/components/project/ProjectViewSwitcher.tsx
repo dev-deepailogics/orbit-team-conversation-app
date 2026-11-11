@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import {
   Columns3,
-  FileText,
   Plus,
   Calendar,
   Clock,
@@ -43,13 +42,6 @@ export const ProjectViewSwitcher: React.FC<ProjectViewSwitcherProps> = ({
       label: "Board",
       icon: Columns3,
       count: ticketCount,
-      isAvailable: true,
-    },
-    {
-      id: "docs",
-      label: "Documents",
-      icon: FileText,
-      count: docCount,
       isAvailable: true,
     },
   ];

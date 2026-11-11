@@ -17,7 +17,6 @@ import {
   CornerUpLeft,
   Copy,
   Check,
-  PenTool,
   Presentation,
   Type,
   HardDrive,
@@ -45,7 +44,6 @@ import { ChannelStorageModal } from './ChannelStorageModal';
 import { ChannelDetailsModal } from '../channel/ChannelDetailsModal';
 import { CompressFileConfirmModal } from './CompressFileConfirmModal';
 import { compressFile } from '../../lib/compression';
-import { EmployeeAvailabilityHeader } from '../availability/EmployeeAvailabilityHeader';
 import { PinnedMessagesModal } from './PinnedMessagesModal';
 import { AnonymousPersonaModal } from '../channel/AnonymousPersonaModal';
 
@@ -67,6 +65,8 @@ interface ChatAreaProps {
   members?: any[];
   onSelectUserDM?: (user: UserProfile) => void;
   onSelectChannel?: (channel: Channel) => void;
+  activeView: 'messages' | 'whiteboard';
+  onChangeView: (view: 'messages' | 'whiteboard') => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -86,6 +86,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   members,
   onSelectUserDM,
   onSelectChannel,
+  activeView,
+  onChangeView: setActiveView,
 }) => {
   const [content, setContent] = useState('');
   const sendingRef = useRef(false);
@@ -142,7 +144,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
   }, [channel.id, channel.isAnonymous, channel.myAnonProfile]);
   const moreMenuRef = useRef<HTMLDivElement>(null);
-  const [activeView, setActiveView] = useState<'messages' | 'whiteboard'>('messages');
   const [copiedChannelId, setCopiedChannelId] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -538,11 +539,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     </div>
   );
 
-  // Switch back to messages when channel changes
-  useEffect(() => {
-    setActiveView('messages');
-  }, [channel.id]);
-
   const handleCopyChannelId = () => {
     navigator.clipboard.writeText(channel.id);
     setCopiedChannelId(true);
@@ -604,90 +600,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               </span>
             )}
           </button>
-
-          {/* Chat vs Canvas Mode Switch */}
-          <div
-            className="flex items-center gap-1 py-1 px-1 rounded-xl border bg-black/5 dark:bg-white/[0.04] ml-1 sm:ml-2 shrink-0"
-            style={{
-              borderColor: 'var(--theme-border)',
-            }}
-          >
-            <button
-              onClick={() => setActiveView('messages')}
-              className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-xs transition-all duration-150 shrink-0 ${
-                activeView === 'messages'
-                  ? 'shadow-sm font-bold'
-                  : 'opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-[var(--theme-bg-surface-hover)]'
-              }`}
-              style={{
-                backgroundColor:
-                  activeView === 'messages'
-                    ? 'var(--theme-bg-surface)'
-                    : 'transparent',
-                color:
-                  activeView === 'messages'
-                    ? 'var(--theme-text-primary)'
-                    : 'var(--theme-text-muted)',
-                borderWidth: activeView === 'messages' ? '1px' : '0px',
-                borderColor:
-                  activeView === 'messages'
-                    ? 'var(--theme-border)'
-                    : 'transparent',
-              }}
-            >
-              <MessageSquare
-                size={13}
-                style={{
-                  color:
-                    activeView === 'messages'
-                      ? 'var(--theme-primary)'
-                      : 'inherit',
-                }}
-              />
-              <span>Chat</span>
-            </button>
-            <button
-              onClick={() => setActiveView('whiteboard')}
-              className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-xs transition-all duration-150 shrink-0 ${
-                activeView === 'whiteboard'
-                  ? 'shadow-sm font-bold'
-                  : 'opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-[var(--theme-bg-surface-hover)]'
-              }`}
-              style={{
-                backgroundColor:
-                  activeView === 'whiteboard'
-                    ? 'var(--theme-bg-surface)'
-                    : 'transparent',
-                color:
-                  activeView === 'whiteboard'
-                    ? 'var(--theme-text-primary)'
-                    : 'var(--theme-text-muted)',
-                borderWidth: activeView === 'whiteboard' ? '1px' : '0px',
-                borderColor:
-                  activeView === 'whiteboard'
-                    ? 'var(--theme-border)'
-                    : 'transparent',
-              }}
-            >
-              <PenTool
-                size={13}
-                style={{
-                  color:
-                    activeView === 'whiteboard'
-                      ? 'var(--theme-primary)'
-                      : 'inherit',
-                }}
-              />
-              <span>Canvas</span>
-            </button>
-          </div>
         </div>
 
         {/* Actions in Header */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Employee Availability & Working Hours Stopwatch Toolbar */}
-          <EmployeeAvailabilityHeader currentUserId={currentUser?.id} />
-
           {/* Anonymous Persona Badge / Edit Button */}
           {channel.isAnonymous && anonProfile && (
             <button
@@ -819,17 +735,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 >
                   <HardDrive size={14} className="text-slack-green" />
                   <span>Channel Files & Storage</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    setActiveView(activeView === 'whiteboard' ? 'messages' : 'whiteboard');
-                  }}
-                  className="w-full px-3.5 py-2 text-left text-xs text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] flex items-center gap-2.5 transition"
-                >
-                  <PenTool size={14} className="text-slack-green" />
-                  <span>{activeView === 'whiteboard' ? 'Back to Chat' : 'Whiteboard & Canvas'}</span>
                 </button>
 
                 <div className="h-px bg-[var(--theme-bg-surface-hover)] my-1" />
