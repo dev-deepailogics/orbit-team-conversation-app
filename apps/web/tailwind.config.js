@@ -96,11 +96,24 @@ module.exports = {
           '0%': { transform: 'translateX(0%)' },
           '100%': { transform: 'translateX(-50%)' },
         },
+        // glow + ripple share one 5s cycle: inner glow fills to the border (0-12%), then the wave leaves the border (12-42%), then rest.
+        glow: {
+          '0%': { transform: 'scale(0.3)', opacity: '0' },
+          '12%': { transform: 'scale(1)', opacity: '1' },
+          '27%, 100%': { transform: 'scale(1)', opacity: '0' },
+        },
+        ripple: {
+          '0%, 11.9%': { transform: 'scale(1)', opacity: '0' },
+          '12%': { transform: 'scale(1)', opacity: '0.7' },
+          '42%, 100%': { transform: 'scale(1.4)', opacity: '0' },
+        },
       },
       animation: {
         aurora: 'aurora 20s ease-in-out infinite',
         float: 'float 6s ease-in-out infinite',
         marquee: 'marquee 35s linear infinite',
+        glow: 'glow 5s ease-out infinite',
+        ripple: 'ripple 5s ease-out infinite',
       },
     },
   },

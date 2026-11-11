@@ -1,18 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
 import { SOCKET_EVENTS, UserAvailabilityRecord } from '@orbit/types';
-import {
-  Clock,
-  Coffee,
-  Play,
-  CheckCircle2,
-  AlertTriangle,
-  X,
-  ChevronDown,
-} from 'lucide-react';
+import { Clock, Coffee, Play, LogOut, AlertTriangle, X } from 'lucide-react';
 
 const BREAK_REASONS = [
   'Lunch',
@@ -23,10 +15,16 @@ const BREAK_REASONS = [
   'Other',
 ];
 
+// 45s → 12m → 1h 23m
+export const formatElapsed = (secs: number) => {
+  if (secs < 60) return `${secs}s`;
+  if (secs < 3600) return `${Math.floor(secs / 60)}m`;
+  return `${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`;
+};
+
 export const EmployeeAvailabilityHeader: React.FC<{
   currentUserId?: string;
-  compact?: boolean;
-}> = ({ currentUserId, compact }) => {
+}> = ({ currentUserId }) => {
   const [availability, setAvailability] = useState<UserAvailabilityRecord | null>(null);
   const [serverTimeOffset, setServerTimeOffset] = useState<number>(0);
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
@@ -99,64 +97,30 @@ export const EmployeeAvailabilityHeader: React.FC<{
     };
   }, [currentUserId]);
 
-  // 2. Stopwatch calculation:
-  // (Current Time - availableTime) - Sum(all break durations)
+  // 2. Stopwatch: (now - availableTime) - sum(breaks, open break counted up to now).
+  // While on break both terms grow equally, so the value stays frozen.
   useEffect(() => {
-    if (!availability || !availability.isAvailable) {
-      if (!availability?.isAvailable && availability?.totalWorkingMinutes) {
-        setElapsedSeconds(availability.totalWorkingMinutes * 60);
-      } else {
-        setElapsedSeconds(0);
-      }
+    if (!availability?.isAvailable) {
+      setElapsedSeconds(0);
       return;
     }
-
-    const interval = setInterval(() => {
+    const tick = () => {
       const now = Date.now() + serverTimeOffset;
-      const startTime = new Date(availability.availableTime).getTime();
-
-      // Sum all completed breaks in ms
-      let totalBreakMs = 0;
+      let breakMs = 0;
       for (const b of availability.breaks || []) {
-        const bStart = new Date(b.breakStartTime).getTime();
-        const bEnd = b.availableAfterBreak ? new Date(b.availableAfterBreak).getTime() : now;
-        totalBreakMs += Math.max(0, bEnd - bStart);
+        const end = b.availableAfterBreak ? new Date(b.availableAfterBreak).getTime() : now;
+        breakMs += Math.max(0, end - new Date(b.breakStartTime).getTime());
       }
-
-      // If on break right now, pause calculation at the moment break started
-      let totalWorkMs = 0;
-      if (availability.isOnBreak) {
-        // Find current open break
-        const openBreak = (availability.breaks || []).find((b) => !b.availableAfterBreak);
-        const freezeTime = openBreak ? new Date(openBreak.breakStartTime).getTime() : now;
-        // Prior completed breaks
-        let priorBreakMs = 0;
-        for (const b of availability.breaks || []) {
-          if (b.availableAfterBreak) {
-            const bStart = new Date(b.breakStartTime).getTime();
-            const bEnd = new Date(b.availableAfterBreak).getTime();
-            priorBreakMs += Math.max(0, bEnd - bStart);
-          }
-        }
-        totalWorkMs = Math.max(0, freezeTime - startTime - priorBreakMs);
-      } else {
-        totalWorkMs = Math.max(0, now - startTime - totalBreakMs);
-      }
-
-      setElapsedSeconds(Math.floor(totalWorkMs / 1000));
-    }, 1000);
-
+      const workMs = now - new Date(availability.availableTime).getTime() - breakMs;
+      setElapsedSeconds(Math.max(0, Math.floor(workMs / 1000)));
+    };
+    tick();
+    if (availability.isOnBreak) return;
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
   }, [availability, serverTimeOffset]);
 
-  // Format hh:mm:ss
-  const formattedTime = useMemo(() => {
-    const hours = Math.floor(elapsedSeconds / 3600);
-    const minutes = Math.floor((elapsedSeconds % 3600) / 60);
-    const seconds = elapsedSeconds % 60;
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  }, [elapsedSeconds]);
-
+  const formattedTime = formatElapsed(elapsedSeconds);
   // 3. User Actions
   const handleCheckIn = async () => {
     if (isActionLocked) return;
@@ -220,127 +184,85 @@ export const EmployeeAvailabilityHeader: React.FC<{
   const isAvailable = availability?.isAvailable ?? false;
   const isOnBreak = availability?.isOnBreak ?? false;
 
+  const menuItem =
+    'w-full px-3 py-2 rounded-lg text-[13px] font-medium flex items-center gap-2 text-left transition hover:bg-[var(--theme-bg-surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed';
+
   return (
     <>
-      {/* Top Header Availability Bar */}
-      <div className="flex items-center">
-        {/* Live Stopwatch / Timer Pill with Dropdown Trigger */}
-        <div className="relative" ref={dropdownRef}>
-          <button
-            type="button"
-            onClick={() => setShowStatusDropdown((prev) => !prev)}
-            title={compact ? `Availability · ${formattedTime}` : 'Click to change availability status'}
-            className={`${compact ? 'w-11 h-11 justify-center' : 'px-3.5 py-1.5'} rounded-xl text-[13px] font-mono font-bold flex items-center gap-2 border shadow-sm transition-all duration-150 cursor-pointer select-none active:scale-95 focus:outline-none ${
-              isOnBreak
-                ? 'bg-amber-500/10 text-amber-600 dark:text-[#F59E0B] border-[#F59E0B]/50 shadow-[0_0_12px_rgba(245,158,11,0.15)] animate-pulse'
-                : isAvailable
-                ? 'bg-emerald-500/10 text-emerald-700 dark:text-[#10B981] border-[#10B981]/50 shadow-[0_0_12px_rgba(16,185,129,0.15)]'
-                : 'bg-sky-500/10 text-sky-700 dark:text-[#38BDF8] border-[#38BDF8]/40 shadow-[0_0_12px_rgba(56,189,248,0.12)]'
-            }`}
+      <div className="relative" ref={dropdownRef}>
+        <button
+          type="button"
+          onClick={() => (isAvailable ? setShowStatusDropdown((prev) => !prev) : handleCheckIn())}
+          disabled={isActionLocked && !isAvailable}
+          title={isOnBreak ? `On break · ${formattedTime}` : isAvailable ? `Working · ${formattedTime}` : 'Check in'}
+          className={`relative w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 hover:rounded-2xl select-none ${
+            isOnBreak
+              ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500/50'
+              : isAvailable
+              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+              : ''
+          }`}
+          style={isAvailable ? undefined : { backgroundColor: 'var(--theme-bg-surface)', color: 'var(--theme-text-primary)' }}
+        >
+          {isOnBreak && (
+            <>
+              <span className="absolute inset-0 rounded-[inherit] bg-amber-500/30 animate-glow pointer-events-none" />
+              <span className="absolute inset-0 rounded-[inherit] border-2 border-amber-500 animate-ripple pointer-events-none" />
+            </>
+          )}
+          {isAvailable ? (
+            <span className="relative flex flex-col items-center text-[11px] leading-[13px] font-semibold tabular-nums tracking-tight">
+              {formattedTime.split(' ').map((part) => <span key={part}>{part}</span>)}
+            </span>
+          ) : (
+            <Clock size={20} />
+          )}
+        </button>
+
+        {showStatusDropdown && isAvailable && (
+          <div
+            className="absolute left-full top-0 ml-3 z-50 w-40 rounded-xl p-1.5 shadow-2xl border border-[var(--theme-border)] text-[var(--theme-text)] animate-in fade-in zoom-in-95 duration-150"
+            style={{ backgroundColor: 'var(--theme-bg-surface)' }}
           >
-            <Clock size={compact ? 20 : 14} />
-            {!compact && <span className="tracking-wide">{formattedTime}</span>}
-            {!compact && <ChevronDown
-              size={12}
-              className={`transition-transform duration-200 opacity-60 ${
-                showStatusDropdown ? 'rotate-180' : 'rotate-0'
-              }`}
-            />}
-          </button>
-
-          {/* Availability Status Dropdown Menu (Strictly Matching Image 1 & User Screenshot) */}
-          {showStatusDropdown && (
-            <div
-              className={`absolute ${compact ? 'left-full top-0 ml-3' : 'right-0 top-full mt-3'} z-50 rounded-[28px] p-3 shadow-2xl border border-[var(--theme-border)] flex items-center gap-3.5 animate-in fade-in zoom-in-95 duration-150`}
-              style={{
-                backgroundColor: "var(--theme-bg-surface)",
-              }}
-            >
-              {/* Option 1: Available */}
+            {isOnBreak ? (
               <button
                 type="button"
-                onClick={() => {
-                  setShowStatusDropdown(false);
-                  handleCheckIn();
-                }}
-                disabled={isAvailable || isActionLocked}
-                className={`h-14 px-5 rounded-[18px] text-[15px] font-semibold flex items-center gap-2.5 transition duration-150 shrink-0 select-none ${
-                  isAvailable && !isOnBreak
-                    ? 'bg-[#007A5A] text-white border-2 border-[#00B074] shadow-[0_0_15px_rgba(0,176,116,0.3)] cursor-default'
-                    : !isAvailable
-                    ? 'bg-[#007A5A] text-white border-2 border-[#00B074] hover:brightness-110 active:scale-95 cursor-pointer shadow-[0_0_15px_rgba(0,176,116,0.3)]'
-                    : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)] opacity-50'
-                }`}
-              >
-                <Play size={16} className="text-[var(--theme-text)] fill-transparent" strokeWidth={2.5} />
-                <span className="font-medium tracking-tight">Available</span>
-              </button>
-
-              {/* Option 2: Break */}
-              <button
-                type="button"
-                onClick={() => {
-                  setShowStatusDropdown(false);
-                  setShowBreakModal(true);
-                }}
-                disabled={!isAvailable || isOnBreak || isActionLocked}
-                className={`h-14 px-5 rounded-[18px] text-[15px] font-semibold flex items-center gap-2.5 transition duration-150 shrink-0 select-none ${
-                  isOnBreak
-                    ? 'bg-amber-500/10 text-[#F59E0B] border-2 border-[#F59E0B] cursor-default'
-                    : isAvailable
-                    ? 'bg-[var(--theme-bg-surface-hover)] hover:brightness-95 text-[var(--theme-text)] border border-[var(--theme-border)] active:scale-95 cursor-pointer'
-                    : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)] opacity-50'
-                }`}
-              >
-                <Coffee size={16} className="text-[var(--theme-text)]" strokeWidth={2.2} />
-                <span className="font-medium tracking-tight">Break</span>
-              </button>
-
-              {/* Option 3: Available after Break */}
-              <button
-                type="button"
+                disabled={isActionLocked}
                 onClick={() => {
                   setShowStatusDropdown(false);
                   handleResumeWork();
                 }}
-                disabled={!isOnBreak || isActionLocked}
-                className={`h-14 px-4 rounded-[18px] text-[14px] font-medium flex items-center justify-center gap-2 text-center leading-tight transition duration-150 shrink-0 select-none ${
-                  isOnBreak
-                    ? 'bg-[#007A5A] hover:bg-[#00916B] text-white border-2 border-[#00B074] shadow-[0_0_15px_rgba(0,176,116,0.3)] active:scale-95 cursor-pointer animate-pulse'
-                    : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)] opacity-90'
-                }`}
+                className={menuItem}
               >
-                <div className="w-3.5 h-3.5 rounded-full border border-dashed border-[var(--theme-text-muted)] flex items-center justify-center shrink-0">
-                  <div className="w-1 h-1 rounded-full bg-[var(--theme-text-muted)]" />
-                </div>
-                <div className="flex flex-col items-center justify-center leading-4 text-center">
-                  <span>Available</span>
-                  <span>after</span>
-                  <span className="text-[13px]">Break</span>
-                </div>
+                <Play size={15} className="text-emerald-500" /> Resume
               </button>
-
-              {/* Option 4: Checkout */}
+            ) : (
               <button
                 type="button"
+                disabled={isActionLocked}
                 onClick={() => {
                   setShowStatusDropdown(false);
-                  handleRequestCheckout();
+                  setShowBreakModal(true);
                 }}
-                disabled={!isAvailable || isOnBreak || isActionLocked}
-                className={`h-14 px-6 rounded-[18px] text-[15px] font-medium flex items-center gap-2 transition duration-150 shrink-0 select-none ${
-                  isAvailable && !isOnBreak
-                    ? 'bg-[var(--theme-bg-surface-hover)] hover:bg-rose-950/40 hover:text-rose-300 hover:border-rose-500/40 text-[var(--theme-text)] border border-[var(--theme-border)] active:scale-95 cursor-pointer'
-                    : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)] opacity-50'
-                }`}
+                className={menuItem}
               >
-                <span className="font-medium tracking-tight">Checkout</span>
+                <Coffee size={15} className="text-amber-500" /> Break
               </button>
-            </div>
-          )}
-        </div>
+            )}
+            <button
+              type="button"
+              disabled={isActionLocked}
+              onClick={() => {
+                setShowStatusDropdown(false);
+                handleRequestCheckout();
+              }}
+              className={`${menuItem} hover:text-rose-500`}
+            >
+              <LogOut size={15} /> Checkout
+            </button>
+          </div>
+        )}
       </div>
-
       {/* Break Reason Modal */}
       {showBreakModal && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">

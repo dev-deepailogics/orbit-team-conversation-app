@@ -145,7 +145,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
             );
           })}
 
-          <EmployeeAvailabilityHeader compact currentUserId={currentUser?.id} />
+          <EmployeeAvailabilityHeader currentUserId={currentUser?.id} />
         </div>
       )}
 
