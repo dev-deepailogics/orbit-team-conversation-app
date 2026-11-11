@@ -599,7 +599,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               {getDirectChannelTitle()}
             </span>
             {channel.isAnonymous && (
-              <span className="text-[10px] font-semibold uppercase bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded ml-1 shrink-0">
+              <span className="text-[10px] font-semibold uppercase bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded ml-1 shrink-0">
                 Anonymous
               </span>
             )}
@@ -693,11 +693,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <button
               onClick={() => setShowAnonPersonaModal(true)}
               title="Change your Anonymous Persona"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-950/70 hover:bg-purple-900/80 border border-purple-500/50 text-purple-700 dark:text-purple-200 text-xs font-medium transition shrink-0 group shadow-sm"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-100 hover:bg-purple-200 dark:bg-purple-950/70 dark:hover:bg-purple-900/80 border border-purple-500/50 text-purple-700 dark:text-purple-200 text-xs font-medium transition shrink-0 group shadow-sm"
             >
               <span className="text-sm">{anonProfile.anonEmoji}</span>
               <span className="hidden sm:inline font-semibold">{anonProfile.anonName}</span>
-              <span className="text-[10px] text-purple-600 dark:text-purple-400 group-hover:text-purple-200 ml-0.5">Edit</span>
+              <span className="text-[10px] text-purple-600 dark:text-purple-400 group-hover:text-purple-800 dark:group-hover:text-purple-200 ml-0.5">Edit</span>
             </button>
           )}
 
@@ -855,7 +855,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
       {/* Anonymous Discussion Info Banner */}
       {channel.isAnonymous && (
-        <div className="bg-gradient-to-r from-purple-950/80 via-indigo-950/60 to-purple-950/80 border-b border-purple-500/30 px-3 sm:px-6 py-2 flex items-center justify-between text-xs text-purple-700 dark:text-purple-200 shrink-0">
+        <div className="bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 dark:from-purple-950/80 dark:via-indigo-950/60 dark:to-purple-950/80 border-b border-purple-500/30 px-3 sm:px-6 py-2 flex items-center justify-between text-xs text-purple-700 dark:text-purple-200 shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-base shrink-0">🎭</span>
             <span className="truncate">
@@ -1008,7 +1008,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         <span
                           className={`text-[10px] font-semibold px-1.5 py-0.2 rounded uppercase ${
                             isSelf
-                              ? 'bg-purple-900/70 text-purple-700 dark:text-purple-200 border border-purple-500/40'
+                              ? 'bg-purple-100 dark:bg-purple-900/70 text-purple-700 dark:text-purple-200 border border-purple-500/40'
                               : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] border border-[var(--theme-border)]'
                           }`}
                         >

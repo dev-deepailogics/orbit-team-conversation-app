@@ -87,7 +87,8 @@ export const CreateTicketFromMessageDialog: React.FC<CreateTicketFromMessageDial
 
   const loadProjectColumns = async (projId: string) => {
     try {
-      const res = await api.get(`/api/projects/${projId}`);
+      // Only columns are needed; keep the ticket payload minimal.
+      const res = await api.get(`/api/projects/${projId}`, { params: { ticketLimit: 1 } });
       const cols = res.data.columns || [];
       setColumns(cols);
       if (cols.length > 0) {

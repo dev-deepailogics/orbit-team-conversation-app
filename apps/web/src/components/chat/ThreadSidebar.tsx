@@ -311,7 +311,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                 <span
                   className={`text-[9px] font-semibold px-1 py-0.2 rounded uppercase ${
                     isParentSelf
-                      ? 'bg-purple-900/70 text-purple-700 dark:text-purple-200 border border-purple-500/40'
+                      ? 'bg-purple-100 dark:bg-purple-900/70 text-purple-700 dark:text-purple-200 border border-purple-500/40'
                       : 'bg-[var(--theme-bg-surface)] text-[var(--theme-text)] border border-[var(--theme-border)]'
                   }`}
                 >
@@ -558,7 +558,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                     <span
                       className={`text-[9px] font-semibold px-1 py-0.2 rounded uppercase ${
                         isReplySelf
-                          ? 'bg-purple-900/70 text-purple-700 dark:text-purple-200 border border-purple-500/40'
+                          ? 'bg-purple-100 dark:bg-purple-900/70 text-purple-700 dark:text-purple-200 border border-purple-500/40'
                           : 'bg-[var(--theme-bg-surface)] text-[var(--theme-text)] border border-[var(--theme-border)]'
                       }`}
                     >

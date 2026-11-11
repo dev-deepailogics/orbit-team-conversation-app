@@ -79,7 +79,7 @@ module.exports = {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        sans: ['var(--theme-font, Inter)', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
         display: ['"Bricolage Grotesque"', '"Space Grotesk"', 'Trap', '-apple-system', 'sans-serif'],
         handwriting: ['Caveat', 'Kalam', 'Patrick Hand', 'Comic Sans MS', 'cursive', 'sans-serif'],
       },

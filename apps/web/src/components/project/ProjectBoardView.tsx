@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+
+const TICKET_PAGE = 20;
 import {
   Project,
   ProjectColumn,
@@ -115,6 +117,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
     updateColumn,
     removeColumn,
     addTicket,
+    appendTickets,
     updateTicket,
     removeTicket,
     moveTicket,
@@ -129,6 +132,11 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [filterPriority, setFilterPriority] = useState<string>("ALL");
   const [filterAssignee, setFilterAssignee] = useState<string>("ALL");
+
+  // Ticket paging: columns whose older tickets are fully loaded / loading now
+  const [exhaustedCols, setExhaustedCols] = useState<Record<string, boolean>>({});
+  const [loadingCols, setLoadingCols] = useState<Record<string, boolean>>({});
+  const loadingRef = useRef<Set<string>>(new Set());
 
   // Modals & Popovers
   const [showTicketModal, setShowTicketModal] = useState(false);
@@ -290,8 +298,11 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
     let isMounted = true;
     const fetchProjectDetails = async () => {
       try {
-        const res = await api.get(`/api/projects/${initialProject.id}`);
+        const res = await api.get(`/api/projects/${initialProject.id}`, {
+          params: { ticketLimit: TICKET_PAGE },
+        });
         if (isMounted) {
+          setExhaustedCols({});
           setCurrentProject(res.data);
         }
       } catch (err) {
@@ -304,6 +315,30 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
       isMounted = false;
     };
   }, [initialProject.id, setCurrentProject]);
+
+  const hasMoreTickets = (column: ProjectColumn) =>
+    !exhaustedCols[column.id] && (column.tickets?.length || 0) >= TICKET_PAGE;
+
+  const loadMoreTickets = async (column: ProjectColumn) => {
+    if (!hasMoreTickets(column) || loadingRef.current.has(column.id)) return;
+    loadingRef.current.add(column.id);
+    setLoadingCols((prev) => ({ ...prev, [column.id]: true }));
+    try {
+      const res = await api.get<Ticket[]>(
+        `/api/projects/${project.id}/columns/${column.id}/tickets`,
+        { params: { skip: column.tickets?.length || 0, take: TICKET_PAGE } },
+      );
+      appendTickets(column.id, res.data);
+      if (res.data.length < TICKET_PAGE) {
+        setExhaustedCols((prev) => ({ ...prev, [column.id]: true }));
+      }
+    } catch (err) {
+      console.error("Failed to load more tickets", err);
+    } finally {
+      loadingRef.current.delete(column.id);
+      setLoadingCols((prev) => ({ ...prev, [column.id]: false }));
+    }
+  };
 
   // Real-time Socket.IO Listeners for Kanban Board
   useEffect(() => {
@@ -480,7 +515,14 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
       const ticketToMove = sourceCol?.tickets?.find((t) => t.id === ticketId);
       if (!ticketToMove) return;
 
-      const newOrderIndex = (targetColumn.tickets || []).length;
+      // Drop on top: loaded tickets are newest first, so the max is in the first page
+      const newOrderIndex =
+        Math.max(
+          -1,
+          ...(targetColumn.tickets || [])
+            .filter((t) => t.id !== ticketId)
+            .map((t) => t.orderIndex),
+        ) + 1;
 
       // Optimistic update in Zustand store
       moveTicket(ticketToMove, fromColumnId, toColumnId, newOrderIndex);
@@ -590,10 +632,9 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
   };
 
   const columns = project.columns || [];
-  const totalTickets = columns.reduce(
-    (acc, c) => acc + (c.tickets?.length || 0),
-    0,
-  );
+  const totalTickets =
+    project._count?.tickets ??
+    columns.reduce((acc, c) => acc + (c.tickets?.length || 0), 0);
 
   return (
     <div
@@ -1094,7 +1135,15 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                   </div>
 
                   {/* Column Tickets List (Scrollable vertically) */}
-                  <div className="flex-1 overflow-y-auto p-2.5 space-y-2.5 min-h-[150px]">
+                  <div
+                    className="flex-1 overflow-y-auto p-2.5 space-y-2.5 min-h-[150px]"
+                    onScroll={(e) => {
+                      const el = e.currentTarget;
+                      if (el.scrollHeight - el.scrollTop - el.clientHeight < 200) {
+                        loadMoreTickets(column);
+                      }
+                    }}
+                  >
                     {colTickets.map((ticket) => {
                       const isBeingDragged = draggedTicketId === ticket.id;
                       const priorityMeta =
@@ -1326,7 +1375,18 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                       );
                     })}
 
-                    {colTickets.length === 0 && (
+                    {hasMoreTickets(column) && (
+                      <button
+                        onClick={() => loadMoreTickets(column)}
+                        disabled={loadingCols[column.id]}
+                        className="w-full py-2 text-[11px] font-medium rounded-lg hover:bg-[var(--theme-bg-surface-hover)] disabled:opacity-60"
+                        style={{ color: "var(--theme-text-muted)" }}
+                      >
+                        {loadingCols[column.id] ? "Loading…" : "Load older tickets"}
+                      </button>
+                    )}
+
+                    {colTickets.length === 0 && !hasMoreTickets(column) && (
                       <div
                         className="h-24 border border-dashed rounded-xl flex items-center justify-center text-[11px]"
                         style={{

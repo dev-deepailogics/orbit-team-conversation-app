@@ -539,7 +539,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                         )}
                         <span className="truncate">{channel.name}</span>
                         {channel.isAnonymous && (
-                          <span className="text-[9px] px-1 py-0.2 rounded bg-purple-950/80 border border-purple-700/50 text-purple-700 dark:text-purple-300 font-semibold shrink-0">
+                          <span className="text-[9px] px-1 py-0.5 rounded bg-purple-100 dark:bg-purple-950/80 border border-purple-700/50 text-purple-700 dark:text-purple-300 font-semibold shrink-0">
                             anon
                           </span>
                         )}

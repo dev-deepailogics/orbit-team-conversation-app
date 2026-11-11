@@ -118,7 +118,7 @@ export const AnonymousPersonaModal: React.FC<AnonymousPersonaModalProps> = ({
 
         <form onSubmit={handleSave} className="p-5 space-y-4">
           {/* Privacy Notice Banner */}
-          <div className="flex items-start gap-2.5 bg-purple-950/30 border border-purple-800/40 rounded-xl p-3 text-xs text-purple-700 dark:text-purple-200">
+          <div className="flex items-start gap-2.5 bg-purple-50 dark:bg-purple-950/30 border border-purple-800/40 rounded-xl p-3 text-xs text-purple-700 dark:text-purple-200">
             <ShieldAlert size={16} className="text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
             <div className="leading-relaxed text-[11px]">
               <strong className="text-purple-700 dark:text-purple-300 font-semibold block">Total Anonymity Protected</strong>
