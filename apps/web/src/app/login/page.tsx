@@ -1,12 +1,24 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Layers, ArrowRight, ArrowLeft } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/authStore';
 import { ThemeToggle } from '../../components/marketing/ThemeToggle';
+
+// Error codes sent back by the server's Microsoft callback (/api/auth/microsoft/callback).
+const MICROSOFT_ERRORS: Record<string, string> = {
+  microsoft_cancelled: 'Microsoft sign-in was cancelled.',
+  microsoft_invalid_state: 'Your sign-in session expired. Please try again.',
+  microsoft_account_exists:
+    'An account with this email already exists. Sign in with your email and password below to link your Microsoft account — after that, "Sign in with Microsoft" will work.',
+  microsoft_no_email: 'Your Microsoft account has no usable email address.',
+  microsoft_not_configured: 'Sign in with Microsoft is not available.',
+  account_deactivated: 'Account is deactivated',
+  microsoft_failed: 'Sign in with Microsoft failed. Please try again.',
+};
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -15,6 +27,29 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const setAuth = useAuthStore((s) => s.setAuth);
+  const fetchMe = useAuthStore((s) => s.fetchMe);
+
+  // Finish a Microsoft sign-in: the server redirects here with #token=… or ?error=…
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.hash.slice(1)).get('token');
+    const errorCode = new URLSearchParams(window.location.search).get('error');
+    if (!token && !errorCode) return;
+    window.history.replaceState(null, '', window.location.pathname); // drop the token from the URL/history
+
+    if (errorCode) {
+      setError(MICROSOFT_ERRORS[errorCode] || MICROSOFT_ERRORS.microsoft_failed);
+      return;
+    }
+    localStorage.setItem('orbit_token', token!);
+    setIsLoading(true);
+    fetchMe().then(() => {
+      if (useAuthStore.getState().user) router.push('/app');
+      else {
+        setError(MICROSOFT_ERRORS.microsoft_failed);
+        setIsLoading(false);
+      }
+    });
+  }, [fetchMe, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,7 +57,8 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const res = await api.post('/api/auth/login', { email, password });
+      // withCredentials sends the HttpOnly pending-Microsoft-link cookie, if any, so this login links it.
+      const res = await api.post('/api/auth/login', { email, password }, { withCredentials: true });
       setAuth(res.data.user, res.data.accessToken);
       router.push('/app');
     } catch (err: any) {
@@ -98,6 +134,25 @@ export default function LoginPage() {
             <ArrowRight size={16} />
           </button>
         </form>
+
+        <div className="flex items-center gap-3 my-5">
+          <div className="h-px flex-1 bg-slate-200 dark:bg-gray-700" />
+          <span className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-gray-500">or</span>
+          <div className="h-px flex-1 bg-slate-200 dark:bg-gray-700" />
+        </div>
+
+        <a
+          href={`${api.defaults.baseURL}/api/auth/microsoft`}
+          className="w-full py-2.5 bg-white dark:bg-[#1A1D21] border border-slate-300 dark:border-gray-700 hover:border-slate-400 dark:hover:border-gray-500 text-slate-800 dark:text-gray-100 font-semibold text-sm rounded-lg transition flex items-center justify-center gap-2.5"
+        >
+          <svg width="16" height="16" viewBox="0 0 21 21" aria-hidden="true">
+            <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+            <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+            <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+            <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+          </svg>
+          <span>Sign in with Microsoft</span>
+        </a>
 
         <p className="text-center text-xs text-slate-500 dark:text-gray-400 mt-6">
           Don&apos;t have an account?{' '}

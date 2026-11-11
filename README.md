@@ -83,6 +83,54 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
+## 🔑 Sign in with Microsoft (Entra ID)
+
+Optional. The login page shows a **Sign in with Microsoft** button. It uses the OpenID Connect authorization code flow with PKCE.
+
+### 1. Register the app in Azure
+1. Go to [Azure portal](https://portal.azure.com) → **Microsoft Entra ID** → **App registrations** → **New registration**.
+2. **Supported account types**: pick what matches `MICROSOFT_TENANT_ID` below:
+   - *Single tenant* (your org only): set `MICROSOFT_TENANT_ID` to the **Directory (tenant) ID** GUID.
+   - *Any Entra ID tenant*: `organizations`.
+   - *Any Entra ID tenant + personal Microsoft accounts*: `common`.
+   - *Personal Microsoft accounts only*: `consumers`.
+3. **Redirect URI**: platform **Web**, value `https://<your-domain>/api/auth/microsoft/callback`. The redirect goes to the **API server**, not the Next.js app.
+4. After creating it, copy the **Application (client) ID** from **Overview**.
+5. **Certificates & secrets** → **New client secret** → copy the secret **Value** (it's only shown once). Set a reminder to rotate it before it expires.
+6. **Token configuration** (recommended) → **Add optional claim** → ID token → `email`. Without an email claim, Orbit falls back to `preferred_username`, and refuses sign-in if neither is an email.
+
+### 2. Environment variables (server)
+```bash
+MICROSOFT_CLIENT_ID=<Application (client) ID>
+MICROSOFT_CLIENT_SECRET=<client secret value>
+MICROSOFT_TENANT_ID=common            # tenant GUID | common | organizations | consumers (not a domain name)
+MICROSOFT_REDIRECT_URI=https://<your-domain>/api/auth/microsoft/callback
+CLIENT_URL=https://<your-domain>      # where users land after sign-in
+```
+If `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` or `MICROSOFT_REDIRECT_URI` is missing, the button shows "not available".
+
+### 3. Testing locally
+Azure accepts plain `http://` only for `localhost` redirect URIs. Add `http://localhost:4000/api/auth/microsoft/callback` as a second **Web** redirect URI on the same registration, or use a separate dev registration. Then set:
+```bash
+MICROSOFT_REDIRECT_URI=http://localhost:4000/api/auth/microsoft/callback
+CLIENT_URL=http://localhost:3000
+```
+Run `npm run dev` and click **Sign in with Microsoft** on http://localhost:3000/login.
+
+### How accounts are matched
+- Users are identified by Microsoft's stable `oid` claim, stored in `user_identities`. They are **never matched by email**.
+- On first sign-in, a new Orbit user is created with no password.
+- If a user with the same email already exists, nothing is linked automatically. The user is asked to sign in with their password, and only that password login (in the same browser, within 10 minutes) links the Microsoft account to the Orbit account. After that, **Sign in with Microsoft** logs them straight in.
+
+### Tests
+```bash
+# Needs a Postgres DB with the current schema (uses real DB; Microsoft endpoints are mocked)
+DATABASE_URL=postgresql://.../orbit_test npx prisma db push --schema packages/db/prisma/schema.prisma
+DATABASE_URL=postgresql://.../orbit_test npm test -w @orbit/server
+```
+
+---
+
 ## 🤖 Bot & Integrations API
 
 ### 1. Create a Bot

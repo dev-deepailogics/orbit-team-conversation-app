@@ -47,7 +47,7 @@ enum SystemRole {
 model User {
   id                String       @id @default(uuid())
   email             String       @unique
-  passwordHash      String
+  passwordHash      String?      // null for users who only sign in via an external identity (e.g. Microsoft)
   username          String       @unique
   displayName       String
   avatarUrl         String?
@@ -89,10 +89,27 @@ model User {
   documentShares    ProjectDocumentShare[]
   availabilities    UserAvailability[]
   ticketComments    TicketComment[]
-
+  identities        UserIdentity[]
 
   @@index([email])
   @@index([username])
+}
+
+// External sign-in identities (e.g. Microsoft Entra ID). Users are matched by
+// (provider, providerUid) only — never by email.
+model UserIdentity {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  provider    String
+  providerUid String   @map("provider_uid")
+  email       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUid])
+  @@index([userId])
+  @@map("user_identities")
 }
 
 model Workspace {
