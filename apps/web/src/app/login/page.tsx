@@ -3,10 +3,10 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Layers, ArrowRight, ArrowLeft } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/authStore';
-import { ThemeToggle } from '../../components/marketing/ThemeToggle';
+import { AuthShell, AuthError, MicrosoftSignIn, authInputClass, authLabelClass, authButtonClass } from '../../components/auth/AuthShell';
 
 // Error codes sent back by the server's Microsoft callback (/api/auth/microsoft/callback).
 const MICROSOFT_ERRORS: Record<string, string> = {
@@ -69,98 +69,52 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen bg-slate-50 dark:bg-[#1A1D21] flex flex-col justify-center items-center p-4">
-      <header className="absolute top-0 inset-x-0 flex items-center justify-between p-4 sm:p-6">
-        <Link
-          href="/"
-          aria-label="Back to home"
-          title="Back to home"
-          className="w-9 h-9 rounded-full flex items-center justify-center border bg-white border-slate-300 hover:border-slate-400 text-slate-700 dark:bg-zinc-900 dark:border-white/15 dark:hover:border-white/30 dark:text-zinc-200 shadow-sm transition-colors"
-        >
-          <ArrowLeft size={16} />
-        </Link>
-        <ThemeToggle />
-      </header>
-      <div className="w-full max-w-md bg-white dark:bg-[#222529] border border-slate-200 dark:border-gray-700/80 rounded-2xl p-8 shadow-xl dark:shadow-2xl">
-        <Link href="/" className="flex items-center justify-center gap-2 mb-6">
-          <div className="w-10 h-10 bg-slack-activeChannel rounded-xl flex items-center justify-center text-white shadow-lg">
-            <Layers size={24} />
-          </div>
-          <span className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">ORBIT</span>
-        </Link>
+    <AuthShell title="Sign in to your workspace" subtitle="Access your team, projects and workspace in one place.">
+      <AuthError message={error} />
 
-        <h1 className="text-xl font-bold text-center text-slate-900 dark:text-white mb-2">Sign in to your workspace</h1>
-        <p className="text-xs text-slate-500 dark:text-gray-400 text-center mb-6">
-          Enter your email address and password to continue.
-        </p>
-
-        {error && (
-          <div className="bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-xs p-3 rounded-lg mb-4">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Email</label>
-            <input
-              type="email"
-              required
-              placeholder="you@company.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-[#1A1D21] border border-slate-300 dark:border-gray-700 rounded-lg px-3.5 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:border-slack-activeChannel"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">Password</label>
-            <input
-              type="password"
-              required
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-[#1A1D21] border border-slate-300 dark:border-gray-700 rounded-lg px-3.5 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:border-slack-activeChannel"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full py-2.5 bg-slack-activeChannel hover:bg-[#0d5388] text-white font-semibold text-sm rounded-lg transition flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            <span>{isLoading ? 'Signing in...' : 'Sign In'}</span>
-            <ArrowRight size={16} />
-          </button>
-        </form>
-
-        <div className="flex items-center gap-3 my-5">
-          <div className="h-px flex-1 bg-slate-200 dark:bg-gray-700" />
-          <span className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-gray-500">or</span>
-          <div className="h-px flex-1 bg-slate-200 dark:bg-gray-700" />
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div>
+          <label htmlFor="email" className={authLabelClass}>Email</label>
+          <input
+            id="email"
+            type="email"
+            required
+            autoComplete="email"
+            placeholder="you@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={authInputClass}
+          />
         </div>
 
-        <a
-          href={`${api.defaults.baseURL}/api/auth/microsoft`}
-          className="w-full py-2.5 bg-white dark:bg-[#1A1D21] border border-slate-300 dark:border-gray-700 hover:border-slate-400 dark:hover:border-gray-500 text-slate-800 dark:text-gray-100 font-semibold text-sm rounded-lg transition flex items-center justify-center gap-2.5"
-        >
-          <svg width="16" height="16" viewBox="0 0 21 21" aria-hidden="true">
-            <rect x="1" y="1" width="9" height="9" fill="#f25022" />
-            <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
-            <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
-            <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
-          </svg>
-          <span>Sign in with Microsoft</span>
-        </a>
+        <div>
+          <label htmlFor="password" className={authLabelClass}>Password</label>
+          <input
+            id="password"
+            type="password"
+            required
+            autoComplete="current-password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className={authInputClass}
+          />
+        </div>
 
-        <p className="text-center text-xs text-slate-500 dark:text-gray-400 mt-6">
-          Don&apos;t have an account?{' '}
-          <Link href="/register" className="text-slack-activeChannel hover:underline font-semibold">
-            Create an account
-          </Link>
-        </p>
-      </div>
-    </div>
+        <button type="submit" disabled={isLoading} className={`${authButtonClass} !mt-8`}>
+          <span>{isLoading ? 'Signing in...' : 'Sign In'}</span>
+          <ArrowRight size={20} />
+        </button>
+      </form>
+
+      <MicrosoftSignIn />
+
+      <p className="text-center text-sm text-slate-400 mt-6">
+        Don&apos;t have an account?{' '}
+        <Link href="/register" className="text-sky-400 hover:text-sky-300 hover:underline font-medium">
+          Create an account
+        </Link>
+      </p>
+    </AuthShell>
   );
 }
