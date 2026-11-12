@@ -19,7 +19,6 @@ import { useProjectStore } from "../../stores/projectStore";
 import { TicketModal } from "./TicketModal";
 import { TicketDetailModal } from "./TicketDetailModal";
 import { ProjectViewSwitcher } from "./ProjectViewSwitcher";
-import { ProjectDocsView } from "./ProjectDocsView";
 import { IssueChatModal } from "./IssueChatModal";
 import { IssueTimelineModal } from "./IssueTimelineModal";
 import {
@@ -1515,13 +1514,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
             )}
           </div>
         </>
-      ) : (
-        <ProjectDocsView
-          project={project}
-          currentUser={currentUser}
-          members={members}
-        />
-      )}
+      ) : null}
 
       {/* Ticket Create / Edit Modal */}
       {showTicketModal && (

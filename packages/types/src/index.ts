@@ -410,7 +410,7 @@ export interface Canvas {
 
 export interface ProjectDocument {
   id: string;
-  projectId: string;
+  projectId: string | null;
   workspaceId: string;
   title: string;
   content: string;

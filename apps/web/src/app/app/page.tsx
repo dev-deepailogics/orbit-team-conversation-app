@@ -37,6 +37,7 @@ import { CreateProjectModal } from "@/components/project/CreateProjectModal";
 import { CreateTicketFromMessageDialog } from "@/components/project/CreateTicketFromMessageDialog";
 import { OrganizationControlView } from "@/components/availability/OrganizationControlView";
 import { CanvasView } from "@/components/whiteboard/CanvasView";
+import { ProjectDocsView } from "@/components/project/ProjectDocsView";
 import {
   Layers,
   ShieldCheck,
@@ -101,6 +102,8 @@ export default function AppDashboard() {
   const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
   const [showOrgControl, setShowOrgControl] = useState(false);
   const [showCanvasHub, setShowCanvasHub] = useState(false);
+  const [showDocsHub, setShowDocsHub] = useState(false);
+  const [docsInitialId, setDocsInitialId] = useState<string | null>(null);
   const [orgControlResetKey, setOrgControlResetKey] = useState(0);
   const [messageForTicket, setMessageForTicket] = useState<Message | null>(
     null,
@@ -205,6 +208,7 @@ export default function AppDashboard() {
   // 3. Handle Workspace Selection
   const handleSelectWorkspace = async (workspace: Workspace) => {
     setShowCanvasHub(false);
+    setShowDocsHub(false);
     setCurrentWorkspace(workspace);
     if (typeof window !== "undefined") {
       localStorage.setItem("orbit_active_workspace_id", workspace.id);
@@ -231,6 +235,7 @@ export default function AppDashboard() {
       let targetChannel: Channel | null = null;
       let targetProject: Project | null = null;
       let targetIsOrgControl = false;
+      let targetDocs: { docId: string | null } | null = null;
       if (typeof window !== "undefined") {
         const urlParams = new URLSearchParams(window.location.search);
         const urlView = urlParams.get("view");
@@ -240,6 +245,7 @@ export default function AppDashboard() {
         if (urlView === "org-control" || urlView === "organization-control") {
           targetIsOrgControl = true;
         }
+        if (urlView === "docs") targetDocs = { docId: urlParams.get("docId") };
         if (urlChId && res.data.channels) {
           targetChannel =
             res.data.channels.find((c: Channel) => c.id === urlChId) || null;
@@ -259,6 +265,8 @@ export default function AppDashboard() {
       } else if (res.data.channels && res.data.channels.length > 0) {
         handleSelectChannel(res.data.channels[0]);
       }
+      // Docs open on top of the default channel so Home has somewhere to go back to
+      if (targetDocs && !targetIsOrgControl) handleOpenDocs(targetDocs.docId);
     } catch (err) {
       console.error("Failed to load workspace details", err);
     }
@@ -290,6 +298,7 @@ export default function AppDashboard() {
   const handleSelectChannel = async (channel: Channel) => {
     setShowOrgControl(false);
     setShowCanvasHub(false);
+    setShowDocsHub(false);
     setCurrentProject(null);
     setCurrentChannel(channel);
     setHasMoreMessages(false);
@@ -321,6 +330,7 @@ export default function AppDashboard() {
   const handleSelectProject = (project: Project) => {
     setShowOrgControl(false);
     setShowCanvasHub(false);
+    setShowDocsHub(false);
     setCurrentProject(project);
     if (typeof window !== "undefined") {
       window.history.replaceState(null, "", `?projectId=${project.id}`);
@@ -331,6 +341,7 @@ export default function AppDashboard() {
   const handleOpenOrgControl = (subview?: string) => {
     setShowOrgControl(true);
     setShowCanvasHub(false);
+    setShowDocsHub(false);
     setCurrentProject(null);
     setOrgControlResetKey((prev) => prev + 1);
     if (typeof window !== "undefined") {
@@ -341,21 +352,34 @@ export default function AppDashboard() {
     }
   };
 
+  // 4d. Docs: workspace-level, own URL (?view=docs&docId=...)
+  const setDocsUrl = (docId: string | null) => {
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", docId ? `?view=docs&docId=${docId}` : "?view=docs");
+    }
+  };
+
+  const handleOpenDocs = (docId: string | null = null) => {
+    setShowCanvasHub(false);
+    setShowOrgControl(false);
+    setDocsInitialId(docId);
+    setShowDocsHub(true);
+    setDocsUrl(docId);
+  };
+
   const handleCloseOrgControl = () => {
     setShowOrgControl(false);
+    syncUrlToCurrent();
+  };
+
+  // Point the URL back at the current channel / project
+  const syncUrlToCurrent = () => {
     if (typeof window !== "undefined") {
-      if (currentChannel) {
-        window.history.replaceState(
-          null,
-          "",
-          `?channelId=${currentChannel.id}`,
-        );
-      } else if (currentProject) {
-        window.history.replaceState(
-          null,
-          "",
-          `?projectId=${currentProject.id}`,
-        );
+      // Project first: selecting a project keeps currentChannel set underneath it
+      if (currentProject) {
+        window.history.replaceState(null, "", `?projectId=${currentProject.id}`);
+      } else if (currentChannel) {
+        window.history.replaceState(null, "", `?channelId=${currentChannel.id}`);
       } else {
         window.history.replaceState(null, "", window.location.pathname);
       }
@@ -794,27 +818,35 @@ export default function AppDashboard() {
     );
   }
 
-  // Workspace rail feature shortcuts (Canvas / Docs)
-  const docsActive = !!currentProject && !showOrgControl && !showCanvasHub && activeSection === "docs";
-  const docsProject = currentProject ?? projects[0];
+  // Workspace rail feature shortcuts (Home / Canvas / Docs)
+  const docsActive = showDocsHub && !!currentWorkspace;
   const railProps = {
     activeFeature: showCanvasHub ? ("canvas" as const) : docsActive ? ("docs" as const) : ("home" as const),
     // Home: back to the channel / project view
     onGoHome: currentWorkspace
       ? () => {
           setShowCanvasHub(false);
+          setShowDocsHub(false);
           setShowOrgControl(false);
-          if (docsActive) setActiveSection("board");
+          syncUrlToCurrent();
         }
       : undefined,
     // Canvas hub: pick an existing canvas or create a new one
-    onOpenCanvas: currentWorkspace ? () => setShowCanvasHub((v) => !v) : undefined,
-    onOpenDocs: docsProject
+    onOpenCanvas: currentWorkspace
       ? () => {
-          setShowCanvasHub(false);
-          if (docsActive) return setActiveSection("board");
-          if (docsProject !== currentProject || showOrgControl) handleSelectProject(docsProject);
-          setActiveSection("docs");
+          if (showDocsHub) {
+            setShowDocsHub(false);
+            syncUrlToCurrent();
+          }
+          setShowCanvasHub((v) => !v);
+        }
+      : undefined,
+    // Docs are workspace-level, not tied to the open project
+    onOpenDocs: currentWorkspace
+      ? () => {
+          if (!showDocsHub) return handleOpenDocs();
+          setShowDocsHub(false);
+          syncUrlToCurrent();
         }
       : undefined,
   };
@@ -845,7 +877,7 @@ export default function AppDashboard() {
                 handleSelectWorkspace(ws);
               }}
             />
-            {currentWorkspace && !showCanvasHub && (
+            {currentWorkspace && !showCanvasHub && !docsActive && (
               <ChannelSidebar
                 workspace={currentWorkspace}
                 channels={channels}
@@ -927,7 +959,7 @@ export default function AppDashboard() {
       </div>
 
       {/* 2. Channels & Members Sidebar (Desktop) */}
-      {currentWorkspace && !showCanvasHub && (
+      {currentWorkspace && !showCanvasHub && !docsActive && (
         <div className="hidden md:flex shrink-0 h-full">
           <ChannelSidebar
             workspace={currentWorkspace}
@@ -1095,6 +1127,14 @@ export default function AppDashboard() {
             </div>
           </div>
         </div>
+      ) : docsActive && currentWorkspace ? (
+        <ProjectDocsView
+          workspaceId={currentWorkspace.id}
+          currentUser={user}
+          members={members}
+          initialDocId={docsInitialId}
+          onDocChange={setDocsUrl}
+        />
       ) : showCanvasHub && currentWorkspace ? (
         <CanvasView
           workspaceId={currentWorkspace.id}

@@ -57,7 +57,7 @@ export const ShareDocumentModal: React.FC<ShareDocumentModalProps> = ({
     setError(null);
     try {
       const res = await api.patch(
-        `/api/projects/${doc.projectId}/documents/${doc.id}`,
+        `/api/documents/${doc.id}`,
         {
           isPublicInProject: !doc.isPublicInProject,
         }
@@ -75,7 +75,7 @@ export const ShareDocumentModal: React.FC<ShareDocumentModalProps> = ({
     setError(null);
     try {
       const res = await api.patch(
-        `/api/projects/${doc.projectId}/documents/${doc.id}`,
+        `/api/documents/${doc.id}`,
         {
           isPublicLinkEnabled: !doc.isPublicLinkEnabled,
         }
@@ -93,7 +93,7 @@ export const ShareDocumentModal: React.FC<ShareDocumentModalProps> = ({
     setError(null);
     try {
       const res = await api.post(
-        `/api/projects/${doc.projectId}/documents/${doc.id}/shares`,
+        `/api/documents/${doc.id}/shares`,
         {
           userId: selectedUserId,
           permission: selectedPermission,
@@ -113,7 +113,7 @@ export const ShareDocumentModal: React.FC<ShareDocumentModalProps> = ({
     setError(null);
     try {
       const res = await api.delete(
-        `/api/projects/${doc.projectId}/documents/${doc.id}/shares/${targetUserId}`
+        `/api/documents/${doc.id}/shares/${targetUserId}`
       );
       onDocumentUpdated(res.data);
     } catch (err: any) {
@@ -209,7 +209,7 @@ export const ShareDocumentModal: React.FC<ShareDocumentModalProps> = ({
                   style={{ color: 'var(--theme-text-muted)' }}
                 >
                   {doc.isPublicInProject
-                    ? 'All workspace members with project access can view and collaborate on this document.'
+                    ? 'All workspace members can view and collaborate on this document.'
                     : 'Only you and specific members you invite below can see this document.'}
                 </p>
               </div>

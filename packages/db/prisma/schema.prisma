@@ -472,7 +472,7 @@ model Ticket {
 
 model ProjectDocument {
   id                  String                 @id @default(uuid())
-  projectId           String
+  projectId           String?                // optional link; docs are workspace-level
   workspaceId         String
   title               String                 @default("Untitled")
   content             String                 @db.Text
@@ -485,7 +485,7 @@ model ProjectDocument {
   createdAt           DateTime               @default(now())
   updatedAt           DateTime               @updatedAt
 
-  project             Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project             Project?               @relation(fields: [projectId], references: [id], onDelete: SetNull)
   workspace           Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   creator             User                   @relation("DocumentCreator", fields: [createdById], references: [id], onDelete: Cascade)
   shares              ProjectDocumentShare[]
