@@ -14,6 +14,8 @@ export interface UserProfile {
   status: UserStatus;
   customStatusText: string | null;
   customStatusEmoji: string | null;
+  /** False for provider (e.g. Microsoft) sessions and accounts without a password. */
+  canChangePassword?: boolean;
   anonEmoji?: string | null;
   isAnonymous?: boolean;
   role?: string;

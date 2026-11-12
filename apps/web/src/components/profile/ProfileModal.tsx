@@ -169,7 +169,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, workspaceId, p
         <div className="p-5 overflow-y-auto">
           <div className="flex gap-1 p-1 mb-5 rounded-xl bg-[var(--theme-bg-surface)]">
             {tabBtn('profile', User, 'Edit info')}
-            {tabBtn('password', KeyRound, 'Password')}
+            {user.canChangePassword && tabBtn('password', KeyRound, 'Password')}
           </div>
 
           {error && <p className="mb-4 text-sm text-red-500 bg-red-500/10 rounded-lg px-3 py-2">{error}</p>}
@@ -262,7 +262,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, workspaceId, p
                   autoComplete="current-password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  placeholder="Leave empty if you only sign in with Microsoft"
+                  required
                   className={input}
                 />
               </div>

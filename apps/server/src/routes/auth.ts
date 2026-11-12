@@ -68,12 +68,16 @@ const updateProfileSchema = z.object({
 });
 
 const changePasswordSchema = z.object({
-  currentPassword: z.string().optional(),
+  currentPassword: z.string(),
   newPassword: z.string().min(6, 'New password must be at least 6 characters'),
 });
 
+// JWT claims. `provider` is set when the session came from an external identity (e.g. Microsoft).
+type SessionUser = { id: string; provider?: string };
+
 type DbUser = NonNullable<Awaited<ReturnType<typeof prisma.user.findUnique>>>;
-const publicUser = (user: DbUser) => ({
+// No password option for provider sessions, provider-only accounts, or demo accounts (they share one generated password).
+const publicUser = (user: DbUser, provider?: string) => ({
   id: user.id,
   email: user.email,
   username: user.username,
@@ -85,6 +89,7 @@ const publicUser = (user: DbUser) => ({
   customStatusEmoji: user.customStatusEmoji,
   createdAt: user.createdAt.toISOString(),
   updatedAt: user.updatedAt.toISOString(),
+  canChangePassword: !!user.passwordHash && !provider && !isDemoEmail(user.email),
 });
 
 export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
@@ -267,6 +272,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       email: user.email,
       username: user.username,
       systemRole: user.systemRole,
+      provider: 'microsoft',
     });
     // URL fragment: never sent to any server or logged; the login page stores it and strips it.
     return reply.redirect(`${clientUrl()}/login#token=${encodeURIComponent(token)}`);
@@ -274,7 +280,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
 
   // Get current user profile
   fastify.get('/me', { preHandler: [fastify.authenticate] }, async (request, reply) => {
-    const userPayload = request.user as { id: string };
+    const userPayload = request.user as SessionUser;
     const user = await prisma.user.findUnique({
       where: { id: userPayload.id },
     });
@@ -283,12 +289,12 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       return reply.status(404).send({ error: 'User not found' });
     }
 
-    return reply.send(publicUser(user));
+    return reply.send(publicUser(user, userPayload.provider));
   });
 
   // Update own profile (display name, username, avatar). Returns a fresh token since the JWT carries username.
   fastify.patch('/me', { preHandler: [fastify.authenticate] }, async (request, reply) => {
-    const { id } = request.user as { id: string };
+    const { id, provider } = request.user as SessionUser;
     const parsed = updateProfileSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.errors[0].message });
@@ -306,23 +312,33 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       email: user.email,
       username: user.username,
       systemRole: user.systemRole,
+      ...(provider && { provider }), // keep the session's sign-in method
     });
-    return reply.send({ accessToken, user: publicUser(user) });
+    return reply.send({ accessToken, user: publicUser(user, provider) });
   });
 
-  // Change own password. Microsoft-only accounts (no password yet) can set one without a current password.
+  // Change own password. Not available to provider (Microsoft) sessions, accounts without a password, or demo accounts.
   fastify.post('/me/password', { preHandler: [fastify.authenticate] }, async (request, reply) => {
-    const { id } = request.user as { id: string };
+    const { id, provider } = request.user as SessionUser;
+    if (provider) {
+      return reply.status(403).send({ error: 'Your password is managed by your sign-in provider' });
+    }
     const parsed = changePasswordSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.errors[0].message });
     }
 
-    const user = await prisma.user.findUnique({ where: { id }, select: { passwordHash: true } });
+    const user = await prisma.user.findUnique({ where: { id }, select: { passwordHash: true, email: true } });
     if (!user) return reply.status(404).send({ error: 'User not found' });
+    if (isDemoEmail(user.email)) {
+      return reply.status(403).send({ error: 'Demo accounts cannot change their password' });
+    }
 
     const { currentPassword, newPassword } = parsed.data;
-    if (user.passwordHash && !(await bcrypt.compare(currentPassword || '', user.passwordHash))) {
+    if (!user.passwordHash) {
+      return reply.status(403).send({ error: 'Your password is managed by your sign-in provider' });
+    }
+    if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
       return reply.status(400).send({ error: 'Current password is incorrect' });
     }
 
