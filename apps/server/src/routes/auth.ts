@@ -55,6 +55,38 @@ const loginSchema = z.object({
   password: z.string(),
 });
 
+// Only our own uploads or DiceBear presets — no arbitrary third-party URLs (tracking pixels etc.).
+const avatarUrlSchema = z
+  .string()
+  .max(500)
+  .refine((u) => u.startsWith('/api/files/download/') || u.startsWith('https://api.dicebear.com/'), 'Invalid avatar URL');
+
+const updateProfileSchema = z.object({
+  displayName: z.string().trim().min(1).max(50).optional(),
+  username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9_-]+$/, 'Username may only contain letters, numbers, _ and -').optional(),
+  avatarUrl: avatarUrlSchema.nullable().optional(),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().optional(),
+  newPassword: z.string().min(6, 'New password must be at least 6 characters'),
+});
+
+type DbUser = NonNullable<Awaited<ReturnType<typeof prisma.user.findUnique>>>;
+const publicUser = (user: DbUser) => ({
+  id: user.id,
+  email: user.email,
+  username: user.username,
+  displayName: user.displayName,
+  avatarUrl: user.avatarUrl,
+  systemRole: user.systemRole,
+  status: user.status,
+  customStatusText: user.customStatusText,
+  customStatusEmoji: user.customStatusEmoji,
+  createdAt: user.createdAt.toISOString(),
+  updatedAt: user.updatedAt.toISOString(),
+});
+
 export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   // Register
   fastify.post('/register', async (request, reply) => {
@@ -98,22 +130,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       systemRole: user.systemRole,
     });
 
-    return reply.status(201).send({
-      accessToken: token,
-      user: {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        displayName: user.displayName,
-        avatarUrl: user.avatarUrl,
-        systemRole: user.systemRole,
-        status: user.status,
-        customStatusText: user.customStatusText,
-        customStatusEmoji: user.customStatusEmoji,
-        createdAt: user.createdAt.toISOString(),
-        updatedAt: user.updatedAt.toISOString(),
-      },
-    });
+    return reply.status(201).send({ accessToken: token, user: publicUser(user) });
   });
 
   // Login
@@ -164,22 +181,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       systemRole: user.systemRole,
     });
 
-    return reply.send({
-      accessToken: token,
-      user: {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        displayName: user.displayName,
-        avatarUrl: user.avatarUrl,
-        systemRole: user.systemRole,
-        status: user.status,
-        customStatusText: user.customStatusText,
-        customStatusEmoji: user.customStatusEmoji,
-        createdAt: user.createdAt.toISOString(),
-        updatedAt: user.updatedAt.toISOString(),
-      },
-    });
+    return reply.send({ accessToken: token, user: publicUser(user) });
   });
 
   // Sign in with Microsoft: redirect to the Entra ID authorize endpoint
@@ -281,18 +283,50 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       return reply.status(404).send({ error: 'User not found' });
     }
 
-    return reply.send({
+    return reply.send(publicUser(user));
+  });
+
+  // Update own profile (display name, username, avatar). Returns a fresh token since the JWT carries username.
+  fastify.patch('/me', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { id } = request.user as { id: string };
+    const parsed = updateProfileSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.errors[0].message });
+    }
+
+    const { username } = parsed.data;
+    if (username) {
+      const taken = await prisma.user.findFirst({ where: { username, NOT: { id } }, select: { id: true } });
+      if (taken) return reply.status(409).send({ error: 'Username is already taken' });
+    }
+
+    const user = await prisma.user.update({ where: { id }, data: parsed.data });
+    const accessToken = fastify.jwt.sign({
       id: user.id,
       email: user.email,
       username: user.username,
-      displayName: user.displayName,
-      avatarUrl: user.avatarUrl,
       systemRole: user.systemRole,
-      status: user.status,
-      customStatusText: user.customStatusText,
-      customStatusEmoji: user.customStatusEmoji,
-      createdAt: user.createdAt.toISOString(),
-      updatedAt: user.updatedAt.toISOString(),
     });
+    return reply.send({ accessToken, user: publicUser(user) });
+  });
+
+  // Change own password. Microsoft-only accounts (no password yet) can set one without a current password.
+  fastify.post('/me/password', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { id } = request.user as { id: string };
+    const parsed = changePasswordSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.errors[0].message });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id }, select: { passwordHash: true } });
+    if (!user) return reply.status(404).send({ error: 'User not found' });
+
+    const { currentPassword, newPassword } = parsed.data;
+    if (user.passwordHash && !(await bcrypt.compare(currentPassword || '', user.passwordHash))) {
+      return reply.status(400).send({ error: 'Current password is incorrect' });
+    }
+
+    await prisma.user.update({ where: { id }, data: { passwordHash: await bcrypt.hash(newPassword, 10) } });
+    return reply.send({ success: true });
   });
 };

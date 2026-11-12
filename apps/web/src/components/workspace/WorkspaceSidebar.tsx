@@ -6,6 +6,8 @@ import { Workspace, UserProfile } from '@orbit/types';
 import { Plus, Layers, ShieldCheck, PenTool, FileText, Home } from 'lucide-react';
 import { api } from '../../lib/api';
 import { EmployeeAvailabilityHeader } from '../availability/EmployeeAvailabilityHeader';
+import { Presence, PRESENCE_STYLE } from '../availability/useTeamPresence';
+import { ProfileModal, defaultAvatar } from '../profile/ProfileModal';
 
 interface WorkspaceSidebarProps {
   workspaces: Workspace[];
@@ -18,6 +20,8 @@ interface WorkspaceSidebarProps {
   onGoHome?: () => void;
   onOpenCanvas?: () => void;
   onOpenDocs?: () => void;
+  presence?: Record<string, Presence>;
+  onLogout: () => void;
 }
 
 const railLabel = 'text-[10px] font-semibold leading-none';
@@ -32,8 +36,12 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   onGoHome,
   onOpenCanvas,
   onOpenDocs,
+  presence = {},
+  onLogout,
 }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const myPresence = (currentUser && presence[currentUser.id]) || 'offline';
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -162,6 +170,39 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
             <span className={railLabel} style={{ color: 'var(--theme-text-muted)' }}>Status</span>
           </div>
         </div>
+      )}
+
+      {/* Profile */}
+      {currentUser && (
+        <button
+          onClick={() => setShowProfile(true)}
+          title={`${currentUser.displayName} · ${PRESENCE_STYLE[myPresence].label}`}
+          className="group mt-auto flex flex-col items-center gap-1 shrink-0"
+        >
+          <span className="relative w-11 h-11">
+            <img
+              src={currentUser.avatarUrl || defaultAvatar(currentUser.username)}
+              alt={currentUser.displayName}
+              className="w-11 h-11 rounded-xl object-cover transition-all duration-200 group-hover:rounded-2xl"
+              style={{ backgroundColor: 'var(--theme-bg-surface)' }}
+            />
+            <span
+              className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ${PRESENCE_STYLE[myPresence].dot}`}
+              style={{ boxShadow: '0 0 0 2px var(--theme-bg-workspace)' }}
+            />
+          </span>
+          <span className={railLabel} style={{ color: 'var(--theme-text-muted)' }}>Profile</span>
+        </button>
+      )}
+
+      {showProfile && currentUser && (
+        <ProfileModal
+          user={currentUser}
+          workspaceId={currentWorkspace?.id}
+          presence={myPresence}
+          onClose={() => setShowProfile(false)}
+          onLogout={onLogout}
+        />
       )}
 
       {/* Create Workspace Modal */}

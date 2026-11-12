@@ -46,6 +46,8 @@ import { CompressFileConfirmModal } from './CompressFileConfirmModal';
 import { compressFile } from '../../lib/compression';
 import { PinnedMessagesModal } from './PinnedMessagesModal';
 import { AnonymousPersonaModal } from '../channel/AnonymousPersonaModal';
+import { UserHoverCard } from './UserHoverCard';
+import { Presence } from '../availability/useTeamPresence';
 
 
 interface ChatAreaProps {
@@ -67,6 +69,8 @@ interface ChatAreaProps {
   onSelectChannel?: (channel: Channel) => void;
   activeView: 'messages' | 'whiteboard';
   onChangeView: (view: 'messages' | 'whiteboard') => void;
+  presence?: Record<string, Presence>;
+  onHuddleUser?: (user: UserProfile) => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -88,6 +92,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onSelectChannel,
   activeView,
   onChangeView: setActiveView,
+  presence = {},
+  onHuddleUser,
 }) => {
   const [content, setContent] = useState('');
   const sendingRef = useRef(false);
@@ -877,6 +883,23 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             const avatarUrl = isBot
               ? (msg.bot?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${msg.bot?.name}`)
               : (msg.user?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${authorName}`);
+            // Profile hover card: real people only (not bots / anonymous posts)
+            const author = !isAnon && !isBot ? msg.user : undefined;
+            const withCard = (node: React.ReactNode, className?: string) =>
+              author ? (
+                <UserHoverCard
+                  user={author}
+                  presence={presence[author.id] || 'offline'}
+                  isSelf={author.id === currentUser.id}
+                  onMessage={() => onSelectUserDM?.(author as UserProfile)}
+                  onHuddle={() => onHuddleUser?.(author as UserProfile)}
+                  className={className}
+                >
+                  {node}
+                </UserHoverCard>
+              ) : (
+                node
+              );
 
             return (
               <div
@@ -894,7 +917,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     {anonEmoji}
                   </div>
                 ) : (
-                  <img src={avatarUrl} alt={authorName} className="w-9 h-9 rounded-lg object-cover shrink-0 mt-0.5" />
+                  withCard(
+                    <img src={avatarUrl} alt={authorName} className="w-9 h-9 rounded-lg object-cover shrink-0 mt-0.5 cursor-pointer" />,
+                    'shrink-0 self-start',
+                  )
                 )}
 
                 <div className="flex-1 min-w-0">
@@ -905,6 +931,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     </div>
                   )}
                   <div className="flex items-center gap-2">
+                    {withCard(
                     <span
                       className="font-bold text-sm hover:underline cursor-pointer flex items-center gap-1.5"
                       style={{ color: 'var(--theme-text-primary)' }}
@@ -933,6 +960,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         </span>
                       ) : null}
                     </span>
+                    )}
                     <span className="text-[11px]" style={{ color: 'var(--theme-text-muted)' }}>
                       {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>

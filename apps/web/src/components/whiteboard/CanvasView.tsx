@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { useResizableSidebar } from '../layout/useResizableSidebar';
 import { Canvas, Channel, UserProfile } from '@orbit/types';
 import { Plus, Search, PenTool, Trash2, Link2, PanelLeft, X } from 'lucide-react';
 import { api } from '../../lib/api';
@@ -30,6 +31,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const sidebar = useResizableSidebar('orbit_canvas_sidebar_width');
   const [isSidebarOpen, setIsSidebarOpen] = useState(
     () => typeof window === 'undefined' || window.innerWidth >= 768
   );
@@ -203,11 +205,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
       <div
         className={`${
           isSidebarOpen
-            ? 'w-64 max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:shadow-2xl'
+            ? 'w-64 md:w-[var(--sidebar-w)] max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:shadow-2xl'
             : 'w-0'
-        } shrink-0 border-r flex flex-col h-full select-none transition-all duration-200 overflow-hidden`}
-        style={{ backgroundColor: 'var(--theme-bg-sidebar)', borderColor: 'var(--theme-border)' }}
+        } shrink-0 border-r flex flex-col h-full select-none ${sidebar.dragging ? '' : 'transition-all duration-200'} overflow-hidden relative`}
+        style={{ backgroundColor: 'var(--theme-bg-sidebar)', borderColor: 'var(--theme-border)', ...sidebar.style }}
       >
+        {sidebar.handle}
         <div
           className="h-14 border-b px-3 sm:px-4 flex items-center justify-between gap-2 shrink-0"
           style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)' }}

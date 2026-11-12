@@ -38,6 +38,7 @@ import { CreateTicketFromMessageDialog } from "@/components/project/CreateTicket
 import { OrganizationControlView } from "@/components/availability/OrganizationControlView";
 import { CanvasView } from "@/components/whiteboard/CanvasView";
 import { ProjectDocsView } from "@/components/project/ProjectDocsView";
+import { useTeamPresence } from "@/components/availability/useTeamPresence";
 import {
   Layers,
   ShieldCheck,
@@ -72,6 +73,8 @@ export default function AppDashboard() {
     setTypingUser,
     incrementUnread,
   } = useChatStore();
+  // Check-in driven presence (working / break / offline) for everyone in the workspace
+  const presence = useTeamPresence(currentWorkspace?.id);
 
   const {
     startHuddle,
@@ -438,6 +441,7 @@ export default function AppDashboard() {
       }
 
       handleSelectChannel(dmChannel);
+      return dmChannel;
     } catch (err) {
       console.error("Failed to open direct message", err);
     }
@@ -821,6 +825,8 @@ export default function AppDashboard() {
   // Workspace rail feature shortcuts (Home / Canvas / Docs)
   const docsActive = showDocsHub && !!currentWorkspace;
   const railProps = {
+    presence,
+    onLogout: logout,
     activeFeature: showCanvasHub ? ("canvas" as const) : docsActive ? ("docs" as const) : ("home" as const),
     // Home: back to the channel / project view
     onGoHome: currentWorkspace
@@ -918,7 +924,7 @@ export default function AppDashboard() {
                   setIsMobileSidebarOpen(false);
                   handleStartHuddle(ch);
                 }}
-                onLogout={logout}
+                presence={presence}
                 onOpenSearch={() => {
                   setIsMobileSidebarOpen(false);
                   setShowSearchModal(true);
@@ -980,7 +986,7 @@ export default function AppDashboard() {
             }}
             onOpenBotPortal={() => setShowBotPortal(true)}
             onStartHuddle={handleStartHuddle}
-            onLogout={logout}
+            presence={presence}
             onOpenSearch={() => setShowSearchModal(true)}
             onOpenOrganizationControl={() => {
               handleOpenOrgControl();
@@ -1188,6 +1194,11 @@ export default function AppDashboard() {
           members={members}
           onSelectUserDM={handleSelectUserDM}
           onSelectChannel={handleSelectChannel}
+          presence={presence}
+          onHuddleUser={async (u) => {
+            const dm = await handleSelectUserDM(u);
+            if (dm) handleStartHuddle(dm);
+          }}
           activeView={chatView}
           onChangeView={setChatView}
         />

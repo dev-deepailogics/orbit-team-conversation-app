@@ -2,6 +2,8 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { Workspace, Channel, UserProfile, Project } from "@orbit/types";
+import { Presence, PRESENCE_STYLE } from "../availability/useTeamPresence";
+import { useResizableSidebar } from "../layout/useResizableSidebar";
 import {
   Hash,
   Lock,
@@ -10,7 +12,6 @@ import {
   PhoneCall,
   Bot,
   UserPlus,
-  LogOut,
   HardDrive,
   X,
   Search,
@@ -25,6 +26,18 @@ import { WorkspaceStorageModal } from "../workspace/WorkspaceStorageModal";
 import { AddWorkspaceMemberDialog } from "../workspace/AddWorkspaceMemberDialog";
 import { ThemeModal } from "../theme/ThemeModal";
 import { OrganizationControlModal } from "../availability/OrganizationControlModal";
+
+/** Animates a section open/closed (grid 0fr -> 1fr). Collapsed content is inert so it can't be tabbed into. */
+const Collapse: React.FC<{ open: boolean; children: React.ReactNode }> = ({ open, children }) => (
+  <div
+    className="grid transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none"
+    style={{ gridTemplateRows: open ? "1fr" : "0fr", opacity: open ? 1 : 0 }}
+    // React 18 drops boolean `inert`; the empty-string attribute is what browsers read.
+    {...(open ? {} : ({ inert: "" } as object))}
+  >
+    <div className="min-h-0 overflow-hidden">{children}</div>
+  </div>
+);
 
 interface ChannelSidebarProps {
   workspace: Workspace;
@@ -42,7 +55,7 @@ interface ChannelSidebarProps {
   onOpenCreateProject?: () => void;
   onOpenBotPortal: () => void;
   onStartHuddle: (channel: Channel) => void;
-  onLogout: () => void;
+  presence?: Record<string, Presence>;
   onOpenSearch?: () => void;
   onOpenOrganizationControl?: () => void;
   onCloseMobile?: () => void;
@@ -65,13 +78,14 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   onOpenCreateProject,
   onOpenBotPortal,
   onStartHuddle,
-  onLogout,
+  presence = {},
   onOpenSearch,
   onOpenOrganizationControl,
   onCloseMobile,
   onMemberAdded,
 }) => {
   const [showCreateChannel, setShowCreateChannel] = useState(false);
+  const sidebar = useResizableSidebar("orbit_sidebar_width");
   const [showStorageModal, setShowStorageModal] = useState(false);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [showThemeModal, setShowThemeModal] = useState(false);
@@ -147,12 +161,15 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 
   return (
     <div
-      className="w-64 border-r flex flex-col h-full select-none"
+      className="relative w-64 md:w-[var(--sidebar-w)] border-r flex flex-col h-full select-none"
       style={{
         backgroundColor: "var(--theme-bg-sidebar)",
         borderColor: "var(--theme-border)",
+        ...sidebar.style,
       }}
     >
+      {sidebar.handle}
+
       {/* Workspace Header with Dropdown */}
       <div
         ref={workspaceMenuRef}
@@ -318,7 +335,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
       </div>
 
       {/* Channel & DMs List */}
-      <div className="flex-1 overflow-y-auto px-2 py-3 space-y-4">
+      <div className="flex-1 overflow-y-auto px-2 py-3 space-y-3">
         {/* Quick Search Bar */}
         {onOpenSearch && (
           <div className="px-1 mb-2">
@@ -356,7 +373,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
         {/* Projects & Boards Section (Trello-like) */}
         <div>
           <div
-            className="flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-wider mb-1 select-none"
+            className="flex items-center justify-between h-7 px-2 text-[15px] font-medium select-none"
             style={{ color: "var(--theme-text-muted)" }}
           >
             <button
@@ -388,7 +405,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
             )}
           </div>
 
-          {!isProjectsCollapsed && (
+          <Collapse open={!isProjectsCollapsed}>
             <div className="space-y-0.5">
               {projects
                 .filter(
@@ -403,9 +420,9 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                     <div
                       key={project.id}
                       onClick={() => onSelectProject?.(project)}
-                      className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
+                      className={`group flex items-center justify-between h-7 pl-5 pr-2 rounded-md text-[15px] transition cursor-pointer ${
                         isActive
-                          ? "shadow font-semibold"
+                          ? "shadow"
                           : "hover:bg-black/5 dark:hover:bg-white/10"
                       }`}
                       style={
@@ -450,7 +467,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
               {projects.length === 0 && onOpenCreateProject && (
                 <button
                   onClick={onOpenCreateProject}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-2 cursor-pointer"
+                  className="w-full text-left h-7 pl-5 pr-2 rounded-md text-[15px] hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-2 cursor-pointer"
                   style={{ color: "var(--theme-text-muted)" }}
                 >
                   <Plus size={12} />
@@ -458,13 +475,13 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 </button>
               )}
             </div>
-          )}
+          </Collapse>
         </div>
 
         {/* Channels Section */}
         <div>
           <div
-            className="flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-wider mb-1 select-none"
+            className="flex items-center justify-between h-7 px-2 text-[15px] font-medium select-none"
             style={{ color: "var(--theme-text-muted)" }}
           >
             <button
@@ -487,7 +504,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
             </button>
           </div>
 
-          {!isChannelsCollapsed && (
+          <Collapse open={!isChannelsCollapsed}>
             <div className="space-y-0.5">
               {channels
                 .filter((c) => c.type !== "DIRECT")
@@ -500,9 +517,9 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                     <div
                       key={channel.id}
                       onClick={() => onSelectChannel(channel)}
-                      className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
+                      className={`group flex items-center justify-between h-7 pl-5 pr-2 rounded-md text-[15px] transition cursor-pointer ${
                         isActive
-                          ? "shadow font-semibold"
+                          ? "shadow"
                           : unread > 0
                             ? "font-bold bg-black/5 dark:bg-white/10"
                             : "hover:bg-black/5 dark:hover:bg-white/10"
@@ -589,13 +606,13 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                   );
                 })}
             </div>
-          )}
+          </Collapse>
         </div>
 
         {/* Direct Messages Section */}
         <div>
           <div
-            className="flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-wider mb-1 select-none"
+            className="flex items-center justify-between h-7 px-2 text-[15px] font-medium select-none"
             style={{ color: "var(--theme-text-muted)" }}
           >
             <button
@@ -608,11 +625,11 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                   isDmsCollapsed ? "-rotate-90" : "rotate-0"
                 }`}
               />
-              <span>Direct Messages</span>
+              <span>Direct messages</span>
             </button>
           </div>
 
-          {!isDmsCollapsed && (
+          <Collapse open={!isDmsCollapsed}>
             <div className="space-y-0.5">
               {(() => {
                 // Collect users from members + any user from existing DIRECT channels (e.g. kicked users with chat history)
@@ -649,7 +666,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 return dmList.map((member) => {
                   const user = member.user;
                   if (!user) return null;
-                  const isOnline = user.status === "ONLINE";
+                  const userPresence = presence[user.id] || "offline";
                   const isSelf = user.id === currentUser?.id;
 
                   // Find matching DM channel to check selection and unread counts
@@ -687,9 +704,9 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                     <div
                       key={member.id}
                       onClick={() => onSelectUserDM(user)}
-                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
+                      className={`flex items-center justify-between h-7 pl-5 pr-2 rounded-md text-[15px] transition cursor-pointer ${
                         isSelectedDM
-                          ? "shadow font-semibold"
+                          ? "shadow"
                           : unread > 0
                             ? "font-bold bg-black/5 dark:bg-white/10"
                             : "hover:bg-black/5 dark:hover:bg-white/10"
@@ -705,7 +722,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                             }
                       }
                     >
-                      <div className="flex items-center gap-2.5 truncate min-w-0">
+                      <div className="flex items-center gap-2 truncate min-w-0">
                         <div className="relative shrink-0">
                           <img
                             src={
@@ -713,12 +730,12 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                               `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`
                             }
                             alt={user.displayName}
-                            className="w-5 h-5 rounded-md object-cover"
+                            className="w-5 h-5 rounded object-cover"
                           />
                           <span
-                            className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-1 ring-black/40 ${
-                              isOnline ? "bg-slack-green" : "bg-gray-500"
-                            }`}
+                            title={PRESENCE_STYLE[userPresence].label}
+                            className={`absolute bottom-0 right-0 w-[7px] h-[7px] rounded-full ${PRESENCE_STYLE[userPresence].dot}`}
+                            style={{ boxShadow: "0 0 0 1.5px var(--theme-bg-sidebar)" }}
                           />
                         </div>
                         <span className="truncate">{user.displayName}</span>
@@ -742,57 +759,9 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 });
               })()}
             </div>
-          )}
+          </Collapse>
         </div>
       </div>
-
-      {/* User Bottom Bar */}
-      {currentUser && (
-        <div
-          className="h-14 border-t px-3 flex items-center justify-between"
-          style={{
-            backgroundColor: "var(--theme-bg-surface)",
-            borderColor: "var(--theme-border)",
-          }}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="relative">
-              <img
-                src={
-                  currentUser.avatarUrl ||
-                  `https://api.dicebear.com/7.x/bottts/svg?seed=${currentUser.username}`
-                }
-                alt={currentUser.displayName}
-                className="w-8 h-8 rounded-lg object-cover"
-              />
-              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-slack-green rounded-full ring-2 ring-black/30" />
-            </div>
-            <div className="truncate">
-              <p
-                className="text-sm font-semibold truncate leading-tight"
-                style={{ color: "var(--theme-text-primary)" }}
-              >
-                {currentUser.displayName}
-              </p>
-              <p
-                className="text-xs truncate"
-                style={{ color: "var(--theme-text-muted)" }}
-              >
-                @{currentUser.username}
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={onLogout}
-            title="Log out"
-            style={{ color: "var(--theme-text-muted)" }}
-            className="p-1.5 hover:text-red-400 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition"
-          >
-            <LogOut size={16} />
-          </button>
-        </div>
-      )}
 
       {/* Create Channel Modal */}
       {showCreateChannel && (

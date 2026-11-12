@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useResizableSidebar } from '../layout/useResizableSidebar';
 import {
   ProjectDocument,
   UserProfile,
@@ -78,6 +79,7 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
   const [isLoadingDocs, setIsLoadingDocs] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'project' | 'shared' | 'private'>('all');
+  const sidebar = useResizableSidebar('orbit_docs_sidebar_width');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   // Active doc editing state
@@ -326,14 +328,16 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
       <div
         className={`${
           isSidebarOpen
-            ? 'w-64 max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:shadow-2xl'
+            ? 'w-64 md:w-[var(--sidebar-w)] max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:shadow-2xl'
             : 'w-0 max-md:-translate-x-full'
-        } shrink-0 border-r flex flex-col h-full transition-all duration-200 overflow-hidden relative`}
+        } shrink-0 border-r flex flex-col h-full ${sidebar.dragging ? '' : 'transition-all duration-200'} overflow-hidden relative`}
         style={{
           backgroundColor: 'var(--theme-bg-sidebar)',
           borderColor: 'var(--theme-border)',
+          ...sidebar.style,
         }}
       >
+        {sidebar.handle}
         {/* Sidebar Header & New Doc (styled like the channels / DMs sidebar) */}
         <div
           className="h-14 border-b px-3 sm:px-4 flex items-center justify-between gap-2 shrink-0"
