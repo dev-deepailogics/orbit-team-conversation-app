@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { Workspace, UserProfile } from '@orbit/types';
-import { Plus, Hash, Layers, ShieldCheck, PenTool, FileText } from 'lucide-react';
+import { Plus, Layers, ShieldCheck, PenTool, FileText, Home } from 'lucide-react';
 import { api } from '../../lib/api';
 import { EmployeeAvailabilityHeader } from '../availability/EmployeeAvailabilityHeader';
 
@@ -13,11 +13,14 @@ interface WorkspaceSidebarProps {
   currentUser?: UserProfile | null;
   onSelectWorkspace: (workspace: Workspace) => void;
   onWorkspaceCreated: (workspace: Workspace) => void;
-  activeFeature?: 'canvas' | 'docs' | null;
+  activeFeature?: 'home' | 'canvas' | 'docs' | null;
   // Handlers are undefined when the feature has no target (no channel / no project)
+  onGoHome?: () => void;
   onOpenCanvas?: () => void;
   onOpenDocs?: () => void;
 }
+
+const railLabel = 'text-[10px] font-semibold leading-none';
 
 export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   workspaces,
@@ -26,6 +29,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   onSelectWorkspace,
   onWorkspaceCreated,
   activeFeature,
+  onGoHome,
   onOpenCanvas,
   onOpenDocs,
 }) => {
@@ -122,8 +126,9 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
 
       {/* Feature Shortcuts */}
       {currentWorkspace && (
-        <div className="flex flex-col items-center gap-3 w-full px-2 pt-3 border-t" style={{ borderColor: 'var(--theme-border)' }}>
+        <div className="flex flex-col items-center gap-2 w-full px-1 pt-3 border-t" style={{ borderColor: 'var(--theme-border)' }}>
           {([
+            { key: 'home', label: 'Home', Icon: Home, onClick: onGoHome },
             { key: 'canvas', label: 'Canvas', Icon: PenTool, onClick: onOpenCanvas },
             { key: 'docs', label: 'Docs', Icon: FileText, onClick: onOpenDocs },
           ] as const).map(({ key, label, Icon, onClick }) => {
@@ -134,18 +139,28 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                 onClick={onClick}
                 disabled={!onClick}
                 title={label}
-                className="w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 hover:rounded-2xl disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{
-                  backgroundColor: isActive ? 'var(--theme-primary)' : 'var(--theme-bg-surface)',
-                  color: isActive ? 'var(--theme-primary-text)' : 'var(--theme-text-primary)',
-                }}
+                className="group flex flex-col items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <Icon size={20} />
+                <span
+                  className="w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 group-hover:rounded-2xl"
+                  style={{
+                    backgroundColor: isActive ? 'var(--theme-primary)' : 'var(--theme-bg-surface)',
+                    color: isActive ? 'var(--theme-primary-text)' : 'var(--theme-text-primary)',
+                  }}
+                >
+                  <Icon size={20} />
+                </span>
+                <span className={railLabel} style={{ color: isActive ? 'var(--theme-text-primary)' : 'var(--theme-text-muted)' }}>
+                  {label}
+                </span>
               </button>
             );
           })}
 
-          <EmployeeAvailabilityHeader currentUserId={currentUser?.id} />
+          <div className="flex flex-col items-center gap-1">
+            <EmployeeAvailabilityHeader currentUserId={currentUser?.id} />
+            <span className={railLabel} style={{ color: 'var(--theme-text-muted)' }}>Status</span>
+          </div>
         </div>
       )}
 

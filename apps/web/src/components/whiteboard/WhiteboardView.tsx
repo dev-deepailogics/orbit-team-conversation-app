@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Channel, UserProfile } from '@orbit/types';
+import { Canvas, UserProfile } from '@orbit/types';
 import {
   MousePointer,
   Hand,
@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
+import { useThemeStore } from '../../stores/themeStore';
 
 // Convert stored markdown to live HTML for contentEditable
 function markdownToHtml(md: string): string {
@@ -193,13 +194,15 @@ interface PeerCursor {
 }
 
 interface WhiteboardViewProps {
-  channel: Channel;
+  canvas: Pick<Canvas, 'id' | 'title' | 'workspaceId'>;
   currentUser: UserProfile | null;
   onClose?: () => void;
+  // Replaces the title in the floating header (e.g. rename + link controls)
+  headerSlot?: React.ReactNode;
 }
 
 const COLOR_PALETTE = [
-  '#FFFFFF', // White
+  '#FFFFFF', // Ink: rendered in the theme's text color (white on dark, dark on light)
   '#007A5A', // Slack Green
   '#36C5F0', // Slack Cyan
   '#ECB22E', // Slack Gold
@@ -226,10 +229,15 @@ const FONT_SIZES = [
 ];
 
 export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
-  channel,
+  canvas,
   currentUser,
   onClose,
+  headerSlot,
 }) => {
+  // Canvas colors follow the active theme. '#FFFFFF' is stored as the "ink" color
+  // and drawn in the theme's text color so it stays visible on light backgrounds.
+  const theme = useThemeStore((s) => s.currentTheme);
+  const ink = (c?: string) => (!c || c.toUpperCase() === '#FFFFFF' ? theme.textColor : c);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const inlineContentEditableRef = useRef<HTMLDivElement | null>(null);
@@ -287,14 +295,14 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 1. Fetch channel whiteboard data on load
+  // 1. Fetch canvas data on load
   useEffect(() => {
     let isMounted = true;
     const loadWhiteboard = async () => {
       try {
-        const res = await api.get(`/api/channels/${channel.id}/whiteboard`);
-        if (isMounted && res.data.whiteboardData?.elements) {
-          const loaded = res.data.whiteboardData.elements;
+        const res = await api.get(`/api/canvases/${canvas.id}`);
+        if (isMounted && res.data.data?.elements) {
+          const loaded = res.data.data.elements;
           setElements(loaded);
           setHistory([loaded]);
           setHistoryIndex(0);
@@ -308,7 +316,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [channel.id]);
+  }, [canvas.id]);
 
   // 2. Debounced Auto-save to Server
   const saveWhiteboardToServer = useCallback(
@@ -317,8 +325,8 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       saveTimeoutRef.current = setTimeout(async () => {
         try {
           setIsSaving(true);
-          await api.put(`/api/channels/${channel.id}/whiteboard`, {
-            whiteboardData: { elements: newElements },
+          await api.put(`/api/canvases/${canvas.id}/data`, {
+            data: { elements: newElements },
           });
         } catch (err) {
           console.error('Failed to auto-save whiteboard', err);
@@ -327,7 +335,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         }
       }, 1000);
     },
-    [channel.id]
+    [canvas.id]
   );
 
   // History Commit
@@ -341,7 +349,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
 
     const socket = getSocket();
     socket.emit('whiteboard:update', {
-      channelId: channel.id,
+      canvasId: canvas.id,
       data: { elements: newElements },
     });
   };
@@ -404,7 +412,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           const filtered = prev.filter((item) => item.id !== targetId);
           saveWhiteboardToServer(filtered);
           getSocket().emit('whiteboard:update', {
-            channelId: channel.id,
+            canvasId: canvas.id,
             data: { elements: filtered },
           });
           return filtered;
@@ -415,7 +423,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         );
         saveWhiteboardToServer(updated);
         getSocket().emit('whiteboard:update', {
-          channelId: channel.id,
+          canvasId: canvas.id,
           data: { elements: updated },
         });
         return updated;
@@ -424,7 +432,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       setEditingId(null);
       setEditText('');
     },
-    [editingId, editText, channel.id, saveWhiteboardToServer]
+    [editingId, editText, canvas.id, saveWhiteboardToServer]
   );
 
   // Clean up autoSave timer on unmount
@@ -459,11 +467,11 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
 
   // 2. Real-time collaboration socket listeners
   useEffect(() => {
-    const socket = getSocket(currentUser?.id, channel.workspaceId);
-    socket.emit('channel:join', channel.id);
+    const socket = getSocket(currentUser?.id, canvas.workspaceId);
+    socket.emit('canvas:join', canvas.id);
 
-    const onWhiteboardUpdate = (payload: { channelId: string; data: any; userId: string }) => {
-      if (payload.channelId === channel.id && payload.userId !== currentUser?.id) {
+    const onWhiteboardUpdate = (payload: { canvasId: string; data: any; userId: string }) => {
+      if (payload.canvasId === canvas.id && payload.userId !== currentUser?.id) {
         if (payload.data?.elements) {
           setElements(payload.data.elements);
         }
@@ -471,12 +479,12 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     };
 
     const onWhiteboardCursor = (payload: {
-      channelId: string;
+      canvasId: string;
       cursor: { x: number; y: number };
       user: { displayName: string; avatarUrl?: string };
       userId: string;
     }) => {
-      if (payload.channelId === channel.id && payload.userId !== currentUser?.id) {
+      if (payload.canvasId === canvas.id && payload.userId !== currentUser?.id) {
         setPeerCursors((prev) => ({
           ...prev,
           [payload.userId]: {
@@ -492,8 +500,8 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       }
     };
 
-    const onWhiteboardClear = (payload: { channelId: string }) => {
-      if (payload.channelId === channel.id) {
+    const onWhiteboardClear = (payload: { canvasId: string }) => {
+      if (payload.canvasId === canvas.id) {
         setElements([]);
         setHistory([[]]);
         setHistoryIndex(0);
@@ -526,9 +534,10 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       socket.off('whiteboard:update', onWhiteboardUpdate);
       socket.off('whiteboard:cursor', onWhiteboardCursor);
       socket.off('whiteboard:clear', onWhiteboardClear);
+      socket.emit('canvas:leave', canvas.id);
       clearInterval(cursorInterval);
     };
-  }, [channel.id, channel.workspaceId, currentUser?.id]);
+  }, [canvas.id, canvas.workspaceId, currentUser?.id]);
 
   const handleUndo = () => {
     if (historyIndex > 0) {
@@ -536,7 +545,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       setHistoryIndex(historyIndex - 1);
       setElements(prev);
       saveWhiteboardToServer(prev);
-      getSocket().emit('whiteboard:update', { channelId: channel.id, data: { elements: prev } });
+      getSocket().emit('whiteboard:update', { canvasId: canvas.id, data: { elements: prev } });
     }
   };
 
@@ -546,7 +555,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       setHistoryIndex(historyIndex + 1);
       setElements(next);
       saveWhiteboardToServer(next);
-      getSocket().emit('whiteboard:update', { channelId: channel.id, data: { elements: next } });
+      getSocket().emit('whiteboard:update', { canvasId: canvas.id, data: { elements: next } });
     }
   };
 
@@ -562,7 +571,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       commitElements([]);
       setSelectedElementId(null);
       setEditingId(null);
-      await api.delete(`/api/channels/${channel.id}/whiteboard`);
+      getSocket().emit('whiteboard:clear', { canvasId: canvas.id });
       setShowClearModal(false);
       setClearConfirmText('');
     } catch (err) {
@@ -635,7 +644,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
   const emitCursor = (coords: { x: number; y: number }) => {
     if (currentUser) {
       getSocket().emit('whiteboard:cursor', {
-        channelId: channel.id,
+        canvasId: canvas.id,
         cursor: coords,
         user: {
           displayName: currentUser.displayName,
@@ -983,12 +992,12 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       );
       saveWhiteboardToServer(updated);
       getSocket().emit('whiteboard:update', {
-        channelId: channel.id,
+        canvasId: canvas.id,
         data: { elements: updated },
       });
       return updated;
     });
-  }, [selectedElementId, channel.id, saveWhiteboardToServer]);
+  }, [selectedElementId, canvas.id, saveWhiteboardToServer]);
 
   const executeExecCommand = (command: string, value: string | undefined = undefined) => {
     const editor = inlineContentEditableRef.current;
@@ -1249,12 +1258,12 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     }
 
     // Background Canvas
-    ctx.fillStyle = '#141618';
+    ctx.fillStyle = theme.backgroundColor;
     ctx.fillRect(0, 0, width, height);
 
     // Dynamic Infinite Grid Dots
     ctx.save();
-    ctx.fillStyle = '#262A2E';
+    ctx.fillStyle = theme.borderColor;
     const dotSpacing = 28 * zoom;
     const offsetX = (pan.x % dotSpacing + dotSpacing) % dotSpacing;
     const offsetY = (pan.y % dotSpacing + dotSpacing) % dotSpacing;
@@ -1361,11 +1370,11 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           // Draw code chip background
           if (isCode) {
             ctx.save();
-            ctx.fillStyle = '#262A2E';
+            ctx.fillStyle = theme.surfaceHoverColor || theme.surfaceColor;
             ctx.beginPath();
             ctx.roundRect(currentX - 2, currentY - fontSize + 2, textWidth + 4, fontSize * 1.2, 4);
             ctx.fill();
-            ctx.strokeStyle = '#383F45';
+            ctx.strokeStyle = theme.borderColor;
             ctx.lineWidth = 1;
             ctx.stroke();
             ctx.restore();
@@ -1401,8 +1410,8 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       const isCurrentlyEditing = editingId === el.id;
 
       ctx.save();
-      ctx.strokeStyle = el.color;
-      ctx.fillStyle = el.fillColor || el.color;
+      ctx.strokeStyle = ink(el.color);
+      ctx.fillStyle = el.fillColor || ink(el.color);
       ctx.lineWidth = el.strokeWidth;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
@@ -1419,7 +1428,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         const h = el.height || 0;
         ctx.beginPath();
         ctx.roundRect(el.x, el.y, w, h, 8);
-        ctx.fillStyle = el.color + '18';
+        ctx.fillStyle = ink(el.color) + '18';
         ctx.fill();
         ctx.stroke();
       } else if (el.type === 'circle') {
@@ -1429,7 +1438,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         const cy = el.y + (el.height || 0) / 2;
         ctx.beginPath();
         ctx.ellipse(cx, cy, Math.max(1, rx), Math.max(1, ry), 0, 0, Math.PI * 2);
-        ctx.fillStyle = el.color + '18';
+        ctx.fillStyle = ink(el.color) + '18';
         ctx.fill();
         ctx.stroke();
       } else if ((el.type === 'arrow' || el.type === 'line') && el.points && el.points.length === 2) {
@@ -1534,7 +1543,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
             el.text || '',
             el.x,
             el.y + 20,
-            el.color || '#FFFFFF',
+            ink(el.color),
             el.fontSize || 18,
             el.isBold
           );
@@ -1570,7 +1579,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     });
 
     ctx.restore();
-  }, [elements, currentElement, zoom, pan, selectedElementId, editingId, fontLoaded]);
+  }, [elements, currentElement, zoom, pan, selectedElementId, editingId, fontLoaded, theme]);
 
   // Export to PNG Image
   const handleExportImage = () => {
@@ -1579,7 +1588,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     const url = canvas.toDataURL('image/png');
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${channel.name}-brainstorm-canvas.png`;
+    a.download = `${canvas.title || 'canvas'}.png`;
     a.click();
   };
 
@@ -1601,7 +1610,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
             <Sparkles size={15} className="text-slack-green animate-pulse shrink-0" />
             <span className="font-bold text-xs sm:text-sm text-[var(--theme-text)] truncate max-w-[100px] sm:max-w-none">
-              #{channel.name} Canvas
+              {headerSlot ?? canvas.title}
             </span>
           </div>
 
@@ -1885,7 +1894,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
                 <button
                   key={c}
                   onClick={() => setActiveColor(c)}
-                  style={{ backgroundColor: c }}
+                  style={{ backgroundColor: ink(c) }}
                   className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full transition transform hover:scale-125 border shrink-0 ${
                     activeColor === c
                       ? 'ring-2 ring-slack-green ring-offset-2 ring-offset-[var(--theme-bg-surface)]'
@@ -2002,7 +2011,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
                       );
                       saveWhiteboardToServer(updated);
                       getSocket().emit('whiteboard:update', {
-                        channelId: channel.id,
+                        canvasId: canvas.id,
                         data: { elements: updated },
                       });
                       return updated;
@@ -2025,11 +2034,11 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
               color:
                 editingElement.type === 'sticky'
                   ? editingElement.color
-                  : editingElement.color || '#FFFFFF',
+                  : ink(editingElement.color),
               backgroundColor:
                 editingElement.type === 'sticky'
                   ? editingElement.fillColor
-                  : 'rgba(24, 27, 31, 0.92)',
+                  : 'var(--theme-bg-surface)',
               border:
                 editingElement.type === 'sticky'
                   ? `2px dashed ${editingElement.color}40`
@@ -2122,7 +2131,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
             </div>
 
             <p className="text-sm text-[var(--theme-text)] mb-4 leading-relaxed">
-              This will permanently delete all drawings, shapes, sticky notes, and text for everyone on <span className="font-semibold text-[var(--theme-text)]">#{channel.name}</span>. This action cannot be undone.
+              This will permanently delete all drawings, shapes, sticky notes, and text for everyone on <span className="font-semibold text-[var(--theme-text)]">{canvas.title}</span>. This action cannot be undone.
             </p>
 
             <div className="bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-xl p-3 mb-5">

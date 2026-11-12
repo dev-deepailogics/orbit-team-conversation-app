@@ -61,6 +61,19 @@ export async function canUserAccessChannel(userId: string, channelId: string): P
 }
 
 /**
+ * Canvas access: canvases linked to a channel inherit that channel's access;
+ * unlinked or project-linked canvases are visible to the whole workspace.
+ */
+export async function canUserAccessCanvas(
+  userId: string,
+  canvas: { workspaceId: string; channelId: string | null }
+): Promise<boolean> {
+  return canvas.channelId
+    ? canUserAccessChannel(userId, canvas.channelId)
+    : canUserAccessWorkspace(userId, canvas.workspaceId);
+}
+
+/**
  * HTTP Guard: Verifies workspace membership.
  * Sends 403 response if unauthorized.
  */

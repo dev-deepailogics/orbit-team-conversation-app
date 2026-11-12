@@ -30,6 +30,7 @@ import {
   performAutoCheckoutBackfill,
 } from "./routes/availability.js";
 import { driveRoutes } from "./routes/drive.js";
+import { canvasRoutes } from "./routes/canvases.js";
 import { registerPushMiddleware } from "./services/pushService.js";
 
 import { setupSocketServer } from "./socket/index.js";
@@ -160,6 +161,7 @@ async function bootstrap() {
   await fastify.register(pushRoutes, { prefix: "/api/push" });
   await fastify.register(availabilityRoutes, { prefix: "/api/availability" });
   await fastify.register(driveRoutes, { prefix: "/api" });
+  await fastify.register(canvasRoutes, { prefix: "/api/canvases" });
 
   // Start Server
 

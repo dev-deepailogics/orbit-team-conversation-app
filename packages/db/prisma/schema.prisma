@@ -90,6 +90,7 @@ model User {
   availabilities    UserAvailability[]
   ticketComments    TicketComment[]
   identities        UserIdentity[]
+  createdCanvases   Canvas[]          @relation("CanvasCreator")
 
   @@index([email])
   @@index([username])
@@ -135,6 +136,7 @@ model Workspace {
   notifications Notification[]
   huddles     Huddle[]
   attachments Attachment[]
+  canvases    Canvas[]
 
   @@index([slug])
   @@index([ownerId])
@@ -178,6 +180,7 @@ model Channel {
   huddles     Huddle[]
   attachments Attachment[]
   projectNotifications Project[] @relation("ProjectNotificationChannel")
+  canvases    Canvas[]
 
   @@index([workspaceId])
   @@index([type])
@@ -401,6 +404,7 @@ model Project {
   columns     ProjectColumn[]
   tickets     Ticket[]
   documents   ProjectDocument[]
+  canvases    Canvas[]
 
   @@index([workspaceId])
   @@index([createdById])
@@ -638,4 +642,27 @@ model DeviceToken {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+// Collaborative whiteboard canvases. Workspace-scoped; optionally linked to one
+// channel/DM or one project (many canvases can link to the same target).
+model Canvas {
+  id          String    @id @default(uuid())
+  workspaceId String
+  title       String    @default("Untitled canvas")
+  data        Json?
+  channelId   String?
+  projectId   String?
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  channel     Channel?  @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  project     Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  creator     User      @relation("CanvasCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([channelId])
+  @@index([projectId])
 }

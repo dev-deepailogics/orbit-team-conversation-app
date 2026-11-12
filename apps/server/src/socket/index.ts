@@ -2,7 +2,7 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { FastifyInstance } from 'fastify';
 import { prisma } from '@orbit/db';
 import { SOCKET_EVENTS } from '@orbit/types';
-import { canUserAccessWorkspace, canUserAccessChannel } from '../utils/security.js';
+import { canUserAccessWorkspace, canUserAccessChannel, canUserAccessCanvas } from '../utils/security.js';
 
 export function setupSocketServer(fastify: FastifyInstance, io: SocketIOServer) {
   // Store connected user socket mapping
@@ -200,27 +200,31 @@ export function setupSocketServer(fastify: FastifyInstance, io: SocketIOServer) 
     });
 
 
-    // Whiteboard Live Collaboration
-    socket.on(SOCKET_EVENTS.WHITEBOARD_UPDATE, async ({ channelId, data }) => {
-      const hasAccess = await canUserAccessChannel(userId, channelId);
-      if (hasAccess) {
-        socket.to(`channel:${channelId}`).emit(SOCKET_EVENTS.WHITEBOARD_UPDATE, { channelId, data, userId });
+    // Canvas (whiteboard) live collaboration: access is checked once on join,
+    // after which room membership is the authorization for relaying events.
+    socket.on(SOCKET_EVENTS.CANVAS_JOIN, async (canvasId: string) => {
+      const canvas = await prisma.canvas.findUnique({
+        where: { id: canvasId },
+        select: { workspaceId: true, channelId: true },
+      });
+      if (canvas && (await canUserAccessCanvas(userId, canvas))) {
+        socket.join(`canvas:${canvasId}`);
       }
     });
 
-    socket.on(SOCKET_EVENTS.WHITEBOARD_CURSOR, async ({ channelId, cursor, user }) => {
-      const hasAccess = await canUserAccessChannel(userId, channelId);
-      if (hasAccess) {
-        socket.to(`channel:${channelId}`).emit(SOCKET_EVENTS.WHITEBOARD_CURSOR, { channelId, cursor, user, userId });
-      }
+    socket.on(SOCKET_EVENTS.CANVAS_LEAVE, (canvasId: string) => {
+      socket.leave(`canvas:${canvasId}`);
     });
 
-    socket.on(SOCKET_EVENTS.WHITEBOARD_CLEAR, async ({ channelId }) => {
-      const hasAccess = await canUserAccessChannel(userId, channelId);
-      if (hasAccess) {
-        socket.to(`channel:${channelId}`).emit(SOCKET_EVENTS.WHITEBOARD_CLEAR, { channelId, userId });
+    const relayCanvas = (event: string) => (payload: { canvasId: string }) => {
+      const room = `canvas:${payload?.canvasId}`;
+      if (socket.rooms.has(room)) {
+        socket.to(room).emit(event, { ...payload, userId });
       }
-    });
+    };
+    socket.on(SOCKET_EVENTS.WHITEBOARD_UPDATE, relayCanvas(SOCKET_EVENTS.WHITEBOARD_UPDATE));
+    socket.on(SOCKET_EVENTS.WHITEBOARD_CURSOR, relayCanvas(SOCKET_EVENTS.WHITEBOARD_CURSOR));
+    socket.on(SOCKET_EVENTS.WHITEBOARD_CLEAR, relayCanvas(SOCKET_EVENTS.WHITEBOARD_CLEAR));
 
     // Disconnect
     socket.on('disconnect', async () => {

@@ -36,6 +36,7 @@ import { ProjectBoardView } from "@/components/project/ProjectBoardView";
 import { CreateProjectModal } from "@/components/project/CreateProjectModal";
 import { CreateTicketFromMessageDialog } from "@/components/project/CreateTicketFromMessageDialog";
 import { OrganizationControlView } from "@/components/availability/OrganizationControlView";
+import { CanvasView } from "@/components/whiteboard/CanvasView";
 import {
   Layers,
   ShieldCheck,
@@ -99,6 +100,7 @@ export default function AppDashboard() {
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
   const [showOrgControl, setShowOrgControl] = useState(false);
+  const [showCanvasHub, setShowCanvasHub] = useState(false);
   const [orgControlResetKey, setOrgControlResetKey] = useState(0);
   const [messageForTicket, setMessageForTicket] = useState<Message | null>(
     null,
@@ -202,6 +204,7 @@ export default function AppDashboard() {
 
   // 3. Handle Workspace Selection
   const handleSelectWorkspace = async (workspace: Workspace) => {
+    setShowCanvasHub(false);
     setCurrentWorkspace(workspace);
     if (typeof window !== "undefined") {
       localStorage.setItem("orbit_active_workspace_id", workspace.id);
@@ -286,6 +289,7 @@ export default function AppDashboard() {
   // 4. Handle Channel Selection (Chunked Initial Load)
   const handleSelectChannel = async (channel: Channel) => {
     setShowOrgControl(false);
+    setShowCanvasHub(false);
     setCurrentProject(null);
     setCurrentChannel(channel);
     setHasMoreMessages(false);
@@ -316,6 +320,7 @@ export default function AppDashboard() {
   // 4b. Handle Project Selection
   const handleSelectProject = (project: Project) => {
     setShowOrgControl(false);
+    setShowCanvasHub(false);
     setCurrentProject(project);
     if (typeof window !== "undefined") {
       window.history.replaceState(null, "", `?projectId=${project.id}`);
@@ -325,6 +330,7 @@ export default function AppDashboard() {
   // 4c. Handle Organization Control URL Sync
   const handleOpenOrgControl = (subview?: string) => {
     setShowOrgControl(true);
+    setShowCanvasHub(false);
     setCurrentProject(null);
     setOrgControlResetKey((prev) => prev + 1);
     if (typeof window !== "undefined") {
@@ -789,20 +795,23 @@ export default function AppDashboard() {
   }
 
   // Workspace rail feature shortcuts (Canvas / Docs)
-  const canvasActive = !!currentChannel && !currentProject && !showOrgControl && chatView === "whiteboard";
-  const docsActive = !!currentProject && !showOrgControl && activeSection === "docs";
+  const docsActive = !!currentProject && !showOrgControl && !showCanvasHub && activeSection === "docs";
   const docsProject = currentProject ?? projects[0];
   const railProps = {
-    activeFeature: canvasActive ? ("canvas" as const) : docsActive ? ("docs" as const) : null,
-    onOpenCanvas: currentChannel
+    activeFeature: showCanvasHub ? ("canvas" as const) : docsActive ? ("docs" as const) : ("home" as const),
+    // Home: back to the channel / project view
+    onGoHome: currentWorkspace
       ? () => {
-          if (canvasActive) return setChatView("messages");
-          if (currentProject || showOrgControl) handleSelectChannel(currentChannel);
-          setChatView("whiteboard");
+          setShowCanvasHub(false);
+          setShowOrgControl(false);
+          if (docsActive) setActiveSection("board");
         }
       : undefined,
+    // Canvas hub: pick an existing canvas or create a new one
+    onOpenCanvas: currentWorkspace ? () => setShowCanvasHub((v) => !v) : undefined,
     onOpenDocs: docsProject
       ? () => {
+          setShowCanvasHub(false);
           if (docsActive) return setActiveSection("board");
           if (docsProject !== currentProject || showOrgControl) handleSelectProject(docsProject);
           setActiveSection("docs");
@@ -836,7 +845,7 @@ export default function AppDashboard() {
                 handleSelectWorkspace(ws);
               }}
             />
-            {currentWorkspace && (
+            {currentWorkspace && !showCanvasHub && (
               <ChannelSidebar
                 workspace={currentWorkspace}
                 channels={channels}
@@ -918,7 +927,7 @@ export default function AppDashboard() {
       </div>
 
       {/* 2. Channels & Members Sidebar (Desktop) */}
-      {currentWorkspace && (
+      {currentWorkspace && !showCanvasHub && (
         <div className="hidden md:flex shrink-0 h-full">
           <ChannelSidebar
             workspace={currentWorkspace}
@@ -1086,6 +1095,12 @@ export default function AppDashboard() {
             </div>
           </div>
         </div>
+      ) : showCanvasHub && currentWorkspace ? (
+        <CanvasView
+          workspaceId={currentWorkspace.id}
+          currentUser={user}
+          onClose={() => setShowCanvasHub(false)}
+        />
       ) : showOrgControl && currentWorkspace ? (
         <OrganizationControlView
           workspace={currentWorkspace}

@@ -396,6 +396,18 @@ export interface ProjectDocumentShare {
   user?: UserProfile;
 }
 
+export interface Canvas {
+  id: string;
+  workspaceId: string;
+  title: string;
+  data?: { elements: any[] } | null;
+  channelId: string | null;
+  projectId: string | null;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ProjectDocument {
   id: string;
   projectId: string;
@@ -448,6 +460,8 @@ export const SOCKET_EVENTS = {
   WHITEBOARD_UPDATE: "whiteboard:update",
   WHITEBOARD_CURSOR: "whiteboard:cursor",
   WHITEBOARD_CLEAR: "whiteboard:clear",
+  CANVAS_JOIN: "canvas:join",
+  CANVAS_LEAVE: "canvas:leave",
 
   // Projects & Kanban Boards (Trello-like)
   PROJECT_NEW: "project:new",

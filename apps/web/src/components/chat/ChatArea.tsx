@@ -36,7 +36,7 @@ import { getSocket } from '../../lib/socket';
 import { useChatStore } from '../../stores/chatStore';
 import { EmojiPickerPopover } from './EmojiPickerPopover';
 import { getTopEmojis, recordEmojiUsage } from '../../lib/emojiStore';
-import { WhiteboardView } from '../whiteboard/WhiteboardView';
+import { CanvasView } from '../whiteboard/CanvasView';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { RichTextEditor, RichTextEditorRef } from './RichTextEditor';
 import { FileAttachmentList, formatFileSize, getFileCategory } from './FileAttachmentList';
@@ -780,10 +780,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
       {/* Main Content: Whiteboard View or Messages View */}
       {activeView === 'whiteboard' ? (
-        <div className="flex-1 w-full h-full relative">
-          <WhiteboardView
-            channel={channel}
+        <div className="flex-1 w-full h-full relative flex min-h-0">
+          <CanvasView
+            workspaceId={channel.workspaceId}
             currentUser={currentUser}
+            scope={{ channelId: channel.id, label: channel.type === 'DIRECT' ? dmName : `#${channel.name}` }}
             onClose={() => setActiveView('messages')}
           />
         </div>
