@@ -87,7 +87,7 @@ async function main() {
   });
 
   // 4. Create Seed Messages
-  const generalChannel = workspace.channels.find((c) => c.name === 'general');
+  const generalChannel = workspace.channels.find((c: { name: string }) => c.name === 'general');
   if (generalChannel) {
     const welcomeMsg = await prisma.message.create({
       data: {
