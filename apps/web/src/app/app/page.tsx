@@ -106,6 +106,7 @@ export default function AppDashboard() {
   const [showOrgControl, setShowOrgControl] = useState(false);
   const [showCanvasHub, setShowCanvasHub] = useState(false);
   const [showDocsHub, setShowDocsHub] = useState(false);
+  const [showProjectsPanel, setShowProjectsPanel] = useState(false);
   const [docsInitialId, setDocsInitialId] = useState<string | null>(null);
   const [orgControlResetKey, setOrgControlResetKey] = useState(0);
   const [messageForTicket, setMessageForTicket] = useState<Message | null>(
@@ -822,18 +823,25 @@ export default function AppDashboard() {
     );
   }
 
-  // Workspace rail feature shortcuts (Home / Canvas / Docs)
+  // Workspace rail feature shortcuts (Home / Canvas / Docs / Projects)
   const docsActive = showDocsHub && !!currentWorkspace;
   const railProps = {
     presence,
     onLogout: logout,
-    activeFeature: showCanvasHub ? ("canvas" as const) : docsActive ? ("docs" as const) : ("home" as const),
+    activeFeature: showCanvasHub
+      ? ("canvas" as const)
+      : docsActive
+      ? ("docs" as const)
+      : showProjectsPanel
+      ? ("projects" as const)
+      : ("home" as const),
     // Home: back to the channel / project view
     onGoHome: currentWorkspace
       ? () => {
           setShowCanvasHub(false);
           setShowDocsHub(false);
           setShowOrgControl(false);
+          setShowProjectsPanel(false);
           syncUrlToCurrent();
         }
       : undefined,
@@ -844,15 +852,30 @@ export default function AppDashboard() {
             setShowDocsHub(false);
             syncUrlToCurrent();
           }
+          setShowProjectsPanel(false);
           setShowCanvasHub((v) => !v);
         }
       : undefined,
     // Docs are workspace-level, not tied to the open project
     onOpenDocs: currentWorkspace
       ? () => {
-          if (!showDocsHub) return handleOpenDocs();
+          if (!showDocsHub) {
+            setShowProjectsPanel(false);
+            return handleOpenDocs();
+          }
           setShowDocsHub(false);
           syncUrlToCurrent();
+        }
+      : undefined,
+    // Projects & Boards: toggles the list back open in the channel sidebar
+    onOpenProjects: currentWorkspace
+      ? () => {
+          if (showCanvasHub) setShowCanvasHub(false);
+          if (showDocsHub) {
+            setShowDocsHub(false);
+            syncUrlToCurrent();
+          }
+          setShowProjectsPanel((v) => !v);
         }
       : undefined,
   };
@@ -892,6 +915,7 @@ export default function AppDashboard() {
                 members={members}
                 projects={projects}
                 currentProject={currentProject}
+                showProjects={showProjectsPanel}
                 activeHuddleChannelId={
                   activeHuddleChannel || activeHuddleChannelId
                 }
@@ -975,6 +999,7 @@ export default function AppDashboard() {
             members={members}
             projects={projects}
             currentProject={currentProject}
+            showProjects={showProjectsPanel}
             activeHuddleChannelId={activeHuddleChannel || activeHuddleChannelId}
             onSelectChannel={handleSelectChannel}
             onSelectUserDM={handleSelectUserDM}

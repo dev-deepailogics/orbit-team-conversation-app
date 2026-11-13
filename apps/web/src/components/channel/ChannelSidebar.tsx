@@ -53,6 +53,7 @@ interface ChannelSidebarProps {
   onChannelCreated: (channel: Channel) => void;
   onSelectProject?: (project: Project) => void;
   onOpenCreateProject?: () => void;
+  showProjects?: boolean;
   onOpenBotPortal: () => void;
   onStartHuddle: (channel: Channel) => void;
   presence?: Record<string, Presence>;
@@ -76,6 +77,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   onChannelCreated,
   onSelectProject,
   onOpenCreateProject,
+  showProjects = false,
   onOpenBotPortal,
   onStartHuddle,
   presence = {},
@@ -97,9 +99,9 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
   const workspaceMenuRef = useRef<HTMLDivElement>(null);
-  const [isProjectsCollapsed, setIsProjectsCollapsed] = useState(false);
   const [isChannelsCollapsed, setIsChannelsCollapsed] = useState(false);
   const [isDmsCollapsed, setIsDmsCollapsed] = useState(false);
+  const [projectSearchQuery, setProjectSearchQuery] = useState("");
   const unreadCounts = useChatStore((s) => s.unreadCounts);
 
   useEffect(() => {
@@ -179,32 +181,52 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           color: "var(--theme-text-primary)",
         }}
       >
-        <button
-          onClick={() => setShowWorkspaceMenu((prev) => !prev)}
-          title="Workspace options"
-          className="flex items-center gap-1.5 truncate rounded-lg px-2 py-1.5 -ml-1.5 transition hover:bg-black/5 dark:hover:bg-white/10 group text-left min-w-0"
-        >
-          <span className="truncate font-bold text-sm sm:text-base">
-            {workspace.name}
+        {showProjects ? (
+          <span className="flex items-center gap-1.5 truncate font-bold text-sm sm:text-base">
+            <FolderKanban size={16} style={{ color: "var(--theme-primary)" }} />
+            Projects & Boards
           </span>
-          <ChevronDown
-            size={16}
-            className={`shrink-0 transition-transform duration-200 ${
-              showWorkspaceMenu ? "rotate-180" : ""
-            }`}
-            style={{ color: "var(--theme-text-muted)" }}
-          />
-        </button>
+        ) : (
+          <button
+            onClick={() => setShowWorkspaceMenu((prev) => !prev)}
+            title="Workspace options"
+            className="flex items-center gap-1.5 truncate rounded-lg px-2 py-1.5 -ml-1.5 transition hover:bg-black/5 dark:hover:bg-white/10 group text-left min-w-0"
+          >
+            <span className="truncate font-bold text-sm sm:text-base">
+              {workspace.name}
+            </span>
+            <ChevronDown
+              size={16}
+              className={`shrink-0 transition-transform duration-200 ${
+                showWorkspaceMenu ? "rotate-180" : ""
+              }`}
+              style={{ color: "var(--theme-text-muted)" }}
+            />
+          </button>
+        )}
 
         <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={() => setShowAddMemberModal(true)}
-            title="Invite & Add Members"
-            style={{ color: "var(--theme-text-muted)" }}
-            className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
-          >
-            <UserPlus size={18} />
-          </button>
+          {showProjects ? (
+            onOpenCreateProject && (
+              <button
+                onClick={onOpenCreateProject}
+                title="Create Project Board"
+                style={{ color: "var(--theme-text-muted)" }}
+                className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
+              >
+                <Plus size={18} />
+              </button>
+            )
+          ) : (
+            <button
+              onClick={() => setShowAddMemberModal(true)}
+              title="Invite & Add Members"
+              style={{ color: "var(--theme-text-muted)" }}
+              className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
+            >
+              <UserPlus size={18} />
+            </button>
+          )}
           {onCloseMobile && (
             <button
               onClick={onCloseMobile}
@@ -218,7 +240,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
         </div>
 
         {/* Workspace Dropdown Menu */}
-        {showWorkspaceMenu && (
+        {!showProjects && showWorkspaceMenu && (
           <div
             className="absolute top-full left-3 mt-1.5 w-64 rounded-xl border shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150"
             style={{
@@ -337,79 +359,85 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
       {/* Channel & DMs List */}
       <div className="flex-1 overflow-y-auto px-2 py-3 space-y-3">
         {/* Quick Search Bar */}
-        {onOpenSearch && (
+        {showProjects ? (
           <div className="px-1 mb-2">
-            <button
-              onClick={onOpenSearch}
-              title="Search messages (Cmd+K / Ctrl+K)"
-              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs transition group hover:opacity-85"
+            <div
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs"
               style={{
                 backgroundColor: "var(--theme-bg-surface)",
                 borderColor: "var(--theme-border)",
-                color: "var(--theme-text-muted)",
               }}
             >
-              <div className="flex items-center gap-2">
-                <Search
-                  size={14}
-                  style={{ color: "var(--theme-primary)" }}
-                  className="transition"
-                />
-                <span>Search messages...</span>
-              </div>
-              <kbd
-                className="text-[10px] px-1.5 py-0.5 rounded font-mono border"
+              <Search
+                size={14}
+                style={{ color: "var(--theme-primary)" }}
+                className="shrink-0"
+              />
+              <input
+                type="text"
+                value={projectSearchQuery}
+                onChange={(e) => setProjectSearchQuery(e.target.value)}
+                placeholder="Search projects..."
+                className="w-full bg-transparent outline-none"
+                style={{ color: "var(--theme-text-primary)" }}
+              />
+              {projectSearchQuery && (
+                <button
+                  onClick={() => setProjectSearchQuery("")}
+                  title="Clear"
+                  style={{ color: "var(--theme-text-muted)" }}
+                  className="shrink-0 hover:opacity-80"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          onOpenSearch && (
+            <div className="px-1 mb-2">
+              <button
+                onClick={onOpenSearch}
+                title="Search messages (Cmd+K / Ctrl+K)"
+                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs transition group hover:opacity-85"
                 style={{
-                  backgroundColor: "var(--theme-bg-app)",
+                  backgroundColor: "var(--theme-bg-surface)",
                   borderColor: "var(--theme-border)",
+                  color: "var(--theme-text-muted)",
                 }}
               >
-                ⌘K
-              </kbd>
-            </button>
-          </div>
+                <div className="flex items-center gap-2">
+                  <Search
+                    size={14}
+                    style={{ color: "var(--theme-primary)" }}
+                    className="transition"
+                  />
+                  <span>Search messages...</span>
+                </div>
+                <kbd
+                  className="text-[10px] px-1.5 py-0.5 rounded font-mono border"
+                  style={{
+                    backgroundColor: "var(--theme-bg-app)",
+                    borderColor: "var(--theme-border)",
+                  }}
+                >
+                  ⌘K
+                </kbd>
+              </button>
+            </div>
+          )
         )}
 
-        {/* Projects & Boards Section (Trello-like) */}
-        <div>
-          <div
-            className="flex items-center justify-between h-7 px-2 text-[15px] font-medium select-none"
-            style={{ color: "var(--theme-text-muted)" }}
-          >
-            <button
-              onClick={() => setIsProjectsCollapsed((prev) => !prev)}
-              className="flex items-center gap-1.5 hover:text-[var(--theme-text)] transition cursor-pointer text-left focus:outline-none"
-            >
-              <ChevronDown
-                size={14}
-                className={`transition-transform duration-200 shrink-0 ${
-                  isProjectsCollapsed ? "-rotate-90" : "rotate-0"
-                }`}
-              />
-              <span className="flex items-center gap-1.5">
-                <FolderKanban
-                  size={13}
-                  style={{ color: "var(--theme-primary)" }}
-                />
-                <span>Projects & Boards</span>
-              </span>
-            </button>
-            {onOpenCreateProject && (
-              <button
-                onClick={onOpenCreateProject}
-                title="Create Project Board"
-                className="p-1 hover:opacity-80 rounded transition"
-              >
-                <Plus size={14} />
-              </button>
-            )}
-          </div>
-
-          <Collapse open={!isProjectsCollapsed}>
+        {/* Projects & Boards Section (Trello-like) — shown when toggled from the rail's Projects icon; title + create button live in the header above */}
+        {showProjects && (
+          <div>
             <div className="space-y-0.5">
               {projects
                 .filter(
                   (p) => (p.status || "active").toLowerCase() === "active",
+                )
+                .filter((p) =>
+                  p.name.toLowerCase().includes(projectSearchQuery.trim().toLowerCase()),
                 )
                 .map((project) => {
                   const isActive = currentProject?.id === project.id;
@@ -475,9 +503,11 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 </button>
               )}
             </div>
-          </Collapse>
-        </div>
+          </div>
+        )}
 
+        {!showProjects && (
+        <>
         {/* Channels Section */}
         <div>
           <div
@@ -761,6 +791,8 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
             </div>
           </Collapse>
         </div>
+        </>
+        )}
       </div>
 
       {/* Create Channel Modal */}
