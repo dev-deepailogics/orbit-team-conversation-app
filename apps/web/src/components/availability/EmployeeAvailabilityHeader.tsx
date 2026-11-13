@@ -97,10 +97,8 @@ export const EmployeeAvailabilityHeader: React.FC<{
     };
   }, [currentUserId]);
 
-  // 2. Stopwatch: (now - sessionStart) - sum(breaks taken during this session, open break counted up to now).
+  // 2. Stopwatch: (now - availableTime) - sum(breaks, open break counted up to now).
   // While on break both terms grow equally, so the value stays frozen.
-  // sessionStart resets to the most recent check-in: a checkout→checkin gap is recorded as an
-  // "Off Time Update" break, so the timer restarts from 0 instead of resuming the whole day's total.
   useEffect(() => {
     if (!availability?.isAvailable) {
       setElapsedSeconds(0);
@@ -108,25 +106,12 @@ export const EmployeeAvailabilityHeader: React.FC<{
     }
     const tick = () => {
       const now = Date.now() + serverTimeOffset;
-
-      const offTimeBreaks = (availability.breaks || []).filter(
-        (b) => b.breakReason === 'Off Time Update' && b.availableAfterBreak,
-      );
-      const lastCheckIn = offTimeBreaks.reduce<number | null>((latest, b) => {
-        const t = new Date(b.availableAfterBreak as string).getTime();
-        return latest === null || t > latest ? t : latest;
-      }, null);
-      const sessionStart = lastCheckIn ?? new Date(availability.availableTime).getTime();
-
       let breakMs = 0;
       for (const b of availability.breaks || []) {
-        if (b.breakReason === 'Off Time Update') continue; // belongs to a previous session, not this one
-        const start = new Date(b.breakStartTime).getTime();
-        if (start < sessionStart) continue; // also from a previous session
         const end = b.availableAfterBreak ? new Date(b.availableAfterBreak).getTime() : now;
-        breakMs += Math.max(0, end - start);
+        breakMs += Math.max(0, end - new Date(b.breakStartTime).getTime());
       }
-      const workMs = now - sessionStart - breakMs;
+      const workMs = now - new Date(availability.availableTime).getTime() - breakMs;
       setElapsedSeconds(Math.max(0, Math.floor(workMs / 1000)));
     };
     tick();
