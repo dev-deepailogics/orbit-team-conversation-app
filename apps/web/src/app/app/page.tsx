@@ -852,6 +852,7 @@ export default function AppDashboard() {
             setShowDocsHub(false);
             syncUrlToCurrent();
           }
+          if (showOrgControl) setShowOrgControl(false);
           setShowProjectsPanel(false);
           setShowCanvasHub((v) => !v);
         }
@@ -859,6 +860,7 @@ export default function AppDashboard() {
     // Docs are workspace-level, not tied to the open project
     onOpenDocs: currentWorkspace
       ? () => {
+          if (showOrgControl) setShowOrgControl(false);
           if (!showDocsHub) {
             setShowProjectsPanel(false);
             return handleOpenDocs();
@@ -875,6 +877,7 @@ export default function AppDashboard() {
             setShowDocsHub(false);
             syncUrlToCurrent();
           }
+          if (showOrgControl) setShowOrgControl(false);
           setShowProjectsPanel((v) => !v);
         }
       : undefined,
@@ -906,7 +909,7 @@ export default function AppDashboard() {
                 handleSelectWorkspace(ws);
               }}
             />
-            {currentWorkspace && !showCanvasHub && !docsActive && (
+            {currentWorkspace && !showCanvasHub && !docsActive && !showOrgControl && (
               <ChannelSidebar
                 workspace={currentWorkspace}
                 channels={channels}
@@ -989,7 +992,7 @@ export default function AppDashboard() {
       </div>
 
       {/* 2. Channels & Members Sidebar (Desktop) */}
-      {currentWorkspace && !showCanvasHub && !docsActive && (
+      {currentWorkspace && !showCanvasHub && !docsActive && !showOrgControl && (
         <div className="hidden md:flex shrink-0 h-full">
           <ChannelSidebar
             workspace={currentWorkspace}
