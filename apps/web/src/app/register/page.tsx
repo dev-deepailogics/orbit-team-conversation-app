@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { api } from "../../lib/api";
-import { useAuthStore } from "../../stores/authStore";
+import { useAuthStore, postAuthPath } from "../../stores/authStore";
 import {
   AuthShell,
   AuthError,
