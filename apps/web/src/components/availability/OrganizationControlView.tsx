@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { api } from "../../lib/api";
 import { getSocket } from "../../lib/socket";
 import {
@@ -40,6 +41,8 @@ import {
   FolderKanban,
   HardDrive,
   UploadCloud,
+  Gauge,
+  Video,
 } from "lucide-react";
 
 const BREAK_REASONS = [
@@ -140,7 +143,7 @@ export const OrganizationControlView: React.FC<
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  // Selected Card / Tab in Governance Modules
+  // Selected Card / Tab in Governance Modules (null or module name)
   const [selectedModule, setSelectedModule] = useState<
     | "availability"
     | "roles"
@@ -149,7 +152,8 @@ export const OrganizationControlView: React.FC<
     | "policies"
     | "media"
     | "integrations"
-  >("availability");
+    | null
+  >(null);
   const [availabilityExpanded, setAvailabilityExpanded] =
     useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -447,86 +451,77 @@ export const OrganizationControlView: React.FC<
         color: "var(--theme-text-primary)",
       }}
     >
-      {/* 1. Top Navbar Header */}
+      {/* 1. Top Navbar Header - Modernized Sleek Glassmorphic Bar */}
       <div
-        className="h-14 sm:h-16 px-4 sm:px-8 border-b flex items-center justify-between gap-4 shrink-0"
+        className="h-16 px-4 sm:px-8 border-b flex items-center justify-between gap-4 shrink-0 backdrop-blur-md sticky top-0 z-20"
         style={{
           backgroundColor: "var(--theme-bg-surface)",
           borderColor: "var(--theme-border)",
         }}
       >
         <div className="flex items-center gap-3">
-          <h1
-            className="text-lg sm:text-xl font-bold tracking-tight"
-            style={{ color: "var(--theme-text-primary)" }}
-          >
-            Organization Control
-          </h1>
-          <span
-            className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full border"
-            style={{
-              backgroundColor: "var(--theme-bg-app)",
-              borderColor: "var(--theme-border)",
-              color: "var(--theme-text-muted)",
-            }}
-          >
-            Root Level
-          </span>
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500/20 via-purple-500/20 to-cyan-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+            <Building2 size={18} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base sm:text-lg font-display font-bold tracking-tight text-slate-900 dark:text-white">
+                Organization Control
+              </h1>
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Root Level
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400 hidden sm:block">
+              {workspace.name} • Workspace Infrastructure & Governance
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2.5 sm:gap-3">
-          {/* Search control panels */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Search control panels with shortcut badge */}
           <div
-            className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs"
+            className="hidden md:flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-xs transition-all focus-within:ring-2 focus-within:ring-indigo-500/40"
             style={{
               backgroundColor: "var(--theme-bg-app)",
               borderColor: "var(--theme-border)",
               color: "var(--theme-text-muted)",
             }}
           >
-            <Search size={14} />
+            <Search size={14} className="text-slate-400 dark:text-zinc-500" />
             <input
               type="text"
-              placeholder="Search control panels..."
+              placeholder="Search governance modules..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none outline-none text-xs w-44 lg:w-56"
-              style={{ color: "var(--theme-text-primary)" }}
+              className="bg-transparent border-none outline-none text-xs w-48 lg:w-60 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500"
             />
+            <kbd className="hidden lg:inline-block text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-200 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border border-slate-300 dark:border-zinc-700">
+              ⌘K
+            </kbd>
           </div>
 
           {/* Notifications / Alerts icon */}
           <button
             title="Notifications"
-            className="p-2 rounded-xl border hover:opacity-85 transition"
+            className="p-2.5 rounded-xl border hover:border-indigo-500/40 hover:bg-indigo-500/5 transition-all text-slate-600 dark:text-zinc-400"
             style={{
               backgroundColor: "var(--theme-bg-app)",
               borderColor: "var(--theme-border)",
-              color: "var(--theme-text-muted)",
             }}
           >
             <Bell size={16} />
-          </button>
-
-          {/* Quick Actions Button */}
-          <button
-            onClick={() => setSelectedModule("availability")}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white shadow-sm transition hover:opacity-90"
-            style={{ backgroundColor: "var(--theme-primary)" }}
-          >
-            <Zap size={14} className="fill-current" />
-            <span className="hidden sm:inline">Quick Actions</span>
           </button>
 
           {/* Close Panel Button */}
           <button
             onClick={onClose}
             title="Return to Chat"
-            className="p-2 rounded-xl border hover:opacity-85 transition ml-1"
+            className="p-2.5 rounded-xl border hover:border-rose-500/40 hover:bg-rose-500/10 transition-all text-slate-600 dark:text-zinc-400 hover:text-rose-500 ml-1"
             style={{
               backgroundColor: "var(--theme-bg-app)",
               borderColor: "var(--theme-border)",
-              color: "var(--theme-text-muted)",
             }}
           >
             <X size={17} />
@@ -535,725 +530,714 @@ export const OrganizationControlView: React.FC<
       </div>
 
       {/* 2. Main Scrollable Content */}
-      <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 space-y-6">
-        {/* Banner: Workspace Master Configuration */}
-        <div
-          className="p-4 sm:p-5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs"
-          style={{
-            backgroundColor: "var(--theme-bg-surface)",
-            borderColor: "var(--theme-border)",
-          }}
-        >
-          <div className="flex items-center gap-3.5">
-            <div
-              className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border"
-              style={{
-                backgroundColor: "rgba(56, 189, 248, 0.12)",
-                borderColor: "rgba(56, 189, 248, 0.3)",
-                color: "#38bdf8",
-              }}
-            >
-              <SlidersHorizontal size={20} />
-            </div>
-            <div>
-              <h2 className="text-sm sm:text-base font-bold text-[var(--theme-text)]">
-                Workspace Master Configuration
-              </h2>
-              <p
-                className="text-xs mt-0.5"
-                style={{ color: "var(--theme-text-muted)" }}
-              >
-                Manage organization policies, default working presence, and
-                permission boundaries from this control center.
-              </p>
-            </div>
-          </div>
+      <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 space-y-6 relative">
+        {/* Subtle background ambient mesh glow matching marketing page */}
+        <div className="absolute top-0 right-1/4 w-96 h-96 bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-cyan-400/5 blur-[120px] rounded-full pointer-events-none -z-10" />
 
-          <div className="self-start sm:self-center">
-            <span
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border"
-              style={{
-                backgroundColor: "rgba(16, 185, 129, 0.12)",
-                borderColor: "rgba(16, 185, 129, 0.3)",
-                color: "#10b981",
-              }}
-            >
-              <CheckCircle2 size={13} />
-              Status: Verified Organization
-            </span>
-          </div>
+        {/* Section Header: Styled identically to the reference screenshot */}
+        <div className="pt-1 pb-1">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight" style={{ color: "var(--theme-text-primary)" }}>
+            Core Governance <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-indigo-400 to-cyan-400">Modules</span>
+          </h1>
+          <p className="text-xs sm:text-sm mt-1" style={{ color: "var(--theme-text-muted)" }}>
+            Manage and configure essential system modules for better control and efficiency.
+          </p>
         </div>
 
-        {/* Section Header: CORE GOVERNANCE MODULES */}
-        <div>
-          <div className="flex items-center justify-between mb-3.5">
-            <span
-              className="text-xs font-bold uppercase tracking-wider"
-              style={{ color: "var(--theme-text-muted)" }}
-            >
-              Core Governance Modules
-            </span>
-            <span
-              className="text-xs"
-              style={{ color: "var(--theme-text-muted)" }}
-            >
-              Select a card to configure
-            </span>
-          </div>
-
-          {/* Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* 1. Availability Card */}
-            <div
-              onClick={() => {
-                setShowUserAvailabilityPage(true);
-                updateUrlParam("availability");
-              }}
-              className={`p-4 sm:p-5 rounded-2xl border cursor-pointer transition text-left flex flex-col justify-between group shadow-sm hover:border-blue-500/80 hover:shadow-md`}
-              style={{
-                backgroundColor: "var(--theme-bg-surface)",
-                borderColor: "#0091FF",
-              }}
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center text-blue-700 dark:text-blue-400">
-                      <Clock size={19} />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-[var(--theme-text)]">
-                        Availability
-                      </h3>
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 inline-block mt-0.5">
-                        Active • 9:00 - 18:00
-                      </span>
-                    </div>
-                  </div>
-                  <ChevronDown
-                    size={17}
-                    className={`text-[var(--theme-text-muted)] transition-transform ${
-                      selectedModule === "availability" && availabilityExpanded
-                        ? "rotate-180 text-blue-700 dark:text-blue-400"
-                        : ""
-                    }`}
-                  />
-                </div>
-                <p
-                  className="text-xs leading-relaxed"
-                  style={{ color: "var(--theme-text-muted)" }}
-                >
-                  Set core operational hours, global team shifts, away presets,
-                  check-in rules, and auto-replies.
-                </p>
-              </div>
-            </div>
-
-            {/* 2. Roles & Permissions Card */}
-            <div
-              onClick={() => setSelectedModule("roles")}
-              className={`p-4 sm:p-5 rounded-2xl border cursor-pointer transition text-left flex flex-col justify-between group shadow-sm ${
-                selectedModule === "roles"
-                  ? "ring-2 ring-blue-500 shadow-md"
-                  : "hover:border-blue-500/50"
-              }`}
-              style={{
-                backgroundColor: "var(--theme-bg-surface)",
-                borderColor:
-                  selectedModule === "roles"
-                    ? "#0091FF"
-                    : "var(--theme-border)",
-              }}
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-400/30 flex items-center justify-center text-purple-700 dark:text-purple-400">
-                      <Shield size={19} />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-[var(--theme-text)]">
-                        Roles & Permissions
-                      </h3>
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 inline-block mt-0.5">
-                        4 Custom Roles
-                      </span>
-                    </div>
-                  </div>
-                  <ChevronRight
-                    size={17}
-                    className="text-[var(--theme-text-muted)] group-hover:translate-x-0.5 transition"
-                  />
-                </div>
-                <p
-                  className="text-xs leading-relaxed"
-                  style={{ color: "var(--theme-text-muted)" }}
-                >
-                  Configure administrative privileges, granular channel access,
-                  ticket assignments, and member tiers.
-                </p>
-              </div>
-            </div>
-
-            {/* 3. Members & Invites Card */}
-            <div
-              onClick={() => setSelectedModule("members")}
-              className={`p-4 sm:p-5 rounded-2xl border cursor-pointer transition text-left flex flex-col justify-between group shadow-sm ${
-                selectedModule === "members"
-                  ? "ring-2 ring-blue-500 shadow-md"
-                  : "hover:border-blue-500/50"
-              }`}
-              style={{
-                backgroundColor: "var(--theme-bg-surface)",
-                borderColor:
-                  selectedModule === "members"
-                    ? "#0091FF"
-                    : "var(--theme-border)",
-              }}
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400">
-                      <Users size={19} />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-[var(--theme-text)]">
-                        Members & Invites
-                      </h3>
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30 inline-block mt-0.5">
-                        {teamMembers.length || members.length} Active / 50 Seats
-                      </span>
-                    </div>
-                  </div>
-                  <ChevronRight
-                    size={17}
-                    className="text-[var(--theme-text-muted)] group-hover:translate-x-0.5 transition"
-                  />
-                </div>
-                <p
-                  className="text-xs leading-relaxed"
-                  style={{ color: "var(--theme-text-muted)" }}
-                >
-                  Provision staff accounts, dispatch magic invite links, monitor
-                  presence, and manage seat licenses.
-                </p>
-              </div>
-            </div>
-
-            {/* 4. Employee Status Dashboard */}
-            <div
-              onClick={() => {
-                setShowEmployeeStatusPage(true);
-                updateUrlParam("employee-status");
-              }}
-              className="p-4 sm:p-5 rounded-2xl border cursor-pointer transition text-left flex flex-col justify-between group shadow-sm hover:border-emerald-500/80 hover:shadow-md"
-              style={{
-                backgroundColor: "var(--theme-bg-surface)",
-                borderColor: "var(--theme-border)",
-              }}
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400">
-                      <Activity size={19} />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-[var(--theme-text)]">
-                        Employee Status
-                      </h3>
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 inline-block mt-0.5">
-                        {onlineCount} Active Live
-                      </span>
-                    </div>
-                  </div>
-                  <ChevronRight
-                    size={17}
-                    className="text-[var(--theme-text-muted)] group-hover:translate-x-0.5 transition"
-                  />
-                </div>
-                <p
-                  className="text-xs leading-relaxed"
-                  style={{ color: "var(--theme-text-muted)" }}
-                >
-                  Live visual employee dashboard, real-time presence indicators,
-                  on-break rosters, and shift inspections.
-                </p>
-              </div>
-            </div>
-
-            {/* 5. View Projects Portfolio */}
-            <div
-              onClick={() => {
-                setShowProjectsPage(true);
-                updateUrlParam("projects");
-              }}
-              className="p-4 sm:p-5 rounded-2xl border cursor-pointer transition text-left flex flex-col justify-between group shadow-sm hover:border-purple-500/80 hover:shadow-md"
-              style={{
-                backgroundColor: "var(--theme-bg-surface)",
-                borderColor: "var(--theme-border)",
-              }}
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-400/30 flex items-center justify-center text-purple-700 dark:text-purple-400">
-                      <FolderKanban size={19} />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-[var(--theme-text)]">
-                        View Projects
-                      </h3>
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 inline-block mt-0.5">
-                        Project Portfolio
-                      </span>
-                    </div>
-                  </div>
-                  <ChevronRight
-                    size={17}
-                    className="text-[var(--theme-text-muted)] group-hover:translate-x-0.5 transition"
-                  />
-                </div>
-                <p
-                  className="text-xs leading-relaxed"
-                  style={{ color: "var(--theme-text-muted)" }}
-                >
-                  Browse active, inactive, and delivered client projects, assign
-                  teams, and inspect environment configurations.
-                </p>
-              </div>
-            </div>
-
-            {/* 6. Media Management (Google Drive) */}
-            <div
-              onClick={() => {
-                setShowMediaManagementPage(true);
-                updateUrlParam("media");
-              }}
-              className="p-4 sm:p-5 rounded-2xl border cursor-pointer transition text-left flex flex-col justify-between group shadow-sm hover:border-blue-500/80 hover:shadow-md"
-              style={{
-                backgroundColor: "var(--theme-bg-surface)",
-                borderColor: "var(--theme-border)",
-              }}
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center text-blue-700 dark:text-blue-400">
-                      <HardDrive size={19} />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-[var(--theme-text)]">
-                        Media Management
-                      </h3>
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30 inline-block mt-0.5">
-                        Google Drive Sync
-                      </span>
-                    </div>
-                  </div>
-                  <ChevronRight
-                    size={17}
-                    className="text-[var(--theme-text-muted)] group-hover:translate-x-0.5 transition"
-                  />
-                </div>
-                <p
-                  className="text-xs leading-relaxed"
-                  style={{ color: "var(--theme-text-muted)" }}
-                >
-                  Manage project media folders, upload large assets via 16MB
-                  direct chunked streams, and share viewer links.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Dynamic Detail Panel based on selected module */}
-        {selectedModule === "availability" && (
-          <div className="space-y-6 pt-2">
-            {/* Availability Toolbar Header Widget */}
-            <div
-              className="p-6 rounded-2xl border shadow-lg flex flex-col lg:flex-row lg:items-center justify-between gap-6"
-              style={{
-                backgroundColor: "var(--theme-bg-surface)",
-                borderColor: "var(--theme-border)",
-              }}
-            >
-              <div>
-                <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-blue-700 dark:text-blue-400 uppercase">
-                  <Activity size={14} />
-                  <span>Employee Availability Control Suite</span>
-                </div>
-                <h3 className="text-lg sm:text-xl font-bold text-[var(--theme-text)] mt-1">
-                  {isAvailable
-                    ? isOnBreak
-                      ? "You are currently on break"
-                      : "You are currently working"
-                    : "You are currently offline"}
-                </h3>
-                <p
-                  className="text-xs mt-1 max-w-lg"
-                  style={{ color: "var(--theme-text-muted)" }}
-                >
-                  {isAvailable
-                    ? isOnBreak
-                      ? 'Stopwatch is paused while you are on break. Click "Available after Break" to resume shift.'
-                      : "Your active shift is running. Your time is being tracked and synced with PostgreSQL in real-time."
-                    : 'Click "Available" to check in and begin your tracked shift today.'}
-                </p>
-              </div>
-
-              {/* The 4 Action Buttons & Stopwatch Pill */}
-              <div
-                className="p-3.5 rounded-xl border flex flex-wrap items-center gap-2 shrink-0 self-start lg:self-center shadow-inner"
-                style={{
-                  backgroundColor: "var(--theme-bg-app)",
-                  borderColor: "var(--theme-border)",
-                }}
-              >
-                {/* 1. Available Button */}
-                <button
-                  onClick={handleCheckIn}
-                  disabled={isAvailable || isActionLocked}
-                  title={
-                    isAvailable
-                      ? "Already checked in"
-                      : "Start working / Check in"
-                  }
-                  className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shadow-sm ${
-                    isAvailable && !isOnBreak
-                      ? "bg-[#007A5A] text-white cursor-default ring-1 ring-emerald-400"
-                      : !isAvailable
-                        ? "bg-[#0091FF] hover:bg-[#007AE6] text-white active:scale-95"
-                        : "bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)]"
-                  }`}
-                >
-                  <Play
-                    size={13}
-                    className={!isAvailable ? "fill-current" : ""}
-                  />
-                  <span>Available</span>
-                </button>
-
-                {/* 2. Break Button */}
-                <button
-                  onClick={() => setShowBreakModal(true)}
-                  disabled={!isAvailable || isOnBreak || isActionLocked}
-                  title="Take a break (Lunch, Namaz, Tea)"
-                  className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
-                    isOnBreak
-                      ? "bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30 cursor-default"
-                      : isAvailable
-                        ? "bg-[var(--theme-bg-surface-hover)] hover:brightness-95 text-[var(--theme-text)] border border-[var(--theme-border)] active:scale-95"
-                        : "bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)]"
-                  }`}
-                >
-                  <Coffee size={13} />
-                  <span>Break</span>
-                </button>
-
-                {/* 3. Available after Break Button */}
-                <button
-                  onClick={handleResumeWork}
-                  disabled={!isOnBreak || isActionLocked}
-                  title="Resume work after break"
-                  className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
-                    isOnBreak
-                      ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg animate-pulse active:scale-95"
-                      : "bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)]"
-                  }`}
-                >
-                  <CheckCircle2 size={13} />
-                  <span>Available after Break</span>
-                </button>
-
-                {/* 4. Checkout Button */}
-                <button
-                  onClick={handleRequestCheckout}
-                  disabled={!isAvailable || isOnBreak || isActionLocked}
-                  title="End shift and checkout"
-                  className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
-                    isAvailable && !isOnBreak
-                      ? "bg-[var(--theme-bg-surface-hover)] hover:bg-rose-950/40 text-[var(--theme-text)] hover:text-rose-300 border border-[var(--theme-border)] hover:border-rose-500/40 active:scale-95"
-                      : "bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)]"
-                  }`}
-                >
-                  <LogOut size={13} />
-                  <span>Checkout</span>
-                </button>
-
-                {/* 5. Live Stopwatch Pill (00:00:00) */}
-                <div
-                  title="Live calculated net active working time"
-                  className={`px-3.5 py-2 rounded-lg text-xs font-mono font-bold flex items-center gap-2 border shadow-sm transition ${
-                    isOnBreak
-                      ? "bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-500/30"
-                      : isAvailable
-                        ? "bg-[#0091FF]/20 text-[#38B6FF] border-[#0091FF]/40"
-                        : "bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] border-[var(--theme-border)]"
-                  }`}
-                >
-                  <Clock
-                    size={13}
-                    className={isAvailable && !isOnBreak ? "animate-spin" : ""}
-                  />
-                  <span>{formatStopwatch(elapsedSeconds)}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Team Live Attendance Table */}
-            <div
-              className="p-5 sm:p-6 rounded-2xl border shadow-xs"
-              style={{
-                backgroundColor: "var(--theme-bg-surface)",
-                borderColor: "var(--theme-border)",
-              }}
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                <div>
-                  <h4 className="text-sm sm:text-base font-bold text-[var(--theme-text)] flex items-center gap-2">
-                    <Users size={17} className="text-blue-700 dark:text-blue-400" />
-                    <span>Live Team Attendance & Shift Tracker</span>
-                  </h4>
-                  <p
-                    className="text-xs mt-0.5"
-                    style={{ color: "var(--theme-text-muted)" }}
-                  >
-                    Real-time status of all employees in {workspace.name}. (
-                    {onlineCount} Working, {onBreakCount} on Break)
-                  </p>
-                </div>
-
-                <button
-                  onClick={loadTeamAvailability}
-                  className="px-3.5 py-1.5 rounded-xl border text-xs flex items-center gap-1.5 transition hover:opacity-85 self-start sm:self-auto"
-                  style={{
-                    backgroundColor: "var(--theme-bg-app)",
-                    borderColor: "var(--theme-border)",
-                    color: "var(--theme-text-primary)",
-                  }}
-                >
-                  <RefreshCw
-                    size={13}
-                    className={isLoadingTeam ? "animate-spin" : ""}
-                  />
-                  <span>Refresh Team Status</span>
-                </button>
-              </div>
-
-              <div
-                className="border rounded-xl overflow-hidden"
-                style={{ borderColor: "var(--theme-border)" }}
-              >
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead
-                      style={{
-                        backgroundColor: "var(--theme-bg-app)",
-                        color: "var(--theme-text-muted)",
-                      }}
-                    >
-                      <tr
-                        className="border-b"
-                        style={{ borderColor: "var(--theme-border)" }}
-                      >
-                        <th className="py-3 px-4 font-semibold">Employee</th>
-                        <th className="py-3 px-4 font-semibold">Role</th>
-                        <th className="py-3 px-4 font-semibold">
-                          Availability Status
-                        </th>
-                        <th className="py-3 px-4 font-semibold">
-                          Check-in Time
-                        </th>
-                        <th className="py-3 px-4 font-semibold text-right">
-                          Logged Time
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody
-                      className="divide-y"
-                      style={{ borderColor: "var(--theme-border)" }}
-                    >
-                      {teamMembers.map((item) => {
-                        const avail = item.availability;
-                        const isOnlineWorking =
-                          avail?.isAvailable && !avail?.isOnBreak;
-                        const isOnMemberBreak =
-                          avail?.isAvailable && avail?.isOnBreak;
-
-                        return (
-                          <tr
-                            key={item.user.id}
-                            className="hover:bg-[var(--theme-bg-surface-hover)] transition"
-                            style={{
-                              backgroundColor: "var(--theme-bg-surface)",
-                            }}
-                          >
-                            <td className="py-3 px-4 flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-lg bg-blue-600/25 border border-blue-400/30 flex items-center justify-center font-bold text-blue-700 dark:text-blue-300">
-                                {item.user.displayName[0]?.toUpperCase() ||
-                                  item.user.username[0]?.toUpperCase()}
-                              </div>
-                              <div>
-                                <p className="font-semibold text-[var(--theme-text)]">
-                                  {item.user.displayName}
-                                </p>
-                                <p
-                                  className="text-[11px]"
-                                  style={{ color: "var(--theme-text-muted)" }}
-                                >
-                                  @{item.user.username}
-                                </p>
-                              </div>
-                            </td>
-                            <td className="py-3 px-4">
-                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)]">
-                                {item.role}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4">
-                              {isOnMemberBreak ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-                                  <Coffee size={12} />
-                                  On Break
-                                </span>
-                              ) : isOnlineWorking ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                                  Available & Working
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] border border-[var(--theme-border)]">
-                                  Offline
-                                </span>
-                              )}
-                            </td>
-                            <td
-                              className="py-3 px-4"
-                              style={{ color: "var(--theme-text-muted)" }}
-                            >
-                              {avail?.availableTime
-                                ? new Date(
-                                    avail.availableTime,
-                                  ).toLocaleTimeString([], {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })
-                                : "—"}
-                            </td>
-                            <td className="py-3 px-4 text-right font-mono font-medium text-[var(--theme-text)]">
-                              {avail?.totalWorkingMinutes
-                                ? `${Math.floor(avail.totalWorkingMinutes / 60)}h ${avail.totalWorkingMinutes % 60}m`
-                                : isOnlineWorking
-                                  ? "Active Shift"
-                                  : "—"}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Roles Detail Panel */}
-        {selectedModule === "roles" && (
-          <div
-            className="p-6 rounded-2xl border"
+        {/* 6 Cards Grid - Exact match to user reference screenshot */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {/* 1. Availability Card */}
+          <motion.div
+            whileHover={{ y: -3, scale: 1.01 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => {
+              setShowUserAvailabilityPage(true);
+              updateUrlParam("availability");
+            }}
+            className="relative p-6 rounded-2xl border cursor-pointer text-left flex flex-col justify-between group shadow-lg overflow-hidden"
             style={{
               backgroundColor: "var(--theme-bg-surface)",
               borderColor: "var(--theme-border)",
             }}
           >
-            <h4 className="text-base font-bold text-[var(--theme-text)] mb-2">
-              Workspace Roles & Permission Levels
-            </h4>
-            <p
-              className="text-xs mb-4"
-              style={{ color: "var(--theme-text-muted)" }}
-            >
-              Configure administrative boundaries for Super Admins, Workspace
-              Admins, Managers, and Employees.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Ambient Blue Glow Backdrop */}
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-600/15 via-blue-500/5 to-transparent pointer-events-none" />
+
+            <div className="relative z-10">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="flex items-center gap-3.5">
+                  {/* Glowing Blue Squircle Icon */}
+                  <div
+                    className="w-13 h-13 rounded-2xl flex items-center justify-center shrink-0 shadow-lg"
+                    style={{
+                      background: "linear-gradient(135deg, #1E40AF 0%, #3B82F6 100%)",
+                      boxShadow: "0 0 20px rgba(59, 130, 246, 0.4)",
+                      color: "#FFFFFF",
+                    }}
+                  >
+                    <Gauge size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base" style={{ color: "var(--theme-text-primary)" }}>
+                      Availability
+                    </h3>
+                    <span
+                      className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-full border mt-1"
+                      style={{
+                        backgroundColor: "rgba(16, 185, 129, 0.15)",
+                        borderColor: "rgba(16, 185, 129, 0.3)",
+                        color: "#10B981",
+                      }}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      Active • 1:00 - 18:00
+                    </span>
+                  </div>
+                </div>
+
+                {/* Circular Arrow Button */}
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center transition-all group-hover:scale-110"
+                  style={{
+                    backgroundColor: "var(--theme-bg-app)",
+                    borderColor: "var(--theme-border)",
+                    color: "var(--theme-text-muted)",
+                    borderWidth: "1px",
+                  }}
+                >
+                  <ArrowRight size={14} />
+                </div>
+              </div>
+
+              <p className="text-xs leading-relaxed" style={{ color: "var(--theme-text-muted)" }}>
+                Set core operational hours, global team shifts, away presets, check-in rules, and auto-replies.
+              </p>
+            </div>
+
+            {/* Bottom SVG wave curve with continuous animation */}
+            <div className="relative z-0 mt-5 -mb-6 -mx-6 h-11 overflow-hidden opacity-85">
+              <svg viewBox="0 0 400 48" preserveAspectRatio="none" fill="none" className="w-full h-full">
+                <defs>
+                  <linearGradient id="availBlueWave" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#1E40AF" stopOpacity="0.2" />
+                    <stop offset="60%" stopColor="#2563EB" stopOpacity="0.7" />
+                    <stop offset="100%" stopColor="#60A5FA" stopOpacity="1" />
+                  </linearGradient>
+                </defs>
+                <motion.path
+                  d="M0 38 C 90 38, 160 38, 230 38 C 290 38, 330 24, 370 14 C 385 10, 395 18, 400 13"
+                  stroke="url(#availBlueWave)"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  animate={{
+                    d: [
+                      "M0 38 C 90 38, 160 38, 230 38 C 290 38, 330 24, 370 14 C 385 10, 395 18, 400 13",
+                      "M0 37 C 90 37, 160 36, 230 36 C 290 36, 330 20, 370 11 C 385 8, 395 15, 400 10",
+                      "M0 38 C 90 38, 160 38, 230 38 C 290 38, 330 24, 370 14 C 385 10, 395 18, 400 13",
+                    ],
+                  }}
+                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                />
+              </svg>
+            </div>
+          </motion.div>
+
+          {/* 2. Roles & Permissions Card */}
+          <motion.div
+            whileHover={{ y: -3, scale: 1.01 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setSelectedModule(selectedModule === "roles" ? null : "roles")}
+            className="relative p-6 rounded-2xl border cursor-pointer text-left flex flex-col justify-between group shadow-lg overflow-hidden"
+            style={{
+              backgroundColor: "var(--theme-bg-surface)",
+              borderColor: selectedModule === "roles" ? "#A855F7" : "var(--theme-border)",
+            }}
+          >
+            {/* Ambient Purple Glow Backdrop */}
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-600/15 via-purple-500/5 to-transparent pointer-events-none" />
+
+            <div className="relative z-10">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="flex items-center gap-3.5">
+                  {/* Glowing Purple Squircle Icon */}
+                  <div
+                    className="w-13 h-13 rounded-2xl flex items-center justify-center shrink-0 shadow-lg"
+                    style={{
+                      background: "linear-gradient(135deg, #6B21A8 0%, #A855F7 100%)",
+                      boxShadow: "0 0 20px rgba(168, 85, 247, 0.4)",
+                      color: "#FFFFFF",
+                    }}
+                  >
+                    <Shield size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base" style={{ color: "var(--theme-text-primary)" }}>
+                      Roles & Permissions
+                    </h3>
+                    <span
+                      className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-full border mt-1"
+                      style={{
+                        backgroundColor: "rgba(168, 85, 247, 0.15)",
+                        borderColor: "rgba(168, 85, 247, 0.3)",
+                        color: "#C084FC",
+                      }}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+                      4 Custom Roles
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center transition-all group-hover:scale-110"
+                  style={{
+                    backgroundColor: "var(--theme-bg-app)",
+                    borderColor: "var(--theme-border)",
+                    color: "var(--theme-text-muted)",
+                    borderWidth: "1px",
+                  }}
+                >
+                  <ArrowRight size={14} />
+                </div>
+              </div>
+
+              <p className="text-xs leading-relaxed" style={{ color: "var(--theme-text-muted)" }}>
+                Configure administrative privileges, granular channel access, ticket assignments, and member roles.
+              </p>
+            </div>
+
+            {/* Bottom SVG wave curve with continuous animation */}
+            <div className="relative z-0 mt-5 -mb-6 -mx-6 h-11 overflow-hidden opacity-85">
+              <svg viewBox="0 0 400 48" preserveAspectRatio="none" fill="none" className="w-full h-full">
+                <defs>
+                  <linearGradient id="rolesPurpleWave" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#6B21A8" stopOpacity="0.2" />
+                    <stop offset="60%" stopColor="#9333EA" stopOpacity="0.7" />
+                    <stop offset="100%" stopColor="#C084FC" stopOpacity="1" />
+                  </linearGradient>
+                </defs>
+                <motion.path
+                  d="M0 38 C 90 38, 160 38, 230 38 C 290 38, 330 24, 370 14 C 385 10, 395 18, 400 13"
+                  stroke="url(#rolesPurpleWave)"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  animate={{
+                    d: [
+                      "M0 38 C 90 38, 160 38, 230 38 C 290 38, 330 24, 370 14 C 385 10, 395 18, 400 13",
+                      "M0 37 C 90 37, 160 36, 230 36 C 290 36, 330 20, 370 11 C 385 8, 395 15, 400 10",
+                      "M0 38 C 90 38, 160 38, 230 38 C 290 38, 330 24, 370 14 C 385 10, 395 18, 400 13",
+                    ],
+                  }}
+                  transition={{ duration: 4.2, repeat: Infinity, ease: "easeInOut" }}
+                />
+              </svg>
+            </div>
+          </motion.div>
+
+          {/* 3. Members & Invites Card */}
+          <motion.div
+            whileHover={{ y: -3, scale: 1.01 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setSelectedModule(selectedModule === "members" ? null : "members")}
+            className="relative p-6 rounded-2xl border cursor-pointer text-left flex flex-col justify-between group shadow-lg overflow-hidden"
+            style={{
+              backgroundColor: "var(--theme-bg-surface)",
+              borderColor: selectedModule === "members" ? "#10B981" : "var(--theme-border)",
+            }}
+          >
+            {/* Ambient Emerald Glow Backdrop */}
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/15 via-teal-500/5 to-transparent pointer-events-none" />
+
+            <div className="relative z-10">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="flex items-center gap-3.5">
+                  {/* Glowing Emerald Squircle Icon */}
+                  <div
+                    className="w-13 h-13 rounded-2xl flex items-center justify-center shrink-0 shadow-lg"
+                    style={{
+                      background: "linear-gradient(135deg, #065F46 0%, #10B981 100%)",
+                      boxShadow: "0 0 20px rgba(16, 185, 129, 0.4)",
+                      color: "#FFFFFF",
+                    }}
+                  >
+                    <Users size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base" style={{ color: "var(--theme-text-primary)" }}>
+                      Members & Invites
+                    </h3>
+                    <span
+                      className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-full border mt-1"
+                      style={{
+                        backgroundColor: "rgba(16, 185, 129, 0.15)",
+                        borderColor: "rgba(16, 185, 129, 0.3)",
+                        color: "#34D399",
+                      }}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      {teamMembers.length || members.length} Active • 50 Seats
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center transition-all group-hover:scale-110"
+                  style={{
+                    backgroundColor: "var(--theme-bg-app)",
+                    borderColor: "var(--theme-border)",
+                    color: "var(--theme-text-muted)",
+                    borderWidth: "1px",
+                  }}
+                >
+                  <ArrowRight size={14} />
+                </div>
+              </div>
+
+              <p className="text-xs leading-relaxed" style={{ color: "var(--theme-text-muted)" }}>
+                Provision staff accounts, dispatch magic invite links, monitor presence, and manage seat licenses.
+              </p>
+            </div>
+
+            {/* Bottom SVG wave curve with continuous animation */}
+            <div className="relative z-0 mt-5 -mb-6 -mx-6 h-11 overflow-hidden opacity-85">
+              <svg viewBox="0 0 400 48" preserveAspectRatio="none" fill="none" className="w-full h-full">
+                <defs>
+                  <linearGradient id="membersGreenWave" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#065F46" stopOpacity="0.2" />
+                    <stop offset="60%" stopColor="#059669" stopOpacity="0.7" />
+                    <stop offset="100%" stopColor="#34D399" stopOpacity="1" />
+                  </linearGradient>
+                </defs>
+                <motion.path
+                  d="M0 38 C 90 38, 160 38, 230 38 C 290 38, 330 24, 370 14 C 385 10, 395 18, 400 13"
+                  stroke="url(#membersGreenWave)"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  animate={{
+                    d: [
+                      "M0 38 C 90 38, 160 38, 230 38 C 290 38, 330 24, 370 14 C 385 10, 395 18, 400 13",
+                      "M0 37 C 90 37, 160 36, 230 36 C 290 36, 330 20, 370 11 C 385 8, 395 15, 400 10",
+                      "M0 38 C 90 38, 160 38, 230 38 C 290 38, 330 24, 370 14 C 385 10, 395 18, 400 13",
+                    ],
+                  }}
+                  transition={{ duration: 4.4, repeat: Infinity, ease: "easeInOut" }}
+                />
+              </svg>
+            </div>
+          </motion.div>
+
+          {/* 4. Employee Status Dashboard */}
+          <motion.div
+            whileHover={{ y: -3, scale: 1.01 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => {
+              setShowEmployeeStatusPage(true);
+              updateUrlParam("employee-status");
+            }}
+            className="relative p-6 rounded-2xl border cursor-pointer text-left flex flex-col justify-between group shadow-lg overflow-hidden"
+            style={{
+              backgroundColor: "var(--theme-bg-surface)",
+              borderColor: "var(--theme-border)",
+            }}
+          >
+            {/* Ambient Orange/Gold Glow Backdrop */}
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-600/15 via-orange-500/5 to-transparent pointer-events-none" />
+
+            <div className="relative z-10">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="flex items-center gap-3.5">
+                  {/* Glowing Amber Squircle Icon */}
+                  <div
+                    className="w-13 h-13 rounded-2xl flex items-center justify-center shrink-0 shadow-lg"
+                    style={{
+                      background: "linear-gradient(135deg, #B45309 0%, #F59E0B 100%)",
+                      boxShadow: "0 0 20px rgba(245, 158, 11, 0.4)",
+                      color: "#FFFFFF",
+                    }}
+                  >
+                    <Activity size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base" style={{ color: "var(--theme-text-primary)" }}>
+                      Employee Status
+                    </h3>
+                    <span
+                      className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-full border mt-1"
+                      style={{
+                        backgroundColor: "rgba(16, 185, 129, 0.15)",
+                        borderColor: "rgba(16, 185, 129, 0.3)",
+                        color: "#10B981",
+                      }}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      Active • Live
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center transition-all group-hover:scale-110"
+                  style={{
+                    backgroundColor: "var(--theme-bg-app)",
+                    borderColor: "var(--theme-border)",
+                    color: "var(--theme-text-muted)",
+                    borderWidth: "1px",
+                  }}
+                >
+                  <ArrowRight size={14} />
+                </div>
+              </div>
+
+              <p className="text-xs leading-relaxed" style={{ color: "var(--theme-text-muted)" }}>
+                Live visual employee dashboard, real-time presence indicators, on-break rosters, and shift inspections.
+              </p>
+            </div>
+
+            {/* Bottom SVG wave curve with continuous animation */}
+            <div className="relative z-0 mt-5 -mb-6 -mx-6 h-11 overflow-hidden opacity-85">
+              <svg viewBox="0 0 400 48" preserveAspectRatio="none" fill="none" className="w-full h-full">
+                <defs>
+                  <linearGradient id="employeeAmberWave" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#B45309" stopOpacity="0.2" />
+                    <stop offset="60%" stopColor="#D97706" stopOpacity="0.7" />
+                    <stop offset="100%" stopColor="#FBBF24" stopOpacity="1" />
+                  </linearGradient>
+                </defs>
+                <motion.path
+                  d="M0 38 C 90 38, 160 38, 230 38 C 290 38, 330 24, 370 14 C 385 10, 395 18, 400 13"
+                  stroke="url(#employeeAmberWave)"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  animate={{
+                    d: [
+                      "M0 38 C 90 38, 160 38, 230 38 C 290 38, 330 24, 370 14 C 385 10, 395 18, 400 13",
+                      "M0 37 C 90 37, 160 36, 230 36 C 290 36, 330 20, 370 11 C 385 8, 395 15, 400 10",
+                      "M0 38 C 90 38, 160 38, 230 38 C 290 38, 330 24, 370 14 C 385 10, 395 18, 400 13",
+                    ],
+                  }}
+                  transition={{ duration: 4.1, repeat: Infinity, ease: "easeInOut" }}
+                />
+              </svg>
+            </div>
+          </motion.div>
+
+          {/* 5. View Projects Portfolio */}
+          <motion.div
+            whileHover={{ y: -3, scale: 1.01 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => {
+              setShowProjectsPage(true);
+              updateUrlParam("projects");
+            }}
+            className="relative p-6 rounded-2xl border cursor-pointer text-left flex flex-col justify-between group shadow-lg overflow-hidden"
+            style={{
+              backgroundColor: "var(--theme-bg-surface)",
+              borderColor: "var(--theme-border)",
+            }}
+          >
+            {/* Ambient Royal Indigo/Purple Glow Backdrop */}
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/15 via-purple-500/5 to-transparent pointer-events-none" />
+
+            <div className="relative z-10">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="flex items-center gap-3.5">
+                  {/* Glowing Indigo Squircle Icon */}
+                  <div
+                    className="w-13 h-13 rounded-2xl flex items-center justify-center shrink-0 shadow-lg"
+                    style={{
+                      background: "linear-gradient(135deg, #3730A3 0%, #6366F1 100%)",
+                      boxShadow: "0 0 20px rgba(99, 102, 241, 0.4)",
+                      color: "#FFFFFF",
+                    }}
+                  >
+                    <FolderKanban size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base" style={{ color: "var(--theme-text-primary)" }}>
+                      View Projects
+                    </h3>
+                    <span
+                      className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-full border mt-1"
+                      style={{
+                        backgroundColor: "rgba(245, 158, 11, 0.15)",
+                        borderColor: "rgba(245, 158, 11, 0.3)",
+                        color: "#FBBF24",
+                      }}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                      Project Portfolio
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center transition-all group-hover:scale-110"
+                  style={{
+                    backgroundColor: "var(--theme-bg-app)",
+                    borderColor: "var(--theme-border)",
+                    color: "var(--theme-text-muted)",
+                    borderWidth: "1px",
+                  }}
+                >
+                  <ArrowRight size={14} />
+                </div>
+              </div>
+
+              <p className="text-xs leading-relaxed" style={{ color: "var(--theme-text-muted)" }}>
+                Browse active, inactive, and delivered client projects, assign teams, and inspect advancement configurations.
+              </p>
+            </div>
+
+            {/* Bottom SVG wave curve with continuous animation */}
+            <div className="relative z-0 mt-5 -mb-6 -mx-6 h-11 overflow-hidden opacity-85">
+              <svg viewBox="0 0 400 48" preserveAspectRatio="none" fill="none" className="w-full h-full">
+                <defs>
+                  <linearGradient id="projectsIndigoWave" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#3730A3" stopOpacity="0.2" />
+                    <stop offset="60%" stopColor="#4F46E5" stopOpacity="0.7" />
+                    <stop offset="100%" stopColor="#818CF8" stopOpacity="1" />
+                  </linearGradient>
+                </defs>
+                <motion.path
+                  d="M0 38 C 90 38, 160 38, 230 38 C 290 38, 330 24, 370 14 C 385 10, 395 18, 400 13"
+                  stroke="url(#projectsIndigoWave)"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  animate={{
+                    d: [
+                      "M0 38 C 90 38, 160 38, 230 38 C 290 38, 330 24, 370 14 C 385 10, 395 18, 400 13",
+                      "M0 37 C 90 37, 160 36, 230 36 C 290 36, 330 20, 370 11 C 385 8, 395 15, 400 10",
+                      "M0 38 C 90 38, 160 38, 230 38 C 290 38, 330 24, 370 14 C 385 10, 395 18, 400 13",
+                    ],
+                  }}
+                  transition={{ duration: 4.3, repeat: Infinity, ease: "easeInOut" }}
+                />
+              </svg>
+            </div>
+          </motion.div>
+
+          {/* 6. Media Management Card */}
+          <motion.div
+            whileHover={{ y: -3, scale: 1.01 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => {
+              setShowMediaManagementPage(true);
+              updateUrlParam("media");
+            }}
+            className="relative p-6 rounded-2xl border cursor-pointer text-left flex flex-col justify-between group shadow-lg overflow-hidden"
+            style={{
+              backgroundColor: "var(--theme-bg-surface)",
+              borderColor: "var(--theme-border)",
+            }}
+          >
+            {/* Ambient Cyan/Sky Glow Backdrop */}
+            <div className="absolute inset-0 bg-gradient-to-br from-cyan-600/15 via-blue-500/5 to-transparent pointer-events-none" />
+
+            <div className="relative z-10">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="flex items-center gap-3.5">
+                  {/* Glowing Cyan Squircle Icon */}
+                  <div
+                    className="w-13 h-13 rounded-2xl flex items-center justify-center shrink-0 shadow-lg"
+                    style={{
+                      background: "linear-gradient(135deg, #0369A1 0%, #0EA5E9 100%)",
+                      boxShadow: "0 0 20px rgba(14, 165, 233, 0.4)",
+                      color: "#FFFFFF",
+                    }}
+                  >
+                    <Video size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base" style={{ color: "var(--theme-text-primary)" }}>
+                      Media Management
+                    </h3>
+                    <span
+                      className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-full border mt-1"
+                      style={{
+                        backgroundColor: "rgba(14, 165, 233, 0.15)",
+                        borderColor: "rgba(14, 165, 233, 0.3)",
+                        color: "#38BDF8",
+                      }}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                      Media Drive Sync
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center transition-all group-hover:scale-110"
+                  style={{
+                    backgroundColor: "var(--theme-bg-app)",
+                    borderColor: "var(--theme-border)",
+                    color: "var(--theme-text-muted)",
+                    borderWidth: "1px",
+                  }}
+                >
+                  <ArrowRight size={14} />
+                </div>
+              </div>
+
+              <p className="text-xs leading-relaxed" style={{ color: "var(--theme-text-muted)" }}>
+                Manage project media folders, upload large assets via 16MB direct chunked streams, and share via visitor links.
+              </p>
+            </div>
+
+            {/* Bottom SVG wave curve with continuous animation */}
+            <div className="relative z-0 mt-5 -mb-6 -mx-6 h-11 overflow-hidden opacity-85">
+              <svg viewBox="0 0 400 48" preserveAspectRatio="none" fill="none" className="w-full h-full">
+                <defs>
+                  <linearGradient id="mediaCyanWave" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#0369A1" stopOpacity="0.2" />
+                    <stop offset="60%" stopColor="#0284C7" stopOpacity="0.7" />
+                    <stop offset="100%" stopColor="#38BDF8" stopOpacity="1" />
+                  </linearGradient>
+                </defs>
+                <motion.path
+                  d="M0 38 C 90 38, 160 38, 230 38 C 290 38, 330 24, 370 14 C 385 10, 395 18, 400 13"
+                  stroke="url(#mediaCyanWave)"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  animate={{
+                    d: [
+                      "M0 38 C 90 38, 160 38, 230 38 C 290 38, 330 24, 370 14 C 385 10, 395 18, 400 13",
+                      "M0 37 C 90 37, 160 36, 230 36 C 290 36, 330 20, 370 11 C 385 8, 395 15, 400 10",
+                      "M0 38 C 90 38, 160 38, 230 38 C 290 38, 330 24, 370 14 C 385 10, 395 18, 400 13",
+                    ],
+                  }}
+                  transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
+                />
+              </svg>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Roles Detail Panel */}
+        {selectedModule === "roles" && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="p-6 sm:p-7 rounded-3xl border shadow-sm relative overflow-hidden"
+            style={{
+              backgroundColor: "var(--theme-bg-surface)",
+              borderColor: "rgba(168, 85, 247, 0.3)",
+            }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                  <Shield size={18} />
+                </div>
+                <div>
+                  <h4 className="font-display font-bold text-base text-slate-900 dark:text-white">
+                    Workspace Roles & Permission Levels
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400">
+                    Administrative boundaries for Super Admins, Workspace Admins, Managers, and Employees.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedModule(null)}
+                className="text-xs font-mono text-slate-400 hover:text-slate-600 dark:hover:text-white transition px-2.5 py-1 rounded-lg border border-slate-200 dark:border-white/10"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
               {[
                 {
                   name: "SUPER_ADMIN",
-                  desc: "Full root access to system consoles, workspaces, and user directories",
+                  badge: "Full Root",
+                  color: "from-rose-500/10 border-rose-500/20 text-rose-500",
+                  desc: "Full root access to system consoles, workspaces, and user directories.",
                 },
                 {
                   name: "WORKSPACE_ADMIN",
-                  desc: "Can manage channels, bots, organization controls, and members",
+                  badge: "Admin",
+                  color: "from-purple-500/10 border-purple-500/20 text-purple-400",
+                  desc: "Can manage channels, bots, organization controls, and members.",
                 },
                 {
                   name: "MANAGER",
-                  desc: "Can supervise team attendance, create project boards, and assign tickets",
+                  badge: "Staff Lead",
+                  color: "from-blue-500/10 border-blue-500/20 text-blue-400",
+                  desc: "Can supervise team attendance, create project boards, and assign tickets.",
                 },
                 {
                   name: "EMPLOYEE",
-                  desc: "Can chat, join calls, take breaks, and manage personal shift availability",
+                  badge: "Member",
+                  color: "from-emerald-500/10 border-emerald-500/20 text-emerald-400",
+                  desc: "Can chat, join calls, take breaks, and manage personal shift availability.",
                 },
               ].map((r) => (
                 <div
                   key={r.name}
-                  className="p-4 rounded-xl border flex flex-col justify-between"
-                  style={{
-                    backgroundColor: "var(--theme-bg-app)",
-                    borderColor: "var(--theme-border)",
-                  }}
+                  className="p-5 rounded-2xl border bg-slate-50/50 dark:bg-zinc-950/40 border-slate-200 dark:border-white/10 flex flex-col justify-between hover:border-purple-500/40 transition-all shadow-xs"
                 >
-                  <span className="font-bold text-xs text-blue-700 dark:text-blue-400 mb-1">
-                    {r.name}
-                  </span>
-                  <p
-                    className="text-[11px] leading-relaxed"
-                    style={{ color: "var(--theme-text-muted)" }}
-                  >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-mono font-bold text-xs tracking-tight text-slate-900 dark:text-white">
+                      {r.name}
+                    </span>
+                    <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border ${r.color}`}>
+                      {r.badge}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed mt-1">
                     {r.desc}
                   </p>
                 </div>
               ))}
             </div>
-          </div>
+          </motion.div>
         )}
 
         {/* Members Detail Panel */}
         {selectedModule === "members" && (
-          <div
-            className="p-6 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="p-6 sm:p-7 rounded-3xl border shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-5 relative overflow-hidden"
             style={{
               backgroundColor: "var(--theme-bg-surface)",
-              borderColor: "var(--theme-border)",
+              borderColor: "rgba(6, 182, 212, 0.3)",
             }}
           >
-            <div>
-              <h4 className="text-base font-bold text-[var(--theme-text)]">
-                Team Roster & Invitations
-              </h4>
-              <p
-                className="text-xs mt-1"
-                style={{ color: "var(--theme-text-muted)" }}
-              >
-                Invite teammates to {workspace.name} or manage existing
-                privileges.
-              </p>
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
+                <Users size={20} />
+              </div>
+              <div>
+                <h4 className="font-display font-bold text-base text-slate-900 dark:text-white">
+                  Team Roster & Invitations
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                  Invite teammates to <strong className="text-slate-800 dark:text-zinc-200">{workspace.name}</strong>, assign departments, or configure seat licenses.
+                </p>
+              </div>
             </div>
-            {onOpenAddMembers && (
+
+            <div className="flex items-center gap-2.5 shrink-0">
               <button
-                onClick={onOpenAddMembers}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-white shadow-sm flex items-center gap-2 hover:opacity-90 transition"
-                style={{ backgroundColor: "var(--theme-primary)" }}
+                onClick={() => setSelectedModule(null)}
+                className="text-xs font-mono text-slate-400 hover:text-slate-600 dark:hover:text-white transition px-3 py-2 rounded-xl border border-slate-200 dark:border-white/10"
               >
-                <UserCheck size={14} />
-                <span>Invite New Members</span>
+                Close
               </button>
-            )}
-          </div>
+              {onOpenAddMembers && (
+                <button
+                  onClick={onOpenAddMembers}
+                  className="px-4 py-2.5 rounded-full text-xs font-bold text-white bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 hover:opacity-95 shadow-md shadow-cyan-500/20 flex items-center gap-2 transition"
+                >
+                  <UserCheck size={14} />
+                  <span>Invite New Members</span>
+                </button>
+              )}
+            </div>
+          </motion.div>
         )}
       </div>
 
