@@ -6,7 +6,7 @@ import { Text } from '@/components/ui/text';
 import { useCallStore } from '@/features/calls/store';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
-import { channelLabel, isDirect } from '../utils';
+import { channelLabel, dmAvatarUrl, isDirect } from '../utils';
 
 interface Props {
   channel: Channel;
@@ -29,7 +29,7 @@ export function ChannelRow({ channel, myId, unread, onPress }: Props) {
     >
       <View className="w-6 items-center">
         {isDirect(channel) ? (
-          <Avatar name={label} className="h-6 w-6 rounded-md" />
+          <Avatar name={label} url={dmAvatarUrl(channel, myId)} className="h-6 w-6 rounded-md" />
         ) : (
           <Icon size={18} strokeWidth={unread ? 2.5 : 2} color={unread ? colors.foreground : colors.mutedForeground} />
         )}

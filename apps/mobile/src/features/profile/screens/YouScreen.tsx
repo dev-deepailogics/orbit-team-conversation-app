@@ -36,7 +36,7 @@ export function YouScreen({ navigation }: TabScreenProps<'You'>) {
         </View>
 
         <View className="flex-row items-center gap-4 px-4 py-4">
-          <Avatar name={user.displayName} className="h-16 w-16 rounded-2xl" />
+          <Avatar name={user.displayName} url={user.avatarUrl} className="h-16 w-16 rounded-2xl" />
           <View className="flex-1">
             <Text className="text-xl font-black" numberOfLines={1}>
               {user.displayName}

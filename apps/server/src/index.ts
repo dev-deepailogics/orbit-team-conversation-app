@@ -99,7 +99,11 @@ async function bootstrap() {
             where: { id: payload.id },
             select: { disabled: true },
           });
-          if (userRecord?.disabled) {
+          // Valid JWT for a deleted user (e.g. after a DB reset): 401 so clients drop the session and sign in again.
+          if (!userRecord) {
+            return reply.status(401).send({ error: "Unauthorized: user no longer exists" });
+          }
+          if (userRecord.disabled) {
             return reply.status(403).send({ error: "Account is deactivated" });
           }
         }

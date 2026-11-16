@@ -302,7 +302,7 @@ export function TicketDetailScreen({ route, navigation }: ScreenProps<'TicketDet
             {comments.length === 0 && !commentsError && <Text className="text-subtle">No comments yet.</Text>}
             {comments.map(c => (
               <View key={c.id} className="flex-row gap-2">
-                <Avatar name={c.user?.displayName || c.username} />
+                <Avatar name={c.user?.displayName || c.username} url={c.user?.avatarUrl} />
                 <View className="flex-1">
                   <View className="flex-row items-baseline gap-2">
                     <Text className="shrink font-bold" numberOfLines={1}>

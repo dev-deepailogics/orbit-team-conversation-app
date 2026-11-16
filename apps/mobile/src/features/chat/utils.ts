@@ -15,6 +15,12 @@ export function senderName(m: Message): string {
   return m.bot?.name || m.user?.displayName || m.user?.username || 'Unknown';
 }
 
+// Never for anonymous posts: the real user's photo would unmask them.
+export function senderAvatarUrl(m: Message): string | null | undefined {
+  if (m.bot) return m.bot.avatarUrl;
+  return m.isAnonymous ? null : m.user?.avatarUrl;
+}
+
 export function senderEmoji(m: Message): string | null {
   if (m.bot) return '🤖';
   return m.isAnonymous ? m.anonEmoji || '🎭' : null;

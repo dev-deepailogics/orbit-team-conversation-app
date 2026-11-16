@@ -75,7 +75,7 @@ export function NewMessageScreen({ navigation }: ScreenProps<'NewMessage'>) {
               className="min-h-[56px] flex-row items-center gap-3 px-4 py-2 active:bg-muted"
               accessibilityRole="button"
             >
-              <Avatar name={name} />
+              <Avatar name={name} url={item.user?.avatarUrl} />
               <View className="flex-1">
                 <Text className="font-bold" numberOfLines={1}>
                   {name}

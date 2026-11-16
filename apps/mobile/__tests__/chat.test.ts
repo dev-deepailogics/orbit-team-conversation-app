@@ -1,7 +1,7 @@
 import type { Channel, Message } from '@orbit/types';
 import { useChatStore } from '../src/features/chat/store';
-import { formatBytes, groupReactions, isImage, messagePermissions, showHeader, typingLabel } from '../src/features/chat/utils';
-import { channelLabel, parseInviteCode, splitChannels } from '../src/features/workspaces/utils';
+import { formatBytes, groupReactions, isImage, messagePermissions, senderAvatarUrl, showHeader, typingLabel } from '../src/features/chat/utils';
+import { channelLabel, dmAvatarUrl, parseInviteCode, pendingDMUserId, splitChannels } from '../src/features/workspaces/utils';
 
 const msg = (over: Partial<Message>) =>
   ({ id: 'm1', channelId: 'c1', userId: 'u1', parentMessageId: null, createdAt: '2026-10-26T10:00:00Z', ...over }) as Message;
@@ -15,6 +15,27 @@ test('DM labels name the other people, or "(you)" for a self-DM', () => {
   const { channels, dms } = splitChannels([chan({ id: '1', name: 'zeta' }), chan({ id: '2', type: 'DIRECT' }), chan({ id: '3', name: 'alpha' })], 'me');
   expect(channels.map(c => c.id)).toEqual(['3', '1']);
   expect(dms.map(c => c.id)).toEqual(['2']);
+});
+
+test('every workspace member gets a DM row; existing DMs are not duplicated', () => {
+  const members = [member('me', 'Me'), member('u2', 'Bo'), member('u3', 'Al')];
+  const existing = chan({ id: 'd1', type: 'DIRECT', members: [members[0], members[1]] });
+  const { dms } = splitChannels([existing], 'me', members);
+  expect(dms.map(c => [c.id, pendingDMUserId(c)])).toEqual([
+    ['pending-dm:u3', 'u3'],
+    ['d1', undefined],
+    ['pending-dm:me', 'me'],
+  ]);
+});
+
+test('avatars: photo for real senders and 1:1 DM peers, never for anonymous posts', () => {
+  const user = { avatarUrl: '/api/files/download/a.png' } as any;
+  expect(senderAvatarUrl(msg({ user }))).toBe('/api/files/download/a.png');
+  expect(senderAvatarUrl(msg({ user, isAnonymous: true }))).toBeNull();
+  expect(senderAvatarUrl(msg({ user, isAnonymous: true, bot: { avatarUrl: '/b.png' } as any }))).toBe('/b.png');
+  const peer = { userId: 'u2', user } as any;
+  expect(dmAvatarUrl(chan({ type: 'DIRECT', members: [member('me', 'Me'), peer] }), 'me')).toBe('/api/files/download/a.png');
+  expect(dmAvatarUrl(chan({ type: 'GROUP_DIRECT', members: [peer] }), 'me')).toBeNull();
 });
 
 test('parseInviteCode accepts links and bare codes', () => {

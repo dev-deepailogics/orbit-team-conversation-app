@@ -21,6 +21,7 @@ import { useTheme } from '@/lib/theme';
 import type { TabScreenProps } from '@/navigation/types';
 import { ChannelRow } from '../components/ChannelRow';
 import { JoinWorkspaceForm } from '../components/JoinWorkspaceForm';
+import { useOpenChannel } from '../hooks/useOpenChannel';
 import { WorkspaceSwitcherSheet } from '../components/WorkspaceSwitcherSheet';
 import { useWorkspaceStore } from '../store';
 import { splitChannels } from '../utils';
@@ -42,6 +43,7 @@ export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
   const isLoading = useWorkspaceStore(s => s.isLoading);
   const error = useWorkspaceStore(s => s.error);
   const load = useWorkspaceStore(s => s.load);
+  const openChannel = useOpenChannel();
   const [showSwitcher, setShowSwitcher] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
@@ -53,7 +55,7 @@ export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
   const isFocused = useIsFocused();
 
   const rows = useMemo<Row[]>(() => {
-    const { channels, dms } = splitChannels(current?.channels ?? [], myId);
+    const { channels, dms } = splitChannels(current?.channels ?? [], myId, current?.members);
     return [
       {
         kind: 'header',
@@ -68,7 +70,7 @@ export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
       },
       ...dms.map(channel => ({ kind: 'channel' as const, channel })),
     ];
-  }, [current?.channels, myId, navigation]);
+  }, [current?.channels, current?.members, myId, navigation]);
 
   const createSheet = canCreateWorkspace && (
     <CreateWorkspaceSheet
@@ -198,9 +200,7 @@ export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
                 channel={item.channel}
                 myId={myId}
                 unread={unread[item.channel.id] ?? 0}
-                onPress={() =>
-                  navigation.navigate('Channel', { channelId: item.channel.id })
-                }
+                onPress={() => openChannel(item.channel)}
               />
             )
           }

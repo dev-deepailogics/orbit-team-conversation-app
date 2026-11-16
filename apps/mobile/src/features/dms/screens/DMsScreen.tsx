@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useAuthStore } from '@/features/auth/store';
 import { ChannelRow } from '@/features/workspaces/components/ChannelRow';
+import { useOpenChannel } from '@/features/workspaces/hooks/useOpenChannel';
 import { useWorkspaceStore } from '@/features/workspaces/store';
 import { splitChannels } from '@/features/workspaces/utils';
 import { useTheme } from '@/lib/theme';
@@ -18,9 +19,11 @@ export function DMsScreen({ navigation }: TabScreenProps<'DMs'>) {
   const { colors } = useTheme();
   const myId = useAuthStore(s => s.user?.id);
   const channels = useWorkspaceStore(s => s.current?.channels);
+  const members = useWorkspaceStore(s => s.current?.members);
+  const openChannel = useOpenChannel();
   const unread = useWorkspaceStore(s => s.unread);
   const hasWorkspace = useWorkspaceStore(s => !!s.current);
-  const dms = useMemo(() => splitChannels(channels ?? [], myId).dms, [channels, myId]);
+  const dms = useMemo(() => splitChannels(channels ?? [], myId, members).dms, [channels, members, myId]);
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
@@ -40,7 +43,7 @@ export function DMsScreen({ navigation }: TabScreenProps<'DMs'>) {
             channel={item}
             myId={myId}
             unread={unread[item.id] ?? 0}
-            onPress={() => navigation.navigate('Channel', { channelId: item.id })}
+            onPress={() => openChannel(item)}
           />
         )}
         contentContainerStyle={listStyle}

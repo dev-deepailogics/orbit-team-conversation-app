@@ -362,7 +362,7 @@ function UserRow({
       onPress={onPress}
       className="min-h-[64px] flex-row items-center gap-3 py-3 active:opacity-70"
     >
-      <Avatar name={user.displayName || user.username} className="h-10 w-10" />
+      <Avatar name={user.displayName || user.username} url={user.avatarUrl} className="h-10 w-10" />
       <View className="flex-1">
         <View className="flex-row items-center gap-1.5">
           <Text className="shrink font-bold" numberOfLines={1}>

@@ -14,6 +14,7 @@ import {
   groupReactions,
   isImage,
   isNewDay,
+  senderAvatarUrl,
   senderEmoji,
   senderName,
   showHeader,
@@ -65,7 +66,7 @@ export const MessageItem = memo(function MessageItemView({
         delayLongPress={300}
         className={cn('flex-row gap-2 px-4 pb-1 active:bg-muted', header ? 'pt-2.5' : 'pt-0')}
       >
-        <View className="w-9">{header && <Avatar name={name} emoji={senderEmoji(m)} />}</View>
+        <View className="w-9">{header && <Avatar name={name} url={senderAvatarUrl(m)} emoji={senderEmoji(m)} />}</View>
         <View className="flex-1">
           {header && (
             <View className="flex-row items-baseline gap-2">

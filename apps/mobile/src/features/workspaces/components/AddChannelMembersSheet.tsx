@@ -63,7 +63,7 @@ export function AddChannelMembersSheet({ visible, channel, onClose }: Props) {
                 accessibilityState={{ checked: on }}
                 className={cn('min-h-[52px] flex-row items-center gap-3 rounded-lg px-2 active:bg-muted', on && 'bg-accent')}
               >
-                <Avatar name={m.user?.displayName ?? '?'} />
+                <Avatar name={m.user?.displayName ?? '?'} url={m.user?.avatarUrl} />
                 <Text className="flex-1 font-bold" numberOfLines={1}>
                   {m.user?.displayName ?? m.userId}
                   {!!m.user?.username && <Text className="font-normal text-muted-foreground">  @{m.user.username}</Text>}

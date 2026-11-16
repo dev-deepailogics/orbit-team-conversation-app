@@ -44,7 +44,7 @@ export function WorkspaceControlScreen() {
         </View>
         {current.members.map(m => (
           <View key={m.id} className="min-h-[52px] flex-row items-center gap-3">
-            <Avatar name={m.user?.displayName ?? '?'} />
+            <Avatar name={m.user?.displayName ?? '?'} url={m.user?.avatarUrl} />
             <View className="flex-1">
               <Text className="font-bold" numberOfLines={1}>
                 {m.user?.displayName ?? m.userId}
