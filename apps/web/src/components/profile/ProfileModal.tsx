@@ -6,6 +6,7 @@ import { X, Upload, Check, LogOut, User, KeyRound, Loader2 } from 'lucide-react'
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/authStore';
 import { Presence, PRESENCE_STYLE } from '../availability/useTeamPresence';
+import { TimeFormat, getTimeFormat, setTimeFormat } from '../../lib/timeFormat';
 
 const AVATAR_STYLES = ['bottts', 'avataaars', 'open-peeps', 'lorelei', 'notionists', 'thumbs'];
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
@@ -36,6 +37,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, workspaceId, p
   const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl || defaultAvatar(user.username));
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [timeFormat, setTimeFormatState] = useState<TimeFormat>(getTimeFormat);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Password tab
@@ -94,6 +96,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, workspaceId, p
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleTimeFormatChange = (format: TimeFormat) => {
+    setTimeFormatState(format);
+    setTimeFormat(format);
   };
 
   const handleChangePassword = async (e: React.FormEvent) => {
@@ -239,6 +246,31 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, workspaceId, p
               <div>
                 <label htmlFor="profile-email" className={label}>Email</label>
                 <input id="profile-email" value={user.email} disabled className={input} />
+              </div>
+
+              <div>
+                <span className={label}>Time format</span>
+                <div className="flex gap-1 p-1 rounded-xl bg-[var(--theme-bg-surface)]">
+                  {(['12', '24'] as TimeFormat[]).map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => handleTimeFormatChange(f)}
+                      aria-pressed={timeFormat === f}
+                      className="flex-1 py-2 rounded-lg text-sm font-semibold transition"
+                      style={
+                        timeFormat === f
+                          ? { backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-text)' }
+                          : { color: 'var(--theme-text-muted)' }
+                      }
+                    >
+                      {f === '12' ? '12-hour (AM/PM)' : '24-hour'}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-[var(--theme-text-muted)] mt-1">
+                  Current time: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: timeFormat === '12' })}
+                </p>
               </div>
 
               <div className="flex justify-end">

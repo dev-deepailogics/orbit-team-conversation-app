@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { api } from '../../lib/api';
 
 export const authInputClass =
@@ -45,6 +45,33 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
     </div>
   );
 }
+
+/** Password field with a show/hide eye toggle, styled to match authInputClass. */
+export const AuthPasswordInput = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
+  ({ className, ...props }, ref) => {
+    const [visible, setVisible] = useState(false);
+    return (
+      <div className="relative">
+        <input
+          {...props}
+          ref={ref}
+          type={visible ? 'text' : 'password'}
+          className={`${authInputClass} pr-11 ${className || ''}`}
+        />
+        <button
+          type="button"
+          onClick={() => setVisible((v) => !v)}
+          aria-label={visible ? 'Hide password' : 'Show password'}
+          tabIndex={-1}
+          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition"
+        >
+          {visible ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
+      </div>
+    );
+  },
+);
+AuthPasswordInput.displayName = 'AuthPasswordInput';
 
 export function AuthError({ message }: { message: string }) {
   if (!message) return null;

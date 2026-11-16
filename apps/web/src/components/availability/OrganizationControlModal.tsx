@@ -22,6 +22,7 @@ import {
   Shield,
   Activity,
 } from 'lucide-react';
+import { useTimeFormat, formatMessageTime } from '../../lib/timeFormat';
 
 const BREAK_REASONS = [
   'Lunch',
@@ -58,6 +59,8 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
   workspace,
   currentUser,
 }) => {
+  const timeFormat = useTimeFormat();
+  const fmtTime = (d: string | number | Date) => formatMessageTime(d, timeFormat);
   const [activeTab, setActiveTab] = useState<'self' | 'team'>('self');
 
   // Self Availability state
@@ -506,6 +509,7 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
                             hour: '2-digit',
                             minute: '2-digit',
                             second: '2-digit',
+                            hour12: timeFormat === '12',
                           })}
                         </p>
                       </div>
@@ -556,7 +560,7 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
                                 <div>
                                   <span className="font-semibold text-[var(--theme-text)]">{b.breakReason}</span>
                                   <span className="text-[11px] text-[var(--theme-text-muted)] ml-2">
-                                    Started: {new Date(b.breakStartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    Started: {fmtTime(b.breakStartTime)}
                                   </span>
                                 </div>
                               </div>
@@ -660,10 +664,7 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
                           </td>
                           <td className="py-3 px-4 text-[var(--theme-text)]">
                             {avail?.availableTime
-                              ? new Date(avail.availableTime).toLocaleTimeString([], {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })
+                              ? fmtTime(avail.availableTime)
                               : '—'}
                           </td>
                           <td className="py-3 px-4 text-right font-mono font-medium text-[var(--theme-text)]">

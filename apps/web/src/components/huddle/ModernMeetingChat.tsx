@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from "react";
 import {
   useChat,
   useLocalParticipant,
   useRemoteParticipants,
-} from '@livekit/components-react';
+} from "@livekit/components-react";
 import {
   MessageSquare,
   Users,
@@ -17,30 +17,40 @@ import {
   Reply,
   ShieldCheck,
   CornerDownRight,
-} from 'lucide-react';
-import EmojiPicker, { Theme, EmojiClickData, EmojiStyle } from 'emoji-picker-react';
+} from "lucide-react";
+import EmojiPicker, {
+  Theme,
+  EmojiClickData,
+  EmojiStyle,
+} from "emoji-picker-react";
+import { useTimeFormat, formatMessageTime } from "../../lib/timeFormat";
 
-
-const QUICK_EMOJIS = ['👍', '❤️', '😂', '👏', '🎉', '🔥'];
+const QUICK_EMOJIS = ["👍", "❤️", "😂", "👏", "🎉", "🔥"];
 
 export const ModernMeetingChat: React.FC<{
   isOpen: boolean;
   onClose: () => void;
 }> = ({ isOpen, onClose }) => {
+  const timeFormat = useTimeFormat();
   const { chatMessages, send, isSending } = useChat();
   const { localParticipant } = useLocalParticipant();
   const remoteParticipants = useRemoteParticipants();
 
-  const [inputMessage, setInputMessage] = useState('');
+  const [inputMessage, setInputMessage] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [replyingTo, setReplyingTo] = useState<{ senderName: string; text: string } | null>(null);
-  const [reactionsMap, setReactionsMap] = useState<Record<string, Record<string, string[]>>>({});
+  const [replyingTo, setReplyingTo] = useState<{
+    senderName: string;
+    text: string;
+  } | null>(null);
+  const [reactionsMap, setReactionsMap] = useState<
+    Record<string, Record<string, string[]>>
+  >({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-scroll on new message
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
 
   if (!isOpen) return null;
@@ -60,16 +70,16 @@ export const ModernMeetingChat: React.FC<{
 
     try {
       await send(finalPayload);
-      setInputMessage('');
+      setInputMessage("");
       setReplyingTo(null);
       setShowEmojiPicker(false);
     } catch (err) {
-      console.error('Failed to send in-call chat message:', err);
+      console.error("Failed to send in-call chat message:", err);
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
@@ -150,7 +160,9 @@ export const ModernMeetingChat: React.FC<{
             <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-slate-500 mb-2">
               <MessageSquare size={22} />
             </div>
-            <p className="text-xs font-semibold text-slate-300">No messages yet</p>
+            <p className="text-xs font-semibold text-slate-300">
+              No messages yet
+            </p>
             <p className="text-[11px] text-slate-500 mt-0.5">
               Send questions or comments to everyone in the call.
             </p>
@@ -158,14 +170,14 @@ export const ModernMeetingChat: React.FC<{
         ) : (
           chatMessages.map((msg, index) => {
             const isMe = msg.from?.identity === localParticipant.identity;
-            const senderName = msg.from?.name || msg.from?.identity || 'Guest';
+            const senderName = msg.from?.name || msg.from?.identity || "Guest";
             const firstLetter = senderName.charAt(0).toUpperCase();
 
             // Check if message is a JSON reply payload
             let parsedText = msg.message;
             let replyData: { senderName: string; text: string } | null = null;
             try {
-              if (msg.message.startsWith('{') && msg.message.endsWith('}')) {
+              if (msg.message.startsWith("{") && msg.message.endsWith("}")) {
                 const parsed = JSON.parse(msg.message);
                 if (parsed.text) {
                   parsedText = parsed.text;
@@ -181,7 +193,7 @@ export const ModernMeetingChat: React.FC<{
             return (
               <div
                 key={msg.id || index}
-                className={`flex gap-2.5 group/msg ${isMe ? 'flex-row-reverse' : 'flex-row'}`}
+                className={`flex gap-2.5 group/msg ${isMe ? "flex-row-reverse" : "flex-row"}`}
               >
                 {/* User Avatar */}
                 <div
@@ -189,15 +201,17 @@ export const ModernMeetingChat: React.FC<{
                   title={`Mention @${senderName}`}
                   className={`w-7 h-7 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 cursor-pointer transition-transform hover:scale-105 ${
                     isMe
-                      ? 'bg-emerald-500 text-white shadow-[0_0_12px_rgba(16,185,129,0.35)]'
-                      : 'bg-slate-800 text-slate-300 border border-white/10'
+                      ? "bg-emerald-500 text-white shadow-[0_0_12px_rgba(16,185,129,0.35)]"
+                      : "bg-slate-800 text-slate-300 border border-white/10"
                   }`}
                 >
                   {firstLetter}
                 </div>
 
                 {/* Message Body Column */}
-                <div className={`flex flex-col max-w-[78%] ${isMe ? 'items-end' : 'items-start'}`}>
+                <div
+                  className={`flex flex-col max-w-[78%] ${isMe ? "items-end" : "items-start"}`}
+                >
                   {/* Sender Name & Timestamp */}
                   <div className="flex items-center gap-1.5 mb-1 px-1">
                     <span
@@ -207,17 +221,17 @@ export const ModernMeetingChat: React.FC<{
                       {senderName}
                     </span>
                     <span className="text-[10px] text-slate-500">
-                      {new Date(msg.timestamp).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {formatMessageTime(msg.timestamp, timeFormat)}
                     </span>
                   </div>
 
                   {/* Reply Reference if replying to someone */}
                   {replyData && (
                     <div className="flex items-center gap-1.5 px-2.5 py-1 mb-1 rounded-lg bg-white/5 border border-white/10 text-[11px] text-slate-400 max-w-full truncate">
-                      <CornerDownRight size={11} className="text-emerald-400 shrink-0" />
+                      <CornerDownRight
+                        size={11}
+                        className="text-emerald-400 shrink-0"
+                      />
                       <span className="font-semibold text-slate-300 truncate">
                         {replyData.senderName}:
                       </span>
@@ -229,8 +243,8 @@ export const ModernMeetingChat: React.FC<{
                   <div
                     className={`relative px-3.5 py-2.5 rounded-2xl text-xs sm:text-[13px] leading-relaxed shadow-sm transition-all break-words ${
                       isMe
-                        ? 'bg-emerald-600 text-white rounded-tr-sm shadow-[0_4px_16px_rgba(16,185,129,0.25)]'
-                        : 'bg-[#1C2026] text-slate-100 rounded-tl-sm border border-white/[0.08]'
+                        ? "bg-emerald-600 text-white rounded-tr-sm shadow-[0_4px_16px_rgba(16,185,129,0.25)]"
+                        : "bg-[#1C2026] text-slate-100 rounded-tl-sm border border-white/[0.08]"
                     }`}
                   >
                     {parsedText}
@@ -246,24 +260,28 @@ export const ModernMeetingChat: React.FC<{
                   {/* Emoji Reactions List below bubble */}
                   {Object.entries(messageReactions).length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1.5 px-1">
-                      {Object.entries(messageReactions).map(([emoji, users]) => {
-                        if (users.length === 0) return null;
-                        const hasReacted = users.includes(localParticipant.identity);
-                        return (
-                          <button
-                            key={emoji}
-                            onClick={() => handleAddReaction(msg.id, emoji)}
-                            className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border transition active:scale-95 ${
-                              hasReacted
-                                ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
-                                : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
-                            }`}
-                          >
-                            <span>{emoji}</span>
-                            <span>{users.length}</span>
-                          </button>
-                        );
-                      })}
+                      {Object.entries(messageReactions).map(
+                        ([emoji, users]) => {
+                          if (users.length === 0) return null;
+                          const hasReacted = users.includes(
+                            localParticipant.identity,
+                          );
+                          return (
+                            <button
+                              key={emoji}
+                              onClick={() => handleAddReaction(msg.id, emoji)}
+                              className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border transition active:scale-95 ${
+                                hasReacted
+                                  ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
+                                  : "bg-white/5 border-white/10 text-slate-400 hover:text-white"
+                              }`}
+                            >
+                              <span>{emoji}</span>
+                              <span>{users.length}</span>
+                            </button>
+                          );
+                        },
+                      )}
                     </div>
                   )}
 
@@ -306,7 +324,10 @@ export const ModernMeetingChat: React.FC<{
           <div className="flex items-center gap-1.5 truncate">
             <Reply size={13} className="text-emerald-400 shrink-0" />
             <span className="truncate">
-              Replying to <span className="text-white font-semibold">{replyingTo.senderName}</span>
+              Replying to{" "}
+              <span className="text-white font-semibold">
+                {replyingTo.senderName}
+              </span>
             </span>
           </div>
           <button
@@ -336,7 +357,6 @@ export const ModernMeetingChat: React.FC<{
           </div>
         )}
 
-
         <div className="flex flex-col bg-[#161A20] border border-white/10 rounded-2xl p-2.5 focus-within:border-emerald-500/50 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all shadow-inner">
           <textarea
             ref={textareaRef}
@@ -353,7 +373,11 @@ export const ModernMeetingChat: React.FC<{
               {/* Attachment Button */}
               <button
                 type="button"
-                onClick={() => alert('Attachments can also be uploaded via the channel chat.')}
+                onClick={() =>
+                  alert(
+                    "Attachments can also be uploaded via the channel chat.",
+                  )
+                }
                 title="Add attachment"
                 className="p-1.5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition"
               >
@@ -367,8 +391,8 @@ export const ModernMeetingChat: React.FC<{
                 title="Insert emoji"
                 className={`p-1.5 rounded-xl transition ${
                   showEmojiPicker
-                    ? 'bg-emerald-500/20 text-emerald-400'
-                    : 'hover:bg-white/10 text-slate-400 hover:text-white'
+                    ? "bg-emerald-500/20 text-emerald-400"
+                    : "hover:bg-white/10 text-slate-400 hover:text-white"
                 }`}
               >
                 <Smile size={15} />

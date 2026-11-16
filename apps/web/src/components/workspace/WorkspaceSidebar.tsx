@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { Workspace, UserProfile } from '@orbit/types';
-import { Plus, Layers, ShieldCheck, PenTool, FileText, Home } from 'lucide-react';
+import { Plus, Layers, ShieldCheck, PenTool, FileText, Home, FolderKanban } from 'lucide-react';
 import { api } from '../../lib/api';
 import { EmployeeAvailabilityHeader } from '../availability/EmployeeAvailabilityHeader';
 import { Presence, PRESENCE_STYLE } from '../availability/useTeamPresence';
@@ -15,11 +15,12 @@ interface WorkspaceSidebarProps {
   currentUser?: UserProfile | null;
   onSelectWorkspace: (workspace: Workspace) => void;
   onWorkspaceCreated: (workspace: Workspace) => void;
-  activeFeature?: 'home' | 'canvas' | 'docs' | null;
+  activeFeature?: 'home' | 'canvas' | 'docs' | 'projects' | null;
   // Handlers are undefined when the feature has no target (no channel / no project)
   onGoHome?: () => void;
   onOpenCanvas?: () => void;
   onOpenDocs?: () => void;
+  onOpenProjects?: () => void;
   presence?: Record<string, Presence>;
   onLogout: () => void;
 }
@@ -36,6 +37,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   onGoHome,
   onOpenCanvas,
   onOpenDocs,
+  onOpenProjects,
   presence = {},
   onLogout,
 }) => {
@@ -139,6 +141,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
             { key: 'home', label: 'Home', Icon: Home, onClick: onGoHome },
             { key: 'canvas', label: 'Canvas', Icon: PenTool, onClick: onOpenCanvas },
             { key: 'docs', label: 'Docs', Icon: FileText, onClick: onOpenDocs },
+            { key: 'projects', label: 'Projects', Icon: FolderKanban, onClick: onOpenProjects },
           ] as const).map(({ key, label, Icon, onClick }) => {
             const isActive = activeFeature === key;
             return (
