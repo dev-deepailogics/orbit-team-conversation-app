@@ -48,6 +48,7 @@ import { PinnedMessagesModal } from './PinnedMessagesModal';
 import { AnonymousPersonaModal } from '../channel/AnonymousPersonaModal';
 import { UserHoverCard } from './UserHoverCard';
 import { Presence } from '../availability/useTeamPresence';
+import { useTimeFormat, formatMessageTime } from '../../lib/timeFormat';
 
 
 interface ChatAreaProps {
@@ -95,6 +96,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   presence = {},
   onHuddleUser,
 }) => {
+  const timeFormat = useTimeFormat();
   const [content, setContent] = useState('');
   const sendingRef = useRef(false);
   const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
@@ -962,7 +964,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     </span>
                     )}
                     <span className="text-[11px]" style={{ color: 'var(--theme-text-muted)' }}>
-                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {formatMessageTime(msg.createdAt, timeFormat)}
                     </span>
                     {msg.isEdited && !msg.isDeleted && (
                       <span

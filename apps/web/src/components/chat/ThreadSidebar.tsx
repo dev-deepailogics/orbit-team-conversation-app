@@ -12,6 +12,7 @@ import { RichTextEditor, RichTextEditorRef } from './RichTextEditor';
 import { FileAttachmentList, formatFileSize, getFileCategory } from './FileAttachmentList';
 import { CompressFileConfirmModal } from './CompressFileConfirmModal';
 import { compressFile } from '../../lib/compression';
+import { useTimeFormat, formatMessageTime } from '../../lib/timeFormat';
 
 interface ThreadSidebarProps {
   parentMessage: Message;
@@ -34,6 +35,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   onSelectUserDM,
   onSelectChannel,
 }) => {
+  const timeFormat = useTimeFormat();
   const [content, setContent] = useState('');
   const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -319,7 +321,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                 </span>
               )}
               <span className="text-[10px] text-[var(--theme-text-muted)]">
-                {new Date(parentMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {formatMessageTime(parentMessage.createdAt, timeFormat)}
               </span>
               {parentMessage.isEdited && !parentMessage.isDeleted && (
                 <span className="text-[9px] italic select-none text-[var(--theme-text-muted)] font-medium">
@@ -566,7 +568,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                     </span>
                   )}
                   <span className="text-[10px] text-[var(--theme-text-muted)]">
-                    {new Date(reply.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {formatMessageTime(reply.createdAt, timeFormat)}
                   </span>
                   {reply.isEdited && !reply.isDeleted && (
                     <span className="text-[9px] italic select-none text-[var(--theme-text-muted)] font-medium">

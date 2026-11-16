@@ -24,6 +24,7 @@ import { Workspace, Channel } from '@orbit/types';
 import { api } from '../../lib/api';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { FileAttachmentList } from './FileAttachmentList';
+import { useTimeFormat } from '../../lib/timeFormat';
 
 interface SearchMessagesDialogProps {
   isOpen: boolean;
@@ -44,6 +45,7 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
   members,
   onSelectMessage,
 }) => {
+  const timeFormat = useTimeFormat();
   const [query, setQuery] = useState('');
   const [selectedChannelId, setSelectedChannelId] = useState<string>(currentChannel?.id || 'all');
   const [selectedUserId, setSelectedUserId] = useState<string>('all');
@@ -174,14 +176,16 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
     const now = new Date();
     const isToday = d.toDateString() === now.toDateString();
 
+    const hour12 = timeFormat === '12';
     if (isToday) {
-      return `Today at ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      return `Today at ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12 })}`;
     }
     return d.toLocaleDateString([], {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
+      hour12,
     });
   };
 
