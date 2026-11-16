@@ -727,7 +727,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                           <img
                             src={
                               user.avatarUrl ||
-                              `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`
+                              `/api/avatar/bottts/svg?seed=${user.username}`
                             }
                             alt={user.displayName}
                             className="w-5 h-5 rounded object-cover"

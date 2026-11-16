@@ -15,7 +15,7 @@ async function main() {
       username: 'demouser',
       displayName: 'Demo User',
       passwordHash,
-      avatarUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=demouser',
+      avatarUrl: '/api/avatar/bottts/svg?seed=demouser',
       systemRole: 'SUPER_ADMIN',
       status: 'ONLINE',
     },
@@ -30,7 +30,7 @@ async function main() {
       username: 'sarah',
       displayName: 'Sarah Connor',
       passwordHash,
-      avatarUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=sarah',
+      avatarUrl: '/api/avatar/bottts/svg?seed=sarah',
       status: 'ONLINE',
     },
   });

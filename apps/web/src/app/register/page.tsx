@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
 import { api } from '../../lib/api';
-import { useAuthStore } from '../../stores/authStore';
+import { useAuthStore, postAuthPath } from '../../stores/authStore';
 import { AuthShell, AuthError, MicrosoftSignIn, authInputClass, authLabelClass, authButtonClass } from '../../components/auth/AuthShell';
 
 export default function RegisterPage() {
@@ -31,7 +31,7 @@ export default function RegisterPage() {
         password,
       });
       setAuth(res.data.user, res.data.accessToken);
-      router.push('/app');
+      router.push(postAuthPath());
     } catch (err: any) {
       setError(err.response?.data?.error || 'Registration failed');
     } finally {

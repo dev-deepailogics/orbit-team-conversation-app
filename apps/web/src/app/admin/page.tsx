@@ -554,7 +554,7 @@ export default function AdminDashboardPage() {
                         <tr key={u.id} className="hover:bg-white/[0.02] transition">
                           <td className="py-3 px-4 flex items-center gap-2.5">
                             <img
-                              src={u.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${u.username}`}
+                              src={u.avatarUrl || `/api/avatar/bottts/svg?seed=${u.username}`}
                               alt={u.displayName}
                               className="w-8 h-8 rounded-xl object-cover border border-gray-700"
                             />

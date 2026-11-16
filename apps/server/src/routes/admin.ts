@@ -305,7 +305,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       data: {
         name,
         slug,
-        iconUrl: iconUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${slug}`,
+        iconUrl: iconUrl || `/api/avatar/identicon/svg?seed=${slug}`,
         ownerId: owner.id,
         members: {
           create: {

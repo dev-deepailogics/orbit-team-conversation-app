@@ -15,7 +15,7 @@ const joinWorkspaceSchema = z.object({
 });
 
 const addWorkspaceMemberSchema = z.object({
-  emailOrUsername: z.string().min(1),
+  emailOrUsername: z.string().trim().min(1),
   role: z.enum(['ADMIN', 'MEMBER']).default('MEMBER'),
 });
 
@@ -80,7 +80,7 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       data: {
         name,
         slug,
-        iconUrl: iconUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${slug}`,
+        iconUrl: iconUrl || `/api/avatar/identicon/svg?seed=${slug}`,
         ownerId: userId,
         members: {
           create: {

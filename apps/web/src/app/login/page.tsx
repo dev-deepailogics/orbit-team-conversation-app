@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
 import { api } from '../../lib/api';
-import { useAuthStore } from '../../stores/authStore';
+import { useAuthStore, postAuthPath } from '../../stores/authStore';
 import { AuthShell, AuthError, MicrosoftSignIn, authInputClass, authLabelClass, authButtonClass } from '../../components/auth/AuthShell';
 
 // Error codes sent back by the server's Microsoft callback (/api/auth/microsoft/callback).
@@ -43,7 +43,7 @@ export default function LoginPage() {
     localStorage.setItem('orbit_token', token!);
     setIsLoading(true);
     fetchMe().then(() => {
-      if (useAuthStore.getState().user) router.push('/app');
+      if (useAuthStore.getState().user) router.push(postAuthPath());
       else {
         setError(MICROSOFT_ERRORS.microsoft_failed);
         setIsLoading(false);
@@ -60,7 +60,7 @@ export default function LoginPage() {
       // withCredentials sends the HttpOnly pending-Microsoft-link cookie, if any, so this login links it.
       const res = await api.post('/api/auth/login', { email, password }, { withCredentials: true });
       setAuth(res.data.user, res.data.accessToken);
-      router.push('/app');
+      router.push(postAuthPath());
     } catch (err: any) {
       setError(err.response?.data?.error || 'Invalid email or password');
     } finally {

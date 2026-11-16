@@ -103,7 +103,7 @@ export const AddMembersDialog: React.FC<AddMembersDialogProps> = ({
               >
                 <div className="flex items-center gap-2.5">
                   <img
-                    src={user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`}
+                    src={user.avatarUrl || `/api/avatar/bottts/svg?seed=${user.username}`}
                     alt={user.displayName}
                     className="w-8 h-8 rounded-lg object-cover"
                   />

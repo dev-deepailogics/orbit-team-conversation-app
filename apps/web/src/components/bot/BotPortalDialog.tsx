@@ -146,7 +146,7 @@ export const BotPortalDialog: React.FC<BotPortalDialogProps> = ({ workspace, onC
                   >
                     <div className="flex items-center gap-3">
                       <img
-                        src={bot.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${bot.name}`}
+                        src={bot.avatarUrl || `/api/avatar/bottts/svg?seed=${bot.name}`}
                         alt={bot.name}
                         className="w-10 h-10 rounded-lg bg-[var(--theme-bg-surface)]"
                       />

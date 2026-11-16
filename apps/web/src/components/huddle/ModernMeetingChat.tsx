@@ -18,7 +18,7 @@ import {
   ShieldCheck,
   CornerDownRight,
 } from 'lucide-react';
-import EmojiPicker, { Theme, EmojiClickData } from 'emoji-picker-react';
+import EmojiPicker, { Theme, EmojiClickData, EmojiStyle } from 'emoji-picker-react';
 
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '👏', '🎉', '🔥'];
@@ -325,6 +325,7 @@ export const ModernMeetingChat: React.FC<{
           <div className="absolute bottom-full right-4 mb-2 z-50 shadow-2xl">
             <EmojiPicker
               theme={Theme.DARK}
+              emojiStyle={EmojiStyle.NATIVE}
               lazyLoadEmojis={true}
               onEmojiClick={(emojiData: EmojiClickData) => {
                 setInputMessage((prev) => prev + emojiData.emoji);

@@ -135,7 +135,7 @@ export const PinnedMessagesModal: React.FC<PinnedMessagesModalProps> = ({
               const avatarUrl =
                 msg.bot?.avatarUrl ||
                 msg.user?.avatarUrl ||
-                `https://api.dicebear.com/7.x/bottts/svg?seed=${authorName}`;
+                `/api/avatar/bottts/svg?seed=${authorName}`;
 
               return (
                 <div
