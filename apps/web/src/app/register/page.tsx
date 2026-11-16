@@ -1,51 +1,64 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { ArrowRight } from 'lucide-react';
-import { api } from '../../lib/api';
-import { useAuthStore } from '../../stores/authStore';
-import { AuthShell, AuthError, MicrosoftSignIn, AuthPasswordInput, authInputClass, authLabelClass, authButtonClass } from '../../components/auth/AuthShell';
+import React, { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ArrowRight } from "lucide-react";
+import { api } from "../../lib/api";
+import { useAuthStore } from "../../stores/authStore";
+import {
+  AuthShell,
+  AuthError,
+  MicrosoftSignIn,
+  AuthPasswordInput,
+  authInputClass,
+  authLabelClass,
+  authButtonClass,
+} from "../../components/auth/AuthShell";
 
 export default function RegisterPage() {
-  const [email, setEmail] = useState('');
-  const [username, setUsername] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const setAuth = useAuthStore((s) => s.setAuth);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setIsLoading(true);
 
     try {
-      const res = await api.post('/api/auth/register', {
+      const res = await api.post("/api/auth/register", {
         email,
         username,
         displayName,
         password,
       });
       setAuth(res.data.user, res.data.accessToken);
-      router.push('/app');
+      router.push(postAuthPath());
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Registration failed');
+      setError(err.response?.data?.error || "Registration failed");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <AuthShell title="Create your account" subtitle="Set up your profile to join your team's workspace.">
+    <AuthShell
+      title="Create your account"
+      subtitle="Set up your profile to join your team's workspace."
+    >
       <AuthError message={error} />
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
-          <label htmlFor="displayName" className={authLabelClass}>Display Name</label>
+          <label htmlFor="displayName" className={authLabelClass}>
+            Display Name
+          </label>
           <input
             id="displayName"
             type="text"
@@ -58,7 +71,9 @@ export default function RegisterPage() {
           />
         </div>
         <div>
-          <label htmlFor="username" className={authLabelClass}>Username</label>
+          <label htmlFor="username" className={authLabelClass}>
+            Username
+          </label>
           <input
             id="username"
             type="text"
@@ -66,12 +81,18 @@ export default function RegisterPage() {
             autoComplete="username"
             placeholder="alex"
             value={username}
-            onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-zA-Z0-9_-]/g, ''))}
+            onChange={(e) =>
+              setUsername(
+                e.target.value.toLowerCase().replace(/[^a-zA-Z0-9_-]/g, ""),
+              )
+            }
             className={authInputClass}
           />
         </div>
         <div>
-          <label htmlFor="email" className={authLabelClass}>Email</label>
+          <label htmlFor="email" className={authLabelClass}>
+            Email
+          </label>
           <input
             id="email"
             type="email"
@@ -84,7 +105,9 @@ export default function RegisterPage() {
           />
         </div>
         <div>
-          <label htmlFor="password" className={authLabelClass}>Password</label>
+          <label htmlFor="password" className={authLabelClass}>
+            Password
+          </label>
           <AuthPasswordInput
             id="password"
             required
@@ -95,8 +118,12 @@ export default function RegisterPage() {
           />
         </div>
 
-        <button type="submit" disabled={isLoading} className={`${authButtonClass} !mt-8`}>
-          <span>{isLoading ? 'Creating Account...' : 'Create Account'}</span>
+        <button
+          type="submit"
+          disabled={isLoading}
+          className={`${authButtonClass} !mt-8`}
+        >
+          <span>{isLoading ? "Creating Account..." : "Create Account"}</span>
           <ArrowRight size={20} />
         </button>
       </form>
@@ -104,8 +131,11 @@ export default function RegisterPage() {
       <MicrosoftSignIn label="Sign up with Microsoft" />
 
       <p className="text-center text-sm text-slate-400 mt-6">
-        Already have an account?{' '}
-        <Link href="/login" className="text-sky-400 hover:text-sky-300 hover:underline font-medium">
+        Already have an account?{" "}
+        <Link
+          href="/login"
+          className="text-sky-400 hover:text-sky-300 hover:underline font-medium"
+        >
           Sign In
         </Link>
       </p>

@@ -8,10 +8,10 @@ import { useAuthStore } from '../../stores/authStore';
 import { Presence, PRESENCE_STYLE } from '../availability/useTeamPresence';
 import { TimeFormat, getTimeFormat, setTimeFormat } from '../../lib/timeFormat';
 
-const AVATAR_STYLES = ['bottts', 'avataaars', 'adventurer', 'lorelei', 'notionists', 'fun-emoji'];
+const AVATAR_STYLES = ['bottts', 'avataaars', 'open-peeps', 'lorelei', 'notionists', 'thumbs'];
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 
-export const defaultAvatar = (username: string) => `https://api.dicebear.com/7.x/bottts/svg?seed=${username}`;
+export const defaultAvatar = (username: string) => `/api/avatar/bottts/svg?seed=${username}`;
 
 const input =
   'w-full bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-lg px-3 py-2 text-sm text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-[var(--theme-primary)] disabled:opacity-60';
@@ -49,7 +49,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, workspaceId, p
   const [success, setSuccess] = useState('');
 
   const presets = AVATAR_STYLES.flatMap((style) =>
-    [user.username, `${user.username}-alt`].map((seed) => `https://api.dicebear.com/7.x/${style}/svg?seed=${encodeURIComponent(seed)}`),
+    [user.username, `${user.username}-alt`].map((seed) => `/api/avatar/${style}/svg?seed=${encodeURIComponent(seed)}`),
   );
 
   const switchTab = (t: typeof tab) => {

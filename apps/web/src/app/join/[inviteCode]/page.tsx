@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Layers, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
 import { api } from '../../../lib/api';
-import { useAuthStore } from '../../../stores/authStore';
+import { useAuthStore, PENDING_INVITE_KEY } from '../../../stores/authStore';
 
 export default function JoinWorkspacePage() {
   const params = useParams();
@@ -18,15 +18,25 @@ export default function JoinWorkspacePage() {
     fetchMe();
   }, [fetchMe]);
 
+  // Back from sign-in with this invite pending: accept it without a second click.
+  useEffect(() => {
+    if (user && status === 'idle' && localStorage.getItem(PENDING_INVITE_KEY) === inviteCode) handleJoin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
   const handleJoin = async () => {
     if (!token) {
-      router.push(`/login?redirect=/join/${inviteCode}`);
+      localStorage.setItem(PENDING_INVITE_KEY, inviteCode);
+      router.push('/login');
       return;
     }
+    localStorage.removeItem(PENDING_INVITE_KEY);
 
     setStatus('joining');
     try {
       const res = await api.post('/api/workspaces/join', { inviteCode });
+      // /app opens the saved workspace, so point it at the one just joined.
+      localStorage.setItem('orbit_active_workspace_id', res.data.workspaceId);
       setStatus('success');
       setTimeout(() => {
         router.push('/app');

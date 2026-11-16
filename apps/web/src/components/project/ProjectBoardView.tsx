@@ -1351,7 +1351,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                                 <img
                                   src={
                                     ticket.assignee.avatarUrl ||
-                                    `https://api.dicebear.com/7.x/bottts/svg?seed=${ticket.assignee.username}`
+                                    `/api/avatar/bottts/svg?seed=${ticket.assignee.username}`
                                   }
                                   alt={ticket.assignee.displayName}
                                   className="w-6 h-6 rounded-full object-cover ring-1 ring-black/20 dark:ring-white/20"

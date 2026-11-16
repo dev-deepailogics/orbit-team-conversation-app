@@ -66,7 +66,7 @@ export const UserHoverCard: React.FC<UserHoverCardProps> = ({ user, presence, is
     fn?.();
   };
 
-  const avatar = user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`;
+  const avatar = user.avatarUrl || `/api/avatar/bottts/svg?seed=${user.username}`;
   const btn =
     'flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--theme-border)] text-sm font-semibold text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] transition';
 

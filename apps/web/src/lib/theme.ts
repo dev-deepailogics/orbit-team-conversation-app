@@ -314,7 +314,9 @@ export function applyTheme(theme: ThemeConfig) {
   root.style.setProperty('--theme-primary-text', theme.primaryTextColor || '#FFFFFF');
   root.style.setProperty('--theme-secondary', theme.secondaryColor);
   root.style.setProperty('--theme-border', theme.borderColor);
-  if (theme.fontFamily) root.style.setProperty('--theme-font', theme.fontFamily);
+  // Themes saved before presets had fonts lack fontFamily; take it from the preset by id
+  const font = theme.fontFamily ?? THEME_PRESETS.find((p) => p.id === theme.id)?.fontFamily;
+  if (font) root.style.setProperty('--theme-font', font);
   else root.style.removeProperty('--theme-font');
 
   // 2. Synchronize Light / Dark theme class on document element

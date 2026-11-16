@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import EmojiPicker, { Theme, EmojiClickData } from 'emoji-picker-react';
+import EmojiPicker, { Theme, EmojiClickData, EmojiStyle } from 'emoji-picker-react';
 import { Search, Sparkles, X, Grid } from 'lucide-react';
 import { getTopEmojis, recordEmojiUsage, POPULAR_REACTION_EMOJIS } from '../../lib/emojiStore';
 
@@ -153,6 +153,7 @@ export const EmojiPickerPopover: React.FC<EmojiPickerPopoverProps> = ({
         <div className="p-1 bg-[var(--theme-bg-app)]">
           <EmojiPicker
             theme={Theme.DARK}
+            emojiStyle={EmojiStyle.NATIVE}
             width="100%"
             height={320}
             lazyLoadEmojis={true}

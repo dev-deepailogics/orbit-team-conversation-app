@@ -59,7 +59,7 @@ const loginSchema = z.object({
 const avatarUrlSchema = z
   .string()
   .max(500)
-  .refine((u) => u.startsWith('/api/files/download/') || u.startsWith('https://api.dicebear.com/'), 'Invalid avatar URL');
+  .refine((u) => u.startsWith('/api/files/download/') || u.startsWith('/api/avatar/'), 'Invalid avatar URL');
 
 const updateProfileSchema = z.object({
   displayName: z.string().trim().min(1).max(50).optional(),
@@ -124,7 +124,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         username,
         displayName,
         passwordHash,
-        avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=${username}`,
+        avatarUrl: `/api/avatar/bottts/svg?seed=${username}`,
       },
     });
 
@@ -254,7 +254,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
             email,
             username,
             displayName: (profile.name || username).slice(0, 50),
-            avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=${username}`,
+            avatarUrl: `/api/avatar/bottts/svg?seed=${username}`,
             identities: { create: { provider: 'microsoft', providerUid: profile.providerUid, email } },
           },
         });

@@ -268,7 +268,7 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
                   src={
                     selectedFullMessage.bot?.avatarUrl ||
                     selectedFullMessage.user?.avatarUrl ||
-                    `https://api.dicebear.com/7.x/bottts/svg?seed=${
+                    `/api/avatar/bottts/svg?seed=${
                       selectedFullMessage.bot?.name ||
                       selectedFullMessage.user?.displayName ||
                       'User'
@@ -567,7 +567,7 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
                     const avatarUrl =
                       msg.bot?.avatarUrl ||
                       msg.user?.avatarUrl ||
-                      `https://api.dicebear.com/7.x/bottts/svg?seed=${authorName}`;
+                      `/api/avatar/bottts/svg?seed=${authorName}`;
                     const channelName = msg.channel?.name || 'general';
                     const channelType = msg.channel?.type || 'PUBLIC';
 

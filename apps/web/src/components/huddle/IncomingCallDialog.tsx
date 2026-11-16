@@ -36,7 +36,7 @@ export const IncomingCallDialog: React.FC<IncomingCallDialogProps> = ({ onAccept
         {/* Caller Avatar with pulsing ring */}
         <div className="relative">
           <img
-            src={incomingCall.callerAvatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${incomingCall.callerName}`}
+            src={incomingCall.callerAvatar || `/api/avatar/bottts/svg?seed=${incomingCall.callerName}`}
             alt={incomingCall.callerName}
             className="w-12 h-12 rounded-xl object-cover ring-2 ring-slack-green"
           />

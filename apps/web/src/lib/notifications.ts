@@ -20,7 +20,7 @@ export class DesktopNotifier {
     try {
       const notif = new Notification(title, {
         body,
-        icon: icon || 'https://api.dicebear.com/7.x/identicon/svg?seed=orbit',
+        icon: icon || '/api/avatar/identicon/svg?seed=orbit',
         silent: true, // We use our sound manager for audio
       });
 

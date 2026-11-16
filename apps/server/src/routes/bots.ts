@@ -62,7 +62,7 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
         workspaceId,
         name,
         description,
-        avatarUrl: avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${name}`,
+        avatarUrl: avatarUrl || `/api/avatar/bottts/svg?seed=${name}`,
         botToken,
         scopes,
         createdById: userId,

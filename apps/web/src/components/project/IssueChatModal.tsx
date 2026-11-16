@@ -119,7 +119,7 @@ export const IssueChatModal: React.FC<IssueChatModalProps> = ({
               const authorName = comment.user?.displayName || comment.username || 'Team Member';
               const avatar =
                 comment.user?.avatarUrl ||
-                `https://api.dicebear.com/7.x/bottts/svg?seed=${authorName}`;
+                `/api/avatar/bottts/svg?seed=${authorName}`;
               const timeFormatted = new Date(comment.createdAt).toLocaleString(undefined, {
                 month: 'numeric',
                 day: 'numeric',

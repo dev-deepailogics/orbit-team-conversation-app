@@ -21,7 +21,7 @@ export async function getOrCreateSystemBot(workspaceId: string) {
         workspaceId,
         name: 'Orbit Bot',
         description: 'Default Orbit system notifications and activity alerts',
-        avatarUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=OrbitSystemBot&backgroundColor=007a5a',
+        avatarUrl: '/api/avatar/bottts/svg?seed=OrbitSystemBot&backgroundColor=007a5a',
         botToken,
         scopes: ['chat:write', 'system'],
         isActive: true,

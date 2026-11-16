@@ -975,7 +975,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
                   >
                     <div className="relative shrink-0">
                       <img
-                        src={u.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${u.username}`}
+                        src={u.avatarUrl || `/api/avatar/bottts/svg?seed=${u.username}`}
                         alt={u.displayName}
                         className="w-5 h-5 rounded-md object-cover"
                       />

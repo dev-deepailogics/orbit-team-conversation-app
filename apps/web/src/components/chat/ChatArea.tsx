@@ -527,7 +527,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const dmIntro = channel.type === 'DIRECT' && (
     <div className="py-6 border-b mb-2" style={{ borderColor: 'var(--theme-border)' }}>
       <img
-        src={(dmPeer ?? currentUser)?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${dmName}`}
+        src={(dmPeer ?? currentUser)?.avatarUrl || `/api/avatar/bottts/svg?seed=${dmName}`}
         alt={dmName}
         className="w-16 h-16 rounded-xl object-cover mb-3"
       />
@@ -883,8 +883,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               : (msg.user?.displayName || 'Unknown');
             const anonEmoji = msg.anonEmoji || '🎭';
             const avatarUrl = isBot
-              ? (msg.bot?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${msg.bot?.name}`)
-              : (msg.user?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${authorName}`);
+              ? (msg.bot?.avatarUrl || `/api/avatar/bottts/svg?seed=${msg.bot?.name}`)
+              : (msg.user?.avatarUrl || `/api/avatar/bottts/svg?seed=${authorName}`);
             // Profile hover card: real people only (not bots / anonymous posts)
             const author = !isAnon && !isBot ? msg.user : undefined;
             const withCard = (node: React.ReactNode, className?: string) =>

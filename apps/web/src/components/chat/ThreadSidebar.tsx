@@ -274,7 +274,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
     ? (parentMessage.anonName || 'Anonymous')
     : (parentMessage.user?.displayName || parentMessage.bot?.name || 'Unknown');
   const parentAnonEmoji = parentMessage.anonEmoji || '🎭';
-  const avatarUrl = parentMessage.user?.avatarUrl || parentMessage.bot?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${authorName}`;
+  const avatarUrl = parentMessage.user?.avatarUrl || parentMessage.bot?.avatarUrl || `/api/avatar/bottts/svg?seed=${authorName}`;
 
   return (
     <div className="w-full h-full bg-[var(--theme-bg-surface)] border-l border-[var(--theme-border)] flex flex-col select-none">
@@ -535,7 +535,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
             ? (reply.anonName || 'Anonymous')
             : (reply.user?.displayName || 'Unknown');
           const replyEmoji = reply.anonEmoji || '🎭';
-          const replyAvatar = reply.user?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${replyAuthor}`;
+          const replyAvatar = reply.user?.avatarUrl || `/api/avatar/bottts/svg?seed=${replyAuthor}`;
 
           return (
             <div

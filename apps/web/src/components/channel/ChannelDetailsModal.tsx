@@ -456,7 +456,7 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
                               <img
                                 src={
                                   u.avatarUrl ||
-                                  `https://api.dicebear.com/7.x/bottts/svg?seed=${u.displayName || u.username}`
+                                  `/api/avatar/bottts/svg?seed=${u.displayName || u.username}`
                                 }
                                 alt={u.displayName || u.username}
                                 className="w-8 h-8 rounded-lg object-cover"

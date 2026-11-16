@@ -32,6 +32,7 @@ import {
 import { driveRoutes } from "./routes/drive.js";
 import { canvasRoutes } from "./routes/canvases.js";
 import { documentRoutes } from "./routes/documents.js";
+import { avatarRoutes } from "./routes/avatar.js";
 import { registerPushMiddleware } from "./services/pushService.js";
 
 import { setupSocketServer } from "./socket/index.js";
@@ -164,6 +165,7 @@ async function bootstrap() {
   await fastify.register(driveRoutes, { prefix: "/api" });
   await fastify.register(canvasRoutes, { prefix: "/api/canvases" });
   await fastify.register(documentRoutes, { prefix: "/api/documents" });
+  await fastify.register(avatarRoutes, { prefix: "/api/avatar" });
 
   // Start Server
 
