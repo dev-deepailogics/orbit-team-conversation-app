@@ -76,6 +76,7 @@ interface TeamMemberAvailability {
   availability: UserAvailabilityRecord | null;
 }
 
+import { useTimeFormat, formatMessageTime } from "../../lib/timeFormat";
 import { UserAvailabilityView } from "./UserAvailabilityView";
 import { EmployeeStatusView } from "./EmployeeStatusView";
 import { ProjectPortfolioView } from "../project/ProjectPortfolioView";
@@ -94,6 +95,9 @@ export const OrganizationControlView: React.FC<
   onOpenBotPortal,
   onOpenProjectBoard,
 }) => {
+  const timeFormat = useTimeFormat();
+  const fmtTime = (d: string | number | Date) => formatMessageTime(d, timeFormat);
+
   // Navigation: Toggle between Org Control overview, Employee Status page, User Availability page, View Projects page, & Media Management page
   const [showUserAvailabilityPage, setShowUserAvailabilityPage] =
     useState<boolean>(false);
@@ -1135,12 +1139,7 @@ export const OrganizationControlView: React.FC<
                               style={{ color: "var(--theme-text-muted)" }}
                             >
                               {avail?.availableTime
-                                ? new Date(
-                                    avail.availableTime,
-                                  ).toLocaleTimeString([], {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })
+                                ? fmtTime(avail.availableTime)
                                 : "—"}
                             </td>
                             <td className="py-3 px-4 text-right font-mono font-medium text-[var(--theme-text)]">

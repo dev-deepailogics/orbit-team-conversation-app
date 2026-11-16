@@ -18,6 +18,7 @@ import {
   UserMinus,
   Loader2,
 } from "lucide-react";
+import { useTimeFormat, formatMessageTime } from "../../lib/timeFormat";
 
 interface UserAvailabilityViewProps {
   workspace: Workspace;
@@ -47,6 +48,8 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
   initialUserId,
   onBackToOrganizationControl,
 }) => {
+  const timeFormat = useTimeFormat();
+  const fmtTime = (d: string | number | Date) => formatMessageTime(d, timeFormat);
   const [activeTab, setActiveTab] = useState<"today" | "history">("today");
   const [teamMembers, setTeamMembers] = useState<TeamMemberItem[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>(
@@ -605,12 +608,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                         </span>
                         <p className="text-sm sm:text-base font-bold text-[var(--theme-text)] mt-1">
                           {todayRecord?.availableTime
-                            ? new Date(
-                                todayRecord.availableTime,
-                              ).toLocaleTimeString([], {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })
+                            ? fmtTime(todayRecord.availableTime)
                             : "—"}
                         </p>
                       </div>
@@ -629,13 +627,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                           }`}
                         >
                           {todayRecord?.offTime
-                            ? new Date(todayRecord.offTime).toLocaleTimeString(
-                                [],
-                                {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                },
-                              )
+                            ? fmtTime(todayRecord.offTime)
                             : todayRecord?.isAvailable
                               ? "Still Active"
                               : "—"}
@@ -781,12 +773,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                           <div className="flex items-center gap-3">
                             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
                             <strong className="text-[var(--theme-text)]">
-                              {new Date(
-                                todayRecord.availableTime,
-                              ).toLocaleTimeString([], {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
+                              {fmtTime(todayRecord.availableTime)}
                             </strong>
                             <span className="text-[var(--theme-text)]">
                               Logged into workspace via Orbit Desktop / Web
@@ -806,10 +793,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                             <div className="flex items-center gap-3">
                               <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
                               <strong className="text-[var(--theme-text)]">
-                                {new Date(b.breakStartTime).toLocaleTimeString(
-                                  [],
-                                  { hour: "2-digit", minute: "2-digit" },
-                                )}
+                                {fmtTime(b.breakStartTime)}
                               </strong>
                               <span className="text-[var(--theme-text)]">
                                 Took Break:{" "}
@@ -821,7 +805,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                             </div>
                             <span className="text-[var(--theme-text-muted)] text-[11px]">
                               {b.availableAfterBreak
-                                ? `Resumed: ${new Date(b.availableAfterBreak).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                                ? `Resumed: ${fmtTime(b.availableAfterBreak)}`
                                 : "On Break"}
                             </span>
                           </div>
@@ -835,12 +819,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                             />
                             <strong className="text-[var(--theme-text)]">
                               {todayRecord.offTime
-                                ? new Date(
-                                    todayRecord.offTime,
-                                  ).toLocaleTimeString([], {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })
+                                ? fmtTime(todayRecord.offTime)
                                 : "Ongoing"}
                             </strong>
                             <span className="text-[var(--theme-text)]">
@@ -1123,12 +1102,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                         </span>
                         <strong className="text-sm font-bold text-[#0F172A] mt-0.5 block">
                           {selectedRecordForModal?.availableTime
-                            ? new Date(
-                                selectedRecordForModal.availableTime,
-                              ).toLocaleTimeString([], {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })
+                            ? fmtTime(selectedRecordForModal.availableTime)
                             : "09:58 AM"}
                         </strong>
                       </div>
@@ -1139,12 +1113,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                         </span>
                         <strong className="text-sm font-bold text-[#0F172A] mt-0.5 block">
                           {selectedRecordForModal?.offTime
-                            ? new Date(
-                                selectedRecordForModal.offTime,
-                              ).toLocaleTimeString([], {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })
+                            ? fmtTime(selectedRecordForModal.offTime)
                             : "07:41 PM"}
                         </strong>
                       </div>
@@ -1245,16 +1214,10 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                   <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
                     {selectedRecordForModal.breaks.map((b, idx) => {
                       const startTime = b.breakStartTime
-                        ? new Date(b.breakStartTime).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })
+                        ? fmtTime(b.breakStartTime)
                         : "—";
                       const endTime = b.availableAfterBreak
-                        ? new Date(b.availableAfterBreak).toLocaleTimeString(
-                            [],
-                            { hour: "2-digit", minute: "2-digit" },
-                          )
+                        ? fmtTime(b.availableAfterBreak)
                         : "In progress";
                       const duration = b.breakDurationMinutes || 0;
                       const reasonName = b.breakReason || "Break";

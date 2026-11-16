@@ -19,6 +19,7 @@ import {
   CornerDownRight,
 } from 'lucide-react';
 import EmojiPicker, { Theme, EmojiClickData } from 'emoji-picker-react';
+import { useTimeFormat, formatMessageTime } from '../../lib/timeFormat';
 
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '👏', '🎉', '🔥'];
@@ -27,6 +28,7 @@ export const ModernMeetingChat: React.FC<{
   isOpen: boolean;
   onClose: () => void;
 }> = ({ isOpen, onClose }) => {
+  const timeFormat = useTimeFormat();
   const { chatMessages, send, isSending } = useChat();
   const { localParticipant } = useLocalParticipant();
   const remoteParticipants = useRemoteParticipants();
@@ -207,10 +209,7 @@ export const ModernMeetingChat: React.FC<{
                       {senderName}
                     </span>
                     <span className="text-[10px] text-slate-500">
-                      {new Date(msg.timestamp).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {formatMessageTime(msg.timestamp, timeFormat)}
                     </span>
                   </div>
 
