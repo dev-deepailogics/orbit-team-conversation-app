@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/authStore';
-import { AuthShell, AuthError, MicrosoftSignIn, authInputClass, authLabelClass, authButtonClass } from '../../components/auth/AuthShell';
+import { AuthShell, AuthError, MicrosoftSignIn, AuthPasswordInput, authInputClass, authLabelClass, authButtonClass } from '../../components/auth/AuthShell';
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -85,15 +85,13 @@ export default function RegisterPage() {
         </div>
         <div>
           <label htmlFor="password" className={authLabelClass}>Password</label>
-          <input
+          <AuthPasswordInput
             id="password"
-            type="password"
             required
             autoComplete="new-password"
             placeholder="At least 6 characters"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className={authInputClass}
           />
         </div>
 

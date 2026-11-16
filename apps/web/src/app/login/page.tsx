@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/authStore';
-import { AuthShell, AuthError, MicrosoftSignIn, authInputClass, authLabelClass, authButtonClass } from '../../components/auth/AuthShell';
+import { AuthShell, AuthError, MicrosoftSignIn, AuthPasswordInput, authInputClass, authLabelClass, authButtonClass } from '../../components/auth/AuthShell';
 
 // Error codes sent back by the server's Microsoft callback (/api/auth/microsoft/callback).
 const MICROSOFT_ERRORS: Record<string, string> = {
@@ -89,15 +89,13 @@ export default function LoginPage() {
 
         <div>
           <label htmlFor="password" className={authLabelClass}>Password</label>
-          <input
+          <AuthPasswordInput
             id="password"
-            type="password"
             required
             autoComplete="current-password"
             placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className={authInputClass}
           />
         </div>
 
