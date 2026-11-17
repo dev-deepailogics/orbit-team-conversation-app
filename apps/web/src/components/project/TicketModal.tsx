@@ -15,10 +15,14 @@ import {
   Clock,
   AlertCircle,
   AlertTriangle,
+  Paperclip,
+  Loader2,
 } from 'lucide-react';
+import { useTicketAttachmentUpload, TicketAttachmentList } from './TicketAttachments';
 
 interface TicketModalProps {
   projectId: string;
+  workspaceId: string;
   columns: ProjectColumn[];
   defaultColumnId?: string;
   ticket?: Ticket | null;
@@ -40,6 +44,7 @@ const PRIORITIES: { value: TicketPriority; label: string; color: string; icon: a
 
 export const TicketModal: React.FC<TicketModalProps> = ({
   projectId,
+  workspaceId,
   columns,
   defaultColumnId,
   ticket,
@@ -61,6 +66,19 @@ export const TicketModal: React.FC<TicketModalProps> = ({
   const [dueDate, setDueDate] = useState<string>(
     ticket?.dueDate ? new Date(ticket.dueDate).toISOString().split('T')[0] : ''
   );
+
+  const {
+    attachments,
+    isUploading: isUploadingFile,
+    error: attachmentError,
+    handleFileInputChange: handleFileSelected,
+    handlePaste: handleAttachmentPaste,
+    removeAttachment: handleRemoveAttachment,
+  } = useTicketAttachmentUpload(
+    workspaceId,
+    Array.isArray((ticket as any)?.images) ? (ticket as any).images : []
+  );
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -84,6 +102,7 @@ export const TicketModal: React.FC<TicketModalProps> = ({
           priority,
           assigneeId: assigneeId || null,
           dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+          images: attachments,
         });
         onTicketUpdated?.(res.data);
       } else {
@@ -94,6 +113,7 @@ export const TicketModal: React.FC<TicketModalProps> = ({
           priority,
           assigneeId: assigneeId || null,
           dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+          images: attachments,
         });
         onTicketCreated?.(res.data);
       }
@@ -216,6 +236,54 @@ export const TicketModal: React.FC<TicketModalProps> = ({
                 minHeight="80px"
               />
             </div>
+          </div>
+
+          {/* Attachments */}
+          <div tabIndex={0} onPaste={handleAttachmentPaste}>
+            <label
+              className="block text-xs font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5"
+              style={{ color: 'var(--theme-text-muted)' }}
+            >
+              <Paperclip size={14} style={{ color: 'var(--theme-text-muted)' }} />
+              Attachments
+            </label>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={handleFileSelected}
+            />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingFile}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition disabled:opacity-50"
+                style={{
+                  borderColor: 'var(--theme-border)',
+                  color: 'var(--theme-text-primary)',
+                  backgroundColor: 'var(--theme-bg-surface-hover)',
+                }}
+              >
+                {isUploadingFile ? <Loader2 size={13} className="animate-spin" /> : <Paperclip size={13} />}
+                <span>{isUploadingFile ? 'Uploading...' : 'Add Attachment'}</span>
+              </button>
+              <span className="text-[11px]" style={{ color: 'var(--theme-text-muted)' }}>
+                or click here and paste (Ctrl+V)
+              </span>
+            </div>
+
+            {attachmentError && (
+              <p className="text-xs text-red-500 mt-1.5">{attachmentError}</p>
+            )}
+
+            {attachments.length > 0 && (
+              <div className="mt-2.5">
+                <TicketAttachmentList attachments={attachments} onRemove={handleRemoveAttachment} />
+              </div>
+            )}
           </div>
 
           {/* Column Status & Priority Grid */}

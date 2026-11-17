@@ -1520,6 +1520,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
       {showTicketModal && (
         <TicketModal
           projectId={project.id}
+          workspaceId={project.workspaceId}
           columns={columns}
           defaultColumnId={targetColumnId}
           ticket={editingTicket}
@@ -1558,6 +1559,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
       {viewingDetailTicket && (
         <TicketDetailModal
           projectId={project.id}
+          workspaceId={project.workspaceId}
           ticket={viewingDetailTicket}
           columns={columns}
           members={members}

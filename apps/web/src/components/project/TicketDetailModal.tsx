@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   X,
   Edit,
@@ -11,12 +11,16 @@ import {
   Tag,
   Plus,
   Trash2,
+  Paperclip,
+  Loader2,
 } from 'lucide-react';
 import { WorkspaceMember, ProjectColumn } from '@orbit/types';
 import { api } from '../../lib/api';
+import { useTicketAttachmentUpload, TicketAttachmentList } from './TicketAttachments';
 
 interface TicketDetailModalProps {
   projectId: string;
+  workspaceId: string;
   ticket: any;
   columns?: ProjectColumn[];
   members?: WorkspaceMember[];
@@ -27,6 +31,7 @@ interface TicketDetailModalProps {
 
 export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
   projectId,
+  workspaceId,
   ticket,
   columns = [],
   members = [],
@@ -34,6 +39,28 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
   onEditTicket,
   onTicketUpdated,
 }) => {
+  const {
+    attachments,
+    isUploading: isUploadingFile,
+    error: attachmentError,
+    handleFileInputChange: handleFileSelected,
+    handlePaste: handleAttachmentPaste,
+    removeAttachment: handleRemoveAttachment,
+  } = useTicketAttachmentUpload(
+    workspaceId,
+    Array.isArray(ticket.images) ? ticket.images : [],
+    async (next) => {
+      try {
+        const res = await api.put(`/api/projects/${projectId}/tickets/${ticket.id}`, {
+          images: next,
+        });
+        onTicketUpdated?.(res.data);
+      } catch (err) {
+        console.error('Failed to save attachments', err);
+      }
+    }
+  );
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [copiedBranch, setCopiedBranch] = useState(false);
   const [copiedTitle, setCopiedTitle] = useState(false);
   const [checklist, setChecklist] = useState<Array<{ id: string; text: string; completed: boolean }>>(
@@ -306,6 +333,40 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+
+          <div className="border-t my-2" style={{ borderColor: 'var(--theme-border, #334155)' }} />
+
+          {/* Row: Attachments */}
+          <div className="grid grid-cols-[120px_1fr] items-start gap-4">
+            <span className="font-semibold text-[var(--theme-text-muted)] pt-1.5">Attachments</span>
+            <div className="space-y-2.5" tabIndex={0} onPaste={handleAttachmentPaste}>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={handleFileSelected}
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingFile}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--theme-border)] text-xs font-semibold text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] transition disabled:opacity-50"
+                >
+                  {isUploadingFile ? <Loader2 size={13} className="animate-spin" /> : <Paperclip size={13} />}
+                  <span>{isUploadingFile ? 'Uploading...' : 'Add Attachment'}</span>
+                </button>
+                <span className="text-[var(--theme-text-muted)] text-[11px]">or click here and paste (Ctrl+V)</span>
+              </div>
+
+              {attachmentError && (
+                <p className="text-rose-500 text-xs">{attachmentError}</p>
+              )}
+
+              <TicketAttachmentList attachments={attachments} onRemove={handleRemoveAttachment} />
             </div>
           </div>
 
