@@ -56,6 +56,9 @@ services:
       MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
       MICROSOFT_TENANT_ID: ${MICROSOFT_TENANT_ID:-common}
       MICROSOFT_REDIRECT_URI: https://${DOMAIN}/api/auth/microsoft/callback
+      UPLOAD_DIR: /data/uploads
+    volumes:
+      - orbit_uploads:/data/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -73,7 +76,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-orbit_admin} -d ${POSTGRES_DB:-orbit_db}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-orbit_admin} -d ${POSTGRES_DB:-orbit_db}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -86,7 +93,14 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-orbit_redis_password}", "ping"]
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "-a",
+          "${REDIS_PASSWORD:-orbit_redis_password}",
+          "ping",
+        ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -120,3 +134,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  orbit_uploads:
