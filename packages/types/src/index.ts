@@ -99,6 +99,9 @@ export interface WorkspaceMember {
   settings?: WorkspaceMemberSettings | null;
   joinedAt: string;
   user?: UserProfile;
+  // Only present when this object is actually a ChannelMember (Channel.members
+  // reuses this type) — this user's notification preference for that channel.
+  notificationPreference?: "ALL" | "MENTIONS" | "MUTED";
 }
 
 // ==========================================

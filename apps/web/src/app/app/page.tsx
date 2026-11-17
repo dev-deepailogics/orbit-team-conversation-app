@@ -627,13 +627,21 @@ export default function AppDashboard() {
     };
 
     const onChannelUpdated = (updatedChan: Channel) => {
+      // Defensive: if some endpoint ever broadcasts a channel without its
+      // member list, don't let that wipe out per-member state (notification
+      // preference, read receipts) that was already known locally.
+      const merge = (prev: Channel) => ({
+        ...prev,
+        ...updatedChan,
+        members: updatedChan.members ?? prev.members,
+      });
       setChannels(
         useChatStore
           .getState()
-          .channels.map((c) => (c.id === updatedChan.id ? updatedChan : c)),
+          .channels.map((c) => (c.id === updatedChan.id ? merge(c) : c)),
       );
       if (currentChannelRef.current?.id === updatedChan.id) {
-        setCurrentChannel(updatedChan);
+        setCurrentChannel(merge(currentChannelRef.current));
       }
     };
 

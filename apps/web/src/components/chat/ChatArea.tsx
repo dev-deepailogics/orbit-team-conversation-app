@@ -30,6 +30,9 @@ import {
   CheckSquare,
   Pencil,
   Trash2,
+  Bell,
+  BellOff,
+  AtSign,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
@@ -127,6 +130,29 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [isCompressing, setIsCompressing] = useState(false);
 
   const currentWorkspace = useChatStore((state) => state.currentWorkspace);
+  const notificationPreference =
+    channel.members?.find((m) => m.userId === currentUser?.id)?.notificationPreference || 'ALL';
+  const isMuted = notificationPreference === 'MUTED';
+  const [isSavingNotifPref, setIsSavingNotifPref] = useState(false);
+
+  const handleSetNotificationPreference = async (preference: 'ALL' | 'MENTIONS' | 'MUTED') => {
+    if (preference === notificationPreference) return;
+    setIsSavingNotifPref(true);
+    try {
+      await api.post(`/api/channels/${channel.id}/notifications`, { preference });
+      useChatStore.getState().updateChannel({
+        ...channel,
+        members: (channel.members || []).map((m) =>
+          m.userId === currentUser?.id ? { ...m, notificationPreference: preference } : m
+        ),
+      });
+    } catch (err) {
+      console.error('Failed to update notification preference', err);
+    } finally {
+      setIsSavingNotifPref(false);
+    }
+  };
+
   const isWsAdmin =
     currentWorkspace?.ownerId === currentUser?.id ||
     members?.some(
@@ -602,6 +628,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             >
               {getDirectChannelTitle()}
             </span>
+            {isMuted && (
+              <span title="Muted" className="shrink-0 inline-flex">
+                <BellOff size={14} className="text-[var(--theme-text-muted)]" />
+              </span>
+            )}
             {channel.isAnonymous && (
               <span className="text-[10px] font-semibold uppercase bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded ml-1 shrink-0">
                 Anonymous
@@ -711,6 +742,60 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     <span>Add People</span>
                   </button>
                 )}
+
+                {channel.type === 'DIRECT' ? (
+                  // A 1:1 DM has no broader audience to be singled out from, and
+                  // nothing in between "notify" and "don't" — just a plain toggle.
+                  <button
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      handleSetNotificationPreference(isMuted ? 'ALL' : 'MUTED');
+                    }}
+                    disabled={isSavingNotifPref}
+                    className="w-full px-3.5 py-2 text-left text-xs text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] flex items-center gap-2.5 transition disabled:opacity-50"
+                  >
+                    {isMuted ? (
+                      <Bell size={14} className="text-slack-green" />
+                    ) : (
+                      <BellOff size={14} className="text-[var(--theme-text-muted)]" />
+                    )}
+                    <span>{isMuted ? 'Unmute Notifications' : 'Mute Notifications'}</span>
+                  </button>
+                ) : (
+                  <>
+                    <div className="px-3.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--theme-text-muted)]">
+                      Notifications
+                    </div>
+                    {(
+                      [
+                        { value: 'ALL' as const, label: 'All New Posts', icon: Bell },
+                        { value: 'MENTIONS' as const, label: 'Mentions Only', icon: AtSign },
+                        { value: 'MUTED' as const, label: 'Mute', icon: BellOff },
+                      ]
+                    ).map(({ value, label, icon: Icon }) => (
+                      <button
+                        key={value}
+                        onClick={() => {
+                          setShowMoreMenu(false);
+                          handleSetNotificationPreference(value);
+                        }}
+                        disabled={isSavingNotifPref}
+                        className="w-full px-3.5 py-2 text-left text-xs text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] flex items-center gap-2.5 transition disabled:opacity-50"
+                      >
+                        <Icon
+                          size={14}
+                          className={
+                            notificationPreference === value ? 'text-slack-green' : 'text-[var(--theme-text-muted)]'
+                          }
+                        />
+                        <span className="flex-1">{label}</span>
+                        {notificationPreference === value && <Check size={13} className="text-slack-green" />}
+                      </button>
+                    ))}
+                  </>
+                )}
+
+                <div className="my-1.5 border-t border-[var(--theme-border)]" />
 
                 <button
                   onClick={() => {
