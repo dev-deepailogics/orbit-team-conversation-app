@@ -50,3 +50,11 @@ upload/
 
 # TypeScript build info
 *.tsbuildinfo
+
+# Desktop build output & release binaries
+release/
+**/release/
+*.app/
+*.dmg
+*.exe
+*.zip
