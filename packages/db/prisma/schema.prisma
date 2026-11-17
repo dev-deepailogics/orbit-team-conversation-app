@@ -90,10 +90,30 @@ model User {
   availabilities    UserAvailability[]
   ticketComments    TicketComment[]
   identities        UserIdentity[]
+  refreshTokens     RefreshToken[]
   createdCanvases   Canvas[]          @relation("CanvasCreator")
 
   @@index([email])
   @@index([username])
+}
+
+// Opaque, rotating refresh tokens (only the SHA-256 hash is stored). Every rotation keeps the same
+// familyId; presenting an already-rotated token revokes the whole family (stolen-token detection).
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  familyId  String    @map("family_id")
+  provider  String?   // sign-in method of the session (e.g. "microsoft"); carried into new access tokens
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
 }
 
 // External sign-in identities (e.g. Microsoft Entra ID). Users are matched by

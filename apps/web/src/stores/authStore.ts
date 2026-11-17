@@ -1,32 +1,37 @@
 import { create } from 'zustand';
 import { UserProfile } from '@orbit/types';
-import { api } from '../lib/api';
+import { api, clearSession, REFRESH_TOKEN_KEY, TOKEN_KEY, TOKEN_REFRESHED_EVENT } from '../lib/api';
 import { useChatStore } from './chatStore';
 
 interface AuthState {
   user: UserProfile | null;
   token: string | null;
   isLoading: boolean;
-  setAuth: (user: UserProfile, token: string) => void;
+  // refreshToken is omitted when only the access token changed (e.g. a profile update re-signs the JWT).
+  setAuth: (user: UserProfile, token: string, refreshToken?: string) => void;
   logout: () => void;
   fetchMe: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
-  token: typeof window !== 'undefined' ? localStorage.getItem('orbit_token') : null,
+  token: typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null,
   isLoading: true,
 
-  setAuth: (user, token) => {
+  setAuth: (user, token, refreshToken) => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('orbit_token', token);
+      localStorage.setItem(TOKEN_KEY, token);
+      if (refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
     }
     set({ user, token, isLoading: false });
   },
 
   logout: () => {
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('orbit_token');
+      // Revoke the session server-side (best effort), then forget it locally.
+      const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+      if (refreshToken) api.post('/api/auth/logout', { refreshToken }).catch(() => {});
+      clearSession();
     }
     useChatStore.getState().reset();
     set({ user: null, token: null, isLoading: false });
@@ -34,16 +39,17 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   fetchMe: async () => {
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('orbit_token') : null;
+      const token = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null;
       if (!token) {
         set({ user: null, token: null, isLoading: false });
         return;
       }
       const res = await api.get('/api/auth/me');
-      set({ user: res.data, token, isLoading: false });
+      // The request may have refreshed the access token along the way.
+      set({ user: res.data, token: localStorage.getItem(TOKEN_KEY) ?? token, isLoading: false });
     } catch {
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('orbit_token');
+        clearSession();
       }
       set({ user: null, token: null, isLoading: false });
     }
@@ -58,4 +64,11 @@ export const PENDING_INVITE_KEY = 'orbit_pending_invite';
 export function postAuthPath() {
   const code = typeof window !== 'undefined' ? localStorage.getItem(PENDING_INVITE_KEY) : null;
   return code ? `/join/${code}` : '/app';
+}
+
+// Keep the store's token in step with silent refreshes done by the api client / socket.
+if (typeof window !== 'undefined') {
+  window.addEventListener(TOKEN_REFRESHED_EVENT, (e) => {
+    useAuthStore.setState({ token: (e as CustomEvent<string>).detail });
+  });
 }

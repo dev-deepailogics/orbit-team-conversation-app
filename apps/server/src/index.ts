@@ -12,6 +12,7 @@ import Redis from "ioredis";
 import dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
+import { randomBytes } from "crypto";
 
 // Routes
 import { prisma } from "@orbit/db";
@@ -55,9 +56,31 @@ declare module "fastify" {
 
 const PORT = parseInt(process.env.PORT || "4000", 10);
 const HOST = process.env.HOST || "0.0.0.0";
-const JWT_SECRET =
-  process.env.JWT_SECRET ||
-  "orbit_super_secret_jwt_access_token_key_1234567890";
+// Values that were once hardcoded/committed (.env.example, old fallbacks): never acceptable in production.
+const KNOWN_INSECURE_JWT_SECRETS = [
+  "orbit_super_secret_jwt_access_token_key_1234567890",
+  "orbit_production_jwt_secret_key_change_me",
+  "change-me",
+];
+
+function resolveJwtSecret(): string {
+  const secret = process.env.JWT_SECRET?.trim();
+  if (process.env.NODE_ENV === "production") {
+    if (!secret) {
+      throw new Error("JWT_SECRET is required in production. Generate one with: openssl rand -hex 48");
+    }
+    if (secret.length < 32 || KNOWN_INSECURE_JWT_SECRETS.includes(secret)) {
+      throw new Error("JWT_SECRET is too short or a known default. Use at least 32 random characters.");
+    }
+    return secret;
+  }
+  if (secret) return secret;
+  // Dev only: random per process, so there is never a guessable secret. Sessions survive restarts via refresh tokens.
+  console.warn("JWT_SECRET is not set; using a random one for this process (access tokens reset on restart).");
+  return randomBytes(48).toString("hex");
+}
+
+const JWT_SECRET = resolveJwtSecret();
 const REDIS_URL =
   process.env.REDIS_URL || "redis://:orbit_redis_password@localhost:6379";
 

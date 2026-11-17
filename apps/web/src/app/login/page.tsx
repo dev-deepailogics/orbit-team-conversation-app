@@ -39,9 +39,9 @@ export default function LoginPage() {
 
   // Finish a Microsoft sign-in: the server redirects here with #token=… or ?error=…
   useEffect(() => {
-    const token = new URLSearchParams(window.location.hash.slice(1)).get(
-      "token",
-    );
+    const fragment = new URLSearchParams(window.location.hash.slice(1));
+    const token = fragment.get("token");
+    const refreshToken = fragment.get("refreshToken");
     const errorCode = new URLSearchParams(window.location.search).get("error");
     if (!token && !errorCode) return;
     window.history.replaceState(null, "", window.location.pathname); // drop the token from the URL/history
@@ -53,6 +53,7 @@ export default function LoginPage() {
       return;
     }
     localStorage.setItem("orbit_token", token!);
+    if (refreshToken) localStorage.setItem("orbit_refresh_token", refreshToken);
     setIsLoading(true);
     fetchMe().then(() => {
       if (useAuthStore.getState().user) router.push(postAuthPath());
@@ -75,7 +76,7 @@ export default function LoginPage() {
         { email, password },
         { withCredentials: true },
       );
-      setAuth(res.data.user, res.data.accessToken);
+      setAuth(res.data.user, res.data.accessToken, res.data.refreshToken);
       router.push(postAuthPath());
     } catch (err: any) {
       setError(err.response?.data?.error || "Invalid email or password");

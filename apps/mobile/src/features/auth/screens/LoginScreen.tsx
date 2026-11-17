@@ -28,9 +28,9 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
     setError('');
     setIsLoading(true);
     try {
-      const { user, accessToken } = await login(email.trim(), password);
+      const { user, accessToken, refreshToken } = await login(email.trim(), password);
       // Navigation switches to Home automatically once `user` is set.
-      await setAuth(user, accessToken);
+      await setAuth(user, accessToken, refreshToken);
     } catch (err) {
       setError(getErrorMessage(err, 'Invalid email or password'));
       setIsLoading(false);

@@ -32,13 +32,13 @@ export function RegisterScreen({ navigation }: ScreenProps<'Register'>) {
     setError('');
     setIsLoading(true);
     try {
-      const { user, accessToken } = await register({
+      const { user, accessToken, refreshToken } = await register({
         displayName: displayName.trim(),
         username: username.trim(),
         email: email.trim(),
         password,
       });
-      await setAuth(user, accessToken);
+      await setAuth(user, accessToken, refreshToken);
     } catch (err) {
       setError(getErrorMessage(err, 'Registration failed'));
       setIsLoading(false);

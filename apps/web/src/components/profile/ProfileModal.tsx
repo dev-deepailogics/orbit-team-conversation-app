@@ -110,7 +110,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, workspaceId, p
     if (newPassword !== confirmPassword) return setError('New passwords do not match.');
     setIsSaving(true);
     try {
-      await api.post('/api/auth/me/password', { currentPassword, newPassword });
+      const res = await api.post('/api/auth/me/password', { currentPassword, newPassword });
+      // Other devices were signed out; this one gets a fresh session.
+      if (res.data?.accessToken) setAuth(user, res.data.accessToken, res.data.refreshToken);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
