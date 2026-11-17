@@ -39,6 +39,7 @@ import { OrganizationControlView } from "@/components/availability/OrganizationC
 import { CanvasView } from "@/components/whiteboard/CanvasView";
 import { ProjectDocsView } from "@/components/project/ProjectDocsView";
 import { useTeamPresence } from "@/components/availability/useTeamPresence";
+import { useLiveUserStatus } from "@/components/channel/useLiveUserStatus";
 import {
   Layers,
   ShieldCheck,
@@ -100,6 +101,8 @@ export default function AppDashboard() {
 
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [members, setMembers] = useState<any[]>([]);
+  // Whether each member is actually connected to Orbit right now (a live socket).
+  const liveStatus = useLiveUserStatus(members);
   const [showBotPortal, setShowBotPortal] = useState(false);
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
@@ -960,6 +963,7 @@ export default function AppDashboard() {
                   handleStartHuddle(ch);
                 }}
                 presence={presence}
+                liveStatus={liveStatus}
                 onOpenSearch={() => {
                   setIsMobileSidebarOpen(false);
                   setShowSearchModal(true);
@@ -1023,6 +1027,7 @@ export default function AppDashboard() {
             onOpenBotPortal={() => setShowBotPortal(true)}
             onStartHuddle={handleStartHuddle}
             presence={presence}
+            liveStatus={liveStatus}
             onOpenSearch={() => setShowSearchModal(true)}
             onOpenOrganizationControl={() => {
               handleOpenOrgControl();
