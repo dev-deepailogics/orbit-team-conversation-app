@@ -2,7 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 import { UserProfile } from '@orbit/types';
-import { X, Upload, Check, LogOut, User, KeyRound, Loader2 } from 'lucide-react';
+import { X, Upload, Check, LogOut, User, KeyRound, Loader2, Eye, EyeOff } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/authStore';
 import { Presence, PRESENCE_STYLE } from '../availability/useTeamPresence';
@@ -18,6 +18,25 @@ const input =
 const label = 'block text-xs font-semibold uppercase tracking-wider text-[var(--theme-text)] mb-1';
 const primaryBtn =
   'px-5 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-50 flex items-center gap-2';
+
+/** Password input with a show/hide eye toggle, styled to match the modal's `input` class. */
+const PasswordField: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = ({ className, ...props }) => {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="relative">
+      <input {...props} type={visible ? 'text' : 'password'} className={`${input} pr-9 ${className || ''}`} />
+      <button
+        type="button"
+        onClick={() => setVisible((v) => !v)}
+        aria-label={visible ? 'Hide password' : 'Show password'}
+        tabIndex={-1}
+        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition"
+      >
+        {visible ? <EyeOff size={15} /> : <Eye size={15} />}
+      </button>
+    </div>
+  );
+};
 
 interface ProfileModalProps {
   user: UserProfile;
@@ -288,23 +307,21 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, workspaceId, p
             <form onSubmit={handleChangePassword} className="space-y-4">
               <div>
                 <label htmlFor="profile-current-password" className={label}>Current password</label>
-                <input
+                <PasswordField
                   id="profile-current-password"
-                  type="password"
                   autoComplete="current-password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   required
-                  className={input}
                 />
               </div>
               <div>
                 <label htmlFor="profile-new-password" className={label}>New password</label>
-                <input id="profile-new-password" type="password" autoComplete="new-password" required minLength={6} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className={input} />
+                <PasswordField id="profile-new-password" autoComplete="new-password" required minLength={6} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
               </div>
               <div>
                 <label htmlFor="profile-confirm-password" className={label}>Confirm new password</label>
-                <input id="profile-confirm-password" type="password" autoComplete="new-password" required minLength={6} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={input} />
+                <PasswordField id="profile-confirm-password" autoComplete="new-password" required minLength={6} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
               </div>
               <div className="flex justify-end">
                 <button

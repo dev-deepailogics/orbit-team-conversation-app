@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, Mic, User } from 'lucide-react';
 import { api } from '../../lib/api';
 import { UserProfile } from '@orbit/types';
+import { useTimeFormat } from '../../lib/timeFormat';
 
 interface IssueChatModalProps {
   projectId: string;
@@ -18,6 +19,7 @@ export const IssueChatModal: React.FC<IssueChatModalProps> = ({
   currentUser,
   onClose,
 }) => {
+  const timeFormat = useTimeFormat();
   const [comments, setComments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [newText, setNewText] = useState('');
@@ -126,7 +128,7 @@ export const IssueChatModal: React.FC<IssueChatModalProps> = ({
                 year: 'numeric',
                 hour: 'numeric',
                 minute: '2-digit',
-                hour12: true,
+                hour12: timeFormat === '12',
               });
 
               return (

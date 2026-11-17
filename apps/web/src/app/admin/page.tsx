@@ -26,6 +26,8 @@ import {
   Loader2,
   Sparkles,
   Copy,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
@@ -107,6 +109,7 @@ export default function AdminDashboardPage() {
 
   const [selectedUserForPassword, setSelectedUserForPassword] = useState<AdminUser | null>(null);
   const [newPassword, setNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
 
   const [userToDelete, setUserToDelete] = useState<AdminUser | null>(null);
@@ -960,14 +963,23 @@ export default function AdminDashboardPage() {
                 <div className="relative">
                   <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
-                    type="password"
+                    type={showNewPassword ? 'text' : 'password'}
                     required
                     minLength={6}
                     placeholder="Enter at least 6 characters"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full bg-[#222529] border border-gray-700 rounded-xl pl-9 pr-3.5 py-2 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                    className="w-full bg-[#222529] border border-gray-700 rounded-xl pl-9 pr-9 py-2 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-amber-400"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword((v) => !v)}
+                    aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                    tabIndex={-1}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 transition"
+                  >
+                    {showNewPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
                 </div>
               </div>
 
