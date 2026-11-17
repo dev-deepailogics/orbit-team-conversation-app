@@ -60,6 +60,23 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
     const initialPersona = isAnonymous ? generateRandomPersona() : null;
 
+    // Public channels include every current workspace member by default;
+    // new members are auto-joined to them later (see workspace member-add route).
+    const memberIds =
+      type === 'PUBLIC'
+        ? Array.from(
+            new Set([
+              userId,
+              ...(
+                await prisma.workspaceMember.findMany({
+                  where: { workspaceId },
+                  select: { userId: true },
+                })
+              ).map((m) => m.userId),
+            ])
+          )
+        : [userId];
+
     const channel = await prisma.channel.create({
       data: {
         workspaceId,
@@ -70,11 +87,11 @@ export const channelRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         isAnonymous: isAnonymous || false,
         createdById: userId,
         members: {
-          create: {
-            userId,
-            anonName: initialPersona?.anonName,
-            anonEmoji: initialPersona?.anonEmoji,
-          },
+          create: memberIds.map((id) =>
+            id === userId
+              ? { userId, anonName: initialPersona?.anonName, anonEmoji: initialPersona?.anonEmoji }
+              : { userId: id }
+          ),
         },
       },
       include: {

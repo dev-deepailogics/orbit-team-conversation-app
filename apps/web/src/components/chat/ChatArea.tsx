@@ -699,7 +699,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             {/* Dropdown Menu */}
             {showMoreMenu && (
               <div className="absolute right-0 mt-1.5 w-56 bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-xl shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
-                {channel.type !== 'DIRECT' && onOpenAddMembers && (
+                {channel.type === 'PRIVATE' && onOpenAddMembers && (
                   <button
                     onClick={() => {
                       setShowMoreMenu(false);
