@@ -43,6 +43,24 @@ export function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
+// "edited 10:45 AM" / "deleted 10:45 AM" for an edited or deleted message whose updatedAt differs from its createdAt,
+// with a short date added when that happened on another day than it was sent. Null otherwise (never changed, or only
+// touched some other way, e.g. pinned).
+export function messageChangeLabel(m: Pick<Message, 'createdAt' | 'updatedAt' | 'isEdited' | 'isDeleted'>): string | null {
+  if (!m.isEdited && !m.isDeleted) return null;
+  const created = new Date(m.createdAt);
+  const updated = new Date(m.updatedAt);
+  if (!m.updatedAt || isNaN(created.getTime()) || isNaN(updated.getTime()) || created.getTime() === updated.getTime()) {
+    return null;
+  }
+  const time = formatTime(m.updatedAt);
+  const when =
+    created.toDateString() === updated.toDateString()
+      ? time
+      : `${updated.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`;
+  return `${m.isDeleted ? 'deleted' : 'edited'} ${when}`;
+}
+
 export function formatDay(iso: string, now = new Date()): string {
   const d = new Date(iso);
   const yesterday = new Date(now);

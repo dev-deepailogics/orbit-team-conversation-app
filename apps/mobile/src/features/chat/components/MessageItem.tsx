@@ -14,6 +14,7 @@ import {
   groupReactions,
   isImage,
   isNewDay,
+  messageChangeLabel,
   senderAvatarUrl,
   senderEmoji,
   senderName,
@@ -49,6 +50,7 @@ export const MessageItem = memo(function MessageItemView({
   const attachments = (m.attachments ?? []).filter(a => !a.isDeleted);
   const images = attachments.filter(a => isImage(a.fileType));
   const files = attachments.filter(a => !isImage(a.fileType));
+  const changeLabel = messageChangeLabel(m);
 
   return (
     <View>
@@ -79,12 +81,15 @@ export const MessageItem = memo(function MessageItemView({
           )}
 
           {m.isDeleted ? (
-            <Text className="italic text-muted-foreground">This message was deleted.</Text>
+            <View>
+              <Text className="italic text-muted-foreground">This message was deleted.</Text>
+              {!!changeLabel && <Text className="text-xs text-subtle">({changeLabel})</Text>}
+            </View>
           ) : (
             !!m.content && (
               <View>
                 <MarkdownText content={m.content} />
-                {m.isEdited && <Text className="text-xs text-subtle">(edited)</Text>}
+                {m.isEdited && <Text className="text-xs text-subtle">({changeLabel ?? 'edited'})</Text>}
               </View>
             )
           )}

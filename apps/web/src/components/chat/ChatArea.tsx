@@ -50,6 +50,7 @@ import { AnonymousPersonaModal } from '../channel/AnonymousPersonaModal';
 import { UserHoverCard } from './UserHoverCard';
 import { Presence } from '../availability/useTeamPresence';
 import { useTimeFormat, formatMessageTime } from '../../lib/timeFormat';
+import { MessageChangeNote } from './MessageChangeNote';
 
 
 interface ChatAreaProps {
@@ -994,15 +995,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     <span className="text-[11px]" style={{ color: 'var(--theme-text-muted)' }}>
                       {formatMessageTime(msg.createdAt, timeFormat)}
                     </span>
-                    {msg.isEdited && !msg.isDeleted && (
-                      <span
-                        className="text-[10px] italic select-none font-medium opacity-80"
-                        style={{ color: 'var(--theme-text-muted)' }}
-                        title="Edited"
-                      >
-                        (edited)
-                      </span>
-                    )}
+                    <MessageChangeNote message={msg} timeFormat={timeFormat} className="text-[10px] opacity-80" />
                   </div>
 
                   {msg.isDeleted ? (

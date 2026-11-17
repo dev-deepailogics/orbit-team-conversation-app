@@ -51,3 +51,37 @@ export function formatMessageTime(date: string | number | Date, format: TimeForm
     hour12: format === '12',
   });
 }
+
+export interface MessageChange {
+  label: 'edited' | 'deleted';
+  /** When it happened: the time, plus a short date when that isn't the day the message was sent */
+  text: string;
+  /** Full date and time, for a tooltip */
+  title: string;
+}
+
+/**
+ * For an edited or deleted message whose updatedAt differs from its createdAt, when it was edited or deleted.
+ * Null for anything else (never changed, or only touched in some other way such as a pin).
+ */
+export function getMessageChange(
+  m: { createdAt: string | number | Date; updatedAt?: string | number | Date | null; isEdited?: boolean; isDeleted?: boolean },
+  format: TimeFormat,
+): MessageChange | null {
+  if (!m.isEdited && !m.isDeleted) return null;
+  if (!m.updatedAt) return null;
+  const created = new Date(m.createdAt);
+  const updated = new Date(m.updatedAt);
+  if (isNaN(created.getTime()) || isNaN(updated.getTime()) || created.getTime() === updated.getTime()) return null;
+
+  const label = m.isDeleted ? 'deleted' : 'edited';
+  const time = formatMessageTime(updated, format);
+  const sameDay = created.toDateString() === updated.toDateString();
+  const text = sameDay ? time : `${updated.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`;
+  const title = `${label === 'deleted' ? 'Deleted' : 'Edited'} ${updated.toLocaleString([], {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    hour12: format === '12',
+  })}`;
+  return { label, text, title };
+}

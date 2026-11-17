@@ -14,6 +14,7 @@ import { FileAttachmentList, formatFileSize, getFileCategory } from './FileAttac
 import { CompressFileConfirmModal } from './CompressFileConfirmModal';
 import { compressFile } from '../../lib/compression';
 import { useTimeFormat, formatMessageTime } from '../../lib/timeFormat';
+import { MessageChangeNote } from './MessageChangeNote';
 
 interface ThreadSidebarProps {
   parentMessage: Message;
@@ -334,11 +335,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
               <span className="text-[10px] text-[var(--theme-text-muted)]">
                 {formatMessageTime(parentMessage.createdAt, timeFormat)}
               </span>
-              {parentMessage.isEdited && !parentMessage.isDeleted && (
-                <span className="text-[9px] italic select-none text-[var(--theme-text-muted)] font-medium">
-                  (edited)
-                </span>
-              )}
+              <MessageChangeNote message={parentMessage} timeFormat={timeFormat} className="text-[9px]" />
             </div>
 
             {parentMessage.isDeleted ? (
@@ -581,11 +578,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                   <span className="text-[10px] text-[var(--theme-text-muted)]">
                     {formatMessageTime(reply.createdAt, timeFormat)}
                   </span>
-                  {reply.isEdited && !reply.isDeleted && (
-                    <span className="text-[9px] italic select-none text-[var(--theme-text-muted)] font-medium">
-                      (edited)
-                    </span>
-                  )}
+                  <MessageChangeNote message={reply} timeFormat={timeFormat} className="text-[9px]" />
                 </div>
 
                 {reply.isDeleted ? (

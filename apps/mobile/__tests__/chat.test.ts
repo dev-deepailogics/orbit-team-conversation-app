@@ -1,6 +1,15 @@
 import type { Channel, Message } from '@orbit/types';
 import { useChatStore } from '../src/features/chat/store';
-import { formatBytes, groupReactions, isImage, messagePermissions, senderAvatarUrl, showHeader, typingLabel } from '../src/features/chat/utils';
+import {
+  formatBytes,
+  groupReactions,
+  isImage,
+  messageChangeLabel,
+  messagePermissions,
+  senderAvatarUrl,
+  showHeader,
+  typingLabel,
+} from '../src/features/chat/utils';
 import { channelLabel, dmAvatarUrl, parseInviteCode, pendingDMUserId, splitChannels } from '../src/features/workspaces/utils';
 
 const msg = (over: Partial<Message>) =>
@@ -113,4 +122,30 @@ test('only authors edit; authors and workspace admins delete; nothing once delet
   expect(messagePermissions(msg({ userId: 'u2' }), 'me', false)).toEqual({ canEdit: false, canDelete: false });
   expect(messagePermissions(msg({ userId: 'u2' }), 'me', true)).toEqual({ canEdit: false, canDelete: true });
   expect(messagePermissions(msg({ userId: 'me', isDeleted: true }), 'me', true)).toEqual({ canEdit: false, canDelete: false });
+});
+
+describe('messageChangeLabel', () => {
+  const sent = '2026-11-17T10:42:00';
+  const make = (over: Partial<Message>) => ({ createdAt: sent, updatedAt: sent, isEdited: false, isDeleted: false, ...over }) as Message;
+
+  test('nothing for a message that was never edited or deleted', () => {
+    expect(messageChangeLabel(make({ updatedAt: '2026-11-17T10:45:00' }))).toBeNull(); // e.g. only pinned
+  });
+
+  test('hidden when updatedAt equals createdAt, or is missing or invalid', () => {
+    expect(messageChangeLabel(make({ isEdited: true }))).toBeNull();
+    expect(messageChangeLabel(make({ isEdited: true, updatedAt: undefined as never }))).toBeNull();
+    expect(messageChangeLabel(make({ isEdited: true, updatedAt: 'nope' }))).toBeNull();
+  });
+
+  test('says edited or deleted with the time it happened', () => {
+    expect(messageChangeLabel(make({ isEdited: true, updatedAt: '2026-11-17T10:45:00' }))).toMatch(/^edited 10:45/);
+    expect(messageChangeLabel(make({ isDeleted: true, updatedAt: '2026-11-17T11:00:00' }))).toMatch(/^deleted 11:00/);
+    // edited and then deleted reads as deleted
+    expect(messageChangeLabel(make({ isEdited: true, isDeleted: true, updatedAt: '2026-11-17T11:00:00' }))).toMatch(/^deleted/);
+  });
+
+  test('adds the date when it happened on a different day than it was sent', () => {
+    expect(messageChangeLabel(make({ isEdited: true, updatedAt: '2026-11-18T09:05:00' }))).toMatch(/^edited .+, 9:05/);
+  });
 });
