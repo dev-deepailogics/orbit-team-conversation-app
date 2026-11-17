@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 
 const TICKET_PAGE = 20;
 import {
@@ -132,8 +132,51 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
   const [filterPriority, setFilterPriority] = useState<string>("ALL");
   const [filterAssignee, setFilterAssignee] = useState<string>("ALL");
 
+  const projectMembers = useMemo(() => {
+    const roster = [
+      ...(Array.isArray(project.assignedEmployees)
+        ? (project.assignedEmployees as any[])
+        : []),
+      ...(Array.isArray(project.selectedManagers)
+        ? (project.selectedManagers as any[])
+        : []),
+    ];
+    if (roster.length === 0) return members;
+
+    const matchedIds = new Set<string>();
+    for (const entry of roster) {
+      if (!entry) continue;
+      const uid = typeof entry === "string" ? undefined : entry.uid;
+      const name = (
+        typeof entry === "string" ? entry : entry.name || ""
+      ).toLowerCase();
+      const match = members.find(
+        (m) =>
+          (uid && m.user?.id === uid) ||
+          (name && m.user?.displayName?.toLowerCase() === name),
+      );
+      if (match?.user) matchedIds.add(match.user.id);
+    }
+    // The creator and the current viewer can always be assigned tickets too,
+    // even if neither is formally in the roster.
+    const creator = members.find((m) => m.user?.id === project.createdById);
+    if (creator?.user) matchedIds.add(creator.user.id);
+    const viewer = members.find((m) => m.user?.id === currentUser?.id);
+    if (viewer?.user) matchedIds.add(viewer.user.id);
+
+    return members.filter((m) => m.user && matchedIds.has(m.user.id));
+  }, [
+    project.assignedEmployees,
+    project.selectedManagers,
+    project.createdById,
+    currentUser?.id,
+    members,
+  ]);
+
   // Ticket paging: columns whose older tickets are fully loaded / loading now
-  const [exhaustedCols, setExhaustedCols] = useState<Record<string, boolean>>({});
+  const [exhaustedCols, setExhaustedCols] = useState<Record<string, boolean>>(
+    {},
+  );
   const [loadingCols, setLoadingCols] = useState<Record<string, boolean>>({});
   const loadingRef = useRef<Set<string>>(new Set());
 
@@ -310,6 +353,10 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
     };
 
     fetchProjectDetails();
+
+    setFilterAssignee("ALL");
+    setFilterPriority("ALL");
+    setSearchQuery("");
     return () => {
       isMounted = false;
     };
@@ -746,7 +793,10 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                     className="w-full px-3 py-2 text-xs text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/10 transition"
                     style={{ color: "var(--theme-text-primary)" }}
                   >
-                    <Edit2 size={14} className="text-blue-600 dark:text-blue-400" />
+                    <Edit2
+                      size={14}
+                      className="text-blue-600 dark:text-blue-400"
+                    />
                     <span>Edit Project</span>
                   </button>
                   <button
@@ -857,7 +907,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                   <option value="ALL">All Assignees</option>
                   <option value="ME">Assigned to Me</option>
                   <option value="UNASSIGNED">Unassigned</option>
-                  {members.map((m) => {
+                  {projectMembers.map((m) => {
                     const u = m.user;
                     if (!u) return null;
                     return (
@@ -1138,7 +1188,10 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                     className="flex-1 overflow-y-auto p-2.5 space-y-2.5 min-h-[150px]"
                     onScroll={(e) => {
                       const el = e.currentTarget;
-                      if (el.scrollHeight - el.scrollTop - el.clientHeight < 200) {
+                      if (
+                        el.scrollHeight - el.scrollTop - el.clientHeight <
+                        200
+                      ) {
                         loadMoreTickets(column);
                       }
                     }}
@@ -1381,7 +1434,9 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                         className="w-full py-2 text-[11px] font-medium rounded-lg hover:bg-[var(--theme-bg-surface-hover)] disabled:opacity-60"
                         style={{ color: "var(--theme-text-muted)" }}
                       >
-                        {loadingCols[column.id] ? "Loading…" : "Load older tickets"}
+                        {loadingCols[column.id]
+                          ? "Loading…"
+                          : "Load older tickets"}
                       </button>
                     )}
 
@@ -1594,7 +1649,9 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
             >
               <div className="flex items-center gap-2">
                 <Edit2 size={18} className="text-blue-600 dark:text-blue-400" />
-                <h3 className="text-base font-bold text-[var(--theme-text)]">Edit Project</h3>
+                <h3 className="text-base font-bold text-[var(--theme-text)]">
+                  Edit Project
+                </h3>
               </div>
               <button
                 onClick={() => setShowEditProjectModal(false)}
@@ -1648,7 +1705,10 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                     onChange={(e: any) => setEditProjectStatus(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] text-[var(--theme-text)] focus:outline-none focus:border-blue-500 transition appearance-none cursor-pointer text-xs pr-9"
                   >
-                    <option value="active" className="bg-[var(--theme-bg-app)] text-[var(--theme-text)]">
+                    <option
+                      value="active"
+                      className="bg-[var(--theme-bg-app)] text-[var(--theme-text)]"
+                    >
                       Active
                     </option>
                     <option
@@ -1747,7 +1807,10 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                           >
                             <span>{mName}</span>
                             {isAssigned && (
-                              <Check size={14} className="text-blue-600 dark:text-blue-400" />
+                              <Check
+                                size={14}
+                                className="text-blue-600 dark:text-blue-400"
+                              />
                             )}
                           </div>
                         );
