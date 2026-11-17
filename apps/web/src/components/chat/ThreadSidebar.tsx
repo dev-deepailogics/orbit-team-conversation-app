@@ -280,7 +280,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   };
 
   const isParentSelf = parentMessage.isSelf || (!isParentAnon && parentMessage.userId === currentUser?.id);
-  const canEditParent = !parentMessage.isDeleted && (isParentSelf || isSuperAdmin);
+  const canEditParent = !parentMessage.isDeleted && isParentSelf; // admins can delete a message, not edit it
   const canDeleteParent = !parentMessage.isDeleted && (isParentSelf || isWsAdmin || isSuperAdmin);
   const authorName = isParentAnon
     ? (parentMessage.anonName || 'Anonymous')
@@ -341,7 +341,11 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
             {parentMessage.isDeleted ? (
               <div className="flex items-center gap-1.5 py-1 text-xs italic select-none text-[var(--theme-text-muted)]">
                 <Trash2 size={12} className="opacity-60 shrink-0" />
-                <span>This message was deleted</span>
+                <span>
+                  {parentMessage.deletedByName
+                    ? `This message was deleted by ${parentMessage.deletedByName}`
+                    : 'This message was deleted'}
+                </span>
               </div>
             ) : editingMessageId === parentMessage.id ? (
               <div className="mt-2 space-y-2">
@@ -537,7 +541,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
         {replies.map((reply, idx) => {
           const isReplyAnon = !!reply.isAnonymous || isParentAnon;
           const isReplySelf = reply.isSelf || (!isReplyAnon && reply.userId === currentUser?.id);
-          const canEditReply = !reply.isDeleted && (isReplySelf || isSuperAdmin);
+          const canEditReply = !reply.isDeleted && isReplySelf;
           const canDeleteReply = !reply.isDeleted && (isReplySelf || isWsAdmin || isSuperAdmin);
           const replyAuthor = isReplyAnon
             ? (reply.anonName || 'Anonymous')
@@ -584,7 +588,9 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                 {reply.isDeleted ? (
                   <div className="flex items-center gap-1.5 py-1 text-xs italic select-none text-[var(--theme-text-muted)]">
                     <Trash2 size={12} className="opacity-60 shrink-0" />
-                    <span>This message was deleted</span>
+                    <span>
+                      {reply.deletedByName ? `This message was deleted by ${reply.deletedByName}` : 'This message was deleted'}
+                    </span>
                   </div>
                 ) : editingMessageId === reply.id ? (
                   <div className="mt-2 space-y-2">

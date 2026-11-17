@@ -903,7 +903,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             const isBot = !!msg.bot;
             const isAnon = channel.isAnonymous || msg.isAnonymous;
             const isSelf = msg.isSelf || (!isAnon && msg.userId === currentUser.id);
-            const canEdit = !msg.isDeleted && (isSelf || isSuperAdmin);
+            const canEdit = !msg.isDeleted && isSelf; // admins can delete a message, not edit it
             const canDelete = !msg.isDeleted && (isSelf || isWsAdmin || isSuperAdmin);
             const authorName = isAnon
               ? (msg.anonName || 'Anonymous')
@@ -1004,7 +1004,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       style={{ color: 'var(--theme-text-muted)' }}
                     >
                       <Trash2 size={13} className="opacity-60 shrink-0" />
-                      <span>This message was deleted</span>
+                      <span>{msg.deletedByName ? `This message was deleted by ${msg.deletedByName}` : 'This message was deleted'}</span>
                     </div>
                   ) : editingMessageId === msg.id ? (
                     <div className="mt-2 space-y-2">

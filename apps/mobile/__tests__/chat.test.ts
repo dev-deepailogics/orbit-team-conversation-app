@@ -1,6 +1,7 @@
 import type { Channel, Message } from '@orbit/types';
 import { useChatStore } from '../src/features/chat/store';
 import {
+  deletedLabel,
   formatBytes,
   groupReactions,
   isImage,
@@ -147,5 +148,16 @@ describe('messageChangeLabel', () => {
 
   test('adds the date when it happened on a different day than it was sent', () => {
     expect(messageChangeLabel(make({ isEdited: true, updatedAt: '2026-11-18T09:05:00' }))).toMatch(/^edited .+, 9:05/);
+  });
+});
+
+describe('deletedLabel', () => {
+  test('plain placeholder when the author deleted it', () => {
+    expect(deletedLabel({})).toBe('This message was deleted.');
+    expect(deletedLabel({ deletedByName: null })).toBe('This message was deleted.');
+  });
+
+  test('names the admin who deleted it', () => {
+    expect(deletedLabel({ deletedByName: 'Maria' })).toBe('This message was deleted by Maria.');
   });
 });

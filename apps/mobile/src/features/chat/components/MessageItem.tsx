@@ -13,6 +13,7 @@ import {
   formatTime,
   groupReactions,
   isImage,
+  deletedLabel,
   isNewDay,
   messageChangeLabel,
   senderAvatarUrl,
@@ -82,7 +83,7 @@ export const MessageItem = memo(function MessageItemView({
 
           {m.isDeleted ? (
             <View>
-              <Text className="italic text-muted-foreground">This message was deleted.</Text>
+              <Text className="italic text-muted-foreground">{deletedLabel(m)}</Text>
               {!!changeLabel && <Text className="text-xs text-subtle">({changeLabel})</Text>}
             </View>
           ) : (

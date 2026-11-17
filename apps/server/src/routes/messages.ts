@@ -474,7 +474,8 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.status(400).send({ error: 'Cannot edit a deleted message' });
     }
 
-    if (access.message.userId !== userId && !access.isSuperAdmin) {
+    // Only the author edits a message. Admins (including super admins) can delete one, never rewrite what someone said.
+    if (access.message.userId !== userId) {
       return reply.status(403).send({ error: 'You can only edit your own messages' });
     }
 
@@ -556,6 +557,13 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.status(403).send({ error: 'You do not have permission to delete this message' });
     }
 
+    // When an admin deletes someone else's message, record who, so the placeholder can say "deleted by <name>"
+    let deletedBy: { deletedById: string; deletedByName: string } | null = null;
+    if (!isAuthor) {
+      const admin = await prisma.user.findUnique({ where: { id: userId }, select: { displayName: true, username: true } });
+      deletedBy = { deletedById: userId, deletedByName: admin?.displayName || admin?.username || 'an admin' };
+    }
+
     // Soft delete: set isDeleted to true, clear content, and unpin
     const updated = await prisma.message.update({
       where: { id: messageId },
@@ -563,6 +571,7 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         isDeleted: true,
         content: '',
         isPinned: false,
+        ...(deletedBy ?? {}),
       },
       include: {
         user: {

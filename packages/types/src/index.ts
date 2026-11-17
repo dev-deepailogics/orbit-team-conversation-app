@@ -193,6 +193,9 @@ export interface Message {
   content: string; // Markdown or rich text
   isEdited: boolean;
   isDeleted: boolean;
+  // When an admin (not the author) deleted the message: who. Absent when the author deleted it.
+  deletedById?: string | null;
+  deletedByName?: string | null;
   isPinned: boolean;
   createdAt: string;
   updatedAt: string;

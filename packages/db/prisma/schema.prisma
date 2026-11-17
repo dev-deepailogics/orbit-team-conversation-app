@@ -235,6 +235,10 @@ model Message {
   content         String      @db.Text
   isEdited        Boolean     @default(false)
   isDeleted       Boolean     @default(false)
+  // Set only when someone other than the author deleted it (an admin), so the placeholder can say who. The name is
+  // kept as written at the time so it still reads correctly if that account is later renamed or removed.
+  deletedById     String?
+  deletedByName   String?
   isPinned        Boolean     @default(false)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt

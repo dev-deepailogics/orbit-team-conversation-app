@@ -61,6 +61,11 @@ export function messageChangeLabel(m: Pick<Message, 'createdAt' | 'updatedAt' | 
   return `${m.isDeleted ? 'deleted' : 'edited'} ${when}`;
 }
 
+// The placeholder for a deleted message; names the admin when someone other than the author deleted it.
+export function deletedLabel(m: Pick<Message, 'deletedByName'>): string {
+  return m.deletedByName ? `This message was deleted by ${m.deletedByName}.` : 'This message was deleted.';
+}
+
 export function formatDay(iso: string, now = new Date()): string {
   const d = new Date(iso);
   const yesterday = new Date(now);
