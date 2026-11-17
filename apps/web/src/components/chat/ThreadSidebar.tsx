@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Message, UserProfile, Channel } from '@orbit/types';
 import { X, Send, CornerUpLeft, Smile, SmilePlus, Type, Paperclip, FileText, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { api } from '../../lib/api';
+import { loadDraft, saveDraft, clearDraft } from '../../lib/drafts';
 import { useChatStore } from '../../stores/chatStore';
 import { EmojiPickerPopover } from './EmojiPickerPopover';
 import { getTopEmojis, recordEmojiUsage } from '../../lib/emojiStore';
@@ -36,7 +37,16 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   onSelectChannel,
 }) => {
   const timeFormat = useTimeFormat();
-  const [content, setContent] = useState('');
+  // Unsent reply for this thread, restored from this device when the composer mounts (see lib/drafts.ts).
+  const draftScope = `thread:${parentMessage.id}`;
+  const initialDraft = useMemo(
+    () => (currentUser ? loadDraft(currentUser.id, draftScope) : undefined),
+    [currentUser?.id, draftScope],
+  );
+  const [content, setContent] = useState(initialDraft ?? '');
+  useEffect(() => {
+    setContent(initialDraft ?? '');
+  }, [initialDraft, draftScope]);
   const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [threadAttachments, setThreadAttachments] = useState<any[]>([]);
@@ -246,6 +256,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
       onReplyAdded(res.data);
       editorRef.current?.clear();
       setContent('');
+      if (currentUser) clearDraft(currentUser.id, draftScope);
       setThreadAttachments([]);
       setReplyingToMessage(null);
       setShowComposerEmoji(false);
@@ -846,13 +857,21 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
           <RichTextEditor
             key={parentMessage.id}
             ref={editorRef}
+            initialValue={initialDraft}
             autoFocus={true}
             placeholder={isParentAnon ? 'Reply anonymously...' : 'Reply...'}
             showToolbar={showFormatting}
             mentionUsers={mentionUsers}
             minHeight="44px"
-            onTyping={(text) => setContent(text)}
+            onTyping={(text) => {
+              setContent(text);
+              if (currentUser) saveDraft(currentUser.id, draftScope, editorRef.current?.getMarkdown() ?? text);
+            }}
             onSubmit={() => handleSendReply()}
+            onPasteFiles={(files) => {
+              setPendingCompressFiles((prev) => (showCompressModal ? [...prev, ...files] : files));
+              setShowCompressModal(true);
+            }}
           />
           <div className="flex items-center justify-between px-2 py-1.5 bg-[var(--theme-bg-app)] border-t border-[var(--theme-border)] rounded-b-lg">
             <div className="flex items-center gap-1">

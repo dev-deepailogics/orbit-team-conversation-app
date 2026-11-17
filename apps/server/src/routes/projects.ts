@@ -61,11 +61,14 @@ const updateColumnSchema = z.object({
   orderIndex: z.number().int().optional(),
 });
 
+const TICKET_TYPES = ["TASK", "BUG", "STORY", "EPIC"] as const;
+
 const createTicketSchema = z.object({
   columnId: z.string().uuid(),
   title: z.string().min(1).max(255),
   description: z.string().optional().nullable(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).default("MEDIUM"),
+  type: z.enum(TICKET_TYPES).default("TASK"),
   dueDate: z.string().optional().nullable(),
   assigneeId: userIdSchema.optional().nullable(),
   // Multi-assign: [{ uid: <user id>, name }]. assigneeId mirrors the first entry for older clients.
@@ -81,6 +84,7 @@ const updateTicketSchema = z.object({
   title: z.string().min(1).max(255).optional(),
   description: z.string().optional().nullable(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
+  type: z.enum(TICKET_TYPES).optional(),
   dueDate: z.string().optional().nullable(),
   assigneeId: userIdSchema.optional().nullable(),
   // Multi-assign: [{ uid: <user id>, name }]. assigneeId mirrors the first entry for older clients.
@@ -838,7 +842,7 @@ export const projectRoutes: FastifyPluginAsync = async (
           .send({ error: parseResult.error.errors[0].message });
       }
 
-      const { columnId, title, description, priority, dueDate, assignees } =
+      const { columnId, title, description, priority, type, dueDate, assignees } =
         parseResult.data;
       const assigneeId =
         parseResult.data.assigneeId ?? assignees?.[0]?.uid ?? null;
@@ -882,6 +886,7 @@ export const projectRoutes: FastifyPluginAsync = async (
           title,
           description,
           priority,
+          type,
           orderIndex: nextOrderIndex,
           dueDate: dueDate ? new Date(dueDate) : null,
           createdById: userId,
@@ -984,6 +989,7 @@ export const projectRoutes: FastifyPluginAsync = async (
         title,
         description,
         priority,
+        type,
         dueDate,
         assignees,
         orderIndex,
@@ -1041,6 +1047,7 @@ export const projectRoutes: FastifyPluginAsync = async (
       if (title !== undefined) dataToUpdate.title = title;
       if (description !== undefined) dataToUpdate.description = description;
       if (priority !== undefined) dataToUpdate.priority = priority;
+      if (type !== undefined) dataToUpdate.type = type;
       if (dueDate !== undefined)
         dataToUpdate.dueDate = dueDate ? new Date(dueDate) : null;
       if (assigneeId !== undefined) dataToUpdate.assigneeId = assigneeId;

@@ -574,8 +574,10 @@ export default function AppDashboard() {
     };
 
     const onCallStarted = (callData: any) => {
-      // If someone else started a call, notify user
-      if (callData.hostUserId !== user.id) {
+      // If someone else started a call, notify user, unless we're already in that call
+      const huddle = useHuddleStore.getState();
+      const alreadyInCall = huddle.isActive && huddle.channelId === callData.channelId;
+      if (callData.hostUserId !== user.id && !alreadyInCall) {
         setIncomingCall(callData);
       }
       if (callData.channelId) {
@@ -585,7 +587,10 @@ export default function AppDashboard() {
 
     const onCallEnded = (payload: { channelId: string }) => {
       if (payload?.channelId) {
-        useHuddleStore.getState().clearChannelParticipants(payload.channelId);
+        const huddle = useHuddleStore.getState();
+        huddle.clearChannelParticipants(payload.channelId);
+        // The call is over, so stop ringing for it
+        if (huddle.incomingCall?.channelId === payload.channelId) huddle.dismissIncomingCall();
         setActiveHuddleChannel(null);
       }
     };

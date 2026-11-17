@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Message, Project, ProjectColumn, Ticket, TicketPriority, WorkspaceMember } from '@orbit/types';
+import { Message, Project, ProjectColumn, Ticket, TicketPriority, TicketType, WorkspaceMember } from '@orbit/types';
+import { TICKET_TYPES } from '../../lib/ticketTypes';
 import { api } from '../../lib/api';
 import { RichTextEditor, RichTextEditorRef } from '../chat/RichTextEditor';
 import {
@@ -53,6 +54,7 @@ export const CreateTicketFromMessageDialog: React.FC<CreateTicketFromMessageDial
   const [columnId, setColumnId] = useState<string>('');
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<TicketPriority>('MEDIUM');
+  const [type, setType] = useState<TicketType>('TASK');
   const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -80,6 +82,7 @@ export const CreateTicketFromMessageDialog: React.FC<CreateTicketFromMessageDial
 
     // Reset priority & assignee
     setPriority('MEDIUM');
+    setType('TASK');
     setAssigneeId(null);
     setDueDate('');
     setError('');
@@ -132,6 +135,7 @@ export const CreateTicketFromMessageDialog: React.FC<CreateTicketFromMessageDial
         description: desc || null,
         columnId,
         priority,
+        type,
         assigneeId: assigneeId || null,
         dueDate: dueDate ? new Date(dueDate).toISOString() : null,
       });
@@ -312,6 +316,39 @@ export const CreateTicketFromMessageDialog: React.FC<CreateTicketFromMessageDial
                   minHeight="80px"
                 />
               </div>
+            </div>
+
+            {/* Ticket Type */}
+            <div>
+              <label
+                className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
+                style={{ color: 'var(--theme-text-muted)' }}
+              >
+                Type
+              </label>
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value as TicketType)}
+                className="w-full rounded-xl px-3 py-2 text-xs border focus:outline-none transition cursor-pointer"
+                style={{
+                  backgroundColor: 'var(--theme-bg-surface-hover)',
+                  borderColor: 'var(--theme-border)',
+                  color: 'var(--theme-text-primary)',
+                }}
+              >
+                {TICKET_TYPES.map((t) => (
+                  <option
+                    key={t.value}
+                    value={t.value}
+                    style={{
+                      backgroundColor: 'var(--theme-bg-surface)',
+                      color: 'var(--theme-text-primary)',
+                    }}
+                  >
+                    {t.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Column & Priority Grid */}

@@ -396,6 +396,14 @@ enum TicketPriority {
   URGENT
 }
 
+// What kind of work item a ticket is (Jira-style issue type)
+enum TicketType {
+  TASK
+  BUG
+  STORY
+  EPIC
+}
+
 model Project {
   id          String          @id @default(uuid())
   workspaceId String
@@ -453,6 +461,7 @@ model Ticket {
   title       String
   description String?        @db.Text
   priority    TicketPriority @default(MEDIUM)
+  type        TicketType     @default(TASK)
   orderIndex  Int            @default(0)
   dueDate     DateTime?
   createdById String

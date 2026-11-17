@@ -307,6 +307,7 @@ export interface SlashCommandPayload {
 // 8. Projects & Kanban Boards (Trello-like)
 // ==========================================
 export type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+export type TicketType = "TASK" | "BUG" | "STORY" | "EPIC";
 
 export interface Project {
   id: string;
@@ -357,6 +358,7 @@ export interface Ticket {
   title: string;
   description: string | null;
   priority: TicketPriority;
+  type: TicketType;
   orderIndex: number;
   dueDate: string | null;
   createdById: string;

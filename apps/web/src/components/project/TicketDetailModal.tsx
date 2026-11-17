@@ -1,5 +1,6 @@
 'use client';
 
+import { TicketTypeIcon } from './TicketTypeIcon';
 import React, { useState } from 'react';
 import {
   X,
@@ -310,6 +311,14 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
           </div>
 
           <div className="border-t my-2" style={{ borderColor: 'var(--theme-border, #334155)' }} />
+
+          {/* Row: Type */}
+          <div className="grid grid-cols-[120px_1fr] items-center gap-4">
+            <span className="font-semibold text-[var(--theme-text-muted)]">Type</span>
+            <div style={{ color: 'var(--theme-text-primary)' }}>
+              <TicketTypeIcon type={ticket.type} showLabel />
+            </div>
+          </div>
 
           {/* Row: Priority */}
           <div className="grid grid-cols-[120px_1fr] items-center gap-4">

@@ -82,7 +82,9 @@ export const useHuddleStore = create<HuddleState>((set) => ({
     }),
 
   leaveHuddle: () =>
-    set({
+    set((state) => ({
+      // A pending incoming call for the call we're leaving is stale; one for another channel is not
+      incomingCall: state.incomingCall?.channelId === state.channelId ? null : state.incomingCall,
       isActive: false,
       channelId: null,
       channelName: null,
@@ -92,7 +94,7 @@ export const useHuddleStore = create<HuddleState>((set) => ({
       isScreenSharing: false,
       isMinimized: false,
       activeParticipants: [],
-    }),
+    })),
 
   toggleMute: () => set((state) => ({ isMuted: !state.isMuted })),
   toggleVideo: () => set((state) => ({ isVideoOn: !state.isVideoOn })),

@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { ProjectColumn, Ticket, TicketPriority, WorkspaceMember } from '@orbit/types';
+import { ProjectColumn, Ticket, TicketPriority, TicketType, WorkspaceMember } from '@orbit/types';
+import { TICKET_TYPES } from '../../lib/ticketTypes';
 import { api } from '../../lib/api';
 import { RichTextEditor, RichTextEditorRef } from '../chat/RichTextEditor';
 import {
@@ -57,6 +58,7 @@ export const TicketModal: React.FC<TicketModalProps> = ({
   const [title, setTitle] = useState(ticket?.title || initialTitle || '');
   const [columnId, setColumnId] = useState(ticket?.columnId || defaultColumnId || columns[0]?.id || '');
   const [priority, setPriority] = useState<TicketPriority>(ticket?.priority || 'MEDIUM');
+  const [type, setType] = useState<TicketType>(ticket?.type || 'TASK');
   const [assigneeId, setAssigneeId] = useState<string | null>(ticket?.assigneeId || null);
   const [dueDate, setDueDate] = useState<string>(
     ticket?.dueDate ? new Date(ticket.dueDate).toISOString().split('T')[0] : ''
@@ -82,6 +84,7 @@ export const TicketModal: React.FC<TicketModalProps> = ({
           description: desc || null,
           columnId,
           priority,
+          type,
           assigneeId: assigneeId || null,
           dueDate: dueDate ? new Date(dueDate).toISOString() : null,
         });
@@ -92,6 +95,7 @@ export const TicketModal: React.FC<TicketModalProps> = ({
           description: desc || null,
           columnId,
           priority,
+          type,
           assigneeId: assigneeId || null,
           dueDate: dueDate ? new Date(dueDate).toISOString() : null,
         });
@@ -215,6 +219,49 @@ export const TicketModal: React.FC<TicketModalProps> = ({
                 placeholder="Add formatted details, bullet lists, code blocks, or links..."
                 minHeight="80px"
               />
+            </div>
+          </div>
+
+          {/* Ticket Type */}
+          <div>
+            <label
+              className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
+              style={{ color: 'var(--theme-text-muted)' }}
+            >
+              Type
+            </label>
+            <div
+              className="flex items-center gap-1 border p-1 rounded-xl"
+              role="radiogroup"
+              aria-label="Ticket type"
+              style={{
+                backgroundColor: 'var(--theme-bg-surface-hover)',
+                borderColor: 'var(--theme-border)',
+              }}
+            >
+              {TICKET_TYPES.map(({ value, label, color, icon: Icon, description }) => {
+                const isSelected = type === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
+                    title={description}
+                    onClick={() => setType(value)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-1 px-2 rounded-lg text-xs font-semibold transition ${
+                      isSelected ? 'shadow' : 'hover:opacity-80'
+                    }`}
+                    style={{
+                      backgroundColor: isSelected ? color : 'transparent',
+                      color: isSelected ? '#FFFFFF' : 'var(--theme-text-muted)',
+                    }}
+                  >
+                    <Icon size={13} />
+                    {label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

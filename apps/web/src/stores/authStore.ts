@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { UserProfile } from '@orbit/types';
 import { api, clearSession, REFRESH_TOKEN_KEY, TOKEN_KEY, TOKEN_REFRESHED_EVENT } from '../lib/api';
 import { useChatStore } from './chatStore';
+import { clearAllDrafts } from '../lib/drafts';
 
 interface AuthState {
   user: UserProfile | null;
@@ -32,6 +33,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
       if (refreshToken) api.post('/api/auth/logout', { refreshToken }).catch(() => {});
       clearSession();
+      clearAllDrafts(); // unsent drafts are device-local and must not outlive the session on a shared computer
     }
     useChatStore.getState().reset();
     set({ user: null, token: null, isLoading: false });

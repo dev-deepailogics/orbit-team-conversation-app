@@ -68,7 +68,9 @@ export const huddleRoutes: FastifyPluginAsync = async (fastify: FastifyInstance)
       });
     }
 
-    if (fastify.io) {
+    // Only a new huddle rings and announces itself. Every joiner also calls /start, and re-announcing it each time
+    // made the real caller receive "<joiner> started a call" the moment the callee answered (hostUserId was the joiner).
+    if (fastify.io && isNew) {
       const callData = {
         channelId,
         channelName: channel.name,

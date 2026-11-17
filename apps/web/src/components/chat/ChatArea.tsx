@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Channel, Message, UserProfile } from '@orbit/types';
 import {
   Hash,
@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
+import { loadDraft, saveDraft, clearDraft } from '../../lib/drafts';
 import { useChatStore } from '../../stores/chatStore';
 import { EmojiPickerPopover } from './EmojiPickerPopover';
 import { getTopEmojis, recordEmojiUsage } from '../../lib/emojiStore';
@@ -97,7 +98,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onHuddleUser,
 }) => {
   const timeFormat = useTimeFormat();
-  const [content, setContent] = useState('');
+  // Unsent text for this channel, restored from this device when the composer mounts (see lib/drafts.ts).
+  const initialDraft = useMemo(
+    () => (currentUser ? loadDraft(currentUser.id, channel.id) : undefined),
+    [currentUser?.id, channel.id],
+  );
+  const [content, setContent] = useState(initialDraft ?? '');
+  useEffect(() => {
+    setContent(initialDraft ?? '');
+  }, [initialDraft, channel.id]);
   const sendingRef = useRef(false);
   const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
@@ -284,6 +293,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   const handleTyping = (text: string) => {
     setContent(text);
+    if (currentUser) saveDraft(currentUser.id, channel.id, editorRef.current?.getMarkdown() ?? text);
     const socket = getSocket();
 
     if (currentUser) {
@@ -315,6 +325,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       if (cmd === '/call' || cmd === '/meet' || cmd === '/huddle') {
         editorRef.current?.clear();
         setContent('');
+        clearDraft(currentUser.id, channel.id);
         onStartHuddle(channel);
         return;
       }
@@ -330,6 +341,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         }
         editorRef.current?.clear();
         setContent('');
+        clearDraft(currentUser.id, channel.id);
         setReplyingToMessage(null);
         return;
       } catch (err: any) {
@@ -345,6 +357,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     // Clear input immediately so a second Enter can't resend
     editorRef.current?.clear();
     setContent('');
+    clearDraft(currentUser.id, channel.id); // cleared now, not after the request, so text typed while it sends isn't wiped
     setAttachments([]);
     setReplyingToMessage(null);
 
@@ -365,6 +378,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       console.error('Failed to send message', err);
       setAttachments(sentAttachments);
       setReplyingToMessage(sentReplyTo);
+      // Put the unsent text back (unless the user already started a new one) so a failed send isn't lost
+      if (!editorRef.current?.getText()) {
+        editorRef.current?.setMarkdown(trimmed);
+        setContent(trimmed);
+        saveDraft(currentUser.id, channel.id, trimmed);
+      }
     } finally {
       sendingRef.current = false;
     }
@@ -420,6 +439,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
     const files = Array.from(fileList);
     setPendingCompressFiles(files);
+    setShowCompressModal(true);
+  };
+
+  // Pasted images/files (Ctrl+V) go through the same confirmation and upload as the file picker
+  const handlePasteFiles = (files: File[]) => {
+    setPendingCompressFiles((prev) => (showCompressModal ? [...prev, ...files] : files));
     setShowCompressModal(true);
   };
 
@@ -1401,6 +1426,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           <RichTextEditor
             key={channel.id}
             ref={editorRef}
+            initialValue={initialDraft}
             autoFocus={true}
             placeholder={
               isDragOver
@@ -1415,6 +1441,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             mentionUsers={mentionUsers}
             onTyping={(text) => handleTyping(text)}
             onSubmit={() => handleSendMessage()}
+            onPasteFiles={handlePasteFiles}
           />
 
           {/* Action Bar */}

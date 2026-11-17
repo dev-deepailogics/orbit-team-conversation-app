@@ -2,6 +2,9 @@
 
 import React, { useState, useEffect, useRef } from "react";
 
+import { TicketTypeIcon } from "./TicketTypeIcon";
+import { TICKET_TYPES } from "../../lib/ticketTypes";
+
 const TICKET_PAGE = 20;
 import {
   Project,
@@ -48,6 +51,59 @@ import {
   Tag,
   GitBranch,
 } from "lucide-react";
+
+// Placeholder columns shown while a project's columns and tickets are loading, so the board doesn't flash empty.
+const SKELETON_COLUMNS = [3, 2, 4, 2];
+
+const SkeletonBar: React.FC<{ className: string }> = ({ className }) => (
+  <div
+    className={`animate-pulse rounded ${className}`}
+    style={{ backgroundColor: "var(--theme-bg-surface-hover)" }}
+  />
+);
+
+const BoardSkeleton: React.FC = () => (
+  <>
+    {SKELETON_COLUMNS.map((cards, i) => (
+      <div
+        key={i}
+        className="w-72 sm:w-80 shrink-0 border rounded-2xl flex flex-col"
+        style={{
+          backgroundColor: "var(--theme-bg-surface)",
+          borderColor: "var(--theme-border)",
+        }}
+      >
+        <div
+          className="p-3.5 border-b flex items-center gap-2"
+          style={{ borderColor: "var(--theme-border)" }}
+        >
+          <SkeletonBar className="w-2.5 h-2.5 rounded-full" />
+          <SkeletonBar className="h-3 w-24" />
+          <SkeletonBar className="h-4 w-6 rounded-full ml-auto" />
+        </div>
+        <div className="p-3 space-y-3">
+          {Array.from({ length: cards }).map((_, j) => (
+            <div
+              key={j}
+              className="border rounded-xl p-3 space-y-2.5"
+              style={{
+                backgroundColor: "var(--theme-bg-app)",
+                borderColor: "var(--theme-border)",
+              }}
+            >
+              <SkeletonBar className="h-3 w-11/12" />
+              <SkeletonBar className="h-3 w-2/3" />
+              <div className="flex items-center justify-between pt-1">
+                <SkeletonBar className="h-4 w-14 rounded-full" />
+                <SkeletonBar className="h-5 w-5 rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    ))}
+  </>
+);
 
 interface ProjectBoardViewProps {
   project: Project;
@@ -130,12 +186,15 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState("");
   const [filterPriority, setFilterPriority] = useState<string>("ALL");
+  const [filterType, setFilterType] = useState<string>("ALL");
   const [filterAssignee, setFilterAssignee] = useState<string>("ALL");
 
   // Ticket paging: columns whose older tickets are fully loaded / loading now
   const [exhaustedCols, setExhaustedCols] = useState<Record<string, boolean>>({});
   const [loadingCols, setLoadingCols] = useState<Record<string, boolean>>({});
   const loadingRef = useRef<Set<string>>(new Set());
+  // Which project the board has finished its first fetch for (success or failure), to drive the loading skeleton
+  const [loadedProjectId, setLoadedProjectId] = useState<string | null>(null);
 
   // Modals & Popovers
   const [showTicketModal, setShowTicketModal] = useState(false);
@@ -306,6 +365,8 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
         }
       } catch (err) {
         console.error("Failed to load project details", err);
+      } finally {
+        if (isMounted) setLoadedProjectId(initialProject.id);
       }
     };
 
@@ -613,6 +674,9 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
       if (!matchTitle && !matchDesc) return false;
     }
 
+    if (filterType !== "ALL" && (t.type || "TASK") !== filterType) {
+      return false;
+    }
     if (filterPriority !== "ALL" && t.priority !== filterPriority) {
       return false;
     }
@@ -631,6 +695,9 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
   };
 
   const columns = project.columns || [];
+  // The project list carries no columns, so until the details arrive (and unless a cached copy exists) show a skeleton
+  const isBoardLoading =
+    loadedProjectId !== initialProject.id && project.columns === undefined;
   const totalTickets =
     project._count?.tickets ??
     columns.reduce((acc, c) => acc + (c.tickets?.length || 0), 0);
@@ -808,6 +875,34 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                 )}
               </div>
 
+              {/* Type Filter */}
+              <div
+                className="flex items-center gap-1 border rounded-lg px-2 py-1 shadow-sm"
+                style={{
+                  backgroundColor: "var(--theme-bg-app)",
+                  borderColor: "var(--theme-border)",
+                }}
+              >
+                <Filter
+                  size={12}
+                  className="opacity-60"
+                  style={{ color: "var(--theme-text-muted)" }}
+                />
+                <select
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  className="bg-transparent text-xs focus:outline-none cursor-pointer"
+                  style={{ color: "var(--theme-text-primary)" }}
+                >
+                  <option value="ALL">All Types</option>
+                  {TICKET_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* Priority Filter */}
               <div
                 className="flex items-center gap-1 border rounded-lg px-2 py-1 shadow-sm"
@@ -871,11 +966,13 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
 
               {/* Reset filter pill if active */}
               {(searchQuery ||
+                filterType !== "ALL" ||
                 filterPriority !== "ALL" ||
                 filterAssignee !== "ALL") && (
                 <button
                   onClick={() => {
                     setSearchQuery("");
+                    setFilterType("ALL");
                     setFilterPriority("ALL");
                     setFilterAssignee("ALL");
                   }}
@@ -951,7 +1048,8 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
               {/* Add Column Button */}
               <button
                 onClick={() => setShowAddColumn(true)}
-                className="px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg border transition flex items-center gap-1.5 active:scale-95 hover:bg-black/5 dark:hover:bg-white/10 shadow-sm"
+                disabled={isBoardLoading}
+                className="disabled:opacity-50 disabled:cursor-not-allowed px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg border transition flex items-center gap-1.5 active:scale-95 hover:bg-black/5 dark:hover:bg-white/10 shadow-sm"
                 style={{
                   backgroundColor: "var(--theme-bg-app)",
                   borderColor: "var(--theme-border)",
@@ -969,7 +1067,8 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                   setTargetColumnId(columns[0]?.id);
                   setShowTicketModal(true);
                 }}
-                className="px-3 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg shadow-sm transition flex items-center gap-1.5 active:scale-95"
+                disabled={isBoardLoading}
+                className="disabled:opacity-50 disabled:cursor-not-allowed px-3 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg shadow-sm transition flex items-center gap-1.5 active:scale-95"
                 style={{
                   backgroundColor: "var(--theme-primary)",
                   color: "var(--theme-primary-text)",
@@ -982,8 +1081,14 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
           </div>
 
           {/* Kanban Board Horizontal Scroll Area */}
-          <div className="flex-1 overflow-x-auto overflow-y-hidden p-4 sm:p-6 flex items-start gap-4">
-            {columns.map((column, colIndex) => {
+          <div
+            className="flex-1 overflow-x-auto overflow-y-hidden p-4 sm:p-6 flex items-start gap-4"
+            aria-busy={isBoardLoading}
+            aria-label={isBoardLoading ? "Loading tickets" : undefined}
+          >
+            {isBoardLoading ? (
+              <BoardSkeleton />
+            ) : columns.map((column, colIndex) => {
               const colTickets = (column.tickets || []).filter(filterTicket);
               const isDragTarget = dragOverColId === column.id;
 
@@ -1192,6 +1297,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                           {/* Top Header: ID badge on left & 4 Action Buttons on right */}
                           <div className="flex items-center justify-between gap-2 mb-2.5">
                             <div className="flex items-center gap-1.5 flex-wrap">
+                              <TicketTypeIcon type={ticket.type} size={13} />
                               <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-600 text-white shadow-xs">
                                 ID:{" "}
                                 {ticket.issueNumber ||
@@ -1421,7 +1527,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
             })}
 
             {/* Add Column Button Card */}
-            {showAddColumn ? (
+            {isBoardLoading ? null : showAddColumn ? (
               <div
                 className="w-72 sm:w-80 shrink-0 border rounded-2xl p-4 shadow-xl"
                 style={{
