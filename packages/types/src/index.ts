@@ -487,6 +487,8 @@ export const SOCKET_EVENTS = {
 
   // Presence & Notifications
   USER_STATUS_CHANGE: "user:status_change",
+  // Sent only to the people in a thread (not the whole channel) when someone replies in it
+  THREAD_REPLY_NOTIFY: "thread:reply_notify",
   NOTIFICATION_NEW: "notification:new",
 
   // Employee Availability & Time Tracking

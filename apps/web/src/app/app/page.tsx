@@ -518,28 +518,32 @@ export default function AppDashboard() {
       if (granted) registerPush();
     });
 
+    // Chime + desktop notification for a message addressed to this user
+    const alertForMessage = (msg: any) => {
+      sounds.playMessageSound();
+      DesktopNotifier.send(
+        msg.user?.displayName || msg.bot?.name || "New Message",
+        msg.content,
+        msg.user?.avatarUrl || msg.bot?.avatarUrl,
+        () => {
+          window.focus();
+          const allChannels = useChatStore.getState().channels;
+          const targetChannel = allChannels.find((c) => c.id === msg.channelId);
+          if (targetChannel) {
+            handleSelectChannel(targetChannel);
+          }
+        },
+      );
+    };
+
     const onNewMessage = (msg: any) => {
       const activeChannel = currentChannelRef.current;
       const isFromOther = !msg.userId || msg.userId !== user.id;
 
-      // Play message chime if message is from another user or bot
-      if (isFromOther) {
-        sounds.playMessageSound();
-        DesktopNotifier.send(
-          msg.user?.displayName || msg.bot?.name || "New Message",
-          msg.content,
-          msg.user?.avatarUrl || msg.bot?.avatarUrl,
-          () => {
-            window.focus();
-            const allChannels = useChatStore.getState().channels;
-            const targetChannel = allChannels.find(
-              (c) => c.id === msg.channelId,
-            );
-            if (targetChannel) {
-              handleSelectChannel(targetChannel);
-            }
-          },
-        );
+      // Alert for channel messages from another user or bot. Thread replies reach everyone in the channel (to keep
+      // reply counts and open threads current), but only the people in the thread are alerted, via thread:reply_notify.
+      if (isFromOther && !msg.parentMessageId) {
+        alertForMessage(msg);
       }
 
       if (msg.parentMessageId) {
@@ -712,6 +716,7 @@ export default function AppDashboard() {
 
     socket.on("account:deactivated", onAccountDeactivated);
     socket.on("message:new", onNewMessage);
+    socket.on("thread:reply_notify", alertForMessage);
     socket.on("message:reaction", onReaction);
     socket.on("message:updated", onMessageUpdated);
     socket.on("message:pinned", onMessagePinned);
@@ -745,6 +750,7 @@ export default function AppDashboard() {
     return () => {
       socket.off("account:deactivated", onAccountDeactivated);
       socket.off("message:new", onNewMessage);
+      socket.off("thread:reply_notify", alertForMessage);
       socket.off("message:reaction", onReaction);
       socket.off("message:updated", onMessageUpdated);
       socket.off("message:pinned", onMessagePinned);

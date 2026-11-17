@@ -1,3 +1,4 @@
+import { getThreadParticipantIds } from './threadParticipants.js';
 import webpush from 'web-push';
 import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getMessaging, type MulticastMessage } from 'firebase-admin/messaging';
@@ -176,12 +177,7 @@ async function notifyMessage(io: any, messageId: string) {
   // Thread replies only notify people in the thread (parent author + earlier repliers), like Slack.
   let participants: string[] | null = null;
   if (msg.parentMessageId) {
-    const thread = await prisma.message.findMany({
-      where: { OR: [{ id: msg.parentMessageId }, { parentMessageId: msg.parentMessageId }], userId: { not: null } },
-      select: { userId: true },
-      distinct: ['userId'],
-    });
-    participants = thread.map((t) => t.userId as string);
+    participants = await getThreadParticipantIds(msg.parentMessageId, msg.channelId, msg.userId);
   }
 
   const members = await prisma.channelMember.findMany({
