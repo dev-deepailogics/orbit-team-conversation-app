@@ -50,6 +50,9 @@ import {
   Plus,
 } from "lucide-react";
 
+// Longest a typing indicator stays up without a new typing:start (senders refresh it on every keystroke)
+const TYPING_TTL_MS = 6000;
+
 export default function AppDashboard() {
   const router = useRouter();
   const { user, token, isLoading, fetchMe, logout } = useAuthStore();
@@ -546,6 +549,9 @@ export default function AppDashboard() {
         alertForMessage(msg);
       }
 
+      // Their message arrived, so they are no longer typing it
+      if (msg.userId && !msg.parentMessageId) clearTyping(msg.channelId, msg.userId);
+
       if (msg.parentMessageId) {
         addThreadReply(msg);
       } else if (activeChannel && msg.channelId === activeChannel.id) {
@@ -569,12 +575,29 @@ export default function AppDashboard() {
       }
     };
 
-    const onTypingStart = ({ channelId, username }: any) => {
-      setTypingUser(channelId, username, true);
+    // Typing indicators are tracked per user id. They clear on typing:stop, when that person's message arrives, and
+    // after TYPING_TTL_MS without a refresh, so a lost stop event (closed tab, dropped connection) can't leave one stuck.
+    const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    const clearTyping = (channelId: string, userId: string) => {
+      const key = `${channelId}:${userId}`;
+      clearTimeout(typingTimers.get(key));
+      typingTimers.delete(key);
+      setTypingUser(channelId, { userId, username: "" }, false);
     };
 
-    const onTypingStop = ({ channelId }: any) => {
-      setTypingUser(channelId, "", false);
+    const onTypingStart = ({ channelId, username, userId }: any) => {
+      if (!channelId || !userId || userId === user.id) return;
+      setTypingUser(channelId, { userId, username }, true);
+      const key = `${channelId}:${userId}`;
+      clearTimeout(typingTimers.get(key));
+      typingTimers.set(
+        key,
+        setTimeout(() => clearTyping(channelId, userId), TYPING_TTL_MS),
+      );
+    };
+
+    const onTypingStop = ({ channelId, userId }: any) => {
+      if (channelId && userId) clearTyping(channelId, userId);
     };
 
     const onCallStarted = (callData: any) => {
@@ -757,6 +780,8 @@ export default function AppDashboard() {
       socket.off("message:deleted", onMessageDeleted);
       socket.off("typing:start", onTypingStart);
       socket.off("typing:stop", onTypingStop);
+      typingTimers.forEach(clearTimeout);
+      typingTimers.clear();
       socket.off("huddle:started", onCallStarted);
       socket.off("channel:new", onChannelNew);
       socket.off("channel:updated", onChannelUpdated);
@@ -1218,7 +1243,7 @@ export default function AppDashboard() {
           channel={currentChannel}
           messages={messages}
           currentUser={user}
-          typingUsers={typingUsers[currentChannel.id] || []}
+          typingUsers={(typingUsers[currentChannel.id] || []).map((t) => t.username)}
           hasMoreMessages={hasMoreMessages}
           isLoadingOlder={isLoadingOlder}
           onLoadOlderMessages={handleLoadOlderMessages}

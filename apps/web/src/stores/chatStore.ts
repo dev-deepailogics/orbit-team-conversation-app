@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { Workspace, Channel, Message } from '@orbit/types';
 
+export interface TypingUser {
+  userId: string;
+  username: string;
+}
+
 interface ChatState {
   currentWorkspace: Workspace | null;
   channels: Channel[];
@@ -8,7 +13,8 @@ interface ChatState {
   messages: Message[];
   activeThread: Message | null;
   threadReplies: Message[];
-  typingUsers: { [channelId: string]: string[] };
+  // Who is typing per channel, keyed by user id (typing:stop only carries the id, not the name)
+  typingUsers: { [channelId: string]: TypingUser[] };
   unreadCounts: { [channelId: string]: number };
 
   setCurrentWorkspace: (workspace: Workspace | null) => void;
@@ -22,7 +28,7 @@ interface ChatState {
   setActiveThread: (message: Message | null) => void;
   setThreadReplies: (replies: Message[]) => void;
   addThreadReply: (reply: Message) => void;
-  setTypingUser: (channelId: string, username: string, isTyping: boolean) => void;
+  setTypingUser: (channelId: string, user: TypingUser, isTyping: boolean) => void;
   incrementUnread: (messageId: string, channelId: string) => void;
   clearUnread: (channelId: string) => void;
   removeAttachment: (fileId: string) => void;
@@ -127,12 +133,13 @@ export const useChatStore = create<ChatState>((set) => ({
       };
     }),
 
-  setTypingUser: (channelId, username, isTyping) =>
+  setTypingUser: (channelId, user, isTyping) =>
     set((state) => {
       const existing = state.typingUsers[channelId] || [];
-      const updated = isTyping
-        ? Array.from(new Set([...existing, username]))
-        : existing.filter((u) => u !== username);
+      const others = existing.filter((u) => u.userId !== user.userId);
+      // Nothing to change when removing someone who isn't listed (avoids a re-render for every stop event)
+      if (!isTyping && others.length === existing.length) return state;
+      const updated = isTyping ? [...others, user] : others;
       return {
         typingUsers: {
           ...state.typingUsers,

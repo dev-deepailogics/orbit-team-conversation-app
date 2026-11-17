@@ -358,6 +358,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     editorRef.current?.clear();
     setContent('');
     clearDraft(currentUser.id, channel.id); // cleared now, not after the request, so text typed while it sends isn't wiped
+    // Stop the typing indicator for everyone now, not after the request finishes
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    getSocket().emit('typing:stop', { channelId: channel.id });
     setAttachments([]);
     setReplyingToMessage(null);
 
