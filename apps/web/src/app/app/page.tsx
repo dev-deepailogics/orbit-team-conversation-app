@@ -797,7 +797,7 @@ export default function AppDashboard() {
     setActiveThread(message);
     try {
       const res = await api.get(`/api/messages/${message.id}/replies`);
-      setThreadReplies(res.data.replies || []);
+      setThreadReplies(res.data.replies || [], message.id);
     } catch (err) {
       console.error("Failed to load thread replies", err);
     }

@@ -26,7 +26,8 @@ interface ChatState {
   addMessage: (message: Message) => void;
   updateMessage: (message: Message) => void;
   setActiveThread: (message: Message | null) => void;
-  setThreadReplies: (replies: Message[]) => void;
+  // threadId: the thread these replies were fetched for; ignored if the open thread has changed since
+  setThreadReplies: (replies: Message[], threadId?: string) => void;
   addThreadReply: (reply: Message) => void;
   setTypingUser: (channelId: string, user: TypingUser, isTyping: boolean) => void;
   incrementUnread: (messageId: string, channelId: string) => void;
@@ -34,6 +35,9 @@ interface ChatState {
   removeAttachment: (fileId: string) => void;
   reset: () => void;
 }
+
+// Thread replies already counted, so a reply delivered twice doesn't bump a reply count twice (bounded, oldest dropped)
+const countedReplyIds = new Set<string>();
 
 export const useChatStore = create<ChatState>((set) => ({
   currentWorkspace: null,
@@ -115,20 +119,35 @@ export const useChatStore = create<ChatState>((set) => ({
         : null,
     })),
 
-  setActiveThread: (message) => set({ activeThread: message }),
-  setThreadReplies: (replies) => set({ threadReplies: replies }),
-  
+  setActiveThread: (message) =>
+    set((state) => ({
+      activeThread: message,
+      // Opening a different thread (or closing it): drop the previous thread's replies right away instead of showing
+      // them under the new parent until its own replies finish loading
+      threadReplies: state.activeThread?.id === message?.id ? state.threadReplies : [],
+    })),
+  setThreadReplies: (replies, threadId) =>
+    set((state) => {
+      // A slow response for a thread that is no longer open must not overwrite the one that is
+      if (threadId && state.activeThread?.id !== threadId) return state;
+      return { threadReplies: replies };
+    }),
+
   addThreadReply: (reply) =>
     set((state) => {
-      if (state.threadReplies.some((r) => r.id === reply.id)) {
-        return state;
-      }
+      // A reply can arrive more than once (the HTTP response plus the socket echo, anonymous channels send two copies)
+      if (countedReplyIds.has(reply.id)) return state;
+      countedReplyIds.add(reply.id);
+      if (countedReplyIds.size > 1000) countedReplyIds.delete(countedReplyIds.values().next().value as string);
+
+      // Every thread reply in the workspace reaches this client, so only add it to the open thread's list when it is
+      // a reply to that thread; the reply count on the parent message is bumped either way.
+      const inOpenThread =
+        state.activeThread?.id === reply.parentMessageId && !state.threadReplies.some((r) => r.id === reply.id);
       return {
-        threadReplies: [...state.threadReplies, reply],
+        threadReplies: inOpenThread ? [...state.threadReplies, reply] : state.threadReplies,
         messages: state.messages.map((m) =>
-          m.id === reply.parentMessageId
-            ? { ...m, replyCount: (m.replyCount || 0) + 1 }
-            : m
+          m.id === reply.parentMessageId ? { ...m, replyCount: (m.replyCount || 0) + 1 } : m
         ),
       };
     }),
