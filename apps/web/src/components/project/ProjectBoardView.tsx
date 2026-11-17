@@ -1189,11 +1189,11 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                             ...(isOverdue && { borderTopColor: "#ef4444" }),
                           }}
                         >
-                          {/* Top Header: ID badge on left & 4 Action Buttons on right */}
+                          {/* Top Header: Ticket Number badge on left & 4 Action Buttons on right */}
                           <div className="flex items-center justify-between gap-2 mb-2.5">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-600 text-white shadow-xs">
-                                ID:{" "}
+                                No:{" "}
                                 {ticket.issueNumber ||
                                   ticket.customId ||
                                   ticket.id.slice(0, 5)}

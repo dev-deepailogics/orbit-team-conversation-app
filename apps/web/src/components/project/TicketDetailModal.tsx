@@ -269,9 +269,9 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
 
           <div className="border-t my-2" style={{ borderColor: 'var(--theme-border, #334155)' }} />
 
-          {/* Row: Ticket ID */}
+          {/* Row: Ticket Number */}
           <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-            <span className="font-semibold text-[var(--theme-text-muted)]">Ticket ID</span>
+            <span className="font-semibold text-[var(--theme-text-muted)]">Ticket Number</span>
             <span className="font-semibold text-[var(--theme-text)]">
               {ticket.issueNumber || ticket.customId || ticket.id.slice(0, 8)}
             </span>
