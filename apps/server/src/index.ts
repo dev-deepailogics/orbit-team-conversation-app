@@ -116,7 +116,7 @@ async function bootstrap() {
   );
 
   // Create uploads directory if not exists
-  const uploadDir = path.resolve(process.cwd(), "uploads");
+  const uploadDir = process.env.UPLOAD_DIR || path.resolve(process.cwd(), "uploads");
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
