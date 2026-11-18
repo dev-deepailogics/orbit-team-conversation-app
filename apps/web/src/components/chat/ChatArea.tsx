@@ -30,6 +30,7 @@ import {
   CheckSquare,
   Pencil,
   Trash2,
+  Video,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
@@ -38,6 +39,7 @@ import { EmojiPickerPopover } from './EmojiPickerPopover';
 import { getTopEmojis, recordEmojiUsage } from '../../lib/emojiStore';
 import { CanvasView } from '../whiteboard/CanvasView';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { useRecorderStore } from '../../stores/recorderStore';
 import { RichTextEditor, RichTextEditorRef } from './RichTextEditor';
 import { FileAttachmentList, formatFileSize, getFileCategory } from './FileAttachmentList';
 import { ChannelStorageModal } from './ChannelStorageModal';
@@ -159,6 +161,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const isInitialLoadRef = useRef(true);
   const previousMessagesCountRef = useRef(0);
   const editorRef = useRef<RichTextEditorRef>(null);
+  const openRecorder = useRecorderStore((s) => s.open);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -1434,6 +1437,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition"
               >
                 <Paperclip size={16} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  openRecorder({
+                    workspaceId: channel.workspaceId,
+                    channelId: channel.id,
+                    onInsertLink: (link) => editorRef.current?.insertEmoji(link),
+                  })
+                }
+                title="Record a screen clip (Loom-style)"
+                className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition"
+              >
+                <Video size={16} />
               </button>
 
               <button

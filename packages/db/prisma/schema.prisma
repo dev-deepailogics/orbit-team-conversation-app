@@ -91,6 +91,7 @@ model User {
   ticketComments    TicketComment[]
   identities        UserIdentity[]
   createdCanvases   Canvas[]          @relation("CanvasCreator")
+  createdRecordings Recording[]       @relation("RecordingCreator")
 
   @@index([email])
   @@index([username])
@@ -137,6 +138,7 @@ model Workspace {
   huddles     Huddle[]
   attachments Attachment[]
   canvases    Canvas[]
+  recordings  Recording[]
 
   @@index([slug])
   @@index([ownerId])
@@ -181,6 +183,7 @@ model Channel {
   attachments Attachment[]
   projectNotifications Project[] @relation("ProjectNotificationChannel")
   canvases    Canvas[]
+  recordings  Recording[]
 
   @@index([workspaceId])
   @@index([type])
@@ -228,6 +231,7 @@ model Message {
   quotedBy        Message[]   @relation("MessageQuote")
   attachments     Attachment[]
   reactions       Reaction[]
+  recordings      Recording[]
 
   @@index([channelId, createdAt])
   @@index([parentMessageId])
@@ -255,11 +259,46 @@ model Attachment {
   channel         Channel?  @relation(fields: [channelId], references: [id], onDelete: SetNull)
   message         Message?  @relation(fields: [messageId], references: [id], onDelete: Cascade)
   uploader        User?     @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
+  recording       Recording?
 
   @@index([workspaceId, isDeleted])
   @@index([channelId, isDeleted])
   @@index([messageId])
   @@index([uploaderId])
+}
+
+// A screen/webcam/audio recording ("Orbit clip"). Wraps the uploaded video in
+// an Attachment (reusing the existing storage pipeline) and adds the metadata
+// and shareable-link semantics a recording needs: duration, thumbnail, a
+// standalone share slug (so a clip can be viewed/shared before or without
+// ever being dropped into a channel/message), and view count.
+model Recording {
+  id           String    @id @default(uuid())
+  workspaceId  String
+  channelId    String?
+  messageId    String?
+  creatorId    String?
+  title        String    @default("Untitled recording")
+  attachmentId String    @unique
+  thumbnailUrl String?
+  durationSec  Int?
+  shareSlug    String    @unique @default(uuid())
+  viewCount    Int       @default(0)
+  isDeleted    Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  channel      Channel?   @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  message      Message?   @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  creator      User?      @relation("RecordingCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  attachment   Attachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, isDeleted])
+  @@index([channelId])
+  @@index([messageId])
+  @@index([shareSlug])
+  @@index([creatorId])
 }
 
 model Reaction {

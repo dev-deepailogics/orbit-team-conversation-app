@@ -2,6 +2,8 @@
 
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
+import { RecordingEmbed } from '../recording/RecordingEmbed';
+import { CLIP_LINK_PATTERN } from '../recording/recordingUtils';
 
 interface MarkdownRendererProps {
   content: string;
@@ -127,6 +129,15 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             );
           },
           a: ({ href, children }) => {
+            const clipMatch = href?.match(CLIP_LINK_PATTERN);
+            if (clipMatch) {
+              return (
+                <span className="block my-1">
+                  <RecordingEmbed shareSlug={clipMatch[1]} />
+                </span>
+              );
+            }
+
             if (href?.startsWith('mention://')) {
               const username = href.replace('mention://', '');
               const isMe = currentUsername && username.toLowerCase() === currentUsername.toLowerCase();

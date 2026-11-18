@@ -37,6 +37,10 @@ import { CreateProjectModal } from "@/components/project/CreateProjectModal";
 import { CreateTicketFromMessageDialog } from "@/components/project/CreateTicketFromMessageDialog";
 import { OrganizationControlView } from "@/components/availability/OrganizationControlView";
 import { CanvasView } from "@/components/whiteboard/CanvasView";
+import { VideoLibraryView } from "@/components/video/VideoLibraryView";
+import { RecorderOverlay } from "@/components/recording/RecorderOverlay";
+import { useRecorderStore } from "@/stores/recorderStore";
+import { clipShareUrl } from "@/components/recording/recordingUtils";
 import { ProjectDocsView } from "@/components/project/ProjectDocsView";
 import { useTeamPresence } from "@/components/availability/useTeamPresence";
 import {
@@ -107,6 +111,9 @@ export default function AppDashboard() {
   const [showCanvasHub, setShowCanvasHub] = useState(false);
   const [showDocsHub, setShowDocsHub] = useState(false);
   const [showProjectsPanel, setShowProjectsPanel] = useState(false);
+  const [showVideoLibrary, setShowVideoLibrary] = useState(false);
+  const recorderState = useRecorderStore((s) => s);
+  const closeRecorder = useRecorderStore((s) => s.close);
   const [docsInitialId, setDocsInitialId] = useState<string | null>(null);
   const [orgControlResetKey, setOrgControlResetKey] = useState(0);
   const [messageForTicket, setMessageForTicket] = useState<Message | null>(
@@ -834,6 +841,8 @@ export default function AppDashboard() {
       ? ("docs" as const)
       : showProjectsPanel
       ? ("projects" as const)
+      : showVideoLibrary
+      ? ("video" as const)
       : ("home" as const),
     // Home: back to the channel / project view
     onGoHome: currentWorkspace
@@ -842,6 +851,7 @@ export default function AppDashboard() {
           setShowDocsHub(false);
           setShowOrgControl(false);
           setShowProjectsPanel(false);
+          setShowVideoLibrary(false);
           syncUrlToCurrent();
         }
       : undefined,
@@ -854,6 +864,7 @@ export default function AppDashboard() {
           }
           if (showOrgControl) setShowOrgControl(false);
           setShowProjectsPanel(false);
+          setShowVideoLibrary(false);
           setShowCanvasHub((v) => !v);
         }
       : undefined,
@@ -861,6 +872,7 @@ export default function AppDashboard() {
     onOpenDocs: currentWorkspace
       ? () => {
           if (showOrgControl) setShowOrgControl(false);
+          setShowVideoLibrary(false);
           if (!showDocsHub) {
             setShowProjectsPanel(false);
             return handleOpenDocs();
@@ -878,7 +890,21 @@ export default function AppDashboard() {
             syncUrlToCurrent();
           }
           if (showOrgControl) setShowOrgControl(false);
+          setShowVideoLibrary(false);
           setShowProjectsPanel((v) => !v);
+        }
+      : undefined,
+    // Video Library: every recording in this workspace, Loom-style grid + filters
+    onOpenVideoLibrary: currentWorkspace
+      ? () => {
+          if (showCanvasHub) setShowCanvasHub(false);
+          if (showDocsHub) {
+            setShowDocsHub(false);
+            syncUrlToCurrent();
+          }
+          if (showOrgControl) setShowOrgControl(false);
+          setShowProjectsPanel(false);
+          setShowVideoLibrary((v) => !v);
         }
       : undefined,
   };
@@ -909,7 +935,7 @@ export default function AppDashboard() {
                 handleSelectWorkspace(ws);
               }}
             />
-            {currentWorkspace && !showCanvasHub && !docsActive && !showOrgControl && (
+            {currentWorkspace && !showCanvasHub && !docsActive && !showOrgControl && !showVideoLibrary && (
               <ChannelSidebar
                 workspace={currentWorkspace}
                 channels={channels}
@@ -992,7 +1018,7 @@ export default function AppDashboard() {
       </div>
 
       {/* 2. Channels & Members Sidebar (Desktop) */}
-      {currentWorkspace && !showCanvasHub && !docsActive && !showOrgControl && (
+      {currentWorkspace && !showCanvasHub && !docsActive && !showOrgControl && !showVideoLibrary && (
         <div className="hidden md:flex shrink-0 h-full">
           <ChannelSidebar
             workspace={currentWorkspace}
@@ -1174,6 +1200,12 @@ export default function AppDashboard() {
           workspaceId={currentWorkspace.id}
           currentUser={user}
           onClose={() => setShowCanvasHub(false)}
+        />
+      ) : showVideoLibrary && currentWorkspace ? (
+        <VideoLibraryView
+          workspaceId={currentWorkspace.id}
+          currentUser={user}
+          onClose={() => setShowVideoLibrary(false)}
         />
       ) : showOrgControl && currentWorkspace ? (
         <OrganizationControlView
@@ -1436,6 +1468,20 @@ export default function AppDashboard() {
             setMessageForTicket(null);
           }}
           onOpenCreateProject={() => setShowCreateProjectModal(true)}
+        />
+      )}
+
+      {/* 12. Screen Recorder — rendered once at the dashboard root so an in-progress
+          recording survives switching between Chat / Video Library / Canvas / Docs */}
+      {recorderState.isOpen && recorderState.workspaceId && (
+        <RecorderOverlay
+          workspaceId={recorderState.workspaceId}
+          channelId={recorderState.channelId || undefined}
+          onClose={closeRecorder}
+          onUploaded={(recording) => {
+            recorderState.onInsertLink?.(clipShareUrl(recording.shareSlug));
+            closeRecorder();
+          }}
         />
       )}
     </div>

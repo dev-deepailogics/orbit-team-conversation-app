@@ -148,6 +148,25 @@ export interface Attachment {
   uploader?: UserProfile;
 }
 
+export interface Recording {
+  id: string;
+  workspaceId: string;
+  channelId?: string | null;
+  messageId?: string | null;
+  creatorId?: string | null;
+  title: string;
+  attachmentId: string;
+  thumbnailUrl?: string | null;
+  durationSec?: number | null;
+  shareSlug: string;
+  viewCount: number;
+  isDeleted?: boolean;
+  createdAt: string;
+  updatedAt?: string;
+  creator?: UserProfile | null;
+  attachment: Attachment;
+}
+
 export interface StorageCategoryStat {
   category:
     | "images"
@@ -464,6 +483,11 @@ export const SOCKET_EVENTS = {
   WHITEBOARD_CLEAR: "whiteboard:clear",
   CANVAS_JOIN: "canvas:join",
   CANVAS_LEAVE: "canvas:leave",
+
+  // Recordings (Loom-style clips)
+  RECORDING_NEW: "recording:new",
+  RECORDING_UPDATE: "recording:update",
+  RECORDING_DELETE: "recording:delete",
 
   // Projects & Kanban Boards (Trello-like)
   PROJECT_NEW: "project:new",
