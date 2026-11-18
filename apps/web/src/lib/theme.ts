@@ -19,6 +19,42 @@ const ORBIT_DARK: ThemeConfig = {
 
 export const THEME_PRESETS: ThemeConfig[] = [
   ORBIT_DARK,
+  // Figma "Orbit Theme Guideline (Mint teal)". Light follows the Redesign v2/v3 screens:
+  // the guideline's brand/900 sidebar needs a separate on-sidebar text color ThemeConfig can't express.
+  {
+    id: 'mint-teal-light',
+    name: 'Mint Teal (Light)',
+    sidebarColor: '#F2F6F5',
+    workspaceColor: '#E6EDEB',
+    backgroundColor: '#FFFFFF',
+    surfaceColor: '#F6FAF9', // slate/50
+    surfaceHoverColor: '#EDF4F2', // slate/100
+    textColor: '#10201D', // slate/900
+    textMutedColor: '#466059', // slate/600
+    primaryColor: '#0D9488', // brand/600
+    primaryHoverColor: '#0F766E', // brand/700
+    primaryTextColor: '#FFFFFF',
+    secondaryColor: '#2D5855',
+    borderColor: '#DBE7E4', // slate/200
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  },
+  {
+    id: 'mint-teal-dark',
+    name: 'Mint Teal (Dark)',
+    sidebarColor: '#042F2E', // brand/950
+    workspaceColor: '#042F2E',
+    backgroundColor: '#10201D', // slate/900
+    surfaceColor: '#1F312D', // slate/800
+    surfaceHoverColor: '#304842', // slate/700
+    textColor: '#F6FAF9', // slate/50
+    textMutedColor: '#C0D2CE', // slate/300
+    primaryColor: '#14B8A6', // brand/500
+    primaryHoverColor: '#2DD4BF', // brand/400
+    primaryTextColor: '#FFFFFF',
+    secondaryColor: '#5EEAD4', // brand/300
+    borderColor: '#304842', // slate/700
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  },
   {
     id: 'navy-glass',
     name: 'Navy Glass',
@@ -283,7 +319,7 @@ export const THEME_PRESETS: ThemeConfig[] = [
   },
 ];
 
-export const DEFAULT_THEME: ThemeConfig = THEME_PRESETS.find((t) => t.id === 'slack-light')!;
+export const DEFAULT_THEME: ThemeConfig = THEME_PRESETS.find((t) => t.id === 'mint-teal-light')!;
 
 export function isLightColor(hex?: string): boolean {
   if (!hex || !hex.startsWith('#')) return false;
