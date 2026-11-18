@@ -14,6 +14,7 @@ interface CanvasViewProps {
   currentUser: UserProfile | null;
   // When set, only canvases linked to this channel/project are listed, and new ones are linked to it
   scope?: { channelId?: string; projectId?: string; label: string };
+  initialCanvasId?: string | null;
   onClose?: () => void;
   onOpenCanvasSidebar?: () => void;
 }
@@ -24,6 +25,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   workspaceId,
   currentUser,
   scope,
+  initialCanvasId,
   onClose,
   onOpenCanvasSidebar,
 }) => {
@@ -31,7 +33,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const projects = useProjectStore((s) => s.projects);
   const [canvases, setCanvases] = useState<Canvas[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialCanvasId || null);
   const [search, setSearch] = useState('');
   const sidebar = useResizableSidebar('orbit_canvas_sidebar_width');
   const [isSidebarOpen, setIsSidebarOpen] = useState(
@@ -44,16 +46,27 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   useEffect(() => {
     let alive = true;
     setIsLoading(true);
-    setSelectedId(null);
+    setSelectedId(initialCanvasId || null);
     api
       .get('/api/canvases', { params: { workspaceId, channelId: scope?.channelId, projectId: scope?.projectId } })
-      .then((res) => alive && setCanvases(res.data))
+      .then((res) => {
+        if (!alive) return;
+        setCanvases(res.data);
+        if (initialCanvasId) {
+          setSelectedId(initialCanvasId);
+        } else if (scope?.channelId || scope?.projectId) {
+          // If a linked canvas already exists in this scope, auto-open the most recently updated one
+          if (res.data.length > 0) {
+            setSelectedId(res.data[0].id);
+          }
+        }
+      })
       .catch((err) => console.error('Failed to load canvases', err))
       .finally(() => alive && setIsLoading(false));
     return () => {
       alive = false;
     };
-  }, [workspaceId, scope?.channelId, scope?.projectId]);
+  }, [workspaceId, scope?.channelId, scope?.projectId, initialCanvasId]);
 
   useEffect(() => setTitleDraft(selected?.title || ''), [selected?.id, selected?.title]);
 

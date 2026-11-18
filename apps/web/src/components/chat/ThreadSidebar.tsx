@@ -56,7 +56,6 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
     maxWidth: 720,
     side: 'right',
   });
-  const [content, setContent] = useState('');
   const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [threadAttachments, setThreadAttachments] = useState<any[]>([]);
@@ -411,8 +410,8 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
               <div className="flex items-center gap-1.5 py-1 text-xs italic select-none text-[var(--theme-text-muted)]">
                 <Trash2 size={12} className="opacity-60 shrink-0" />
                 <span>
-                  {parentMessage.deletedByName
-                    ? `This message was deleted by ${parentMessage.deletedByName}`
+                  {(parentMessage as any).deletedByName
+                    ? `This message was deleted by ${(parentMessage as any).deletedByName}`
                     : 'This message was deleted'}
                 </span>
               </div>
@@ -668,7 +667,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                   <div className="flex items-center gap-1.5 py-1 text-xs italic select-none text-[var(--theme-text-muted)]">
                     <Trash2 size={12} className="opacity-60 shrink-0" />
                     <span>
-                      {reply.deletedByName ? `This message was deleted by ${reply.deletedByName}` : 'This message was deleted'}
+                      {(reply as any).deletedByName ? `This message was deleted by ${(reply as any).deletedByName}` : 'This message was deleted'}
                     </span>
                   </div>
                 ) : editingMessageId === reply.id ? (

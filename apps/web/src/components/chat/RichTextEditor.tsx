@@ -39,7 +39,6 @@ interface RichTextEditorProps {
   showToolbar?: boolean;
   onKeyDown?: (e: React.KeyboardEvent<HTMLDivElement>) => void;
   onTyping?: (text: string) => void;
-  onPasteFiles?: (files: File[]) => void;
   onSubmit?: () => void;
   minHeight?: string;
   className?: string;
@@ -224,7 +223,6 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       className = '',
       mentionUsers = [],
       autoFocus = false,
-      onPasteFiles,
     },
     ref
   ) => {
@@ -555,23 +553,6 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         }
       }
       if (onTyping) onTyping(editor.innerText.replace(/\u200B/g, ''));
-    };
-
-    const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
-      const data = e.clipboardData;
-      if (!onPasteFiles || !data) return;
-      let files = Array.from(data.files || []);
-      if (files.length === 0) {
-        files = Array.from(data.items || [])
-          .filter((item) => item.kind === 'file')
-          .map((item) => item.getAsFile())
-          .filter((f): f is File => !!f);
-      }
-      if (files.length === 0) return;
-      // Copying spreadsheet cells or Word text also puts a rendered picture on the clipboard: keep pasting the text then.
-      if (data.getData('text/plain').trim()) return;
-      e.preventDefault();
-      onPasteFiles(namePastedFiles(files));
     };
 
     const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -1156,7 +1137,6 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
             onPaste={handlePaste}
             onKeyDown={handleEditorKeyDown}
             onInput={handleInput}
-            onPaste={handlePaste}
             onKeyUp={checkMentionTrigger}
             onClick={checkMentionTrigger}
             style={{ minHeight, color: 'var(--theme-text-primary)' }}

@@ -31,6 +31,7 @@ import {
   Pencil,
   Trash2,
   ChevronDown,
+  PenTool,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
@@ -75,6 +76,7 @@ interface ChatAreaProps {
   onChangeView: (view: 'messages' | 'whiteboard') => void;
   presence?: Record<string, Presence>;
   onHuddleUser?: (user: UserProfile) => void;
+  onOpenQuickCanvas?: () => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -98,6 +100,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onChangeView: setActiveView,
   presence = {},
   onHuddleUser,
+  onOpenQuickCanvas,
 }) => {
   const timeFormat = useTimeFormat();
   // Unsent text for this channel, restored from this device when the composer mounts (see lib/drafts.ts).
@@ -780,6 +783,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 <button
                   onClick={() => {
                     setShowMoreMenu(false);
+                    if (onOpenQuickCanvas) {
+                      onOpenQuickCanvas();
+                    } else {
+                      setActiveView('whiteboard');
+                    }
+                  }}
+                  className="w-full px-3.5 py-2 text-left text-xs text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] flex items-center gap-2.5 transition"
+                >
+                  <PenTool size={14} className="text-slack-green" />
+                  <span>Canvas</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowMoreMenu(false);
                     setShowPinsModal(true);
                   }}
                   className="w-full px-3.5 py-2 text-left text-xs text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] flex items-center gap-2.5 transition"
@@ -1050,7 +1068,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       style={{ color: 'var(--theme-text-muted)' }}
                     >
                       <Trash2 size={13} className="opacity-60 shrink-0" />
-                      <span>{msg.deletedByName ? `This message was deleted by ${msg.deletedByName}` : 'This message was deleted'}</span>
+                      <span>{(msg as any).deletedByName ? `This message was deleted by ${(msg as any).deletedByName}` : 'This message was deleted'}</span>
                     </div>
                   ) : editingMessageId === msg.id ? (
                     <div className="mt-2 space-y-2">
@@ -1504,12 +1522,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             showToolbar={showFormatting}
             mentionUsers={mentionUsers}
             onTyping={(text) => handleTyping(text)}
-            onPasteFiles={(files) => {
-              setPendingCompressFiles(files);
-              setShowCompressModal(true);
-            }}
-            onSubmit={() => handleSendMessage()}
             onPasteFiles={handlePasteFiles}
+            onSubmit={() => handleSendMessage()}
           />
 
           {/* Action Bar */}

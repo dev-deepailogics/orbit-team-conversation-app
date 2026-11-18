@@ -379,6 +379,65 @@ export default function AppDashboard() {
   };
 
   // 4d. Canvas creation and deletion handlers
+  const handleOpenOrCreateScopedCanvas = async (targetChannel?: Channel | null, targetProject?: any | null) => {
+    if (!currentWorkspace) return;
+    const ch = targetChannel !== undefined ? targetChannel : currentChannel;
+    const pr = targetProject !== undefined ? targetProject : currentProject;
+
+    try {
+      // 1. Fetch canvases linked to this channel or project
+      const params: any = { workspaceId: currentWorkspace.id };
+      if (ch) params.channelId = ch.id;
+      if (pr) params.projectId = pr.id;
+
+      const res = await api.get('/api/canvases', { params });
+      const linkedCanvases: any[] = res.data || [];
+
+      if (linkedCanvases.length > 0) {
+        // Open the existing linked canvas
+        setSelectedCanvasId(linkedCanvases[0].id);
+        setShowCanvasHub(true);
+        setShowDocsHub(false);
+        setShowOrgControl(false);
+        setShowProjectsPanel(false);
+      } else {
+        // Create canvas titled after channel or user DM or project
+        let canvasTitle = 'Untitled canvas';
+        if (ch) {
+          if (ch.type === 'DIRECT' || ch.type === 'GROUP_DIRECT') {
+            const others = (ch.members || [])
+              .filter((m: any) => m.userId !== user?.id)
+              .map((m: any) => m.user?.displayName || m.user?.username);
+            const otherName = others.filter(Boolean).join(', ') || ch.name;
+            canvasTitle = `${otherName} Canvas`;
+          } else {
+            canvasTitle = `${ch.name} Canvas`;
+          }
+        } else if (pr) {
+          canvasTitle = `${pr.name} Canvas`;
+        }
+
+        const createRes = await api.post('/api/canvases', {
+          workspaceId: currentWorkspace.id,
+          title: canvasTitle,
+          channelId: ch ? ch.id : undefined,
+          projectId: !ch && pr ? pr.id : undefined,
+        });
+
+        setCanvases((prev) => [createRes.data, ...prev]);
+        setSelectedCanvasId(createRes.data.id);
+        setShowCanvasHub(true);
+        setShowDocsHub(false);
+        setShowOrgControl(false);
+        setShowProjectsPanel(false);
+      }
+    } catch (err: any) {
+      console.error('Failed to open or create canvas', err);
+      // Fallback: open canvas hub
+      setShowCanvasHub(true);
+    }
+  };
+
   const handleCreateCanvas = async () => {
     if (!currentWorkspace) return;
     try {
@@ -1353,6 +1412,7 @@ export default function AppDashboard() {
         <CanvasView
           workspaceId={currentWorkspace.id}
           currentUser={user}
+          initialCanvasId={selectedCanvasId}
           onClose={() => setShowCanvasHub(false)}
           onOpenCanvasSidebar={() => setIsMobileSidebarOpen(true)}
         />
@@ -1410,6 +1470,7 @@ export default function AppDashboard() {
           }}
           activeView={chatView}
           onChangeView={setChatView}
+          onOpenQuickCanvas={() => handleOpenOrCreateScopedCanvas(currentChannel, null)}
         />
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center text-[var(--theme-text-muted)] p-4 text-center">
