@@ -30,6 +30,7 @@ import {
   CheckSquare,
   Pencil,
   Trash2,
+  ChevronDown,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
@@ -155,6 +156,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [copiedChannelId, setCopiedChannelId] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
+  const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<string | null>(null);
   const previousScrollHeightRef = useRef<number>(0);
   const isInitialLoadRef = useRef(true);
   const previousMessagesCountRef = useRef(0);
@@ -212,6 +215,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   // Reset scroll and load state when channel changes & auto-focus message input
   useEffect(() => {
     isInitialLoadRef.current = true;
+    isNearBottomRef.current = true;
+    setFirstUnreadMessageId(null);
     previousMessagesCountRef.current = 0;
     previousScrollHeightRef.current = 0;
 
@@ -262,15 +267,43 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       return;
     }
 
-    // 3. New message added at the bottom: scroll to bottom
+    // 3. New message added at the bottom:
+    // Only auto-scroll if user is already near bottom OR if the new message was sent by the current user
     if (messages.length > previousMessagesCountRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      const lastMessage = messages[messages.length - 1];
+      const isSentByMe = Boolean(
+        lastMessage && (
+          lastMessage.isSelf ||
+          (currentUser && lastMessage.userId === currentUser.id)
+        )
+      );
+
+      if (isNearBottomRef.current || isSentByMe) {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        // User is at bottom, so they have seen the message
+        setFirstUnreadMessageId(null);
+      } else {
+        // User was scrolled up reading history; mark the first unread incoming message
+        if (!isSentByMe) {
+          setFirstUnreadMessageId((prev) => prev || lastMessage?.id || null);
+        }
+      }
     }
     previousMessagesCountRef.current = messages.length;
-  }, [messages]);
+  }, [messages, currentUser]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
+    // Track if user is near bottom (within 150px)
+    const distanceFromBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
+    const isNearBottom = distanceFromBottom < 150;
+    isNearBottomRef.current = isNearBottom;
+
+    // Once user scrolls down and sees the latest messages, clear the new messages indicator
+    if (isNearBottom) {
+      setFirstUnreadMessageId(null);
+    }
+
     // When user scrolls close to top (within 40px), trigger loading older messages
     if (target.scrollTop <= 40 && hasMoreMessages && !isLoadingOlder && onLoadOlderMessages) {
       previousScrollHeightRef.current = target.scrollHeight;
@@ -410,6 +443,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+      setTimeout(() => {
+        editorRef.current?.focus();
+      }, 50);
     }
   };
 
@@ -904,13 +940,23 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               );
 
             return (
-              <div
-                key={msg.id}
-                id={`msg-${msg.id}`}
-                className={`group flex gap-2.5 sm:gap-3 hover:bg-black/5 dark:hover:bg-[var(--theme-bg-surface-hover)] -mx-3 sm:-mx-6 px-3 sm:px-6 py-2 rounded-lg transition-all duration-300 relative ${
-                  msg.isPinned ? 'bg-amber-500/5 border-l-2 border-amber-400/80 pl-2 sm:pl-5' : ''
-                }`}
-              >
+              <React.Fragment key={msg.id}>
+                {firstUnreadMessageId === msg.id && (
+                  <div className="flex items-center gap-3 my-4 select-none relative z-10 animate-in fade-in duration-200">
+                    <div className="flex-1 h-[1.5px] bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.4)]" />
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider text-white bg-red-500 shadow-md">
+                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                      <span>New Messages</span>
+                    </div>
+                    <div className="flex-1 h-[1.5px] bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.4)]" />
+                  </div>
+                )}
+                <div
+                  id={`msg-${msg.id}`}
+                  className={`group flex gap-2.5 sm:gap-3 hover:bg-black/5 dark:hover:bg-[var(--theme-bg-surface-hover)] -mx-3 sm:-mx-6 px-3 sm:px-6 py-2 rounded-lg transition-all duration-300 relative ${
+                    msg.isPinned ? 'bg-amber-500/5 border-l-2 border-amber-400/80 pl-2 sm:pl-5' : ''
+                  }`}
+                >
                 {isAnon ? (
                   <div
                     className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-900/70 to-indigo-900/70 border border-purple-500/40 flex items-center justify-center text-lg shrink-0 mt-0.5 shadow-sm select-none"
@@ -1262,9 +1308,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   />
                 )}
               </div>
-            );
-          })}
-        </>
+            </React.Fragment>
+          );
+        })}
+      </>
       )}
       <div ref={messagesEndRef} />
       </div>
@@ -1277,8 +1324,25 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       )}
 
-      {/* Chat Input */}
-      <div className="px-3 sm:px-6 pb-3 sm:pb-6 pt-1">
+      {/* Chat Input Container */}
+      <div className="px-3 sm:px-6 pb-3 sm:pb-6 pt-1 relative">
+        {/* Floating "New Messages ↓" pill positioned above the input box */}
+        {firstUnreadMessageId && !isNearBottomRef.current && (
+          <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-30 animate-in fade-in slide-in-from-bottom-2 duration-150 pointer-events-auto">
+            <button
+              type="button"
+              onClick={() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+                setFirstUnreadMessageId(null);
+              }}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slack-green hover:bg-slack-green/90 text-white text-xs font-semibold shadow-xl border border-black/10 dark:border-white/10 transition transform hover:scale-105 cursor-pointer"
+            >
+              <span>New messages</span>
+              <ChevronDown size={14} />
+            </button>
+          </div>
+        )}
+
         {/* Quote Reply Banner */}
         {replyingToMessage && (
           <div className="mb-2 bg-[var(--theme-bg-surface)] border-l-4 border-slack-green rounded-r-xl px-3.5 py-2 flex items-center justify-between shadow-lg">
@@ -1362,7 +1426,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     {isImage ? (
                       <div className="w-4 h-4 rounded overflow-hidden bg-[var(--theme-bg-app)]">
                         <img
-                          src={att.fileUrl}
+                          src={
+                            att.fileUrl?.startsWith('http')
+                              ? att.fileUrl
+                              : `${(process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:4000').replace(/\/$/, '')}${att.fileUrl?.startsWith('/') ? '' : '/'}${att.fileUrl}`
+                          }
                           alt=""
                           className="w-full h-full object-cover"
                         />
@@ -1414,6 +1482,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             showToolbar={showFormatting}
             mentionUsers={mentionUsers}
             onTyping={(text) => handleTyping(text)}
+            onPasteFiles={(files) => {
+              setPendingCompressFiles(files);
+              setShowCompressModal(true);
+            }}
             onSubmit={() => handleSendMessage()}
           />
 

@@ -43,6 +43,7 @@ interface ProjectDocsViewProps {
   members: WorkspaceMember[];
   initialDocId?: string | null; // from the URL (?view=docs&docId=...)
   onDocChange?: (docId: string | null) => void;
+  onOpenDocsSidebar?: () => void;
 }
 
 const COVER_PRESETS = [
@@ -64,6 +65,7 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
   members,
   initialDocId,
   onDocChange,
+  onOpenDocsSidebar,
 }) => {
   const projects = useProjectStore((s) => s.projects);
   const {
@@ -314,186 +316,12 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
         color: 'var(--theme-text-primary)',
       }}
     >
-      {/* Mobile Drawer Backdrop */}
-      {isSidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 md:hidden animate-in fade-in duration-200"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-
-      {/* ========================================== */}
-      {/* 1. Left Document Navigation Sidebar        */}
-      {/* ========================================== */}
-      <div
-        className={`${
-          isSidebarOpen
-            ? 'w-64 md:w-[var(--sidebar-w)] max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:shadow-2xl'
-            : 'w-0 max-md:-translate-x-full'
-        } shrink-0 border-r flex flex-col h-full ${sidebar.dragging ? '' : 'transition-all duration-200'} overflow-hidden relative`}
-        style={{
-          backgroundColor: 'var(--theme-bg-sidebar)',
-          borderColor: 'var(--theme-border)',
-          ...sidebar.style,
-        }}
-      >
-        {sidebar.handle}
-        {/* Sidebar Header & New Doc (styled like the channels / DMs sidebar) */}
-        <div
-          className="h-14 border-b px-3 sm:px-4 flex items-center justify-between gap-2 shrink-0"
-          style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)' }}
-        >
-          <span className="truncate font-bold text-sm sm:text-base">Docs</span>
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              onClick={handleCreateNewDoc}
-              title="Create new document"
-              aria-label="Create new document"
-              className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10"
-            >
-              <Plus size={18} />
-            </button>
-            <button
-              onClick={() => setIsSidebarOpen(false)}
-              className="p-1.5 rounded-lg opacity-60 hover:opacity-100 md:hidden"
-              aria-label="Close sidebar"
-            >
-              <X size={15} />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-2 py-3 space-y-4">
-          {/* Search Input */}
-          <div className="px-1">
-            <div
-              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs"
-              style={{ backgroundColor: 'var(--theme-bg-surface)', borderColor: 'var(--theme-border)', color: 'var(--theme-text-muted)' }}
-            >
-              <Search size={14} className="shrink-0" style={{ color: 'var(--theme-primary)' }} />
-              <input
-                type="text"
-                placeholder="Search documents..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-transparent focus:outline-none"
-                style={{ color: 'var(--theme-text-primary)' }}
-              />
-            </div>
-          </div>
-
-          <div>
-            {/* Section header with filter pills */}
-            <div
-              className="flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-wider mb-1"
-              style={{ color: 'var(--theme-text-muted)' }}
-            >
-              <span>Documents</span>
-              <span className="text-[10px] font-semibold">{documents.length}</span>
-            </div>
-            <div className="px-1.5 pb-1.5 flex items-center gap-1 overflow-x-auto">
-              {(
-                [
-                  { id: 'all', label: 'All' },
-                  { id: 'project', label: 'Public' },
-                  { id: 'shared', label: 'Shared' },
-                  { id: 'private', label: 'Drafts' },
-                ] as const
-              ).map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveFilter(tab.id)}
-                  className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition ${
-                    activeFilter === tab.id ? 'font-semibold' : 'hover:bg-black/5 dark:hover:bg-white/10'
-                  }`}
-                  style={{
-                    backgroundColor: activeFilter === tab.id ? 'var(--theme-bg-surface)' : 'transparent',
-                    color: activeFilter === tab.id ? 'var(--theme-text-primary)' : 'var(--theme-text-muted)',
-                  }}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            {isLoadingDocs ? (
-              <div className="px-2.5 py-1.5 text-xs" style={{ color: 'var(--theme-text-muted)' }}>Loading docs...</div>
-            ) : filteredDocs.length === 0 ? (
-              <div className="px-2.5 py-1.5 text-xs" style={{ color: 'var(--theme-text-muted)' }}>
-                {searchQuery ? 'No documents found' : 'No documents yet'}
-              </div>
-            ) : (
-              <div className="space-y-0.5">
-                {filteredDocs.map((doc) => {
-                  const isActive = currentDocument?.id === doc.id;
-                  const isCreator = doc.createdById === currentUser?.id;
-                  return (
-                    <div
-                      key={doc.id}
-                      onClick={() => {
-                        setCurrentDocument(doc);
-                        if (typeof window !== 'undefined' && window.innerWidth < 768) setIsSidebarOpen(false);
-                      }}
-                      title={`${doc.title || 'Untitled Document'} · ${doc.isPublicInProject ? 'Public' : 'Private'} · ${doc.creator?.displayName || 'Member'} · ${projectLabel(doc)}`}
-                      className={`group flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
-                        isActive ? 'shadow font-semibold' : 'hover:bg-black/5 dark:hover:bg-white/10'
-                      }`}
-                      style={
-                        isActive
-                          ? { backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-text)' }
-                          : { color: 'var(--theme-text-primary)' }
-                      }
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        <span className="text-sm shrink-0 leading-none">{doc.icon || '📄'}</span>
-                        <span className="truncate">{doc.title || 'Untitled Document'}</span>
-                        {!doc.isPublicInProject && <Lock size={12} className="shrink-0 opacity-60" />}
-                      </div>
-
-                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition shrink-0">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCurrentDocument(doc);
-                            setShowShareModal(true);
-                          }}
-                          title="Share document"
-                          aria-label="Share document"
-                          className="p-0.5 rounded opacity-70 hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10"
-                        >
-                          <Share2 size={13} />
-                        </button>
-                        {(isCreator || currentUser?.systemRole === 'SUPER_ADMIN') && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteDoc(doc.id);
-                            }}
-                            title="Delete document"
-                            aria-label="Delete document"
-                            className="p-0.5 rounded opacity-70 hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* ========================================== */}
       {/* 2. Main Document Canvas & Notion Editor    */}
-      {/* ========================================== */}
       <div className="flex-1 flex flex-col h-full overflow-hidden relative">
         {/* Sidebar Toggle Button */}
         <button
-          onClick={() => setIsSidebarOpen((prev) => !prev)}
-          title={isSidebarOpen ? 'Collapse Documents Sidebar' : 'Expand Documents Sidebar'}
+          onClick={onOpenDocsSidebar || (() => setIsSidebarOpen((prev) => !prev))}
+          title="Documents"
           className="absolute left-2.5 top-2.5 z-20 px-2 py-1.5 rounded-xl border shadow-sm opacity-80 hover:opacity-100 transition flex items-center gap-1 text-xs backdrop-blur-md"
           style={{
             backgroundColor: 'var(--theme-bg-surface)',
@@ -501,8 +329,8 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
             color: 'var(--theme-text-primary)',
           }}
         >
-          {isSidebarOpen ? <ChevronLeft size={14} /> : <FileText size={14} />}
-          <span className="text-[11px] font-semibold hidden sm:inline">{isSidebarOpen ? 'Hide' : 'Documents'}</span>
+          <FileText size={14} />
+          <span className="text-[11px] font-semibold hidden sm:inline">Documents</span>
         </button>
 
         {currentDocument ? (

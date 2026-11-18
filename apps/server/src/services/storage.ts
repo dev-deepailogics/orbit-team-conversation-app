@@ -17,7 +17,7 @@ export interface StorageDriver {
     storageProvider: string;
   }>;
   deleteFile(fileKey: string): Promise<boolean>;
-  getFileStream(fileKey: string): Promise<{
+  getFileStream(fileKey: string, options?: { start?: number; end?: number }): Promise<{
     stream: NodeJS.ReadableStream;
     size?: number;
     mimeType?: string;
@@ -107,7 +107,10 @@ export class LocalStorageDriver implements StorageDriver {
     }
   }
 
-  public async getFileStream(fileKey: string): Promise<{
+  public async getFileStream(
+    fileKey: string,
+    options?: { start?: number; end?: number }
+  ): Promise<{
     stream: NodeJS.ReadableStream;
     size?: number;
     fileName?: string;
@@ -118,7 +121,7 @@ export class LocalStorageDriver implements StorageDriver {
     }
 
     const stat = await fs.promises.stat(absolutePath);
-    const stream = fs.createReadStream(absolutePath);
+    const stream = fs.createReadStream(absolutePath, options);
     return {
       stream,
       size: stat.size,
