@@ -39,6 +39,7 @@ interface RichTextEditorProps {
   showToolbar?: boolean;
   onKeyDown?: (e: React.KeyboardEvent<HTMLDivElement>) => void;
   onTyping?: (text: string) => void;
+  onPasteFiles?: (files: File[]) => void;
   onSubmit?: () => void;
   minHeight?: string;
   className?: string;
@@ -204,6 +205,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       showToolbar = true,
       onKeyDown,
       onTyping,
+      onPasteFiles,
       onSubmit,
       minHeight = '60px',
       className = '',
@@ -689,6 +691,45 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
               if (onTyping) onTyping(editor.innerText.replace(/\u200B/g, ''));
               return;
             }
+
+            // Auto-convert typed URL before space into a clickable link
+            if (node && node.nodeType === Node.TEXT_NODE && offset > 0) {
+              const textBefore = text.slice(0, offset);
+              const urlMatch = textBefore.match(/(https?:\/\/[^\s]+)$/);
+              if (urlMatch) {
+                const url = urlMatch[1];
+                const urlStart = textBefore.lastIndexOf(url);
+                const parentA = node.parentElement?.closest('a');
+                if (!parentA) {
+                  e.preventDefault();
+                  const fullText = node.textContent || '';
+                  const beforeUrl = fullText.slice(0, urlStart);
+                  const afterUrl = fullText.slice(offset);
+
+                  node.textContent = beforeUrl;
+
+                  const linkEl = document.createElement('a');
+                  linkEl.href = url;
+                  linkEl.target = '_blank';
+                  linkEl.rel = 'noreferrer';
+                  linkEl.className = 'text-blue-600 dark:text-blue-400 underline hover:opacity-80';
+                  linkEl.textContent = url;
+
+                  const spaceNode = document.createTextNode(' ' + afterUrl);
+                  node.parentNode?.insertBefore(linkEl, node.nextSibling);
+                  linkEl.parentNode?.insertBefore(spaceNode, linkEl.nextSibling);
+
+                  const newRange = document.createRange();
+                  newRange.setStart(spaceNode, 1);
+                  newRange.setEnd(spaceNode, 1);
+                  sel.removeAllRanges();
+                  sel.addRange(newRange);
+
+                  if (onTyping) onTyping(editor.innerText.replace(/\u200B/g, ''));
+                  return;
+                }
+              }
+            }
           }
         }
       }
@@ -820,6 +861,83 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         onTyping(editorRef.current.innerText.replace(/\u200B/g, ''));
       }
       checkMentionTrigger();
+    };
+
+    const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+      // 1. Check if clipboard contains files (e.g. copied screenshot, image, file)
+      const items = e.clipboardData?.items;
+      if (items && items.length > 0) {
+        const files: File[] = [];
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          if (item.kind === 'file') {
+            const file = item.getAsFile();
+            if (file) {
+              files.push(file);
+            }
+          }
+        }
+
+        if (files.length > 0 && onPasteFiles) {
+          e.preventDefault();
+          onPasteFiles(files);
+          return;
+        }
+      }
+
+      // 2. Also check e.clipboardData.files directly
+      if (e.clipboardData?.files && e.clipboardData.files.length > 0 && onPasteFiles) {
+        const fileList = Array.from(e.clipboardData.files);
+        if (fileList.length > 0) {
+          e.preventDefault();
+          onPasteFiles(fileList);
+          return;
+        }
+      }
+
+      // 3. Auto-link pasted URLs (e.g., https://... or http://...)
+      const pastedText = e.clipboardData?.getData('text/plain') || '';
+      const urlRegex = /^https?:\/\/[^\s]+$/i;
+      if (pastedText && urlRegex.test(pastedText.trim())) {
+        e.preventDefault();
+        const cleanUrl = pastedText.trim();
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+          const range = sel.getRangeAt(0);
+          range.deleteContents();
+
+          const linkEl = document.createElement('a');
+          linkEl.href = cleanUrl;
+          linkEl.target = '_blank';
+          linkEl.rel = 'noreferrer';
+          linkEl.className = 'text-blue-600 dark:text-blue-400 underline hover:opacity-80';
+          linkEl.textContent = cleanUrl;
+
+          range.insertNode(linkEl);
+
+          // Add trailing space / zero-width separator so typing continues normally outside the <a> tag
+          const postNode = document.createTextNode(' ');
+          linkEl.parentNode?.insertBefore(postNode, linkEl.nextSibling);
+
+          const newRange = document.createRange();
+          newRange.setStartAfter(postNode);
+          newRange.setEndAfter(postNode);
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+
+          if (editorRef.current && onTyping) {
+            onTyping(editorRef.current.innerText.replace(/\u200B/g, ''));
+          }
+          return;
+        }
+      }
+
+      // Allow default text paste flow, but update typing state on next tick
+      setTimeout(() => {
+        if (editorRef.current && onTyping) {
+          onTyping(editorRef.current.innerText.replace(/\u200B/g, ''));
+        }
+      }, 0);
     };
 
     return (
@@ -1006,6 +1124,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
             contentEditable
             onKeyDown={handleEditorKeyDown}
             onInput={handleInput}
+            onPaste={handlePaste}
             onKeyUp={checkMentionTrigger}
             onClick={checkMentionTrigger}
             style={{ minHeight, color: 'var(--theme-text-primary)' }}

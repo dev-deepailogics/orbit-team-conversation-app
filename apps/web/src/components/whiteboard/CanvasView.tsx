@@ -15,6 +15,7 @@ interface CanvasViewProps {
   // When set, only canvases linked to this channel/project are listed, and new ones are linked to it
   scope?: { channelId?: string; projectId?: string; label: string };
   onClose?: () => void;
+  onOpenCanvasSidebar?: () => void;
 }
 
 const isDirect = (c: Channel) => c.type === 'DIRECT' || c.type === 'GROUP_DIRECT';
@@ -24,6 +25,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   currentUser,
   scope,
   onClose,
+  onOpenCanvasSidebar,
 }) => {
   const channels = useChatStore((s) => s.channels);
   const projects = useProjectStore((s) => s.projects);
@@ -149,8 +151,8 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   const headerSlot = selected && (
     <div className="flex items-center gap-1.5 min-w-0">
       <button
-        onClick={() => setIsSidebarOpen((v) => !v)}
-        title={isSidebarOpen ? 'Hide canvas list' : 'Show canvas list'}
+        onClick={onOpenCanvasSidebar || (() => setIsSidebarOpen((v) => !v))}
+        title="Show canvas list"
         aria-label="Toggle canvas list"
         className="p-1 rounded-md shrink-0 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]"
       >
@@ -201,119 +203,121 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
 
   return (
     <div className="flex-1 flex h-full overflow-hidden relative" style={{ color: 'var(--theme-text-primary)' }}>
-      {/* Canvas list sidebar (styled like the channels / DMs sidebar) */}
-      <div
-        className={`${
-          isSidebarOpen
-            ? 'w-64 md:w-[var(--sidebar-w)] max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:shadow-2xl'
-            : 'w-0'
-        } shrink-0 border-r flex flex-col h-full select-none ${sidebar.dragging ? '' : 'transition-all duration-200'} overflow-hidden relative`}
-        style={{ backgroundColor: 'var(--theme-bg-sidebar)', borderColor: 'var(--theme-border)', ...sidebar.style }}
-      >
-        {sidebar.handle}
+      {/* Canvas list sidebar (only rendered when scope is provided, e.g. embedded modal) */}
+      {scope && (
         <div
-          className="h-14 border-b px-3 sm:px-4 flex items-center justify-between gap-2 shrink-0"
-          style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)' }}
+          className={`${
+            isSidebarOpen
+              ? 'w-64 md:w-[var(--sidebar-w)]'
+              : 'w-0'
+          } shrink-0 border-r flex flex-col h-full select-none ${sidebar.dragging ? '' : 'transition-all duration-200'} overflow-hidden relative`}
+          style={{ backgroundColor: 'var(--theme-bg-sidebar)', borderColor: 'var(--theme-border)', ...sidebar.style }}
         >
-          <span className="truncate font-bold text-sm sm:text-base">{scope ? `Canvases · ${scope.label}` : 'Canvases'}</span>
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              onClick={handleCreate}
-              title="Create new canvas"
-              aria-label="Create new canvas"
-              className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10"
-            >
-              <Plus size={18} />
-            </button>
-            <button
-              onClick={() => setIsSidebarOpen(false)}
-              className="p-1.5 rounded-lg opacity-60 hover:opacity-100 md:hidden"
-              aria-label="Close canvas list"
-            >
-              <X size={15} />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-2 py-3 space-y-4">
-          <div className="px-1">
-            <div
-              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs"
-              style={{ backgroundColor: 'var(--theme-bg-surface)', borderColor: 'var(--theme-border)', color: 'var(--theme-text-muted)' }}
-            >
-              <Search size={14} className="shrink-0" style={{ color: 'var(--theme-primary)' }} />
-              <input
-                type="search"
-                placeholder="Search canvases..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-transparent focus:outline-none"
-                style={{ color: 'var(--theme-text-primary)' }}
-              />
+          {sidebar.handle}
+          <div
+            className="h-14 border-b px-3 sm:px-4 flex items-center justify-between gap-2 shrink-0"
+            style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)' }}
+          >
+            <span className="truncate font-bold text-sm sm:text-base">{scope ? `Canvases · ${scope.label}` : 'Canvases'}</span>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={handleCreate}
+                title="Create new canvas"
+                aria-label="Create new canvas"
+                className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10"
+              >
+                <Plus size={18} />
+              </button>
+              <button
+                onClick={() => setIsSidebarOpen(false)}
+                className="p-1.5 rounded-lg opacity-60 hover:opacity-100 md:hidden"
+                aria-label="Close canvas list"
+              >
+                <X size={15} />
+              </button>
             </div>
           </div>
 
-          <div>
-            <div
-              className="flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-wider mb-1"
-              style={{ color: 'var(--theme-text-muted)' }}
-            >
-              <span>All canvases</span>
-              <span className="text-[10px] font-semibold">{canvases.length}</span>
-            </div>
-
-            {isLoading ? (
-              <div className="px-2.5 py-1.5 text-xs" style={{ color: 'var(--theme-text-muted)' }}>Loading canvases...</div>
-            ) : filtered.length === 0 ? (
-              <div className="px-2.5 py-1.5 text-xs" style={{ color: 'var(--theme-text-muted)' }}>
-                {search ? 'No canvases found' : 'No canvases yet'}
+          <div className="flex-1 overflow-y-auto px-2 py-3 space-y-4">
+            <div className="px-1">
+              <div
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs"
+                style={{ backgroundColor: 'var(--theme-bg-surface)', borderColor: 'var(--theme-border)', color: 'var(--theme-text-muted)' }}
+              >
+                <Search size={14} className="shrink-0" style={{ color: 'var(--theme-primary)' }} />
+                <input
+                  type="search"
+                  placeholder="Search canvases..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full bg-transparent focus:outline-none"
+                  style={{ color: 'var(--theme-text-primary)' }}
+                />
               </div>
-            ) : (
-              <div className="space-y-0.5">
-                {filtered.map((c) => {
-                  const isActive = c.id === selectedId;
-                  return (
-                    <div
-                      key={c.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => openCanvas(c.id)}
-                      onKeyDown={(e) => e.key === 'Enter' && openCanvas(c.id)}
-                      title={linkLabel(c) ? `${c.title} · ${linkLabel(c)}` : `${c.title} · Not linked`}
-                      className={`group flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
-                        isActive ? 'shadow font-semibold' : 'hover:bg-black/5 dark:hover:bg-white/10'
-                      }`}
-                      style={
-                        isActive
-                          ? { backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-text)' }
-                          : { color: 'var(--theme-text-primary)' }
-                      }
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        <PenTool size={15} className="shrink-0 opacity-70" />
-                        <span className="truncate">{c.title}</span>
+            </div>
+
+            <div>
+              <div
+                className="flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-wider mb-1"
+                style={{ color: 'var(--theme-text-muted)' }}
+              >
+                <span>All canvases</span>
+                <span className="text-[10px] font-semibold">{canvases.length}</span>
+              </div>
+
+              {isLoading ? (
+                <div className="px-2.5 py-1.5 text-xs" style={{ color: 'var(--theme-text-muted)' }}>Loading canvases...</div>
+              ) : filtered.length === 0 ? (
+                <div className="px-2.5 py-1.5 text-xs" style={{ color: 'var(--theme-text-muted)' }}>
+                  {search ? 'No canvases found' : 'No canvases yet'}
+                </div>
+              ) : (
+                <div className="space-y-0.5">
+                  {filtered.map((c) => {
+                    const isActive = c.id === selectedId;
+                    return (
+                      <div
+                        key={c.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => openCanvas(c.id)}
+                        onKeyDown={(e) => e.key === 'Enter' && openCanvas(c.id)}
+                        title={linkLabel(c) ? `${c.title} · ${linkLabel(c)}` : `${c.title} · Not linked`}
+                        className={`group flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
+                          isActive ? 'shadow font-semibold' : 'hover:bg-black/5 dark:hover:bg-white/10'
+                        }`}
+                        style={
+                          isActive
+                            ? { backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-text)' }
+                            : { color: 'var(--theme-text-primary)' }
+                        }
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <PenTool size={15} className="shrink-0 opacity-70" />
+                          <span className="truncate">{c.title}</span>
+                        </div>
+                        {canDelete(c) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(c);
+                            }}
+                            title="Delete canvas"
+                            aria-label={`Delete ${c.title}`}
+                            className="p-0.5 rounded shrink-0 opacity-0 group-hover:opacity-70 hover:!opacity-100 focus:opacity-100 hover:bg-black/10 dark:hover:bg-white/10"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
                       </div>
-                      {canDelete(c) && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(c);
-                          }}
-                          title="Delete canvas"
-                          aria-label={`Delete ${c.title}`}
-                          className="p-0.5 rounded shrink-0 opacity-0 group-hover:opacity-70 hover:!opacity-100 focus:opacity-100 hover:bg-black/10 dark:hover:bg-white/10"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Main area: the selected canvas, or a "new or existing" chooser */}
       <div className="flex-1 h-full relative overflow-hidden" style={{ backgroundColor: 'var(--theme-bg-app)' }}>
@@ -328,14 +332,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
         ) : (
           <div className="h-full overflow-y-auto p-6 flex flex-col items-center">
             <div className="w-full max-w-2xl mt-6 sm:mt-16">
-              {!isSidebarOpen && (
-                <button
-                  onClick={() => setIsSidebarOpen(true)}
-                  className="mb-4 flex items-center gap-1.5 text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]"
-                >
-                  <PanelLeft size={14} /> Show canvas list
-                </button>
-              )}
+              <button
+                onClick={onOpenCanvasSidebar || (() => setIsSidebarOpen(true))}
+                className="mb-4 flex items-center gap-1.5 text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]"
+              >
+                <PanelLeft size={14} /> Show canvas list
+              </button>
               <h2 className="text-lg font-bold">{scope ? `Canvases in ${scope.label}` : 'Canvases'}</h2>
               <p className="text-xs mt-1 mb-5" style={{ color: 'var(--theme-text-muted)' }}>
                 Start a new canvas or pick up where you left off.
