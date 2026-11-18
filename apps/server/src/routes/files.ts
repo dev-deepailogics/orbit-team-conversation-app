@@ -173,17 +173,52 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     const originalName = attachment?.fileName || fileData.fileName || 'file';
 
     const dispositionType = downloadQuery ? 'attachment' : 'inline';
+    // Clean ASCII fallback for `filename="..."` (HTTP headers forbid non-ASCII characters such as Unicode narrow no-break space U+8239 from macOS screenshots)
+    const asciiSafeName = originalName.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '');
     const encodedName = encodeURIComponent(originalName);
 
     reply.header('Content-Type', mimeType);
+    reply.header('Accept-Ranges', 'bytes');
+    reply.header(
+      'Content-Disposition',
+      `${dispositionType}; filename="${asciiSafeName}"; filename*=UTF-8''${encodedName}`
+    );
+    reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+
+    // Handle HTTP Range requests (crucial for video playback like MP4, WebM, MOV in browsers)
+    const rangeHeader = request.headers.range;
+    const totalSize = fileData.size || 0;
+
+    if (rangeHeader && rangeHeader.startsWith('bytes=') && totalSize > 0) {
+      const parts = rangeHeader.slice(6).split('-');
+      const startStr = parts[0];
+      const endStr = parts[1];
+
+      let start = parseInt(startStr, 10);
+      let end = parseInt(endStr, 10);
+
+      if (isNaN(start)) {
+        start = totalSize - end;
+        end = totalSize - 1;
+      } else if (isNaN(end)) {
+        end = totalSize - 1;
+      }
+
+      if (start >= 0 && start <= end && end < totalSize) {
+        const chunkLength = end - start + 1;
+        const rangeStream = await storageDriver.getFileStream(rawKey, { start, end });
+
+        reply.status(206);
+        reply.header('Content-Range', `bytes ${start}-${end}/${totalSize}`);
+        reply.header('Content-Length', chunkLength);
+
+        return reply.send(rangeStream?.stream || fileData.stream);
+      }
+    }
+
     if (fileData.size) {
       reply.header('Content-Length', fileData.size);
     }
-    reply.header(
-      'Content-Disposition',
-      `${dispositionType}; filename="${originalName.replace(/"/g, '')}"; filename*=UTF-8''${encodedName}`
-    );
-    reply.header('Cache-Control', 'public, max-age=31536000, immutable');
 
     return reply.send(fileData.stream);
   });

@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState } from "react";
 import {
   X,
   Edit,
@@ -13,10 +13,13 @@ import {
   Trash2,
   Paperclip,
   Loader2,
-} from 'lucide-react';
-import { WorkspaceMember, ProjectColumn } from '@orbit/types';
-import { api } from '../../lib/api';
-import { useTicketAttachmentUpload, TicketAttachmentList } from './TicketAttachments';
+} from "lucide-react";
+import { WorkspaceMember, ProjectColumn } from "@orbit/types";
+import { api } from "../../lib/api";
+import {
+  useTicketAttachmentUpload,
+  TicketAttachmentList,
+} from "./TicketAttachments";
 
 interface TicketDetailModalProps {
   projectId: string;
@@ -51,22 +54,26 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
     Array.isArray(ticket.images) ? ticket.images : [],
     async (next) => {
       try {
-        const res = await api.put(`/api/projects/${projectId}/tickets/${ticket.id}`, {
-          images: next,
-        });
+        const res = await api.put(
+          `/api/projects/${projectId}/tickets/${ticket.id}`,
+          {
+            images: next,
+          },
+        );
         onTicketUpdated?.(res.data);
       } catch (err) {
-        console.error('Failed to save attachments', err);
+        console.error("Failed to save attachments", err);
       }
-    }
+    },
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [copiedBranch, setCopiedBranch] = useState(false);
   const [copiedTitle, setCopiedTitle] = useState(false);
-  const [checklist, setChecklist] = useState<Array<{ id: string; text: string; completed: boolean }>>(
-    Array.isArray(ticket.checklist) ? ticket.checklist : []
-  );
-  const [newChecklistItem, setNewChecklistItem] = useState('');
+  const [copiedTicketId, setCopiedTicketId] = useState(false);
+  const [checklist, setChecklist] = useState<
+    Array<{ id: string; text: string; completed: boolean }>
+  >(Array.isArray(ticket.checklist) ? ticket.checklist : []);
+  const [newChecklistItem, setNewChecklistItem] = useState("");
   const [isSavingChecklist, setIsSavingChecklist] = useState(false);
 
   // Copy helpers
@@ -85,16 +92,19 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
   // Checklist handlers
   const handleToggleChecklist = async (id: string) => {
     const nextList = checklist.map((item) =>
-      item.id === id ? { ...item, completed: !item.completed } : item
+      item.id === id ? { ...item, completed: !item.completed } : item,
     );
     setChecklist(nextList);
     try {
-      const res = await api.put(`/api/projects/${projectId}/tickets/${ticket.id}`, {
-        checklist: nextList,
-      });
+      const res = await api.put(
+        `/api/projects/${projectId}/tickets/${ticket.id}`,
+        {
+          checklist: nextList,
+        },
+      );
       onTicketUpdated?.(res.data);
     } catch (err) {
-      console.error('Failed to update checklist item', err);
+      console.error("Failed to update checklist item", err);
     }
   };
 
@@ -109,16 +119,19 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
     };
     const nextList = [...checklist, newItem];
     setChecklist(nextList);
-    setNewChecklistItem('');
+    setNewChecklistItem("");
 
     try {
       setIsSavingChecklist(true);
-      const res = await api.put(`/api/projects/${projectId}/tickets/${ticket.id}`, {
-        checklist: nextList,
-      });
+      const res = await api.put(
+        `/api/projects/${projectId}/tickets/${ticket.id}`,
+        {
+          checklist: nextList,
+        },
+      );
       onTicketUpdated?.(res.data);
     } catch (err) {
-      console.error('Failed to add checklist item', err);
+      console.error("Failed to add checklist item", err);
     } finally {
       setIsSavingChecklist(false);
     }
@@ -128,44 +141,66 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
     const nextList = checklist.filter((item) => item.id !== id);
     setChecklist(nextList);
     try {
-      const res = await api.put(`/api/projects/${projectId}/tickets/${ticket.id}`, {
-        checklist: nextList,
-      });
+      const res = await api.put(
+        `/api/projects/${projectId}/tickets/${ticket.id}`,
+        {
+          checklist: nextList,
+        },
+      );
       onTicketUpdated?.(res.data);
     } catch (err) {
-      console.error('Failed to remove checklist item', err);
+      console.error("Failed to remove checklist item", err);
     }
   };
 
   // Resolve priority badge color
-  const priority = (ticket.priority || 'MEDIUM').toUpperCase();
+  const priority = (ticket.priority || "MEDIUM").toUpperCase();
   const priorityBadge =
-    priority === 'URGENT'
-      ? { text: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/30' }
-      : priority === 'HIGH'
-      ? { text: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/30' }
-      : priority === 'LOW'
-      ? { text: 'text-[var(--theme-text-muted)]', bg: 'bg-slate-500/10', border: 'border-slate-500/30' }
-      : { text: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/30' };
+    priority === "URGENT"
+      ? {
+          text: "text-red-600 dark:text-red-400",
+          bg: "bg-red-500/10",
+          border: "border-red-500/30",
+        }
+      : priority === "HIGH"
+        ? {
+            text: "text-rose-600 dark:text-rose-400",
+            bg: "bg-rose-500/10",
+            border: "border-rose-500/30",
+          }
+        : priority === "LOW"
+          ? {
+              text: "text-[var(--theme-text-muted)]",
+              bg: "bg-slate-500/10",
+              border: "border-slate-500/30",
+            }
+          : {
+              text: "text-blue-600 dark:text-blue-400",
+              bg: "bg-blue-500/10",
+              border: "border-blue-500/30",
+            };
 
   // Resolve assignee display
-  const assigneeName = ticket.assignee?.displayName || ticket.assignee?.username || null;
-  const assigneeInitial = assigneeName ? assigneeName.charAt(0).toUpperCase() : null;
+  const assigneeName =
+    ticket.assignee?.displayName || ticket.assignee?.username || null;
+  const assigneeInitial = assigneeName
+    ? assigneeName.charAt(0).toUpperCase()
+    : null;
 
   // Due Date & Created Date
   const dueDateFormatted = ticket.dueDate
-    ? new Date(ticket.dueDate).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
+    ? new Date(ticket.dueDate).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
       })
     : null;
 
   const createdDateFormatted = ticket.createdAt
-    ? new Date(ticket.createdAt).toLocaleDateString('en-US', {
-        month: 'numeric',
-        day: 'numeric',
-        year: 'numeric',
+    ? new Date(ticket.createdAt).toLocaleDateString("en-US", {
+        month: "numeric",
+        day: "numeric",
+        year: "numeric",
       })
     : null;
 
@@ -176,15 +211,15 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
       <div
         className="w-full max-w-2xl rounded-2xl border shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-150"
         style={{
-          backgroundColor: 'var(--theme-bg-surface, #1e293b)',
-          borderColor: 'var(--theme-border, #334155)',
-          color: 'var(--theme-text-primary, #ffffff)',
+          backgroundColor: "var(--theme-bg-surface, #1e293b)",
+          borderColor: "var(--theme-border, #334155)",
+          color: "var(--theme-text-primary, #ffffff)",
         }}
       >
         {/* Top Header: Title, Copy link & Edit Button */}
         <div
           className="px-6 py-4 border-b flex items-center justify-between shrink-0 gap-4"
-          style={{ borderColor: 'var(--theme-border, #334155)' }}
+          style={{ borderColor: "var(--theme-border, #334155)" }}
         >
           <div className="flex-1 min-w-0 pr-2">
             <h3 className="text-base font-bold text-[var(--theme-text)] leading-snug break-words">
@@ -199,7 +234,14 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
               title="Copy Title"
               className="p-1.5 rounded-lg border border-[var(--theme-border)] hover:bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition"
             >
-              {copiedTitle ? <Check size={14} className="text-emerald-600 dark:text-emerald-400" /> : <Copy size={14} />}
+              {copiedTitle ? (
+                <Check
+                  size={14}
+                  className="text-emerald-600 dark:text-emerald-400"
+                />
+              ) : (
+                <Copy size={14} />
+              )}
             </button>
 
             {/* Edit button */}
@@ -229,7 +271,9 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
           {/* Row: Git Branch */}
           {ticket.gitbranch && (
             <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-              <span className="font-semibold text-[var(--theme-text-muted)]">Git Branch</span>
+              <span className="font-semibold text-[var(--theme-text-muted)]">
+                Git Branch
+              </span>
               <div className="flex items-center gap-2">
                 <span className="px-3 py-1.5 rounded-lg bg-[var(--theme-bg-app)] border border-[var(--theme-border)] font-mono text-xs text-[var(--theme-text)] break-all select-all">
                   {ticket.gitbranch}
@@ -238,7 +282,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
                   onClick={() => handleCopyBranch(ticket.gitbranch)}
                   className="px-2.5 py-1.5 rounded-lg border border-[var(--theme-border)] text-xs font-medium hover:bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] hover:text-[var(--theme-text)] transition shrink-0"
                 >
-                  {copiedBranch ? 'Copied!' : 'Copy'}
+                  {copiedBranch ? "Copied!" : "Copy"}
                 </button>
               </div>
             </div>
@@ -246,19 +290,25 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
 
           {/* Row: Description / Summary / Test Plan */}
           <div className="grid grid-cols-[120px_1fr] items-start gap-4 pt-1">
-            <span className="font-semibold text-[var(--theme-text-muted)] pt-1">Description</span>
+            <span className="font-semibold text-[var(--theme-text-muted)] pt-1">
+              Description
+            </span>
             <div className="space-y-3 min-w-0">
               {ticket.description ? (
                 <div className="text-[var(--theme-text)] leading-relaxed whitespace-pre-wrap font-sans text-xs bg-[var(--theme-bg-app)] p-3 rounded-xl border border-[var(--theme-border)]">
                   {ticket.description}
                 </div>
               ) : (
-                <p className="text-[var(--theme-text-muted)] italic">No description provided.</p>
+                <p className="text-[var(--theme-text-muted)] italic">
+                  No description provided.
+                </p>
               )}
 
               {ticket.testPlan && (
                 <div className="pt-2">
-                  <h5 className="font-bold text-[var(--theme-text)] text-xs mb-1">Test plan</h5>
+                  <h5 className="font-bold text-[var(--theme-text)] text-xs mb-1">
+                    Test plan
+                  </h5>
                   <div className="text-[var(--theme-text)] whitespace-pre-wrap bg-[var(--theme-bg-app)] p-3 rounded-xl border border-[var(--theme-border)]">
                     {ticket.testPlan}
                   </div>
@@ -267,11 +317,16 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
             </div>
           </div>
 
-          <div className="border-t my-2" style={{ borderColor: 'var(--theme-border, #334155)' }} />
+          <div
+            className="border-t my-2"
+            style={{ borderColor: "var(--theme-border, #334155)" }}
+          />
 
           {/* Row: Ticket Number */}
           <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-            <span className="font-semibold text-[var(--theme-text-muted)]">Ticket Number</span>
+            <span className="font-semibold text-[var(--theme-text-muted)]">
+              Ticket Number
+            </span>
             <span className="font-semibold text-[var(--theme-text)]">
               {ticket.issueNumber || ticket.customId || ticket.id.slice(0, 8)}
             </span>
@@ -279,9 +334,14 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
 
           {/* Row: Checklist */}
           <div className="grid grid-cols-[120px_1fr] items-start gap-4">
-            <span className="font-semibold text-[var(--theme-text-muted)] pt-1.5">Checklist</span>
+            <span className="font-semibold text-[var(--theme-text-muted)] pt-1.5">
+              Checklist
+            </span>
             <div className="space-y-2.5">
-              <form onSubmit={handleAddChecklistItem} className="flex items-center gap-2">
+              <form
+                onSubmit={handleAddChecklistItem}
+                className="flex items-center gap-2"
+              >
                 <input
                   type="text"
                   value={newChecklistItem}
@@ -299,7 +359,9 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
               </form>
 
               {checklist.length === 0 ? (
-                <p className="text-[var(--theme-text-muted)] text-xs py-1">No checklist items yet.</p>
+                <p className="text-[var(--theme-text-muted)] text-xs py-1">
+                  No checklist items yet.
+                </p>
               ) : (
                 <div className="space-y-1.5 pt-1">
                   {checklist.map((item) => (
@@ -316,7 +378,9 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
                         />
                         <span
                           className={`truncate ${
-                            item.completed ? 'line-through text-[var(--theme-text-muted)]' : 'text-[var(--theme-text)]'
+                            item.completed
+                              ? "line-through text-[var(--theme-text-muted)]"
+                              : "text-[var(--theme-text)]"
                           }`}
                         >
                           {item.text}
@@ -336,12 +400,21 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
             </div>
           </div>
 
-          <div className="border-t my-2" style={{ borderColor: 'var(--theme-border, #334155)' }} />
+          <div
+            className="border-t my-2"
+            style={{ borderColor: "var(--theme-border, #334155)" }}
+          />
 
           {/* Row: Attachments */}
           <div className="grid grid-cols-[120px_1fr] items-start gap-4">
-            <span className="font-semibold text-[var(--theme-text-muted)] pt-1.5">Attachments</span>
-            <div className="space-y-2.5" tabIndex={0} onPaste={handleAttachmentPaste}>
+            <span className="font-semibold text-[var(--theme-text-muted)] pt-1.5">
+              Attachments
+            </span>
+            <div
+              className="space-y-2.5"
+              tabIndex={0}
+              onPaste={handleAttachmentPaste}
+            >
               <input
                 ref={fileInputRef}
                 type="file"
@@ -356,25 +429,41 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
                   disabled={isUploadingFile}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--theme-border)] text-xs font-semibold text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] transition disabled:opacity-50"
                 >
-                  {isUploadingFile ? <Loader2 size={13} className="animate-spin" /> : <Paperclip size={13} />}
-                  <span>{isUploadingFile ? 'Uploading...' : 'Add Attachment'}</span>
+                  {isUploadingFile ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <Paperclip size={13} />
+                  )}
+                  <span>
+                    {isUploadingFile ? "Uploading..." : "Add Attachment"}
+                  </span>
                 </button>
-                <span className="text-[var(--theme-text-muted)] text-[11px]">or click here and paste (Ctrl+V)</span>
+                <span className="text-[var(--theme-text-muted)] text-[11px]">
+                  or click here and paste (Ctrl+V)
+                </span>
               </div>
 
               {attachmentError && (
                 <p className="text-rose-500 text-xs">{attachmentError}</p>
               )}
 
-              <TicketAttachmentList attachments={attachments} onRemove={handleRemoveAttachment} />
+              <TicketAttachmentList
+                attachments={attachments}
+                onRemove={handleRemoveAttachment}
+              />
             </div>
           </div>
 
-          <div className="border-t my-2" style={{ borderColor: 'var(--theme-border, #334155)' }} />
+          <div
+            className="border-t my-2"
+            style={{ borderColor: "var(--theme-border, #334155)" }}
+          />
 
           {/* Row: Priority */}
           <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-            <span className="font-semibold text-[var(--theme-text-muted)]">Priority</span>
+            <span className="font-semibold text-[var(--theme-text-muted)]">
+              Priority
+            </span>
             <div>
               <span
                 className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold border ${priorityBadge.bg} ${priorityBadge.text} ${priorityBadge.border}`}
@@ -386,11 +475,14 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
 
           {/* Row: Labels */}
           <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-            <span className="font-semibold text-[var(--theme-text-muted)]">Labels</span>
+            <span className="font-semibold text-[var(--theme-text-muted)]">
+              Labels
+            </span>
             <div className="flex items-center gap-1.5 flex-wrap">
               {labels.length > 0 ? (
                 labels.map((lbl: any, idx: number) => {
-                  const labelText = typeof lbl === 'string' ? lbl : lbl?.name || 'Label';
+                  const labelText =
+                    typeof lbl === "string" ? lbl : lbl?.name || "Label";
                   return (
                     <span
                       key={idx}
@@ -409,7 +501,9 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
 
           {/* Row: Assignees */}
           <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-            <span className="font-semibold text-[var(--theme-text-muted)]">Assignees</span>
+            <span className="font-semibold text-[var(--theme-text-muted)]">
+              Assignees
+            </span>
             <div className="flex items-center gap-2">
               {ticket.assignee ? (
                 <div className="flex items-center gap-2">
@@ -430,34 +524,44 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
                   {assigneeInitial}
                 </div>
               ) : (
-                <span className="text-[var(--theme-text-muted)]">Unassigned</span>
+                <span className="text-[var(--theme-text-muted)]">
+                  Unassigned
+                </span>
               )}
             </div>
           </div>
 
           {/* Row: Story Points */}
           <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-            <span className="font-semibold text-[var(--theme-text-muted)]">Story Points</span>
+            <span className="font-semibold text-[var(--theme-text-muted)]">
+              Story Points
+            </span>
             <span className="text-[var(--theme-text)] font-medium">
-              {ticket.storyPoints !== null && ticket.storyPoints !== undefined ? ticket.storyPoints : '-'}
+              {ticket.storyPoints !== null && ticket.storyPoints !== undefined
+                ? ticket.storyPoints
+                : "-"}
             </span>
           </div>
 
           {/* Row: Due Date */}
           <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-            <span className="font-semibold text-[var(--theme-text-muted)]">Due Date</span>
+            <span className="font-semibold text-[var(--theme-text-muted)]">
+              Due Date
+            </span>
             <div className="flex items-center gap-1.5 text-[var(--theme-text)]">
               <Calendar size={13} className="text-[var(--theme-text-muted)]" />
-              <span>{dueDateFormatted || '-'}</span>
+              <span>{dueDateFormatted || "-"}</span>
             </div>
           </div>
 
           {/* Row: Created Date */}
           <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-            <span className="font-semibold text-[var(--theme-text-muted)]">Created</span>
+            <span className="font-semibold text-[var(--theme-text-muted)]">
+              Created
+            </span>
             <div className="flex items-center gap-1.5 text-[var(--theme-text)]">
               <Calendar size={13} className="text-[var(--theme-text-muted)]" />
-              <span>{createdDateFormatted || '-'}</span>
+              <span>{createdDateFormatted || "-"}</span>
             </div>
           </div>
         </div>

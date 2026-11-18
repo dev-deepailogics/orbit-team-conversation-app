@@ -37,7 +37,26 @@ import { useThemeStore } from '../../stores/themeStore';
 // Convert stored markdown to live HTML for contentEditable
 function markdownToHtml(md: string): string {
   if (!md) return '';
-  const lines = md.split('\n');
+
+  // Pre-process multi-line bold (**...** across lines) and italic (*...*)
+  let processedMd = md
+    .replace(/\*\*([\s\S]*?)\*\*/g, (_, text) => {
+      return text
+        .split('\n')
+        .map((l: string) => {
+          const trimmed = l.trim();
+          return trimmed ? `<b>${trimmed}</b>` : '';
+        })
+        .join('\n');
+    })
+    .replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, (_, text) => {
+      const trimmed = text.trim();
+      return trimmed ? `<i>${trimmed}</i>` : '';
+    })
+    .replace(/~~([^~\n]+)~~/g, '<s>$1</s>')
+    .replace(/`([^`\n]+)`/g, '<code class="bg-[var(--theme-bg-surface-hover)] text-[#ECB22E] px-1 py-0.5 rounded font-mono text-xs">$1</code>');
+
+  const lines = processedMd.split('\n');
   let inList = false;
   let inOrdered = false;
   let html = '';
@@ -45,7 +64,7 @@ function markdownToHtml(md: string): string {
   const formatInline = (str: string) => {
     return str
       .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
-      .replace(/\*([^*]+)\*/g, '<i>$1</i>')
+      .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<i>$1</i>')
       .replace(/~~([^~]+)~~/g, '<s>$1</s>')
       .replace(/`([^`]+)`/g, '<code class="bg-[var(--theme-bg-surface-hover)] text-[#ECB22E] px-1 py-0.5 rounded font-mono text-xs">$1</code>');
   };
@@ -1293,7 +1312,28 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       isGlobalBold?: boolean,
       isHandwriting?: boolean
     ) => {
-      const rawLines = (fullText || '').split('\n');
+      // Pre-process multi-line bold (**...** across lines) and italic (*...*) so each line retains markdown tags
+      const normalizedText = (fullText || '')
+        .replace(/\*\*([\s\S]*?)\*\*/g, (_, text) => {
+          return text
+            .split('\n')
+            .map((l: string) => {
+              const trimmed = l.trim();
+              return trimmed ? `**${trimmed}**` : '';
+            })
+            .join('\n');
+        })
+        .replace(/(?<!\*)\*([^\n*]+)\*(?!\*)/g, (_, text) => {
+          return text
+            .split('\n')
+            .map((l: string) => {
+              const trimmed = l.trim();
+              return trimmed ? `*${trimmed}*` : '';
+            })
+            .join('\n');
+        });
+
+      const rawLines = normalizedText.split('\n');
       let currentY = startY;
 
       rawLines.forEach((raw) => {
@@ -1333,7 +1373,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         }
 
         // Parse inline formatting: **bold**, *italic*, ~~strike~~, `code`
-        const parts = line.split(/(\*\*[^*]+\*\*|\*[^*]+\*|~~[^~]+~~|`[^`]+`)/g);
+        const parts = line.split(/(\*\*[^*]+\*\*|\*[^*\n]+\*|~~[^~]+~~|`[^`]+`)/g);
 
         parts.forEach((part) => {
           if (!part) return;
