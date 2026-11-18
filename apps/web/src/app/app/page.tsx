@@ -38,6 +38,7 @@ import { CreateTicketFromMessageDialog } from "@/components/project/CreateTicket
 import { OrganizationControlView } from "@/components/availability/OrganizationControlView";
 import { CanvasView } from "@/components/whiteboard/CanvasView";
 import { ProjectDocsView } from "@/components/project/ProjectDocsView";
+import { ShareDocumentModal } from "@/components/project/ShareDocumentModal";
 import { useTeamPresence } from "@/components/availability/useTeamPresence";
 import {
   Layers,
@@ -98,6 +99,9 @@ export default function AppDashboard() {
     addTicket,
     activeSection,
     setActiveSection,
+    documents,
+    currentDocument,
+    setCurrentDocument,
   } = useProjectStore();
   const [chatView, setChatView] = useState<"messages" | "whiteboard">("messages");
 
@@ -110,6 +114,9 @@ export default function AppDashboard() {
   const [showCanvasHub, setShowCanvasHub] = useState(false);
   const [showDocsHub, setShowDocsHub] = useState(false);
   const [showProjectsPanel, setShowProjectsPanel] = useState(false);
+  const [canvases, setCanvases] = useState<any[]>([]);
+  const [selectedCanvasId, setSelectedCanvasId] = useState<string | null>(null);
+  const [shareDocTarget, setShareDocTarget] = useState<any | null>(null);
   const [docsInitialId, setDocsInitialId] = useState<string | null>(null);
   const [orgControlResetKey, setOrgControlResetKey] = useState(0);
   const [messageForTicket, setMessageForTicket] = useState<Message | null>(
@@ -239,6 +246,18 @@ export default function AppDashboard() {
         setProjects([]);
       }
 
+      // Load Workspace Canvases & Documents for the sidebar
+      try {
+        const [canvasRes, docRes] = await Promise.all([
+          api.get("/api/canvases", { params: { workspaceId: workspace.id } }),
+          api.get("/api/documents", { params: { workspaceId: workspace.id } }),
+        ]);
+        setCanvases(canvasRes.data || []);
+        useProjectStore.getState().setDocuments(docRes.data || []);
+      } catch (cdErr) {
+        console.error("Failed to load canvases or documents", cdErr);
+      }
+
       let targetChannel: Channel | null = null;
       let targetProject: Project | null = null;
       let targetIsOrgControl = false;
@@ -356,6 +375,69 @@ export default function AppDashboard() {
         ? `?view=org-control&subview=${subview}`
         : `?view=org-control`;
       window.history.replaceState(null, "", param);
+    }
+  };
+
+  // 4d. Canvas creation and deletion handlers
+  const handleCreateCanvas = async () => {
+    if (!currentWorkspace) return;
+    try {
+      const res = await api.post("/api/canvases", {
+        workspaceId: currentWorkspace.id,
+        title: "Untitled canvas",
+      });
+      setCanvases((prev) => [res.data, ...prev]);
+      setSelectedCanvasId(res.data.id);
+      setShowCanvasHub(true);
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Failed to create canvas");
+    }
+  };
+
+  const handleDeleteCanvas = async (canvasId: string) => {
+    const target = canvases.find((c) => c.id === canvasId);
+    if (!window.confirm(`Delete "${target?.title || "canvas"}"? This cannot be undone.`)) return;
+    try {
+      await api.delete(`/api/canvases/${canvasId}`);
+      setCanvases((prev) => prev.filter((c) => c.id !== canvasId));
+      if (selectedCanvasId === canvasId) {
+        setSelectedCanvasId(null);
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Failed to delete canvas");
+    }
+  };
+
+  // 4e. Document creation and deletion handlers
+  const handleCreateNewDoc = async () => {
+    if (!currentWorkspace || !user) return;
+    try {
+      const res = await api.post("/api/documents", {
+        workspaceId: currentWorkspace.id,
+        title: "Untitled Document",
+        content: "",
+        icon: "📄",
+        isPublicInProject: true,
+      });
+      useProjectStore.getState().addDocument(res.data);
+      useProjectStore.getState().setCurrentDocument(res.data);
+      handleOpenDocs(res.data.id);
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Failed to create document");
+    }
+  };
+
+  const handleDeleteDoc = async (docId: string) => {
+    const target = useProjectStore.getState().documents.find((d) => d.id === docId);
+    if (!window.confirm(`Delete "${target?.title || "document"}"? This cannot be undone.`)) return;
+    try {
+      await api.delete(`/api/documents/${docId}`);
+      useProjectStore.getState().removeDocument(docId);
+      if (useProjectStore.getState().currentDocument?.id === docId) {
+        useProjectStore.getState().setCurrentDocument(null);
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Failed to delete document");
     }
   };
 
@@ -861,10 +943,11 @@ export default function AppDashboard() {
 
   // Workspace rail feature shortcuts (Home / Canvas / Docs / Projects)
   const docsActive = showDocsHub && !!currentWorkspace;
+  const canvasActive = showCanvasHub && !!currentWorkspace;
   const railProps = {
     presence,
     onLogout: logout,
-    activeFeature: showCanvasHub
+    activeFeature: canvasActive
       ? ("canvas" as const)
       : docsActive
       ? ("docs" as const)
@@ -881,7 +964,7 @@ export default function AppDashboard() {
           syncUrlToCurrent();
         }
       : undefined,
-    // Canvas hub: pick an existing canvas or create a new one
+    // Canvas hub: opens Canvases list in the secondary sidebar
     onOpenCanvas: currentWorkspace
       ? () => {
           if (showDocsHub) {
@@ -893,10 +976,11 @@ export default function AppDashboard() {
           setShowCanvasHub((v) => !v);
         }
       : undefined,
-    // Docs are workspace-level, not tied to the open project
+    // Docs: opens Docs list in the secondary sidebar
     onOpenDocs: currentWorkspace
       ? () => {
           if (showOrgControl) setShowOrgControl(false);
+          if (showCanvasHub) setShowCanvasHub(false);
           if (!showDocsHub) {
             setShowProjectsPanel(false);
             return handleOpenDocs();
@@ -945,7 +1029,8 @@ export default function AppDashboard() {
                 handleSelectWorkspace(ws);
               }}
             />
-            {currentWorkspace && !showCanvasHub && !docsActive && !showOrgControl && (
+            {/* Show Channels & DMs / Projects / Canvas / Docs sidebar */}
+            {currentWorkspace && !showOrgControl && (
               <ChannelSidebar
                 workspace={currentWorkspace}
                 channels={channels}
@@ -955,6 +1040,39 @@ export default function AppDashboard() {
                 projects={projects}
                 currentProject={currentProject}
                 showProjects={showProjectsPanel}
+                showCanvas={showCanvasHub}
+                showDocs={docsActive}
+                onClosePanel={() => {
+                  setShowProjectsPanel(false);
+                  setShowCanvasHub(false);
+                  setShowDocsHub(false);
+                  syncUrlToCurrent();
+                }}
+                canvases={canvases}
+                currentCanvasId={selectedCanvasId}
+                onSelectCanvas={(canvasId) => {
+                  setSelectedCanvasId(canvasId);
+                  setShowCanvasHub(true);
+                  setIsMobileSidebarOpen(false);
+                }}
+                onOpenCreateCanvas={() => {
+                  setIsMobileSidebarOpen(false);
+                  handleCreateCanvas();
+                }}
+                onDeleteCanvas={handleDeleteCanvas}
+                documents={documents}
+                currentDocument={currentDocument}
+                onSelectDocument={(doc) => {
+                  setCurrentDocument(doc);
+                  handleOpenDocs(doc.id);
+                  setIsMobileSidebarOpen(false);
+                }}
+                onOpenCreateDoc={() => {
+                  setIsMobileSidebarOpen(false);
+                  handleCreateNewDoc();
+                }}
+                onShareDocument={(doc) => setShareDocTarget(doc)}
+                onDeleteDocument={handleDeleteDoc}
                 activeHuddleChannelId={
                   activeHuddleChannel || activeHuddleChannelId
                 }
@@ -1027,8 +1145,8 @@ export default function AppDashboard() {
         />
       </div>
 
-      {/* 2. Channels & Members Sidebar (Desktop) */}
-      {currentWorkspace && !showCanvasHub && !docsActive && !showOrgControl && (
+      {/* 2. Channels & Members / Projects / Canvas / Docs Sidebar (Desktop) */}
+      {currentWorkspace && !showOrgControl && (
         <div className="hidden md:flex shrink-0 h-full">
           <ChannelSidebar
             workspace={currentWorkspace}
@@ -1039,6 +1157,31 @@ export default function AppDashboard() {
             projects={projects}
             currentProject={currentProject}
             showProjects={showProjectsPanel}
+            showCanvas={showCanvasHub}
+            showDocs={docsActive}
+            onClosePanel={() => {
+              setShowProjectsPanel(false);
+              setShowCanvasHub(false);
+              setShowDocsHub(false);
+              syncUrlToCurrent();
+            }}
+            canvases={canvases}
+            currentCanvasId={selectedCanvasId}
+            onSelectCanvas={(canvasId) => {
+              setSelectedCanvasId(canvasId);
+              setShowCanvasHub(true);
+            }}
+            onOpenCreateCanvas={handleCreateCanvas}
+            onDeleteCanvas={handleDeleteCanvas}
+            documents={documents}
+            currentDocument={currentDocument}
+            onSelectDocument={(doc) => {
+              setCurrentDocument(doc);
+              handleOpenDocs(doc.id);
+            }}
+            onOpenCreateDoc={handleCreateNewDoc}
+            onShareDocument={(doc) => setShareDocTarget(doc)}
+            onDeleteDocument={handleDeleteDoc}
             activeHuddleChannelId={activeHuddleChannel || activeHuddleChannelId}
             onSelectChannel={handleSelectChannel}
             onSelectUserDM={handleSelectUserDM}
@@ -1204,12 +1347,14 @@ export default function AppDashboard() {
           members={members}
           initialDocId={docsInitialId}
           onDocChange={setDocsUrl}
+          onOpenDocsSidebar={() => setIsMobileSidebarOpen(true)}
         />
       ) : showCanvasHub && currentWorkspace ? (
         <CanvasView
           workspaceId={currentWorkspace.id}
           currentUser={user}
           onClose={() => setShowCanvasHub(false)}
+          onOpenCanvasSidebar={() => setIsMobileSidebarOpen(true)}
         />
       ) : showOrgControl && currentWorkspace ? (
         <OrganizationControlView
@@ -1371,18 +1516,16 @@ export default function AppDashboard() {
             className="fixed inset-0 bg-black/60 md:hidden transition-opacity"
             onClick={() => setActiveThread(null)}
           />
-          <div className="relative ml-auto h-full w-full sm:w-96 md:w-80 lg:w-96 shadow-2xl md:shadow-none animate-in slide-in-from-right duration-200">
-            <ThreadSidebar
-              parentMessage={activeThread}
-              replies={threadReplies}
-              currentUser={user}
-              onClose={() => setActiveThread(null)}
-              onReplyAdded={addThreadReply}
-              members={members}
-              onSelectUserDM={handleSelectUserDM}
-              onSelectChannel={handleSelectChannel}
-            />
-          </div>
+          <ThreadSidebar
+            parentMessage={activeThread}
+            replies={threadReplies}
+            currentUser={user}
+            onClose={() => setActiveThread(null)}
+            onReplyAdded={addThreadReply}
+            members={members}
+            onSelectUserDM={handleSelectUserDM}
+            onSelectChannel={handleSelectChannel}
+          />
         </div>
       )}
 
@@ -1472,6 +1615,21 @@ export default function AppDashboard() {
             setMessageForTicket(null);
           }}
           onOpenCreateProject={() => setShowCreateProjectModal(true)}
+        />
+      )}
+
+      {/* 12. Share Document Dialog */}
+      {shareDocTarget && (
+        <ShareDocumentModal
+          document={shareDocTarget}
+          currentUser={user}
+          members={members}
+          isOpen={!!shareDocTarget}
+          onClose={() => setShareDocTarget(null)}
+          onDocumentUpdated={(updated) => {
+            useProjectStore.getState().updateDocument(updated);
+            setShareDocTarget(updated);
+          }}
         />
       )}
     </div>

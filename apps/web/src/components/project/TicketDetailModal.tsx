@@ -37,6 +37,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
 }) => {
   const [copiedBranch, setCopiedBranch] = useState(false);
   const [copiedTitle, setCopiedTitle] = useState(false);
+  const [copiedTicketId, setCopiedTicketId] = useState(false);
   const [checklist, setChecklist] = useState<Array<{ id: string; text: string; completed: boolean }>>(
     Array.isArray(ticket.checklist) ? ticket.checklist : []
   );
@@ -246,9 +247,38 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
           {/* Row: Ticket ID */}
           <div className="grid grid-cols-[120px_1fr] items-center gap-4">
             <span className="font-semibold text-[var(--theme-text-muted)]">Ticket ID</span>
-            <span className="font-semibold text-[var(--theme-text)]">
-              {ticket.issueNumber || ticket.customId || ticket.id.slice(0, 8)}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-[var(--theme-text)]">
+                {ticket.issueNumber || ticket.customId || ticket.id.slice(0, 8)}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  const displayId = String(ticket.issueNumber || ticket.customId || ticket.id.slice(0, 8));
+                  navigator.clipboard.writeText(displayId);
+                  setCopiedTicketId(true);
+                  setTimeout(() => setCopiedTicketId(false), 2000);
+                }}
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-xs transition border hover:bg-black/5 dark:hover:bg-white/10"
+                style={{
+                  color: copiedTicketId ? '#22c55e' : 'var(--theme-text-muted)',
+                  borderColor: copiedTicketId ? '#22c55e' : 'var(--theme-border, #334155)',
+                }}
+                title="Copy Ticket ID"
+              >
+                {copiedTicketId ? (
+                  <>
+                    <Check size={12} className="text-emerald-500" />
+                    <span className="text-[11px] font-medium text-emerald-500">Copied</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy size={12} />
+                    <span className="text-[11px] font-medium">Copy</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Row: Checklist */}

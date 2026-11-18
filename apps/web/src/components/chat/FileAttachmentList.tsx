@@ -45,7 +45,10 @@ export function getFileCategory(
   if (mime.startsWith('image/') || ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp'].includes(ext)) {
     return 'image';
   }
-  if (mime.startsWith('video/') || ['.mp4', '.webm', '.mov', '.avi', '.mkv'].includes(ext)) {
+  if (
+    mime.startsWith('video/') ||
+    ['.mp4', '.webm', '.ogg', '.mov', '.m4v', '.avi', '.mkv'].includes(ext)
+  ) {
     return 'video';
   }
   if (mime.startsWith('audio/') || ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac'].includes(ext)) {
@@ -101,16 +104,18 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  const [failedImageIds, setFailedImageIds] = useState<Record<string, boolean>>({});
+
   if (!attachments || attachments.length === 0) return null;
 
   const activeAttachments = attachments.filter((a) => !a.isDeleted);
   if (activeAttachments.length === 0) return null;
 
   const images = activeAttachments.filter(
-    (a) => getFileCategory(a.fileType, a.fileName) === 'image'
+    (a) => getFileCategory(a.fileType, a.fileName) === 'image' && !failedImageIds[a.id]
   );
   const nonImages = activeAttachments.filter(
-    (a) => getFileCategory(a.fileType, a.fileName) !== 'image'
+    (a) => getFileCategory(a.fileType, a.fileName) !== 'image' || failedImageIds[a.id]
   );
 
   const handleDeleteFile = async (e: React.MouseEvent, file: Attachment) => {
@@ -135,8 +140,10 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
   };
 
   const getFullFileUrl = (url: string) => {
+    if (!url) return '';
     if (url.startsWith('http')) return url;
-    return url;
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:4000';
+    return `${serverUrl.replace(/\/$/, '')}${url.startsWith('/') ? '' : '/'}${url}`;
   };
 
   const getDownloadUrl = (file: Attachment) => {
@@ -226,6 +233,9 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
                   alt={img.fileName}
                   className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
                   loading="lazy"
+                  onError={() => {
+                    setFailedImageIds((prev) => ({ ...prev, [img.id]: true }));
+                  }}
                 />
               </div>
 
@@ -397,7 +407,7 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
       {/* 4. Interactive Image Lightbox Modal */}
       {lightboxImage && (
         <div
-          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col items-center justify-between p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col items-center justify-between p-4 animate-in fade-in duration-150 text-white"
           onClick={() => setLightboxImage(null)}
           onKeyDown={(e) => {
             if (e.key === 'Escape') setLightboxImage(null);
@@ -406,12 +416,12 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
         >
           {/* Top Bar */}
           <div
-            className="w-full flex items-center justify-between text-[var(--theme-text)] z-10"
+            className="w-full flex items-center justify-between text-white z-10"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex flex-col">
-              <span className="font-bold text-sm truncate max-w-md">{lightboxImage.fileName}</span>
-              <span className="text-xs text-[var(--theme-text-muted)] font-mono">
+              <span className="font-bold text-sm truncate max-w-md text-white drop-shadow-sm">{lightboxImage.fileName}</span>
+              <span className="text-xs text-neutral-300 font-mono">
                 {formatFileSize(lightboxImage.fileSize)}
               </span>
             </div>
@@ -420,33 +430,33 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
               <button
                 onClick={() => setZoomLevel((z) => Math.max(0.5, z - 0.25))}
                 title="Zoom Out"
-                className="p-2 text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-xl transition"
+                className="p-2 text-neutral-200 hover:text-white hover:bg-white/10 rounded-xl transition"
               >
                 <ZoomOut size={18} />
               </button>
-              <span className="text-xs font-mono text-[var(--theme-text)]">{Math.round(zoomLevel * 100)}%</span>
+              <span className="text-xs font-mono text-neutral-200">{Math.round(zoomLevel * 100)}%</span>
               <button
                 onClick={() => setZoomLevel((z) => Math.min(3, z + 0.25))}
                 title="Zoom In"
-                className="p-2 text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-xl transition"
+                className="p-2 text-neutral-200 hover:text-white hover:bg-white/10 rounded-xl transition"
               >
                 <ZoomIn size={18} />
               </button>
               <button
                 onClick={() => setZoomLevel(1)}
                 title="Reset Zoom"
-                className="p-2 text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-xl transition"
+                className="p-2 text-neutral-200 hover:text-white hover:bg-white/10 rounded-xl transition"
               >
                 <Maximize2 size={18} />
               </button>
 
-              <span className="w-px h-6 bg-[var(--theme-bg-surface-hover)] mx-1" />
+              <span className="w-px h-6 bg-white/20 mx-1" />
 
               <a
                 href={getDownloadUrl(lightboxImage)}
                 download={lightboxImage.fileName}
                 title="Download"
-                className="p-2 bg-slack-green hover:bg-slack-green/90 text-white rounded-xl transition flex items-center gap-1.5 text-xs font-semibold"
+                className="p-2 bg-slack-green hover:bg-slack-green/90 text-white rounded-xl transition flex items-center gap-1.5 text-xs font-semibold shadow-sm"
               >
                 <Download size={16} />
                 <span>Download</span>
@@ -455,7 +465,7 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
               <button
                 onClick={() => setLightboxImage(null)}
                 title="Close (Esc)"
-                className="p-2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-xl transition"
+                className="p-2 text-neutral-300 hover:text-white hover:bg-white/10 rounded-xl transition"
               >
                 <X size={20} />
               </button>

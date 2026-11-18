@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Message, UserProfile, Channel } from '@orbit/types';
-import { X, Send, CornerUpLeft, Smile, SmilePlus, Type, Paperclip, FileText, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { X, Send, CornerUpLeft, Smile, SmilePlus, Type, Paperclip, FileText, Loader2, Pencil, Trash2, ChevronDown } from 'lucide-react';
 import { api } from '../../lib/api';
 import { loadDraft, saveDraft, clearDraft } from '../../lib/drafts';
 import { useChatStore } from '../../stores/chatStore';
@@ -15,6 +15,7 @@ import { CompressFileConfirmModal } from './CompressFileConfirmModal';
 import { compressFile } from '../../lib/compression';
 import { useTimeFormat, formatMessageTime } from '../../lib/timeFormat';
 import { MessageChangeNote } from './MessageChangeNote';
+import { useResizableSidebar } from '../layout/useResizableSidebar';
 
 interface ThreadSidebarProps {
   parentMessage: Message;
@@ -48,6 +49,14 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   useEffect(() => {
     setContent(initialDraft ?? '');
   }, [initialDraft, draftScope]);
+  const sidebar = useResizableSidebar({
+    storageKey: 'orbit_thread_sidebar_width',
+    defaultWidth: 384,
+    minWidth: 300,
+    maxWidth: 720,
+    side: 'right',
+  });
+  const [content, setContent] = useState('');
   const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [threadAttachments, setThreadAttachments] = useState<any[]>([]);
@@ -66,6 +75,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   const [pendingCompressFiles, setPendingCompressFiles] = useState<File[]>([]);
   const [showCompressModal, setShowCompressModal] = useState(false);
   const [isCompressing, setIsCompressing] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   const currentWorkspace = useChatStore((state) => state.currentWorkspace);
   const isWsAdmin =
@@ -116,6 +126,10 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   };
 
   const repliesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
+  const [firstUnreadReplyId, setFirstUnreadReplyId] = useState<string | null>(null);
+  const previousRepliesCountRef = useRef(0);
   const editorRef = useRef<RichTextEditorRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -158,11 +172,44 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   }, []);
 
   useEffect(() => {
-    repliesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [replies]);
+    // Only auto-scroll if user is already near bottom OR if the new reply was sent by the current user
+    if (replies.length > previousRepliesCountRef.current) {
+      const lastReply = replies[replies.length - 1];
+      const isSentByMe = Boolean(
+        lastReply && (
+          lastReply.isSelf ||
+          (currentUser && lastReply.userId === currentUser.id)
+        )
+      );
+
+      if (isNearBottomRef.current || isSentByMe) {
+        repliesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        setFirstUnreadReplyId(null);
+      } else {
+        if (!isSentByMe) {
+          setFirstUnreadReplyId((prev) => prev || lastReply?.id || null);
+        }
+      }
+    }
+    previousRepliesCountRef.current = replies.length;
+  }, [replies, currentUser]);
+
+  const handleThreadScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const distanceFromBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
+    const isNearBottom = distanceFromBottom < 120;
+    isNearBottomRef.current = isNearBottom;
+
+    if (isNearBottom) {
+      setFirstUnreadReplyId(null);
+    }
+  };
 
   // Default to the reply input field when thread is opened or parent message changes
   useEffect(() => {
+    isNearBottomRef.current = true;
+    setFirstUnreadReplyId(null);
+    previousRepliesCountRef.current = 0;
     const timer = setTimeout(() => {
       editorRef.current?.focus();
     }, 100);
@@ -230,11 +277,25 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
       setShowCompressModal(false);
       setPendingCompressFiles([]);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      setTimeout(() => {
+        editorRef.current?.focus();
+      }, 50);
     }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
+
+    const files = Array.from(fileList);
+    setPendingCompressFiles(files);
+    setShowCompressModal(true);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const fileList = e.dataTransfer.files;
     if (!fileList || fileList.length === 0) return;
 
     const files = Array.from(fileList);
@@ -289,7 +350,11 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   const avatarUrl = parentMessage.user?.avatarUrl || parentMessage.bot?.avatarUrl || `/api/avatar/bottts/svg?seed=${authorName}`;
 
   return (
-    <div className="w-full h-full bg-[var(--theme-bg-surface)] border-l border-[var(--theme-border)] flex flex-col select-none">
+    <div
+      className="relative ml-auto h-full w-full sm:w-96 md:w-[var(--sidebar-w)] shadow-2xl md:shadow-none bg-[var(--theme-bg-surface)] border-l border-[var(--theme-border)] flex flex-col select-none"
+      style={sidebar.style}
+    >
+      {sidebar.handle}
       {/* Thread Header */}
       <div className="h-14 border-b border-[var(--theme-border)] px-4 flex items-center justify-between">
         <h3 className="font-bold text-[var(--theme-text)] text-sm">Thread</h3>
@@ -302,7 +367,11 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
       </div>
 
       {/* Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleThreadScroll}
+        className="flex-1 overflow-y-auto p-4 space-y-4"
+      >
         {/* Parent Message */}
         <div
           id={`thread-msg-${parentMessage.id}`}
@@ -550,11 +619,21 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
           const replyAvatar = reply.user?.avatarUrl || `/api/avatar/bottts/svg?seed=${replyAuthor}`;
 
           return (
-            <div
-              key={reply.id}
-              id={`thread-msg-${reply.id}`}
-              className="group relative flex gap-3 p-2 rounded-lg hover:bg-[var(--theme-bg-surface)] transition-all duration-300"
-            >
+            <React.Fragment key={reply.id}>
+              {firstUnreadReplyId === reply.id && (
+                <div className="flex items-center gap-2 my-2 select-none relative z-10 animate-in fade-in duration-200">
+                  <div className="flex-1 h-[1.5px] bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.4)]" />
+                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider text-white bg-red-500 shadow-sm">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                    <span>New Replies</span>
+                  </div>
+                  <div className="flex-1 h-[1.5px] bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.4)]" />
+                </div>
+              )}
+              <div
+                id={`thread-msg-${reply.id}`}
+                className="group relative flex gap-3 p-2 rounded-lg hover:bg-[var(--theme-bg-surface)] transition-all duration-300"
+              >
               {isReplyAnon ? (
                 <div
                   className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-900/70 to-indigo-900/70 border border-purple-500/40 flex items-center justify-center text-sm shrink-0 mt-0.5 select-none"
@@ -796,13 +875,31 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                 />
               )}
             </div>
-          );
-        })}
-        <div ref={repliesEndRef} />
-      </div>
+          </React.Fragment>
+        );
+      })}
+      <div ref={repliesEndRef} />
+    </div>
 
       {/* Reply Input */}
       <div className="p-3 border-t border-[var(--theme-border)] bg-[var(--theme-bg-app)] relative">
+        {/* Floating "New replies ↓" pill positioned above the input box */}
+        {firstUnreadReplyId && !isNearBottomRef.current && (
+          <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-30 animate-in fade-in slide-in-from-bottom-2 duration-150 pointer-events-auto">
+            <button
+              type="button"
+              onClick={() => {
+                repliesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+                setFirstUnreadReplyId(null);
+              }}
+              className="flex items-center gap-1 px-3 py-1 rounded-full bg-slack-green hover:bg-slack-green/90 text-white text-[11px] font-semibold shadow-xl border border-black/10 dark:border-white/10 transition transform hover:scale-105 cursor-pointer"
+            >
+              <span>New replies</span>
+              <ChevronDown size={13} />
+            </button>
+          </div>
+        )}
+
         {/* Quote Reply Banner */}
         {replyingToMessage && (
           <div className="flex items-center justify-between bg-[var(--theme-bg-surface)] border-l-4 border-slack-green rounded-t-lg px-3 py-1.5 mb-1 text-xs">
@@ -829,7 +926,18 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
           </div>
         )}
 
-        <form onSubmit={handleSendReply} className="bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-lg relative">
+        <form
+          onSubmit={handleSendReply}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragOver(true);
+          }}
+          onDragLeave={() => setIsDragOver(false)}
+          onDrop={handleDrop}
+          className={`bg-[var(--theme-bg-surface)] border rounded-lg relative transition ${
+            isDragOver ? 'ring-2 ring-slack-green/50 border-slack-green' : 'border-[var(--theme-border)]'
+          }`}
+        >
           {/* Uploaded attachments preview */}
           {threadAttachments.length > 0 && (
             <div className="flex flex-wrap gap-1.5 p-2 bg-[var(--theme-bg-app)] border-b border-[var(--theme-border)]">

@@ -19,7 +19,12 @@ import {
   Palette,
   Check,
   Building2,
+  PenTool,
+  FileText,
+  Trash2,
+  Share2,
 } from "lucide-react";
+import { ProjectDocument } from "@orbit/types";
 import { api } from "../../lib/api";
 import { useChatStore } from "../../stores/chatStore";
 import { WorkspaceStorageModal } from "../workspace/WorkspaceStorageModal";
@@ -54,6 +59,22 @@ interface ChannelSidebarProps {
   onSelectProject?: (project: Project) => void;
   onOpenCreateProject?: () => void;
   showProjects?: boolean;
+  showCanvas?: boolean;
+  showDocs?: boolean;
+  onClosePanel?: () => void;
+  // Canvas props
+  canvases?: any[];
+  currentCanvasId?: string | null;
+  onSelectCanvas?: (canvasId: string) => void;
+  onOpenCreateCanvas?: () => void;
+  onDeleteCanvas?: (canvasId: string) => void;
+  // Docs props
+  documents?: ProjectDocument[];
+  currentDocument?: ProjectDocument | null;
+  onSelectDocument?: (doc: ProjectDocument) => void;
+  onOpenCreateDoc?: () => void;
+  onShareDocument?: (doc: ProjectDocument) => void;
+  onDeleteDocument?: (docId: string) => void;
   onOpenBotPortal: () => void;
   onStartHuddle: (channel: Channel) => void;
   presence?: Record<string, Presence>;
@@ -78,6 +99,20 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   onSelectProject,
   onOpenCreateProject,
   showProjects = false,
+  showCanvas = false,
+  showDocs = false,
+  onClosePanel,
+  canvases = [],
+  currentCanvasId,
+  onSelectCanvas,
+  onOpenCreateCanvas,
+  onDeleteCanvas,
+  documents = [],
+  currentDocument,
+  onSelectDocument,
+  onOpenCreateDoc,
+  onShareDocument,
+  onDeleteDocument,
   onOpenBotPortal,
   onStartHuddle,
   presence = {},
@@ -101,7 +136,12 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   const workspaceMenuRef = useRef<HTMLDivElement>(null);
   const [isChannelsCollapsed, setIsChannelsCollapsed] = useState(false);
   const [isDmsCollapsed, setIsDmsCollapsed] = useState(false);
+  const [dmSearchQuery, setDmSearchQuery] = useState("");
+  const [showDmSearch, setShowDmSearch] = useState(false);
   const [projectSearchQuery, setProjectSearchQuery] = useState("");
+  const [canvasSearchQuery, setCanvasSearchQuery] = useState("");
+  const [docSearchQuery, setDocSearchQuery] = useState("");
+  const [docActiveFilter, setDocActiveFilter] = useState<"all" | "project" | "shared" | "private">("all");
   const unreadCounts = useChatStore((s) => s.unreadCounts);
 
   useEffect(() => {
@@ -186,6 +226,16 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
             <FolderKanban size={16} style={{ color: "var(--theme-primary)" }} />
             Projects & Boards
           </span>
+        ) : showCanvas ? (
+          <span className="flex items-center gap-1.5 truncate font-bold text-sm sm:text-base">
+            <PenTool size={16} style={{ color: "var(--theme-primary)" }} />
+            Canvases
+          </span>
+        ) : showDocs ? (
+          <span className="flex items-center gap-1.5 truncate font-bold text-sm sm:text-base">
+            <FileText size={16} style={{ color: "var(--theme-primary)" }} />
+            Docs
+          </span>
         ) : (
           <button
             onClick={() => setShowWorkspaceMenu((prev) => !prev)}
@@ -207,35 +257,98 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 
         <div className="flex items-center gap-1 shrink-0">
           {showProjects ? (
-            onOpenCreateProject && (
+            <>
+              {onOpenCreateProject && (
+                <button
+                  onClick={onOpenCreateProject}
+                  title="Create Project Board"
+                  style={{ color: "var(--theme-text-muted)" }}
+                  className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
+                >
+                  <Plus size={18} />
+                </button>
+              )}
               <button
-                onClick={onOpenCreateProject}
-                title="Create Project Board"
+                onClick={() => {
+                  onClosePanel?.();
+                  onCloseMobile?.();
+                }}
+                title="Close Projects"
                 style={{ color: "var(--theme-text-muted)" }}
                 className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
               >
-                <Plus size={18} />
+                <X size={18} />
               </button>
-            )
+            </>
+          ) : showCanvas ? (
+            <>
+              {onOpenCreateCanvas && (
+                <button
+                  onClick={onOpenCreateCanvas}
+                  title="Create Canvas"
+                  style={{ color: "var(--theme-text-muted)" }}
+                  className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
+                >
+                  <Plus size={18} />
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  onClosePanel?.();
+                  onCloseMobile?.();
+                }}
+                title="Close Canvases"
+                style={{ color: "var(--theme-text-muted)" }}
+                className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
+              >
+                <X size={18} />
+              </button>
+            </>
+          ) : showDocs ? (
+            <>
+              {onOpenCreateDoc && (
+                <button
+                  onClick={onOpenCreateDoc}
+                  title="Create Document"
+                  style={{ color: "var(--theme-text-muted)" }}
+                  className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
+                >
+                  <Plus size={18} />
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  onClosePanel?.();
+                  onCloseMobile?.();
+                }}
+                title="Close Docs"
+                style={{ color: "var(--theme-text-muted)" }}
+                className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
+              >
+                <X size={18} />
+              </button>
+            </>
           ) : (
-            <button
-              onClick={() => setShowAddMemberModal(true)}
-              title="Invite & Add Members"
-              style={{ color: "var(--theme-text-muted)" }}
-              className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
-            >
-              <UserPlus size={18} />
-            </button>
-          )}
-          {onCloseMobile && (
-            <button
-              onClick={onCloseMobile}
-              title="Close Menu"
-              style={{ color: "var(--theme-text-muted)" }}
-              className="md:hidden p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
-            >
-              <X size={18} />
-            </button>
+            <>
+              <button
+                onClick={() => setShowAddMemberModal(true)}
+                title="Invite & Add Members"
+                style={{ color: "var(--theme-text-muted)" }}
+                className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
+              >
+                <UserPlus size={18} />
+              </button>
+              {onCloseMobile && (
+                <button
+                  onClick={onCloseMobile}
+                  title="Close Menu"
+                  style={{ color: "var(--theme-text-muted)" }}
+                  className="md:hidden p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
+                >
+                  <X size={18} />
+                </button>
+              )}
+            </>
           )}
         </div>
 
@@ -393,6 +506,107 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
               )}
             </div>
           </div>
+        ) : showCanvas ? (
+          <div className="px-1 mb-2">
+            <div
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs"
+              style={{
+                backgroundColor: "var(--theme-bg-surface)",
+                borderColor: "var(--theme-border)",
+              }}
+            >
+              <Search
+                size={14}
+                style={{ color: "var(--theme-primary)" }}
+                className="shrink-0"
+              />
+              <input
+                type="text"
+                value={canvasSearchQuery}
+                onChange={(e) => setCanvasSearchQuery(e.target.value)}
+                placeholder="Search canvases..."
+                className="w-full bg-transparent outline-none"
+                style={{ color: "var(--theme-text-primary)" }}
+              />
+              {canvasSearchQuery && (
+                <button
+                  onClick={() => setCanvasSearchQuery("")}
+                  title="Clear"
+                  style={{ color: "var(--theme-text-muted)" }}
+                  className="shrink-0 hover:opacity-80"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+          </div>
+        ) : showDocs ? (
+          <div className="px-1 mb-2 space-y-2">
+            <div
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs"
+              style={{
+                backgroundColor: "var(--theme-bg-surface)",
+                borderColor: "var(--theme-border)",
+              }}
+            >
+              <Search
+                size={14}
+                style={{ color: "var(--theme-primary)" }}
+                className="shrink-0"
+              />
+              <input
+                type="text"
+                value={docSearchQuery}
+                onChange={(e) => setDocSearchQuery(e.target.value)}
+                placeholder="Search documents..."
+                className="w-full bg-transparent outline-none"
+                style={{ color: "var(--theme-text-primary)" }}
+              />
+              {docSearchQuery && (
+                <button
+                  onClick={() => setDocSearchQuery("")}
+                  title="Clear"
+                  style={{ color: "var(--theme-text-muted)" }}
+                  className="shrink-0 hover:opacity-80"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+            {/* Filter pills */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+              {(
+                [
+                  { id: "all", label: "All" },
+                  { id: "project", label: "Public" },
+                  { id: "shared", label: "Shared" },
+                  { id: "private", label: "Drafts" },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setDocActiveFilter(tab.id)}
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition shrink-0 ${
+                    docActiveFilter === tab.id
+                      ? "font-semibold shadow-xs"
+                      : "hover:bg-black/5 dark:hover:bg-white/10"
+                  }`}
+                  style={{
+                    backgroundColor:
+                      docActiveFilter === tab.id
+                        ? "var(--theme-bg-surface)"
+                        : "transparent",
+                    color:
+                      docActiveFilter === tab.id
+                        ? "var(--theme-text-primary)"
+                        : "var(--theme-text-muted)",
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
         ) : (
           onOpenSearch && (
             <div className="px-1 mb-2">
@@ -506,7 +720,190 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           </div>
         )}
 
-        {!showProjects && (
+        {/* Canvases Section — shown when toggled from rail */}
+        {showCanvas && (
+          <div>
+            <div className="space-y-0.5">
+              {canvases
+                .filter((c: any) =>
+                  (c.title || "Untitled canvas")
+                    .toLowerCase()
+                    .includes(canvasSearchQuery.trim().toLowerCase()),
+                )
+                .map((canvas: any) => {
+                  const isActive = currentCanvasId === canvas.id;
+                  const canDelete =
+                    canvas.createdById === currentUser?.id ||
+                    currentUser?.systemRole === "SUPER_ADMIN";
+
+                  return (
+                    <div
+                      key={canvas.id}
+                      onClick={() => onSelectCanvas?.(canvas.id)}
+                      className={`group flex items-center justify-between h-7 pl-5 pr-2 rounded-md text-[15px] transition cursor-pointer ${
+                        isActive
+                          ? "shadow font-semibold"
+                          : "hover:bg-black/5 dark:hover:bg-white/10"
+                      }`}
+                      style={
+                        isActive
+                          ? {
+                              backgroundColor: "var(--theme-primary)",
+                              color: "var(--theme-primary-text)",
+                            }
+                          : {
+                              color: "var(--theme-text-primary)",
+                            }
+                      }
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <PenTool size={14} className="shrink-0" />
+                        <span className="truncate">
+                          {canvas.title || "Untitled canvas"}
+                        </span>
+                      </div>
+
+                      {canDelete && onDeleteCanvas && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteCanvas(canvas.id);
+                          }}
+                          title="Delete canvas"
+                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition shrink-0"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+
+              {canvases.length === 0 && onOpenCreateCanvas && (
+                <button
+                  onClick={onOpenCreateCanvas}
+                  className="w-full text-left h-7 pl-5 pr-2 rounded-md text-[15px] hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-2 cursor-pointer"
+                  style={{ color: "var(--theme-text-muted)" }}
+                >
+                  <Plus size={12} />
+                  <span>Create a canvas...</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Docs Section — shown when toggled from rail */}
+        {showDocs && (
+          <div>
+            <div className="space-y-0.5">
+              {documents
+                .filter((doc) => {
+                  if (docActiveFilter === "project") return doc.isPublicInProject;
+                  if (docActiveFilter === "shared") {
+                    return (
+                      !doc.isPublicInProject &&
+                      doc.shares &&
+                      doc.shares.length > 0
+                    );
+                  }
+                  if (docActiveFilter === "private") {
+                    return (
+                      !doc.isPublicInProject &&
+                      doc.createdById === currentUser?.id &&
+                      (!doc.shares || doc.shares.length === 0)
+                    );
+                  }
+                  return true;
+                })
+                .filter((doc) =>
+                  (doc.title || "Untitled Document")
+                    .toLowerCase()
+                    .includes(docSearchQuery.trim().toLowerCase()),
+                )
+                .map((doc) => {
+                  const isActive = currentDocument?.id === doc.id;
+                  const isCreator = doc.createdById === currentUser?.id;
+                  const canDelete =
+                    isCreator || currentUser?.systemRole === "SUPER_ADMIN";
+
+                  return (
+                    <div
+                      key={doc.id}
+                      onClick={() => onSelectDocument?.(doc)}
+                      className={`group flex items-center justify-between h-7 pl-5 pr-2 rounded-md text-[15px] transition cursor-pointer ${
+                        isActive
+                          ? "shadow font-semibold"
+                          : "hover:bg-black/5 dark:hover:bg-white/10"
+                      }`}
+                      style={
+                        isActive
+                          ? {
+                              backgroundColor: "var(--theme-primary)",
+                              color: "var(--theme-primary-text)",
+                            }
+                          : {
+                              color: "var(--theme-text-primary)",
+                            }
+                      }
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <span className="text-sm shrink-0 leading-none">
+                          {doc.icon || "📄"}
+                        </span>
+                        <span className="truncate">
+                          {doc.title || "Untitled Document"}
+                        </span>
+                        {!doc.isPublicInProject && (
+                          <Lock size={12} className="shrink-0 opacity-60" />
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition shrink-0">
+                        {onShareDocument && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onShareDocument(doc);
+                            }}
+                            title="Share document"
+                            className="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition"
+                          >
+                            <Share2 size={13} />
+                          </button>
+                        )}
+                        {canDelete && onDeleteDocument && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteDocument(doc.id);
+                            }}
+                            title="Delete document"
+                            className="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+              {documents.length === 0 && onOpenCreateDoc && (
+                <button
+                  onClick={onOpenCreateDoc}
+                  className="w-full text-left h-7 pl-5 pr-2 rounded-md text-[15px] hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-2 cursor-pointer"
+                  style={{ color: "var(--theme-text-muted)" }}
+                >
+                  <Plus size={12} />
+                  <span>Create a document...</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!showProjects && !showCanvas && !showDocs && (
         <>
         {/* Channels Section */}
         <div>
@@ -642,12 +1039,12 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
         {/* Direct Messages Section */}
         <div>
           <div
-            className="flex items-center justify-between h-7 px-2 text-[15px] font-medium select-none"
+            className="flex items-center justify-between h-7 px-2 text-[15px] font-medium select-none group/dm-header"
             style={{ color: "var(--theme-text-muted)" }}
           >
             <button
               onClick={() => setIsDmsCollapsed((prev) => !prev)}
-              className="flex items-center gap-1.5 hover:text-[var(--theme-text)] transition cursor-pointer text-left focus:outline-none"
+              className="flex items-center gap-1.5 hover:text-[var(--theme-text)] transition cursor-pointer text-left focus:outline-none flex-1 truncate"
             >
               <ChevronDown
                 size={14}
@@ -657,10 +1054,51 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
               />
               <span>Direct messages</span>
             </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isDmsCollapsed) setIsDmsCollapsed(false);
+                setShowDmSearch((prev) => !prev);
+              }}
+              title="Search users"
+              className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 hover:text-[var(--theme-text)] transition shrink-0 focus:outline-none opacity-70 group-hover/dm-header:opacity-100"
+            >
+              <Search size={14} />
+            </button>
           </div>
 
           <Collapse open={!isDmsCollapsed}>
             <div className="space-y-0.5">
+              {showDmSearch && (
+                <div className="px-2 pt-1 pb-1.5">
+                  <div
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs border"
+                    style={{
+                      backgroundColor: "var(--theme-surface, rgba(255,255,255,0.04))",
+                      borderColor: "var(--theme-border, rgba(255,255,255,0.1))",
+                      color: "var(--theme-text-primary)",
+                    }}
+                  >
+                    <Search size={12} className="shrink-0 opacity-60" />
+                    <input
+                      type="text"
+                      value={dmSearchQuery}
+                      onChange={(e) => setDmSearchQuery(e.target.value)}
+                      placeholder="Search users..."
+                      autoFocus
+                      className="bg-transparent border-none outline-none w-full text-xs placeholder:text-[var(--theme-text-muted)] focus:outline-none"
+                    />
+                    {dmSearchQuery && (
+                      <button
+                        onClick={() => setDmSearchQuery("")}
+                        className="opacity-60 hover:opacity-100 transition focus:outline-none"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
               {(() => {
                 // Collect users from members + any user from existing DIRECT channels (e.g. kicked users with chat history)
                 const userMap = new Map<string, { user: any; id: string }>();
@@ -691,7 +1129,34 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                     });
                   });
 
-                const dmList = Array.from(userMap.values());
+                let dmList = Array.from(userMap.values());
+
+                if (dmSearchQuery.trim()) {
+                  const query = dmSearchQuery.toLowerCase().trim();
+                  dmList = dmList.filter((m) => {
+                    const u = m.user;
+                    if (!u) return false;
+                    const name = (u.displayName || "").toLowerCase();
+                    const username = (u.username || "").toLowerCase();
+                    const email = (u.email || "").toLowerCase();
+                    return (
+                      name.includes(query) ||
+                      username.includes(query) ||
+                      email.includes(query)
+                    );
+                  });
+                }
+
+                if (dmList.length === 0 && dmSearchQuery.trim()) {
+                  return (
+                    <div
+                      className="px-3 py-2 text-xs text-center italic"
+                      style={{ color: "var(--theme-text-muted)" }}
+                    >
+                      No users found
+                    </div>
+                  );
+                }
 
                 return dmList.map((member) => {
                   const user = member.user;
