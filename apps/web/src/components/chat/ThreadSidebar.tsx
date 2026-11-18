@@ -26,6 +26,10 @@ interface ThreadSidebarProps {
   members?: any[];
   onSelectUserDM?: (user: UserProfile) => void;
   onSelectChannel?: (channel: Channel) => void;
+  // Replies load newest-first in pages; these drive loading the earlier ones as the user scrolls up
+  hasMoreReplies?: boolean;
+  isLoadingOlderReplies?: boolean;
+  onLoadOlderReplies?: () => void;
 }
 
 export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
@@ -37,6 +41,9 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   members,
   onSelectUserDM,
   onSelectChannel,
+  hasMoreReplies = false,
+  isLoadingOlderReplies = false,
+  onLoadOlderReplies,
 }) => {
   const timeFormat = useTimeFormat();
   // Unsent reply for this thread, restored from this device when the composer mounts (see lib/drafts.ts).
@@ -129,10 +136,13 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   const isNearBottomRef = useRef(true);
   const [firstUnreadReplyId, setFirstUnreadReplyId] = useState<string | null>(null);
   const previousRepliesCountRef = useRef(0);
+  const previousScrollHeightRef = useRef(0); // set just before older replies are requested, to keep the view in place
   const editorRef = useRef<RichTextEditorRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isParentAnon = !!parentMessage.isAnonymous;
+  // The parent's reply count covers replies that haven't been loaded yet; never show fewer than are on screen
+  const totalReplies = Math.max(parentMessage.replyCount ?? 0, replies.length);
 
   const mentionUsers = React.useMemo(() => {
     if (isParentAnon) return [];
@@ -171,6 +181,14 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   }, []);
 
   useEffect(() => {
+    // Older replies were added above the ones on screen: keep the view exactly where it was, don't treat them as new
+    if (previousScrollHeightRef.current > 0 && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop += scrollContainerRef.current.scrollHeight - previousScrollHeightRef.current;
+      previousScrollHeightRef.current = 0;
+      previousRepliesCountRef.current = replies.length;
+      return;
+    }
+
     // Only auto-scroll if user is already near bottom OR if the new reply was sent by the current user
     if (replies.length > previousRepliesCountRef.current) {
       const lastReply = replies[replies.length - 1];
@@ -182,7 +200,9 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
       );
 
       if (isNearBottomRef.current || isSentByMe) {
-        repliesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        // The first replies of an opened thread jump to the bottom at once: a smooth scroll would pass through the top
+        // and trigger loading earlier replies that nobody asked for
+        repliesEndRef.current?.scrollIntoView({ behavior: previousRepliesCountRef.current === 0 ? 'auto' : 'smooth' });
         setFirstUnreadReplyId(null);
       } else {
         if (!isSentByMe) {
@@ -193,6 +213,17 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
     previousRepliesCountRef.current = replies.length;
   }, [replies, currentUser]);
 
+  // A request that fails or returns nothing new must not leave a stale height behind for the next real update
+  useEffect(() => {
+    if (!isLoadingOlderReplies) previousScrollHeightRef.current = 0;
+  }, [isLoadingOlderReplies]);
+
+  const loadOlderReplies = () => {
+    if (!hasMoreReplies || isLoadingOlderReplies || !onLoadOlderReplies) return;
+    if (scrollContainerRef.current) previousScrollHeightRef.current = scrollContainerRef.current.scrollHeight;
+    onLoadOlderReplies();
+  };
+
   const handleThreadScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
     const distanceFromBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
@@ -202,6 +233,9 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
     if (isNearBottom) {
       setFirstUnreadReplyId(null);
     }
+
+    // Close to the top: bring in the earlier replies
+    if (target.scrollTop <= 40) loadOlderReplies();
   };
 
   // Default to the reply input field when thread is opened or parent message changes
@@ -600,10 +634,31 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
         {/* Reply Count Separator */}
         <div className="flex items-center gap-2 py-1">
           <span className="text-[11px] font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">
-            {replies.length} {replies.length === 1 ? 'Reply' : 'Replies'}
+            {totalReplies} {totalReplies === 1 ? 'Reply' : 'Replies'}
           </span>
           <div className="flex-1 h-px bg-[var(--theme-bg-surface-hover)]" />
         </div>
+
+        {/* Earlier replies: loaded automatically on scrolling up, or with this button */}
+        {hasMoreReplies && (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={loadOlderReplies}
+              disabled={isLoadingOlderReplies}
+              className="px-3 py-1 text-xs font-medium rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg-surface)] text-[var(--theme-text)] flex items-center gap-2 transition disabled:opacity-50 hover:opacity-85"
+            >
+              {isLoadingOlderReplies ? (
+                <>
+                  <Loader2 size={12} className="animate-spin" />
+                  <span>Loading earlier replies...</span>
+                </>
+              ) : (
+                <span>Load earlier replies</span>
+              )}
+            </button>
+          </div>
+        )}
 
         {/* Replies List */}
         {replies.map((reply, idx) => {

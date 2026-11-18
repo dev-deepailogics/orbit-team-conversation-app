@@ -97,7 +97,9 @@ describe('chat store', () => {
   });
 
   test('a reply bumps the parent count once, even if delivered twice to an open thread', () => {
-    useChatStore.setState({ thread: { parentId: 'm1', parent: msg({}), replies: [], isLoading: false, error: '' } });
+    useChatStore.setState({
+      thread: { parentId: 'm1', parent: msg({}), replies: [], hasMore: false, nextCursor: null, isLoading: false, isLoadingOlder: false, error: '' },
+    });
     const reply = msg({ id: 'r1', parentMessageId: 'm1' });
     useChatStore.getState().receiveMessage(reply);
     useChatStore.getState().receiveMessage(reply);

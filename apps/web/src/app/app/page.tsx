@@ -51,6 +51,9 @@ import {
   Plus,
 } from "lucide-react";
 
+// How many thread replies are fetched at a time
+const THREAD_PAGE_SIZE = 30;
+
 // Longest a typing indicator stays up without a new typing:start (senders refresh it on every keystroke)
 const TYPING_TTL_MS = 6000;
 
@@ -73,6 +76,8 @@ export default function AppDashboard() {
     updateMessage,
     setActiveThread,
     setThreadReplies,
+    prependThreadReplies,
+    threadHasMore,
     addThreadReply,
     setTypingUser,
     incrementUnread,
@@ -135,6 +140,7 @@ export default function AppDashboard() {
 
   // Message chunking & pagination
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [isLoadingOlderReplies, setIsLoadingOlderReplies] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
 
@@ -934,13 +940,36 @@ export default function AppDashboard() {
   }, [user, currentWorkspace]);
 
   // 6. Handle Opening Thread
+  // Replies load newest-first in pages (like channel messages); earlier ones come in as the user scrolls up
   const handleOpenThread = async (message: Message) => {
     setActiveThread(message);
     try {
-      const res = await api.get(`/api/messages/${message.id}/replies`);
-      setThreadReplies(res.data.replies || [], message.id);
+      const res = await api.get(`/api/messages/${message.id}/replies`, { params: { limit: THREAD_PAGE_SIZE } });
+      setThreadReplies(res.data.replies || [], message.id, {
+        hasMore: !!res.data.hasMore,
+        nextCursor: res.data.nextCursor || null,
+      });
     } catch (err) {
       console.error("Failed to load thread replies", err);
+    }
+  };
+
+  const handleLoadOlderReplies = async () => {
+    const { activeThread: thread, threadNextCursor } = useChatStore.getState();
+    if (!thread || !threadNextCursor || isLoadingOlderReplies) return;
+    setIsLoadingOlderReplies(true);
+    try {
+      const res = await api.get(`/api/messages/${thread.id}/replies`, {
+        params: { cursor: threadNextCursor, limit: THREAD_PAGE_SIZE },
+      });
+      prependThreadReplies(res.data.replies || [], thread.id, {
+        hasMore: !!res.data.hasMore,
+        nextCursor: res.data.nextCursor || null,
+      });
+    } catch (err) {
+      console.error("Failed to load earlier thread replies", err);
+    } finally {
+      setIsLoadingOlderReplies(false);
     }
   };
 
@@ -1583,6 +1612,9 @@ export default function AppDashboard() {
             currentUser={user}
             onClose={() => setActiveThread(null)}
             onReplyAdded={addThreadReply}
+            hasMoreReplies={threadHasMore}
+            isLoadingOlderReplies={isLoadingOlderReplies}
+            onLoadOlderReplies={handleLoadOlderReplies}
             members={members}
             onSelectUserDM={handleSelectUserDM}
             onSelectChannel={handleSelectChannel}

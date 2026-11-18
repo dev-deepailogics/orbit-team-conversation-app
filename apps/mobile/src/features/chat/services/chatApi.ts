@@ -42,9 +42,19 @@ export async function sendMessage(channelId: string, content: string, attachment
   return res.data;
 }
 
-export async function getThread(messageId: string): Promise<{ parent: Message; replies: Message[] }> {
-  const res = await api.get<{ parent: Message; replies: Message[] }>(`/api/messages/${messageId}/replies`);
-  return res.data;
+export interface ThreadPage {
+  parent: Message;
+  replies: Message[]; // oldest → newest
+  hasMore: boolean;
+  nextCursor: string | null;
+}
+
+// Newest PAGE_SIZE replies; pass the previous page's nextCursor for the page before it.
+export async function getThread(messageId: string, cursor?: string | null): Promise<ThreadPage> {
+  const res = await api.get<ThreadPage>(`/api/messages/${messageId}/replies`, {
+    params: { limit: PAGE_SIZE, ...(cursor ? { cursor } : {}) },
+  });
+  return { ...res.data, hasMore: !!res.data.hasMore, nextCursor: res.data.nextCursor ?? null };
 }
 
 export async function sendReply(messageId: string, content: string, attachments: StagedAttachment[] = []): Promise<Message> {

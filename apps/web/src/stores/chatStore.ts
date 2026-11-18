@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { Workspace, Channel, Message } from '@orbit/types';
 
+export interface ThreadPage {
+  hasMore: boolean;
+  nextCursor: string | null;
+}
+
 export interface TypingUser {
   userId: string;
   username: string;
@@ -13,6 +18,8 @@ interface ChatState {
   messages: Message[];
   activeThread: Message | null;
   threadReplies: Message[];
+  threadHasMore: boolean;
+  threadNextCursor: string | null;
   // Who is typing per channel, keyed by user id (typing:stop only carries the id, not the name)
   typingUsers: { [channelId: string]: TypingUser[] };
   unreadCounts: { [channelId: string]: number };
@@ -26,8 +33,10 @@ interface ChatState {
   addMessage: (message: Message) => void;
   updateMessage: (message: Message) => void;
   setActiveThread: (message: Message | null) => void;
-  // threadId: the thread these replies were fetched for; ignored if the open thread has changed since
-  setThreadReplies: (replies: Message[], threadId?: string) => void;
+  // threadId: the thread these replies were fetched for; ignored if the open thread has changed since.
+  // page: whether older replies exist and where to continue from (replies load newest-first, like channel messages)
+  setThreadReplies: (replies: Message[], threadId?: string, page?: ThreadPage) => void;
+  prependThreadReplies: (older: Message[], threadId: string, page: ThreadPage) => void;
   addThreadReply: (reply: Message) => void;
   setTypingUser: (channelId: string, user: TypingUser, isTyping: boolean) => void;
   incrementUnread: (messageId: string, channelId: string) => void;
@@ -46,6 +55,8 @@ export const useChatStore = create<ChatState>((set) => ({
   messages: [],
   activeThread: null,
   threadReplies: [],
+  threadHasMore: false,
+  threadNextCursor: null,
   typingUsers: {},
   unreadCounts: {},
 
@@ -57,6 +68,8 @@ export const useChatStore = create<ChatState>((set) => ({
       messages: [],
       activeThread: null,
       threadReplies: [],
+      threadHasMore: false,
+      threadNextCursor: null,
       typingUsers: {},
       unreadCounts: {},
     }),
@@ -124,13 +137,29 @@ export const useChatStore = create<ChatState>((set) => ({
       activeThread: message,
       // Opening a different thread (or closing it): drop the previous thread's replies right away instead of showing
       // them under the new parent until its own replies finish loading
-      threadReplies: state.activeThread?.id === message?.id ? state.threadReplies : [],
+      ...(state.activeThread?.id === message?.id
+        ? {}
+        : { threadReplies: [], threadHasMore: false, threadNextCursor: null }),
     })),
-  setThreadReplies: (replies, threadId) =>
+  setThreadReplies: (replies, threadId, page) =>
     set((state) => {
       // A slow response for a thread that is no longer open must not overwrite the one that is
       if (threadId && state.activeThread?.id !== threadId) return state;
-      return { threadReplies: replies };
+      return {
+        threadReplies: replies,
+        threadHasMore: page?.hasMore ?? false,
+        threadNextCursor: page?.nextCursor ?? null,
+      };
+    }),
+  prependThreadReplies: (older, threadId, page) =>
+    set((state) => {
+      if (state.activeThread?.id !== threadId) return state;
+      const have = new Set(state.threadReplies.map((r) => r.id));
+      return {
+        threadReplies: [...older.filter((r) => !have.has(r.id)), ...state.threadReplies],
+        threadHasMore: page.hasMore,
+        threadNextCursor: page.nextCursor,
+      };
     }),
 
   addThreadReply: (reply) =>
