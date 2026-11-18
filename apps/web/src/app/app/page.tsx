@@ -226,7 +226,12 @@ export default function AppDashboard() {
     }
     setCurrentProject(null);
     try {
-      const res = await api.get(`/api/workspaces/${workspace.id}`);
+      const [res, unread] = await Promise.all([
+        api.get(`/api/workspaces/${workspace.id}`),
+        // Server-side counts (since each member's lastReadAt); a failure just means no badges.
+        api.get(`/api/channels/workspaces/${workspace.id}/unread`).catch(() => null),
+      ]);
+      useChatStore.setState({ unreadCounts: unread?.data ?? {} });
       setChannels(res.data.channels || []);
       setMembers(res.data.members || []);
 
@@ -324,6 +329,7 @@ export default function AppDashboard() {
     setShowDocsHub(false);
     setCurrentProject(null);
     setCurrentChannel(channel);
+    api.post(`/api/channels/${channel.id}/read`).catch(() => {});
     setHasMoreMessages(false);
     setNextCursor(null);
     if (typeof window !== "undefined") {
@@ -628,7 +634,9 @@ export default function AppDashboard() {
         addThreadReply(msg);
       } else if (activeChannel && msg.channelId === activeChannel.id) {
         addMessage(msg);
-      } else {
+        // Seen live in the open channel: keep lastReadAt current so a reload doesn't resurrect it as unread.
+        if (isFromOther) api.post(`/api/channels/${msg.channelId}/read`).catch(() => {});
+      } else if (isFromOther) {
         // Different channel or DM -> increment unread badge!
         incrementUnread(msg.id, msg.channelId);
       }
