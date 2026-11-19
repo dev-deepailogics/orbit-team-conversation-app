@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Avatar } from '@/components/project/projectViewUtils';
 import { Channel, UserProfile } from '@orbit/types';
-import { UserPlus, X, Check, Search } from 'lucide-react';
+import { UserPlus, X, Check, Search } from '@/components/ui/icons';
 import { api } from '../../lib/api';
 
 interface AddMembersDialogProps {
@@ -102,11 +103,7 @@ export const AddMembersDialog: React.FC<AddMembersDialogProps> = ({
                 }`}
               >
                 <div className="flex items-center gap-2.5">
-                  <img
-                    src={user.avatarUrl || `/api/avatar/bottts/svg?seed=${user.username}`}
-                    alt={user.displayName}
-                    className="w-8 h-8 rounded-lg object-cover"
-                  />
+                  <Avatar name={user.displayName || user.username} src={user.avatarUrl} size={32} />
                   <div>
                     <p className="text-xs font-semibold text-[var(--theme-text)]">{user.displayName}</p>
                     <p className="text-[10px] text-[var(--theme-text-muted)]">@{user.username}</p>

@@ -19,6 +19,47 @@ const ORBIT_DARK: ThemeConfig = {
 
 export const THEME_PRESETS: ThemeConfig[] = [
   ORBIT_DARK,
+  // Figma "Orbit Theme Guideline (Mint teal)". Light follows the Redesign v2/v3 screens:
+  // the guideline's brand/900 sidebar needs a separate on-sidebar text color ThemeConfig can't express.
+  {
+    id: 'mint-teal-light',
+    name: 'Mint Teal (Light)',
+    sidebarColor: '#F2F6F5',
+    workspaceColor: '#E6EDEB',
+    backgroundColor: '#FFFFFF',
+    surfaceColor: '#F6FAF9', // slate/50
+    surfaceHoverColor: '#EDF4F2', // slate/100
+    textColor: '#10201D', // slate/900
+    textMutedColor: '#466059', // slate/600
+    primaryColor: '#0D9488', // brand/600
+    primaryHoverColor: '#0F766E', // brand/700
+    primaryTextColor: '#FFFFFF',
+    secondaryColor: '#2D5855',
+    borderColor: '#DBE7E4', // slate/200
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    selectedColor: '#D5E6E2',
+    accentColor: '#2D5855',
+    sectionColor: '#3E6F68',
+  },
+  {
+    id: 'mint-teal-dark',
+    name: 'Mint Teal (Dark)',
+    sidebarColor: '#042F2E', // brand/950
+    workspaceColor: '#042F2E',
+    backgroundColor: '#10201D', // slate/900
+    surfaceColor: '#1F312D', // slate/800
+    surfaceHoverColor: '#304842', // slate/700
+    textColor: '#F6FAF9', // slate/50
+    textMutedColor: '#C0D2CE', // slate/300
+    primaryColor: '#14B8A6', // brand/500
+    primaryHoverColor: '#2DD4BF', // brand/400
+    primaryTextColor: '#FFFFFF',
+    secondaryColor: '#5EEAD4', // brand/300
+    borderColor: '#304842', // slate/700
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    selectedColor: '#134E4A', // brand/900 (bg/selected, dark)
+    sectionColor: '#8BA7A1', // slate/400 (text/muted, dark)
+  },
   {
     id: 'navy-glass',
     name: 'Navy Glass',
@@ -283,7 +324,7 @@ export const THEME_PRESETS: ThemeConfig[] = [
   },
 ];
 
-export const DEFAULT_THEME: ThemeConfig = THEME_PRESETS.find((t) => t.id === 'slack-light')!;
+export const DEFAULT_THEME: ThemeConfig = THEME_PRESETS.find((t) => t.id === 'mint-teal-light')!;
 
 export function isLightColor(hex?: string): boolean {
   if (!hex || !hex.startsWith('#')) return false;
@@ -315,9 +356,17 @@ export function applyTheme(theme: ThemeConfig) {
   root.style.setProperty('--theme-secondary', theme.secondaryColor);
   root.style.setProperty('--theme-border', theme.borderColor);
   // Themes saved before presets had fonts lack fontFamily; take it from the preset by id
-  const font = theme.fontFamily ?? THEME_PRESETS.find((p) => p.id === theme.id)?.fontFamily;
-  if (font) root.style.setProperty('--theme-font', font);
-  else root.style.removeProperty('--theme-font');
+  const preset = THEME_PRESETS.find((p) => p.id === theme.id);
+  const optional: [string, string | undefined][] = [
+    ['--theme-font', theme.fontFamily ?? preset?.fontFamily],
+    ['--theme-selected', theme.selectedColor ?? preset?.selectedColor],
+    ['--theme-accent', theme.accentColor ?? preset?.accentColor],
+    ['--theme-section', theme.sectionColor ?? preset?.sectionColor],
+  ];
+  for (const [prop, value] of optional) {
+    if (value) root.style.setProperty(prop, value);
+    else root.style.removeProperty(prop);
+  }
 
   // 2. Synchronize Light / Dark theme class on document element
   const isLight = isLightColor(theme.backgroundColor) || isLightColor(theme.sidebarColor);

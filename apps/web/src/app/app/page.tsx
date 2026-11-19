@@ -27,6 +27,7 @@ import { WorkspaceSidebar } from "@/components/workspace/WorkspaceSidebar";
 import { ChannelSidebar } from "@/components/channel/ChannelSidebar";
 import { ChatArea } from "@/components/chat/ChatArea";
 import { ThreadSidebar } from "@/components/chat/ThreadSidebar";
+import { QuickTodos } from "@/components/layout/QuickTodos";
 import { HuddleModal } from "@/components/huddle/HuddleModal";
 import { IncomingCallDialog } from "@/components/huddle/IncomingCallDialog";
 import { AddMembersDialog } from "@/components/channel/AddMembersDialog";
@@ -42,9 +43,14 @@ import { RecorderOverlay } from "@/components/recording/RecorderOverlay";
 import { useRecorderStore } from "@/stores/recorderStore";
 import { clipShareUrl } from "@/components/recording/recordingUtils";
 import { ProjectDocsView } from "@/components/project/ProjectDocsView";
+import { ShareDocumentModal } from "@/components/project/ShareDocumentModal";
 import { useTeamPresence } from "@/components/availability/useTeamPresence";
+import { useLiveUserStatus } from "@/components/channel/useLiveUserStatus";
+import { WorkspaceSkeleton } from "@/components/brand/LoadingScreens";
+import { EmptyState } from "@/components/brand/EmptyState";
+import { ProfileModal } from "@/components/profile/ProfileModal";
+import { OfflineOverlay } from "@/components/brand/OfflineScreen";
 import {
-  Layers,
   ShieldCheck,
   Building2,
   LogOut,
@@ -52,7 +58,13 @@ import {
   Copy,
   Check,
   Plus,
-} from "lucide-react";
+} from "@/components/ui/icons";
+
+// How many thread replies are fetched at a time
+const THREAD_PAGE_SIZE = 30;
+
+// Longest a typing indicator stays up without a new typing:start (senders refresh it on every keystroke)
+const TYPING_TTL_MS = 6000;
 
 export default function AppDashboard() {
   const router = useRouter();
@@ -73,12 +85,14 @@ export default function AppDashboard() {
     updateMessage,
     setActiveThread,
     setThreadReplies,
+    prependThreadReplies,
+    threadHasMore,
     addThreadReply,
     setTypingUser,
     incrementUnread,
   } = useChatStore();
   // Check-in driven presence (working / break / offline) for everyone in the workspace
-  const presence = useTeamPresence(currentWorkspace?.id);
+  const { presence, breakReasons } = useTeamPresence(currentWorkspace?.id);
 
   const {
     startHuddle,
@@ -99,11 +113,18 @@ export default function AppDashboard() {
     addTicket,
     activeSection,
     setActiveSection,
+    documents,
+    currentDocument,
+    setCurrentDocument,
   } = useProjectStore();
-  const [chatView, setChatView] = useState<"messages" | "whiteboard">("messages");
+  const [chatView, setChatView] = useState<"messages" | "whiteboard">(
+    "messages",
+  );
 
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [members, setMembers] = useState<any[]>([]);
+  // Whether each member is actually connected to Orbit right now (a live socket).
+  const liveStatus = useLiveUserStatus(members);
   const [showBotPortal, setShowBotPortal] = useState(false);
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
@@ -114,6 +135,39 @@ export default function AppDashboard() {
   const [showVideoLibrary, setShowVideoLibrary] = useState(false);
   const recorderState = useRecorderStore((s) => s);
   const closeRecorder = useRecorderStore((s) => s.close);
+  const [canvases, setCanvases] = useState<any[]>([]);
+  const [newCanvasSignal, setNewCanvasSignal] = useState(0);
+  const [showProfilePage, setShowProfilePage] = useState(false);
+  const wasProfileOpen = useRef(false);
+  useEffect(() => {
+    if (
+      wasProfileOpen.current &&
+      !showProfilePage &&
+      typeof window !== "undefined"
+    ) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("view") === "profile") {
+        params.delete("view");
+        const qs = params.toString();
+        window.history.replaceState(
+          null,
+          "",
+          qs ? `?${qs}` : window.location.pathname,
+        );
+      }
+    }
+    wasProfileOpen.current = showProfilePage;
+  }, [showProfilePage]);
+  // The canvas hub is toggled from several places; any of them leaves the profile page.
+  useEffect(() => {
+    if (showCanvasHub) {
+      setShowProfilePage(false);
+      setShowVideoLibrary(false);
+    }
+  }, [showCanvasHub]);
+  const [newDocSignal, setNewDocSignal] = useState(0);
+  const [selectedCanvasId, setSelectedCanvasId] = useState<string | null>(null);
+  const [shareDocTarget, setShareDocTarget] = useState<any | null>(null);
   const [docsInitialId, setDocsInitialId] = useState<string | null>(null);
   const [orgControlResetKey, setOrgControlResetKey] = useState(0);
   const [messageForTicket, setMessageForTicket] = useState<Message | null>(
@@ -132,6 +186,7 @@ export default function AppDashboard() {
 
   // Message chunking & pagination
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [isLoadingOlderReplies, setIsLoadingOlderReplies] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
 
@@ -190,7 +245,9 @@ export default function AppDashboard() {
           (currentWorkspace &&
             res.data.find((w: Workspace) => w.id === currentWorkspace.id)) ||
           res.data[0];
-        handleSelectWorkspace(targetWs);
+        // Await so the loading screen stays up until the previous channel/view is restored;
+        // otherwise "Nothing open yet" flashes for a frame on every refresh.
+        await handleSelectWorkspace(targetWs);
       } else {
         // Clear active workspace and channels when user has 0 workspaces
         setCurrentWorkspace(null);
@@ -206,10 +263,13 @@ export default function AppDashboard() {
     }
   };
 
+  // Keyed on the user id: saving the profile replaces the user object and token but must not reload the workspace
+  const hasToken = !!token;
   useEffect(() => {
-    if (!user || !token) return;
+    if (!user || !hasToken) return;
     loadWorkspaces();
-  }, [user, token]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, hasToken]);
 
   // Synchronize workspace theme (cached in localStorage, synced with DB)
   useEffect(() => {
@@ -226,29 +286,49 @@ export default function AppDashboard() {
     }
     setCurrentProject(null);
     try {
-      const res = await api.get(`/api/workspaces/${workspace.id}`);
+      // All independent: fetch in parallel. Only the workspace itself is required; the rest degrade gracefully.
+      const [res, unread, projRes, sidebarRes] = await Promise.all([
+        api.get(`/api/workspaces/${workspace.id}`),
+        // Server-side counts (since each member's lastReadAt); a failure just means no badges.
+        api
+          .get(`/api/channels/workspaces/${workspace.id}/unread`)
+          .catch(() => null),
+        api
+          .get(`/api/projects/workspaces/${workspace.id}/projects`)
+          .catch((pErr) => {
+            console.error("Failed to load projects", pErr);
+            return null;
+          }),
+        Promise.all([
+          api.get("/api/canvases", { params: { workspaceId: workspace.id } }),
+          api.get("/api/documents", { params: { workspaceId: workspace.id } }),
+        ]).catch((cdErr) => {
+          console.error("Failed to load canvases or documents", cdErr);
+          return null;
+        }),
+      ]);
+      useChatStore.getState().setUnreadCounts(unread?.data ?? {});
       setChannels(res.data.channels || []);
       setMembers(res.data.members || []);
 
-      // Load Workspace Projects
-      let projectsData: Project[] = [];
-      try {
-        const projRes = await api.get(
-          `/api/projects/workspaces/${workspace.id}/projects`,
-        );
-        projectsData = projRes.data || [];
-        setProjects(projectsData);
-      } catch (pErr) {
-        console.error("Failed to load projects", pErr);
-        setProjects([]);
+      const projectsData: Project[] = projRes?.data || [];
+      setProjects(projectsData);
+
+      if (sidebarRes) {
+        const [canvasRes, docRes] = sidebarRes;
+        setCanvases(canvasRes.data || []);
+        useProjectStore.getState().setDocuments(docRes.data || []);
       }
 
       let targetChannel: Channel | null = null;
       let targetProject: Project | null = null;
       let targetIsOrgControl = false;
       let targetDocs: { docId: string | null } | null = null;
+      let targetProfile = false;
       if (typeof window !== "undefined") {
         const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get("search") === "1") setShowSearchModal(true);
+        if (urlParams.get("view") === "profile") targetProfile = true;
         const urlView = urlParams.get("view");
         const urlChId = urlParams.get("channelId");
         const urlProjId = urlParams.get("projectId");
@@ -271,13 +351,14 @@ export default function AppDashboard() {
         handleOpenOrgControl();
       } else if (targetProject) {
         handleSelectProject(targetProject);
-      } else if (targetChannel) {
-        handleSelectChannel(targetChannel);
-      } else if (res.data.channels && res.data.channels.length > 0) {
-        handleSelectChannel(res.data.channels[0]);
+      } else {
+        // Awaited so the boot screen covers the first page of messages too (no empty-channel flash).
+        const channel = targetChannel ?? res.data.channels?.[0];
+        if (channel) await handleSelectChannel(channel);
       }
       // Docs open on top of the default channel so Home has somewhere to go back to
       if (targetDocs && !targetIsOrgControl) handleOpenDocs(targetDocs.docId);
+      if (targetProfile) openProfilePage();
     } catch (err) {
       console.error("Failed to load workspace details", err);
     }
@@ -305,13 +386,31 @@ export default function AppDashboard() {
     }
   };
 
+  // Server-side read state, so unread counts survive a reload and sync across devices
+  const markChannelRead = (channelId: string) => {
+    api.post(`/api/channels/${channelId}/read`).catch(() => {});
+  };
+  // Messages arriving in the open channel are read; batch those into one call per couple of seconds
+  const readTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const markChannelReadSoon = (channelId: string) => {
+    if (readTimers.current[channelId]) return;
+    readTimers.current[channelId] = setTimeout(() => {
+      delete readTimers.current[channelId];
+      markChannelRead(channelId);
+    }, 2000);
+  };
+
   // 4. Handle Channel Selection (Chunked Initial Load)
   const handleSelectChannel = async (channel: Channel) => {
+    setShowProfilePage(false);
     setShowOrgControl(false);
     setShowCanvasHub(false);
     setShowDocsHub(false);
+    setShowProjectsPanel(false);
+    setShowVideoLibrary(false);
     setCurrentProject(null);
     setCurrentChannel(channel);
+    markChannelRead(channel.id);
     setHasMoreMessages(false);
     setNextCursor(null);
     if (typeof window !== "undefined") {
@@ -338,10 +437,19 @@ export default function AppDashboard() {
   };
 
   // 4b. Handle Project Selection
+  // Last board the user opened, so the Projects rail icon can reopen it.
+  const lastProjectIdRef = useRef<string | null>(null);
+
   const handleSelectProject = (project: Project) => {
+    setShowProfilePage(false);
     setShowOrgControl(false);
     setShowCanvasHub(false);
     setShowDocsHub(false);
+    setShowVideoLibrary(false);
+    // A board is always shown with the Projects list beside it, however it was opened
+    // (sidebar, search, URL, Organization Control).
+    setShowProjectsPanel(true);
+    lastProjectIdRef.current = project.id;
     setCurrentProject(project);
     if (typeof window !== "undefined") {
       window.history.replaceState(null, "", `?projectId=${project.id}`);
@@ -350,9 +458,12 @@ export default function AppDashboard() {
 
   // 4c. Handle Organization Control URL Sync
   const handleOpenOrgControl = (subview?: string) => {
+    setShowProfilePage(false);
     setShowOrgControl(true);
     setShowCanvasHub(false);
     setShowDocsHub(false);
+    setShowProjectsPanel(false);
+    setShowVideoLibrary(false);
     setCurrentProject(null);
     setOrgControlResetKey((prev) => prev + 1);
     if (typeof window !== "undefined") {
@@ -363,16 +474,142 @@ export default function AppDashboard() {
     }
   };
 
+  // 4d. Canvas creation and deletion handlers
+  const handleOpenOrCreateScopedCanvas = async (targetChannel?: Channel | null, targetProject?: any | null) => {
+    if (!currentWorkspace) return;
+    const ch = targetChannel !== undefined ? targetChannel : currentChannel;
+    const pr = targetProject !== undefined ? targetProject : currentProject;
+
+    try {
+      // 1. Fetch canvases linked to this channel or project
+      const params: any = { workspaceId: currentWorkspace.id };
+      if (ch) params.channelId = ch.id;
+      if (pr) params.projectId = pr.id;
+
+      const res = await api.get('/api/canvases', { params });
+      const linkedCanvases: any[] = res.data || [];
+
+      if (linkedCanvases.length > 0) {
+        // Open the existing linked canvas
+        setSelectedCanvasId(linkedCanvases[0].id);
+        setShowCanvasHub(true);
+        setShowDocsHub(false);
+        setShowOrgControl(false);
+        setShowProjectsPanel(false);
+      } else {
+        // Create canvas titled after channel or user DM or project
+        let canvasTitle = 'Untitled canvas';
+        if (ch) {
+          if (ch.type === 'DIRECT' || ch.type === 'GROUP_DIRECT') {
+            const others = (ch.members || [])
+              .filter((m: any) => m.userId !== user?.id)
+              .map((m: any) => m.user?.displayName || m.user?.username);
+            const otherName = others.filter(Boolean).join(', ') || ch.name;
+            canvasTitle = `${otherName} Canvas`;
+          } else {
+            canvasTitle = `${ch.name} Canvas`;
+          }
+        } else if (pr) {
+          canvasTitle = `${pr.name} Canvas`;
+        }
+
+        const createRes = await api.post('/api/canvases', {
+          workspaceId: currentWorkspace.id,
+          title: canvasTitle,
+          channelId: ch ? ch.id : undefined,
+          projectId: !ch && pr ? pr.id : undefined,
+        });
+
+        setCanvases((prev) => [createRes.data, ...prev]);
+        setSelectedCanvasId(createRes.data.id);
+        setShowCanvasHub(true);
+        setShowDocsHub(false);
+        setShowOrgControl(false);
+        setShowProjectsPanel(false);
+      }
+    } catch (err: any) {
+      console.error('Failed to open or create canvas', err);
+      // Fallback: open canvas hub
+      setShowCanvasHub(true);
+    }
+  };
+
+  // Opens the canvas hub with its "New canvas" dialog (name, link, template)
+  const handleCreateCanvas = () => {
+    if (!currentWorkspace) return;
+    setShowDocsHub(false);
+    setShowOrgControl(false);
+    setSelectedCanvasId(null);
+    setShowCanvasHub(true);
+    setNewCanvasSignal((n) => n + 1);
+  };
+
+  const handleDeleteCanvas = async (canvasId: string) => {
+    const target = canvases.find((c) => c.id === canvasId);
+    if (
+      !window.confirm(
+        `Delete "${target?.title || "canvas"}"? This cannot be undone.`,
+      )
+    )
+      return;
+    try {
+      await api.delete(`/api/canvases/${canvasId}`);
+      setCanvases((prev) => prev.filter((c) => c.id !== canvasId));
+      if (selectedCanvasId === canvasId) {
+        setSelectedCanvasId(null);
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Failed to delete canvas");
+    }
+  };
+
+  // 4e. Document creation and deletion handlers
+  // Opens Docs with its "New document" dialog (title, visibility, project)
+  const handleCreateNewDoc = () => {
+    if (!currentWorkspace || !user) return;
+    handleOpenDocs(null);
+    setNewDocSignal((n) => n + 1);
+  };
+
+  const handleDeleteDoc = async (docId: string) => {
+    const target = useProjectStore
+      .getState()
+      .documents.find((d) => d.id === docId);
+    if (
+      !window.confirm(
+        `Delete "${target?.title || "document"}"? This cannot be undone.`,
+      )
+    )
+      return;
+    try {
+      await api.delete(`/api/documents/${docId}`);
+      useProjectStore.getState().removeDocument(docId);
+      if (useProjectStore.getState().currentDocument?.id === docId) {
+        useProjectStore.getState().setCurrentDocument(null);
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Failed to delete document");
+    }
+  };
+
   // 4d. Docs: workspace-level, own URL (?view=docs&docId=...)
   const setDocsUrl = (docId: string | null) => {
     if (typeof window !== "undefined") {
-      window.history.replaceState(null, "", docId ? `?view=docs&docId=${docId}` : "?view=docs");
+      window.history.replaceState(
+        null,
+        "",
+        docId ? `?view=docs&docId=${docId}` : "?view=docs",
+      );
     }
   };
 
   const handleOpenDocs = (docId: string | null = null) => {
+    setShowProfilePage(false);
     setShowCanvasHub(false);
     setShowOrgControl(false);
+    setShowProjectsPanel(false);
+    setShowVideoLibrary(false);
+    setCurrentProject(null);
     setDocsInitialId(docId);
     setShowDocsHub(true);
     setDocsUrl(docId);
@@ -383,18 +620,125 @@ export default function AppDashboard() {
     syncUrlToCurrent();
   };
 
+  // Home: close every feature view (incl. an open board) and show the channel. Every "close" or
+  // "back" path uses this, so the rail, the sidebar and the main area always agree.
+  const goHome = () => {
+    setShowProfilePage(false);
+    setShowCanvasHub(false);
+    setShowDocsHub(false);
+    setShowOrgControl(false);
+    setShowProjectsPanel(false);
+    setShowVideoLibrary(false);
+    setCurrentProject(null);
+    // The channel stays loaded underneath other views; only fetch one if none was ever opened
+    // (e.g. the app was loaded straight onto a project or docs URL).
+    const channel = currentChannel ?? channels[0];
+    if (channel && channel.id !== currentChannel?.id) {
+      handleSelectChannel(channel);
+    } else if (typeof window !== "undefined") {
+      window.history.replaceState(
+        null,
+        "",
+        currentChannel ? `?channelId=${currentChannel.id}` : window.location.pathname,
+      );
+    }
+  };
+
+  // Projects: show the list and reopen the last board (or the first one) in the main area.
+  const openProjects = () => {
+    const target =
+      projects.find((p) => p.id === lastProjectIdRef.current) ?? projects[0];
+    if (target) {
+      handleSelectProject(target);
+      return;
+    }
+    // No boards yet: show the (empty) list with its "create" action over the current channel.
+    setShowProfilePage(false);
+    setShowCanvasHub(false);
+    setShowDocsHub(false);
+    setShowOrgControl(false);
+    setShowVideoLibrary(false);
+    setShowProjectsPanel(true);
+  };
+
+  // Video Library: every recording in this workspace (Loom-style grid). Like Canvas, it owns the
+  // main area with no secondary sidebar; clicking it again goes Home.
+  const openVideoLibrary = () => {
+    setShowProfilePage(false);
+    setShowCanvasHub(false);
+    setShowDocsHub(false);
+    setShowOrgControl(false);
+    setShowProjectsPanel(false);
+    setCurrentProject(null);
+    setShowVideoLibrary(true);
+    if (typeof window !== "undefined") {
+      window.history.replaceState(
+        null,
+        "",
+        currentChannel ? `?channelId=${currentChannel.id}` : window.location.pathname,
+      );
+    }
+  };
+
   // Point the URL back at the current channel / project
   const syncUrlToCurrent = () => {
     if (typeof window !== "undefined") {
       // Project first: selecting a project keeps currentChannel set underneath it
       if (currentProject) {
-        window.history.replaceState(null, "", `?projectId=${currentProject.id}`);
+        window.history.replaceState(
+          null,
+          "",
+          `?projectId=${currentProject.id}`,
+        );
       } else if (currentChannel) {
-        window.history.replaceState(null, "", `?channelId=${currentChannel.id}`);
+        window.history.replaceState(
+          null,
+          "",
+          `?channelId=${currentChannel.id}`,
+        );
       } else {
         window.history.replaceState(null, "", window.location.pathname);
       }
     }
+  };
+
+  // Profile: a full page in the main area (?view=profile)
+  // Rewrites the URL to just the channel/project it already names, plus or minus view=profile.
+  // Reads the live URL (not state) so it is correct inside stale closures such as the initial load.
+  const setProfileInUrl = (on: boolean) => {
+    if (typeof window === "undefined") return;
+    const current = new URLSearchParams(window.location.search);
+    const next = new URLSearchParams();
+    const projectId = current.get("projectId");
+    const channelId = current.get("channelId");
+    if (projectId) next.set("projectId", projectId);
+    else if (channelId) next.set("channelId", channelId);
+    if (on) next.set("view", "profile");
+    const qs = next.toString();
+    window.history.replaceState(
+      null,
+      "",
+      qs ? `?${qs}` : window.location.pathname,
+    );
+  };
+  const openProfilePage = () => {
+    setShowCanvasHub(false);
+    setShowDocsHub(false);
+    setShowOrgControl(false);
+    setShowVideoLibrary(false);
+    setIsMobileSidebarOpen(false);
+    setShowProfilePage(true);
+    setProfileInUrl(true);
+  };
+  // Switching or creating a workspace leaves the profile page (the URL would otherwise reopen it)
+  const switchWorkspace = (ws: Workspace) => {
+    setShowProfilePage(false);
+    setProfileInUrl(false);
+    handleSelectWorkspace(ws);
+  };
+  const closeProfilePage = () => {
+    setShowProfilePage(false);
+    syncUrlToCurrent();
   };
 
   // 4a. Load Older Messages (Cursor-based Pagination)
@@ -457,6 +801,7 @@ export default function AppDashboard() {
 
   // 4c. Handle selection of searched message
   const handleSelectSearchedMessage = async (searchedMsg: any) => {
+    setShowProfilePage(false);
     try {
       // 1. If message belongs to a channel that is not currently selected, switch to that channel
       if (!currentChannel || currentChannel.id !== searchedMsg.channelId) {
@@ -525,35 +870,44 @@ export default function AppDashboard() {
       if (granted) registerPush();
     });
 
+    // Chime + desktop notification for a message addressed to this user
+    const alertForMessage = (msg: any) => {
+      sounds.playMessageSound();
+      DesktopNotifier.send(
+        msg.user?.displayName || msg.bot?.name || "New Message",
+        msg.content,
+        msg.user?.avatarUrl || msg.bot?.avatarUrl,
+        () => {
+          window.focus();
+          const allChannels = useChatStore.getState().channels;
+          const targetChannel = allChannels.find((c) => c.id === msg.channelId);
+          if (targetChannel) {
+            handleSelectChannel(targetChannel);
+          }
+        },
+      );
+    };
+
     const onNewMessage = (msg: any) => {
       const activeChannel = currentChannelRef.current;
       const isFromOther = !msg.userId || msg.userId !== user.id;
 
-      // Play message chime if message is from another user or bot
-      if (isFromOther) {
-        sounds.playMessageSound();
-        DesktopNotifier.send(
-          msg.user?.displayName || msg.bot?.name || "New Message",
-          msg.content,
-          msg.user?.avatarUrl || msg.bot?.avatarUrl,
-          () => {
-            window.focus();
-            const allChannels = useChatStore.getState().channels;
-            const targetChannel = allChannels.find(
-              (c) => c.id === msg.channelId,
-            );
-            if (targetChannel) {
-              handleSelectChannel(targetChannel);
-            }
-          },
-        );
+      // Alert for channel messages from another user or bot. Thread replies reach everyone in the channel (to keep
+      // reply counts and open threads current), but only the people in the thread are alerted, via thread:reply_notify.
+      if (isFromOther && !msg.parentMessageId) {
+        alertForMessage(msg);
       }
+
+      // Their message arrived, so they are no longer typing it
+      if (msg.userId && !msg.parentMessageId) clearTyping(msg.channelId, msg.userId);
 
       if (msg.parentMessageId) {
         addThreadReply(msg);
       } else if (activeChannel && msg.channelId === activeChannel.id) {
         addMessage(msg);
-      } else {
+        // Seen live in the open channel: keep lastReadAt current so a reload doesn't resurrect it as unread.
+        if (isFromOther) markChannelReadSoon(msg.channelId);
+      } else if (isFromOther) {
         // Different channel or DM -> increment unread badge!
         incrementUnread(msg.id, msg.channelId);
       }
@@ -572,17 +926,36 @@ export default function AppDashboard() {
       }
     };
 
-    const onTypingStart = ({ channelId, username }: any) => {
-      setTypingUser(channelId, username, true);
+    // Typing indicators are tracked per user id. They clear on typing:stop, when that person's message arrives, and
+    // after TYPING_TTL_MS without a refresh, so a lost stop event (closed tab, dropped connection) can't leave one stuck.
+    const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    const clearTyping = (channelId: string, userId: string) => {
+      const key = `${channelId}:${userId}`;
+      clearTimeout(typingTimers.get(key));
+      typingTimers.delete(key);
+      setTypingUser(channelId, { userId, username: "" }, false);
     };
 
-    const onTypingStop = ({ channelId }: any) => {
-      setTypingUser(channelId, "", false);
+    const onTypingStart = ({ channelId, username, userId }: any) => {
+      if (!channelId || !userId || userId === user.id) return;
+      setTypingUser(channelId, { userId, username }, true);
+      const key = `${channelId}:${userId}`;
+      clearTimeout(typingTimers.get(key));
+      typingTimers.set(
+        key,
+        setTimeout(() => clearTyping(channelId, userId), TYPING_TTL_MS),
+      );
+    };
+
+    const onTypingStop = ({ channelId, userId }: any) => {
+      if (channelId && userId) clearTyping(channelId, userId);
     };
 
     const onCallStarted = (callData: any) => {
-      // If someone else started a call, notify user
-      if (callData.hostUserId !== user.id) {
+      // If someone else started a call, notify user, unless we're already in that call
+      const huddle = useHuddleStore.getState();
+      const alreadyInCall = huddle.isActive && huddle.channelId === callData.channelId;
+      if (callData.hostUserId !== user.id && !alreadyInCall) {
         setIncomingCall(callData);
       }
       if (callData.channelId) {
@@ -592,7 +965,10 @@ export default function AppDashboard() {
 
     const onCallEnded = (payload: { channelId: string }) => {
       if (payload?.channelId) {
-        useHuddleStore.getState().clearChannelParticipants(payload.channelId);
+        const huddle = useHuddleStore.getState();
+        huddle.clearChannelParticipants(payload.channelId);
+        // The call is over, so stop ringing for it
+        if (huddle.incomingCall?.channelId === payload.channelId) huddle.dismissIncomingCall();
         setActiveHuddleChannel(null);
       }
     };
@@ -634,13 +1010,21 @@ export default function AppDashboard() {
     };
 
     const onChannelUpdated = (updatedChan: Channel) => {
+      // Defensive: if some endpoint ever broadcasts a channel without its
+      // member list, don't let that wipe out per-member state (notification
+      // preference, read receipts) that was already known locally.
+      const merge = (prev: Channel) => ({
+        ...prev,
+        ...updatedChan,
+        members: updatedChan.members ?? prev.members,
+      });
       setChannels(
         useChatStore
           .getState()
-          .channels.map((c) => (c.id === updatedChan.id ? updatedChan : c)),
+          .channels.map((c) => (c.id === updatedChan.id ? merge(c) : c)),
       );
       if (currentChannelRef.current?.id === updatedChan.id) {
-        setCurrentChannel(updatedChan);
+        setCurrentChannel(merge(currentChannelRef.current));
       }
     };
 
@@ -714,6 +1098,7 @@ export default function AppDashboard() {
 
     socket.on("account:deactivated", onAccountDeactivated);
     socket.on("message:new", onNewMessage);
+    socket.on("thread:reply_notify", alertForMessage);
     socket.on("message:reaction", onReaction);
     socket.on("message:updated", onMessageUpdated);
     socket.on("message:pinned", onMessagePinned);
@@ -747,12 +1132,15 @@ export default function AppDashboard() {
     return () => {
       socket.off("account:deactivated", onAccountDeactivated);
       socket.off("message:new", onNewMessage);
+      socket.off("thread:reply_notify", alertForMessage);
       socket.off("message:reaction", onReaction);
       socket.off("message:updated", onMessageUpdated);
       socket.off("message:pinned", onMessagePinned);
       socket.off("message:deleted", onMessageDeleted);
       socket.off("typing:start", onTypingStart);
       socket.off("typing:stop", onTypingStop);
+      typingTimers.forEach(clearTimeout);
+      typingTimers.clear();
       socket.off("huddle:started", onCallStarted);
       socket.off("channel:new", onChannelNew);
       socket.off("channel:updated", onChannelUpdated);
@@ -764,13 +1152,36 @@ export default function AppDashboard() {
   }, [user, currentWorkspace]);
 
   // 6. Handle Opening Thread
+  // Replies load newest-first in pages (like channel messages); earlier ones come in as the user scrolls up
   const handleOpenThread = async (message: Message) => {
     setActiveThread(message);
     try {
-      const res = await api.get(`/api/messages/${message.id}/replies`);
-      setThreadReplies(res.data.replies || []);
+      const res = await api.get(`/api/messages/${message.id}/replies`, { params: { limit: THREAD_PAGE_SIZE } });
+      setThreadReplies(res.data.replies || [], message.id, {
+        hasMore: !!res.data.hasMore,
+        nextCursor: res.data.nextCursor || null,
+      });
     } catch (err) {
       console.error("Failed to load thread replies", err);
+    }
+  };
+
+  const handleLoadOlderReplies = async () => {
+    const { activeThread: thread, threadNextCursor } = useChatStore.getState();
+    if (!thread || !threadNextCursor || isLoadingOlderReplies) return;
+    setIsLoadingOlderReplies(true);
+    try {
+      const res = await api.get(`/api/messages/${thread.id}/replies`, {
+        params: { cursor: threadNextCursor, limit: THREAD_PAGE_SIZE },
+      });
+      prependThreadReplies(res.data.replies || [], thread.id, {
+        hasMore: !!res.data.hasMore,
+        nextCursor: res.data.nextCursor || null,
+      });
+    } catch (err) {
+      console.error("Failed to load earlier thread replies", err);
+    } finally {
+      setIsLoadingOlderReplies(false);
     }
   };
 
@@ -808,104 +1219,61 @@ export default function AppDashboard() {
     }
   };
 
-  if (isLoading || isDataLoading) {
-    return (
-      <div
-        className="h-screen w-screen flex flex-col items-center justify-center gap-3"
-        style={{ backgroundColor: "var(--theme-bg-app)" }}
-      >
-        <div
-          className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-xl animate-pulse"
-          style={{ backgroundColor: "var(--theme-primary)" }}
-        >
-          <Layers size={28} />
-        </div>
-        <span
-          className="text-sm font-semibold"
-          style={{ color: "var(--theme-text-muted)" }}
-        >
-          Loading Orbit...
-        </span>
-      </div>
-    );
-  }
+  // One continuous boot screen (session â†’ workspace â†’ restored view + its first messages),
+  // so a refresh goes straight from loading to the finished page with no intermediate flashes.
+  if (isLoading || isDataLoading) return <WorkspaceSkeleton />;
 
   // Workspace rail feature shortcuts (Home / Canvas / Docs / Projects)
   const docsActive = showDocsHub && !!currentWorkspace;
+  const canvasActive = showCanvasHub && !!currentWorkspace;
   const railProps = {
     presence,
+    members,
+    onOpenBotPortal: () => {
+      setIsMobileSidebarOpen(false);
+      setShowBotPortal(true);
+    },
     onLogout: logout,
-    activeFeature: showCanvasHub
-      ? ("canvas" as const)
-      : docsActive
-      ? ("docs" as const)
-      : showProjectsPanel
-      ? ("projects" as const)
-      : showVideoLibrary
-      ? ("video" as const)
-      : ("home" as const),
-    // Home: back to the channel / project view
-    onGoHome: currentWorkspace
+    onOpenProfile: openProfilePage,
+    activeFeature: showProfilePage
+      ? null
+      : canvasActive
+        ? ("canvas" as const)
+        : docsActive
+          ? ("docs" as const)
+          : showProjectsPanel
+            ? ("projects" as const)
+            : showVideoLibrary
+              ? ("video" as const)
+              : ("home" as const),
+    // Every rail item switches sidebar AND main area together; clicking the active one goes Home.
+    onGoHome: currentWorkspace ? goHome : undefined,
+    onOpenCanvas: currentWorkspace
       ? () => {
-          setShowCanvasHub(false);
+          if (canvasActive) return goHome();
           setShowDocsHub(false);
           setShowOrgControl(false);
           setShowProjectsPanel(false);
-          setShowVideoLibrary(false);
-          syncUrlToCurrent();
-        }
-      : undefined,
-    // Canvas hub: pick an existing canvas or create a new one
-    onOpenCanvas: currentWorkspace
-      ? () => {
-          if (showDocsHub) {
-            setShowDocsHub(false);
-            syncUrlToCurrent();
+          setShowProfilePage(false);
+          setCurrentProject(null);
+          setShowCanvasHub(true);
+          if (typeof window !== "undefined") {
+            window.history.replaceState(
+              null,
+              "",
+              currentChannel ? `?channelId=${currentChannel.id}` : window.location.pathname,
+            );
           }
-          if (showOrgControl) setShowOrgControl(false);
-          setShowProjectsPanel(false);
-          setShowVideoLibrary(false);
-          setShowCanvasHub((v) => !v);
         }
       : undefined,
-    // Docs are workspace-level, not tied to the open project
     onOpenDocs: currentWorkspace
-      ? () => {
-          if (showOrgControl) setShowOrgControl(false);
-          setShowVideoLibrary(false);
-          if (!showDocsHub) {
-            setShowProjectsPanel(false);
-            return handleOpenDocs();
-          }
-          setShowDocsHub(false);
-          syncUrlToCurrent();
-        }
+      ? () => (docsActive ? goHome() : handleOpenDocs())
       : undefined,
-    // Projects & Boards: toggles the list back open in the channel sidebar
     onOpenProjects: currentWorkspace
-      ? () => {
-          if (showCanvasHub) setShowCanvasHub(false);
-          if (showDocsHub) {
-            setShowDocsHub(false);
-            syncUrlToCurrent();
-          }
-          if (showOrgControl) setShowOrgControl(false);
-          setShowVideoLibrary(false);
-          setShowProjectsPanel((v) => !v);
-        }
+      ? () => (showProjectsPanel && !showProfilePage ? goHome() : openProjects())
       : undefined,
-    // Video Library: every recording in this workspace, Loom-style grid + filters
     onOpenVideoLibrary: currentWorkspace
-      ? () => {
-          if (showCanvasHub) setShowCanvasHub(false);
-          if (showDocsHub) {
-            setShowDocsHub(false);
-            syncUrlToCurrent();
-          }
-          if (showOrgControl) setShowOrgControl(false);
-          setShowProjectsPanel(false);
-          setShowVideoLibrary((v) => !v);
-        }
+      ? () => (showVideoLibrary && !showProfilePage ? goHome() : openVideoLibrary())
       : undefined,
   };
 
@@ -914,6 +1282,8 @@ export default function AppDashboard() {
       className="flex h-screen w-screen overflow-hidden relative"
       style={{ backgroundColor: "var(--theme-bg-app)" }}
     >
+      <OfflineOverlay />
+
       {/* Mobile Navigation Drawer (Backdrop + Slide-over Sidebars) */}
       {isMobileSidebarOpen && (
         <div className="fixed inset-0 z-50 flex md:hidden animate-in fade-in duration-200">
@@ -927,15 +1297,14 @@ export default function AppDashboard() {
               workspaces={workspaces}
               currentWorkspace={currentWorkspace}
               currentUser={user}
-              onSelectWorkspace={(ws) => {
-                handleSelectWorkspace(ws);
-              }}
+              onSelectWorkspace={switchWorkspace}
               onWorkspaceCreated={(ws) => {
                 setWorkspaces([...workspaces, ws]);
-                handleSelectWorkspace(ws);
+                switchWorkspace(ws);
               }}
             />
-            {currentWorkspace && !showCanvasHub && !docsActive && !showOrgControl && !showVideoLibrary && (
+            {/* Show Channels & DMs / Projects / Canvas / Docs sidebar */}
+            {currentWorkspace && !showOrgControl && !showVideoLibrary && (
               <ChannelSidebar
                 workspace={currentWorkspace}
                 channels={channels}
@@ -945,6 +1314,34 @@ export default function AppDashboard() {
                 projects={projects}
                 currentProject={currentProject}
                 showProjects={showProjectsPanel}
+                showCanvas={showCanvasHub}
+                showDocs={docsActive}
+                onClosePanel={goHome}
+                canvases={canvases}
+                currentCanvasId={selectedCanvasId}
+                onSelectCanvas={(canvasId) => {
+                  setSelectedCanvasId(canvasId);
+                  setShowCanvasHub(true);
+                  setIsMobileSidebarOpen(false);
+                }}
+                onOpenCreateCanvas={() => {
+                  setIsMobileSidebarOpen(false);
+                  handleCreateCanvas();
+                }}
+                onDeleteCanvas={handleDeleteCanvas}
+                documents={documents}
+                currentDocument={currentDocument}
+                onSelectDocument={(doc) => {
+                  setCurrentDocument(doc);
+                  handleOpenDocs(doc.id);
+                  setIsMobileSidebarOpen(false);
+                }}
+                onOpenCreateDoc={() => {
+                  setIsMobileSidebarOpen(false);
+                  handleCreateNewDoc();
+                }}
+                onShareDocument={(doc) => setShareDocTarget(doc)}
+                onDeleteDocument={handleDeleteDoc}
                 activeHuddleChannelId={
                   activeHuddleChannel || activeHuddleChannelId
                 }
@@ -978,6 +1375,8 @@ export default function AppDashboard() {
                   handleStartHuddle(ch);
                 }}
                 presence={presence}
+                breakReasons={breakReasons}
+                liveStatus={liveStatus}
                 onOpenSearch={() => {
                   setIsMobileSidebarOpen(false);
                   setShowSearchModal(true);
@@ -1009,16 +1408,16 @@ export default function AppDashboard() {
           workspaces={workspaces}
           currentWorkspace={currentWorkspace}
           currentUser={user}
-          onSelectWorkspace={handleSelectWorkspace}
+          onSelectWorkspace={switchWorkspace}
           onWorkspaceCreated={(ws) => {
             setWorkspaces([...workspaces, ws]);
-            handleSelectWorkspace(ws);
+            switchWorkspace(ws);
           }}
         />
       </div>
 
-      {/* 2. Channels & Members Sidebar (Desktop) */}
-      {currentWorkspace && !showCanvasHub && !docsActive && !showOrgControl && !showVideoLibrary && (
+      {/* 2. Channels & Members / Projects / Canvas / Docs Sidebar (Desktop) */}
+      {currentWorkspace && !showOrgControl && !showVideoLibrary && (
         <div className="hidden md:flex shrink-0 h-full">
           <ChannelSidebar
             workspace={currentWorkspace}
@@ -1029,6 +1428,26 @@ export default function AppDashboard() {
             projects={projects}
             currentProject={currentProject}
             showProjects={showProjectsPanel}
+            showCanvas={showCanvasHub}
+            showDocs={docsActive}
+            onClosePanel={goHome}
+            canvases={canvases}
+            currentCanvasId={selectedCanvasId}
+            onSelectCanvas={(canvasId) => {
+              setSelectedCanvasId(canvasId);
+              setShowCanvasHub(true);
+            }}
+            onOpenCreateCanvas={handleCreateCanvas}
+            onDeleteCanvas={handleDeleteCanvas}
+            documents={documents}
+            currentDocument={currentDocument}
+            onSelectDocument={(doc) => {
+              setCurrentDocument(doc);
+              handleOpenDocs(doc.id);
+            }}
+            onOpenCreateDoc={handleCreateNewDoc}
+            onShareDocument={(doc) => setShareDocTarget(doc)}
+            onDeleteDocument={handleDeleteDoc}
             activeHuddleChannelId={activeHuddleChannel || activeHuddleChannelId}
             onSelectChannel={handleSelectChannel}
             onSelectUserDM={handleSelectUserDM}
@@ -1041,6 +1460,8 @@ export default function AppDashboard() {
             onOpenBotPortal={() => setShowBotPortal(true)}
             onStartHuddle={handleStartHuddle}
             presence={presence}
+            breakReasons={breakReasons}
+            liveStatus={liveStatus}
             onOpenSearch={() => setShowSearchModal(true)}
             onOpenOrganizationControl={() => {
               handleOpenOrgControl();
@@ -1059,7 +1480,15 @@ export default function AppDashboard() {
       )}
 
       {/* 3. Main Chat View or Empty Workspace State */}
-      {workspaces.length === 0 ? (
+      {showProfilePage && user ? (
+        <ProfileModal
+          user={user}
+          workspaceId={currentWorkspace?.id}
+          presence={presence[user.id] || "offline"}
+          onClose={closeProfilePage}
+          onLogout={logout}
+        />
+      ) : workspaces.length === 0 ? (
         <div
           className="flex-1 flex flex-col items-center justify-center p-6 text-center relative overflow-y-auto"
           style={{ backgroundColor: "var(--theme-bg-app)" }}
@@ -1150,7 +1579,10 @@ export default function AppDashboard() {
                       className="px-2.5 py-1 text-xs font-medium rounded bg-[var(--theme-bg-surface-hover)] hover:bg-gray-600 text-[var(--theme-text)] flex items-center gap-1.5 transition shrink-0"
                     >
                       {copiedEmail ? (
-                        <Check size={13} className="text-green-600 dark:text-green-400" />
+                        <Check
+                          size={13}
+                          className="text-green-600 dark:text-green-400"
+                        />
                       ) : (
                         <Copy size={13} />
                       )}
@@ -1194,18 +1626,33 @@ export default function AppDashboard() {
           members={members}
           initialDocId={docsInitialId}
           onDocChange={setDocsUrl}
+          onOpenDocsSidebar={() => setIsMobileSidebarOpen(true)}
+          onOpenSearch={() => setShowSearchModal(true)}
+          newDocSignal={newDocSignal}
         />
       ) : showCanvasHub && currentWorkspace ? (
         <CanvasView
           workspaceId={currentWorkspace.id}
           currentUser={user}
-          onClose={() => setShowCanvasHub(false)}
+          members={members}
+          selectedCanvasId={selectedCanvasId}
+          onSelectCanvas={setSelectedCanvasId}
+          onOpenSearch={() => setShowSearchModal(true)}
+          newCanvasSignal={newCanvasSignal}
+          onCanvasCreated={(c) =>
+            setCanvases((prev) => [c, ...prev.filter((x) => x.id !== c.id)])
+          }
+          onCanvasDeleted={(id) =>
+            setCanvases((prev) => prev.filter((x) => x.id !== id))
+          }
+          onClose={goHome}
+          onOpenCanvasSidebar={() => setIsMobileSidebarOpen(true)}
         />
       ) : showVideoLibrary && currentWorkspace ? (
         <VideoLibraryView
           workspaceId={currentWorkspace.id}
           currentUser={user}
-          onClose={() => setShowVideoLibrary(false)}
+          onClose={goHome}
         />
       ) : showOrgControl && currentWorkspace ? (
         <OrganizationControlView
@@ -1231,15 +1678,20 @@ export default function AppDashboard() {
           currentUser={user}
           members={members}
           channels={channels}
-          onBackToChat={() => setCurrentProject(null)}
-          onDeleteProject={(id) => removeProject(id)}
+          onBackToChat={goHome}
+          onDeleteProject={(id) => {
+            removeProject(id);
+            goHome();
+          }}
+          onOpenSearch={() => setShowSearchModal(true)}
+          onOpenChannel={handleSelectChannel}
         />
       ) : currentChannel ? (
         <ChatArea
           channel={currentChannel}
           messages={messages}
           currentUser={user}
-          typingUsers={typingUsers[currentChannel.id] || []}
+          typingUsers={(typingUsers[currentChannel.id] || []).map((t) => t.username)}
           hasMoreMessages={hasMoreMessages}
           isLoadingOlder={isLoadingOlder}
           onLoadOlderMessages={handleLoadOlderMessages}
@@ -1261,22 +1713,15 @@ export default function AppDashboard() {
           }}
           activeView={chatView}
           onChangeView={setChatView}
+          onOpenQuickCanvas={() => handleOpenOrCreateScopedCanvas(currentChannel, null)}
         />
       ) : (
-        <div className="flex-1 flex flex-col items-center justify-center text-[var(--theme-text-muted)] p-4 text-center">
-          <p className="text-base font-semibold text-[var(--theme-text)]">
-            No channel or project selected
-          </p>
-          <p className="text-xs text-[var(--theme-text-muted)] mt-1">
-            Select a channel, direct message, or project board to begin
-          </p>
-          <button
-            onClick={() => setIsMobileSidebarOpen(true)}
-            className="mt-4 md:hidden px-4 py-2 bg-slack-green hover:bg-[#008a65] text-white text-xs font-semibold rounded-lg shadow transition"
-          >
-            Browse Channels & Projects
-          </button>
-        </div>
+        <EmptyState
+          title="Nothing open yet"
+          body="Pick a channel, direct message, or project board to begin."
+          actionLabel="Browse channels"
+          onAction={() => setIsMobileSidebarOpen(true)}
+        />
       )}
 
       {/* Workspace Creation Modal for Admins */}
@@ -1367,18 +1812,19 @@ export default function AppDashboard() {
             className="fixed inset-0 bg-black/60 md:hidden transition-opacity"
             onClick={() => setActiveThread(null)}
           />
-          <div className="relative ml-auto h-full w-full sm:w-96 md:w-80 lg:w-96 shadow-2xl md:shadow-none animate-in slide-in-from-right duration-200">
-            <ThreadSidebar
-              parentMessage={activeThread}
-              replies={threadReplies}
-              currentUser={user}
-              onClose={() => setActiveThread(null)}
-              onReplyAdded={addThreadReply}
-              members={members}
-              onSelectUserDM={handleSelectUserDM}
-              onSelectChannel={handleSelectChannel}
-            />
-          </div>
+          <ThreadSidebar
+            parentMessage={activeThread}
+            replies={threadReplies}
+            currentUser={user}
+            onClose={() => setActiveThread(null)}
+            onReplyAdded={addThreadReply}
+            hasMoreReplies={threadHasMore}
+            isLoadingOlderReplies={isLoadingOlderReplies}
+            onLoadOlderReplies={handleLoadOlderReplies}
+            members={members}
+            onSelectUserDM={handleSelectUserDM}
+            onSelectChannel={handleSelectChannel}
+          />
         </div>
       )}
 
@@ -1439,6 +1885,28 @@ export default function AppDashboard() {
         channels={channels}
         members={members}
         onSelectMessage={handleSelectSearchedMessage}
+        onSelectChannel={(ch) => {
+          setShowSearchModal(false);
+          handleSelectChannel(ch);
+        }}
+        onSelectUser={(u) => {
+          setShowSearchModal(false);
+          handleSelectUserDM(u);
+        }}
+        onSelectProject={(p) => {
+          setShowSearchModal(false);
+          handleSelectProject(p);
+        }}
+        onSelectDocument={(doc) => {
+          setShowSearchModal(false);
+          setCurrentDocument(doc);
+          handleOpenDocs(doc.id);
+        }}
+        onSelectCanvas={(canvasId) => {
+          setShowSearchModal(false);
+          setSelectedCanvasId(canvasId);
+          setShowCanvasHub(true);
+        }}
       />
 
       {/* 10. Create Project Board Dialog */}
@@ -1449,7 +1917,7 @@ export default function AppDashboard() {
           onClose={() => setShowCreateProjectModal(false)}
           onProjectCreated={(newProj) => {
             addProject(newProj);
-            setCurrentProject(newProj);
+            handleSelectProject(newProj);
           }}
         />
       )}
@@ -1471,7 +1939,25 @@ export default function AppDashboard() {
         />
       )}
 
-      {/* 12. Screen Recorder — rendered once at the dashboard root so an in-progress
+      {/* 12. Share Document Dialog */}
+      {shareDocTarget && (
+        <ShareDocumentModal
+          document={shareDocTarget}
+          currentUser={user}
+          members={members}
+          isOpen={!!shareDocTarget}
+          onClose={() => setShareDocTarget(null)}
+          onDocumentUpdated={(updated) => {
+            useProjectStore.getState().updateDocument(updated);
+            setShareDocTarget(updated);
+          }}
+        />
+      )}
+
+      {/* 13. Quick to-dos (Alt+T) */}
+      <QuickTodos />
+
+      {/* 14. Screen Recorder — rendered once at the dashboard root so an in-progress
           recording survives switching between Chat / Video Library / Canvas / Docs */}
       {recorderState.isOpen && recorderState.workspaceId && (
         <RecorderOverlay

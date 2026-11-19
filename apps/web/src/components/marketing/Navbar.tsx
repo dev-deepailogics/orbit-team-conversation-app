@@ -12,7 +12,7 @@ import {
   Sparkles,
   ExternalLink,
   Github,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { ThemeToggle } from './ThemeToggle';
 
 interface NavLinkItem {

@@ -17,13 +17,15 @@ import {
   Reply,
   ShieldCheck,
   CornerDownRight,
-} from "lucide-react";
+} from "@/components/ui/icons";
 import EmojiPicker, {
   Theme,
   EmojiClickData,
   EmojiStyle,
 } from "emoji-picker-react";
 import { useTimeFormat, formatMessageTime } from "../../lib/timeFormat";
+import { api } from "../../lib/api";
+import { useHuddleStore } from "../../stores/huddleStore";
 
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "👏", "🎉", "🔥"];
 
@@ -60,7 +62,8 @@ export const ModernMeetingChat: React.FC<{
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isSending) return;
 
-    let finalPayload = inputMessage.trim();
+    const text = inputMessage.trim();
+    let finalPayload = text;
     if (replyingTo) {
       finalPayload = JSON.stringify({
         text: inputMessage.trim(),
@@ -70,6 +73,13 @@ export const ModernMeetingChat: React.FC<{
 
     try {
       await send(finalPayload);
+      // The in-call chat disappears with the room, so also keep it in the call's thread in the channel
+      const { channelId } = useHuddleStore.getState();
+      if (channelId) {
+        api
+          .post(`/api/huddles/${channelId}/chat`, { text })
+          .catch((err) => console.error("Failed to save in-call message to the call thread:", err));
+      }
       setInputMessage("");
       setReplyingTo(null);
       setShowEmojiPicker(false);

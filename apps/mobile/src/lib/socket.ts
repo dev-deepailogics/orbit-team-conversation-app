@@ -1,5 +1,6 @@
 import { io, type Socket } from 'socket.io-client';
 import { SERVER_URL } from './config';
+import { getAuthToken, refreshAuthToken } from './api';
 
 // Mirrors SOCKET_EVENTS in @orbit/types: Metro can't import runtime values from that package (see AGENTS.md),
 // and the server emits a few raw strings (message:updated/deleted, channel:deleted) that aren't in it.
@@ -38,8 +39,28 @@ let socket: Socket | null = null;
 // and re-runs that on every auto-reconnect. Switching workspace = new connection, so the old workspace room is dropped.
 export function connectSocket(token: string, workspaceId: string): Socket {
   socket?.disconnect();
-  socket = io(SERVER_URL, { auth: { token, workspaceId }, transports: ['websocket'] });
-  return socket;
+  // Auth is a function so every (auto-)reconnect handshakes with the latest, possibly refreshed, token.
+  const next = io(SERVER_URL, {
+    auth: (cb) => cb({ token: getAuthToken() ?? token, workspaceId }),
+    transports: ['websocket'],
+  });
+  socket = next;
+
+  // An expired access token is rejected in the handshake and socket.io won't retry by itself:
+  // refresh once, then reconnect.
+  let retrying = false;
+  next.on('connect_error', async (err) => {
+    if (retrying || !/Invalid socket authentication token/i.test(err.message)) return;
+    retrying = true;
+    try {
+      if (await refreshAuthToken()) next.connect();
+    } catch {
+      // Refresh failed; the auth store's 401 handling signs the user out.
+    } finally {
+      retrying = false;
+    }
+  });
+  return next;
 }
 
 export function getSocket(): Socket | null {

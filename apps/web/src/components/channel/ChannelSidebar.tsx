@@ -1,8 +1,11 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Workspace, Channel, UserProfile, Project } from "@orbit/types";
-import { Presence, PRESENCE_STYLE } from "../availability/useTeamPresence";
+import { Avatar } from "@/components/project/projectViewUtils";
+import { Workspace, Channel, UserProfile, Project, UserStatus } from "@orbit/types";
+import { Presence } from "../availability/useTeamPresence";
+import { StatusEmoji } from "../availability/StatusEmoji";
+import { isLiveOnline } from "./useLiveUserStatus";
 import { useResizableSidebar } from "../layout/useResizableSidebar";
 import {
   Hash,
@@ -19,13 +22,24 @@ import {
   Palette,
   Check,
   Building2,
-} from "lucide-react";
+  
+  FileText,
+  Trash2,
+  Share2,
+  Canvas,
+  Board,
+  Pen,
+  Mask,
+} from "@/components/ui/icons";
+import { ProjectDocument } from "@orbit/types";
 import { api } from "../../lib/api";
 import { useChatStore } from "../../stores/chatStore";
 import { WorkspaceStorageModal } from "../workspace/WorkspaceStorageModal";
 import { AddWorkspaceMemberDialog } from "../workspace/AddWorkspaceMemberDialog";
 import { ThemeModal } from "../theme/ThemeModal";
 import { OrganizationControlModal } from "../availability/OrganizationControlModal";
+import { CreateChannelModal } from "./CreateChannelModal";
+import { NewDirectMessageModal } from "./NewDirectMessageModal";
 
 /** Animates a section open/closed (grid 0fr -> 1fr). Collapsed content is inert so it can't be tabbed into. */
 const Collapse: React.FC<{ open: boolean; children: React.ReactNode }> = ({ open, children }) => (
@@ -37,6 +51,75 @@ const Collapse: React.FC<{ open: boolean; children: React.ReactNode }> = ({ open
   >
     <div className="min-h-0 overflow-hidden">{children}</div>
   </div>
+);
+
+const SectionHeader: React.FC<{
+  label: string;
+  collapsed: boolean;
+  onToggle: () => void;
+  onAdd?: () => void;
+  addTitle?: string;
+}> = ({ label, collapsed, onToggle, onAdd, addTitle }) => (
+  <div className="flex items-center h-[26px] pr-2 select-none" style={{ color: "var(--theme-section)" }}>
+    <button
+      onClick={onToggle}
+      className="flex-1 h-full flex items-center gap-1.5 pl-1 text-left text-xs font-semibold transition hover:opacity-75 focus:outline-none min-w-0"
+    >
+      <ChevronDown
+        size={14}
+        className={`transition-transform duration-200 ${collapsed ? "-rotate-90" : ""}`}
+      />
+      <span className="truncate">{label}</span>
+    </button>
+    {onAdd && (
+      <button
+        onClick={onAdd}
+        title={addTitle}
+        className="shrink-0 rounded transition hover:opacity-70"
+        style={{ color: "var(--theme-text-muted)" }}
+      >
+        <Plus size={16} />
+      </button>
+    )}
+  </div>
+);
+
+const ActiveBar = () => (
+  <span
+    className="absolute left-0 top-[6px] w-[3px] h-5 rounded-[2px]"
+    style={{ backgroundColor: "var(--theme-accent)" }}
+  />
+);
+
+const UnreadBadge: React.FC<{ count: number }> = ({ count }) => (
+  <span
+    className="ml-2 shrink-0 min-w-[22px] h-5 px-1.5 rounded-[10px] flex items-center justify-center text-xs font-bold"
+    style={{ backgroundColor: "var(--theme-accent)", color: "var(--theme-primary-text)" }}
+  >
+    {count}
+  </span>
+);
+
+const rowClass = (active: boolean) =>
+  `group relative flex items-center h-8 pr-3 rounded-lg cursor-pointer transition-colors ${
+    active ? "" : "hover:bg-[var(--theme-fill-hover)]"
+  }`;
+
+const rowStyle = (active: boolean): React.CSSProperties | undefined =>
+  active ? { backgroundColor: "var(--theme-selected)" } : undefined;
+
+const rowLabel = (active: boolean, unread = false) => ({
+  className: `flex-1 truncate text-sm ${active || unread ? "font-semibold" : ""}`,
+  style: { color: "var(--theme-text)", opacity: active || unread ? 1 : 0.9 },
+});
+
+const RowIcon: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <span
+    className="ml-[10px] mr-2 w-[18px] h-[18px] shrink-0 flex items-center justify-center"
+    style={{ color: "var(--theme-text-muted)" }}
+  >
+    {children}
+  </span>
 );
 
 interface ChannelSidebarProps {
@@ -54,9 +137,28 @@ interface ChannelSidebarProps {
   onSelectProject?: (project: Project) => void;
   onOpenCreateProject?: () => void;
   showProjects?: boolean;
+  showCanvas?: boolean;
+  showDocs?: boolean;
+  onClosePanel?: () => void;
+  // Canvas props
+  canvases?: any[];
+  currentCanvasId?: string | null;
+  onSelectCanvas?: (canvasId: string) => void;
+  onOpenCreateCanvas?: () => void;
+  onDeleteCanvas?: (canvasId: string) => void;
+  // Docs props
+  documents?: ProjectDocument[];
+  currentDocument?: ProjectDocument | null;
+  onSelectDocument?: (doc: ProjectDocument) => void;
+  onOpenCreateDoc?: () => void;
+  onShareDocument?: (doc: ProjectDocument) => void;
+  onDeleteDocument?: (docId: string) => void;
   onOpenBotPortal: () => void;
   onStartHuddle: (channel: Channel) => void;
   presence?: Record<string, Presence>;
+  /** userId -> reason of their open break (only for members currently on break). */
+  breakReasons?: Record<string, string>;
+  liveStatus?: Record<string, UserStatus>;
   onOpenSearch?: () => void;
   onOpenOrganizationControl?: () => void;
   onCloseMobile?: () => void;
@@ -78,30 +180,48 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   onSelectProject,
   onOpenCreateProject,
   showProjects = false,
+  showCanvas = false,
+  showDocs = false,
+  onClosePanel,
+  canvases = [],
+  currentCanvasId,
+  onSelectCanvas,
+  onOpenCreateCanvas,
+  onDeleteCanvas,
+  documents = [],
+  currentDocument,
+  onSelectDocument,
+  onOpenCreateDoc,
+  onShareDocument,
+  onDeleteDocument,
   onOpenBotPortal,
   onStartHuddle,
   presence = {},
+  breakReasons = {},
+  liveStatus = {},
   onOpenSearch,
   onOpenOrganizationControl,
   onCloseMobile,
   onMemberAdded,
 }) => {
   const [showCreateChannel, setShowCreateChannel] = useState(false);
-  const sidebar = useResizableSidebar("orbit_sidebar_width");
+  const sidebar = useResizableSidebar({ storageKey: "orbit_sidebar_width", defaultWidth: 208 });
   const [showStorageModal, setShowStorageModal] = useState(false);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [showThemeModal, setShowThemeModal] = useState(false);
   const [showOrgControlModal, setShowOrgControlModal] = useState(false);
-  const [channelName, setChannelName] = useState("");
-  const [channelTopic, setChannelTopic] = useState("");
-  const [isPrivate, setIsPrivate] = useState(false);
-  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [showNewDm, setShowNewDm] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
   const workspaceMenuRef = useRef<HTMLDivElement>(null);
   const [isChannelsCollapsed, setIsChannelsCollapsed] = useState(false);
   const [isDmsCollapsed, setIsDmsCollapsed] = useState(false);
+  const [dmSearchQuery, setDmSearchQuery] = useState("");
+  const [showDmSearch, setShowDmSearch] = useState(false);
   const [projectSearchQuery, setProjectSearchQuery] = useState("");
+  const [canvasSearchQuery, setCanvasSearchQuery] = useState("");
+  const [docSearchQuery, setDocSearchQuery] = useState("");
+  const [docActiveFilter, setDocActiveFilter] = useState<"all" | "project" | "shared" | "private">("all");
   const unreadCounts = useChatStore((s) => s.unreadCounts);
 
   useEffect(() => {
@@ -130,30 +250,6 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
     currentUserMember?.role === "ADMIN" ||
     workspace.ownerId === currentUser?.id;
 
-  const handleCreateChannel = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!channelName) return;
-    try {
-      const res = await api.post(
-        `/api/channels/workspaces/${workspace.id}/channels`,
-        {
-          name: channelName.toLowerCase().replace(/[^a-z0-9-]/g, "-"),
-          topic: channelTopic,
-          type: isPrivate ? "PRIVATE" : "PUBLIC",
-          isAnonymous,
-        },
-      );
-      onChannelCreated(res.data);
-      setShowCreateChannel(false);
-      setChannelName("");
-      setChannelTopic("");
-      setIsPrivate(false);
-      setIsAnonymous(false);
-    } catch (err: any) {
-      alert(err.response?.data?.error || "Failed to create channel");
-    }
-  };
-
   const copyInviteLink = () => {
     const inviteLink = `${window.location.origin}/join/${(workspace as any).inviteCode || workspace.id}`;
     navigator.clipboard.writeText(inviteLink);
@@ -163,10 +259,9 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 
   return (
     <div
-      className="relative w-64 md:w-[var(--sidebar-w)] border-r flex flex-col h-full select-none"
+      className="relative w-64 md:w-[var(--sidebar-w)] shrink-0 flex flex-col h-full select-none"
       style={{
         backgroundColor: "var(--theme-bg-sidebar)",
-        borderColor: "var(--theme-border)",
         ...sidebar.style,
       }}
     >
@@ -175,24 +270,34 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
       {/* Workspace Header with Dropdown */}
       <div
         ref={workspaceMenuRef}
-        className="relative h-14 border-b px-3 sm:px-4 flex items-center justify-between font-bold select-none z-30"
+        className="relative h-14 shrink-0 border-b pl-4 pr-3 flex items-center justify-between gap-2.5 select-none z-30"
         style={{
-          borderColor: "var(--theme-border)",
+          borderColor: "var(--theme-fill)",
           color: "var(--theme-text-primary)",
         }}
       >
         {showProjects ? (
-          <span className="flex items-center gap-1.5 truncate font-bold text-sm sm:text-base">
-            <FolderKanban size={16} style={{ color: "var(--theme-primary)" }} />
+          <span className="flex items-center gap-2 truncate font-bold text-[17px]">
+            <Board size={18} style={{ color: "var(--theme-text-muted)" }} />
             Projects & Boards
+          </span>
+        ) : showCanvas ? (
+          <span className="flex items-center gap-2 truncate font-bold text-[17px]">
+            <Canvas size={18} style={{ color: "var(--theme-text-muted)" }} />
+            Canvases
+          </span>
+        ) : showDocs ? (
+          <span className="flex items-center gap-2 truncate font-bold text-[17px]">
+            <FileText size={18} style={{ color: "var(--theme-text-muted)" }} />
+            Docs
           </span>
         ) : (
           <button
             onClick={() => setShowWorkspaceMenu((prev) => !prev)}
             title="Workspace options"
-            className="flex items-center gap-1.5 truncate rounded-lg px-2 py-1.5 -ml-1.5 transition hover:bg-black/5 dark:hover:bg-white/10 group text-left min-w-0"
+            className="flex-1 flex items-center justify-between gap-1.5 rounded-lg py-1 -ml-1.5 pl-1.5 pr-0.5 transition hover:bg-[var(--theme-fill-hover)] text-left min-w-0"
           >
-            <span className="truncate font-bold text-sm sm:text-base">
+            <span className="truncate font-bold text-[17px] leading-tight">
               {workspace.name}
             </span>
             <ChevronDown
@@ -207,35 +312,98 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 
         <div className="flex items-center gap-1 shrink-0">
           {showProjects ? (
-            onOpenCreateProject && (
+            <>
+              {onOpenCreateProject && (
+                <button
+                  onClick={onOpenCreateProject}
+                  title="Create Project Board"
+                  style={{ color: "var(--theme-text-muted)" }}
+                  className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
+                >
+                  <Plus size={18} />
+                </button>
+              )}
               <button
-                onClick={onOpenCreateProject}
-                title="Create Project Board"
+                onClick={() => {
+                  onClosePanel?.();
+                  onCloseMobile?.();
+                }}
+                title="Close Projects"
                 style={{ color: "var(--theme-text-muted)" }}
                 className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
               >
-                <Plus size={18} />
+                <X size={18} />
               </button>
-            )
+            </>
+          ) : showCanvas ? (
+            <>
+              {onOpenCreateCanvas && (
+                <button
+                  onClick={onOpenCreateCanvas}
+                  title="Create Canvas"
+                  style={{ color: "var(--theme-text-muted)" }}
+                  className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
+                >
+                  <Plus size={18} />
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  onClosePanel?.();
+                  onCloseMobile?.();
+                }}
+                title="Close Canvases"
+                style={{ color: "var(--theme-text-muted)" }}
+                className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
+              >
+                <X size={18} />
+              </button>
+            </>
+          ) : showDocs ? (
+            <>
+              {onOpenCreateDoc && (
+                <button
+                  onClick={onOpenCreateDoc}
+                  title="Create Document"
+                  style={{ color: "var(--theme-text-muted)" }}
+                  className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
+                >
+                  <Plus size={18} />
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  onClosePanel?.();
+                  onCloseMobile?.();
+                }}
+                title="Close Docs"
+                style={{ color: "var(--theme-text-muted)" }}
+                className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
+              >
+                <X size={18} />
+              </button>
+            </>
           ) : (
-            <button
-              onClick={() => setShowAddMemberModal(true)}
-              title="Invite & Add Members"
-              style={{ color: "var(--theme-text-muted)" }}
-              className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
-            >
-              <UserPlus size={18} />
-            </button>
-          )}
-          {onCloseMobile && (
-            <button
-              onClick={onCloseMobile}
-              title="Close Menu"
-              style={{ color: "var(--theme-text-muted)" }}
-              className="md:hidden p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
-            >
-              <X size={18} />
-            </button>
+            <>
+              <button
+                onClick={() => setShowNewDm(true)}
+                title="New message"
+                className="w-8 h-8 rounded-lg flex items-center justify-center transition hover:brightness-95"
+                style={{ backgroundColor: "var(--theme-fill)", color: "var(--theme-text-muted)" }}
+              >
+                <Pen size={18} />
+              </button>
+              {onCloseMobile && (
+                <button
+                  onClick={onCloseMobile}
+                  title="Close Menu"
+                  style={{ color: "var(--theme-text-muted)" }}
+                  className="md:hidden p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
+                >
+                  <X size={18} />
+                </button>
+              )}
+            </>
           )}
         </div>
 
@@ -331,6 +499,17 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 style={{ backgroundColor: "var(--theme-border)" }}
               />
 
+              <button
+                onClick={() => {
+                  setShowWorkspaceMenu(false);
+                  setShowAddMemberModal(true);
+                }}
+                className="w-full px-3.5 py-2 text-left text-xs flex items-center gap-2.5 transition hover:bg-[var(--theme-fill-hover)]"
+              >
+                <UserPlus size={15} style={{ color: "var(--theme-primary)" }} />
+                <span>Invite & Add Members</span>
+              </button>
+
               {/* Copy Invite Link */}
               <button
                 onClick={() => {
@@ -393,36 +572,121 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
               )}
             </div>
           </div>
+        ) : showCanvas ? (
+          <div className="px-1 mb-2">
+            <div
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs"
+              style={{
+                backgroundColor: "var(--theme-bg-surface)",
+                borderColor: "var(--theme-border)",
+              }}
+            >
+              <Search
+                size={14}
+                style={{ color: "var(--theme-primary)" }}
+                className="shrink-0"
+              />
+              <input
+                type="text"
+                value={canvasSearchQuery}
+                onChange={(e) => setCanvasSearchQuery(e.target.value)}
+                placeholder="Search canvases..."
+                className="w-full bg-transparent outline-none"
+                style={{ color: "var(--theme-text-primary)" }}
+              />
+              {canvasSearchQuery && (
+                <button
+                  onClick={() => setCanvasSearchQuery("")}
+                  title="Clear"
+                  style={{ color: "var(--theme-text-muted)" }}
+                  className="shrink-0 hover:opacity-80"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+          </div>
+        ) : showDocs ? (
+          <div className="px-1 mb-2 space-y-2">
+            <div
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs"
+              style={{
+                backgroundColor: "var(--theme-bg-surface)",
+                borderColor: "var(--theme-border)",
+              }}
+            >
+              <Search
+                size={14}
+                style={{ color: "var(--theme-primary)" }}
+                className="shrink-0"
+              />
+              <input
+                type="text"
+                value={docSearchQuery}
+                onChange={(e) => setDocSearchQuery(e.target.value)}
+                placeholder="Search documents..."
+                className="w-full bg-transparent outline-none"
+                style={{ color: "var(--theme-text-primary)" }}
+              />
+              {docSearchQuery && (
+                <button
+                  onClick={() => setDocSearchQuery("")}
+                  title="Clear"
+                  style={{ color: "var(--theme-text-muted)" }}
+                  className="shrink-0 hover:opacity-80"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+            {/* Filter pills */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+              {(
+                [
+                  { id: "all", label: "All" },
+                  { id: "project", label: "Public" },
+                  { id: "shared", label: "Shared" },
+                  { id: "private", label: "Drafts" },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setDocActiveFilter(tab.id)}
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition shrink-0 ${
+                    docActiveFilter === tab.id
+                      ? "font-semibold shadow-xs"
+                      : "hover:bg-black/5 dark:hover:bg-white/10"
+                  }`}
+                  style={{
+                    backgroundColor:
+                      docActiveFilter === tab.id
+                        ? "var(--theme-bg-surface)"
+                        : "transparent",
+                    color:
+                      docActiveFilter === tab.id
+                        ? "var(--theme-text-primary)"
+                        : "var(--theme-text-muted)",
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
         ) : (
           onOpenSearch && (
-            <div className="px-1 mb-2">
+            <div className="px-1">
               <button
                 onClick={onOpenSearch}
                 title="Search messages (Cmd+K / Ctrl+K)"
-                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs transition group hover:opacity-85"
-                style={{
-                  backgroundColor: "var(--theme-bg-surface)",
-                  borderColor: "var(--theme-border)",
-                  color: "var(--theme-text-muted)",
-                }}
+                className="w-full h-8 flex items-center gap-[9px] pl-[9px] pr-4 rounded-lg transition hover:brightness-95"
+                style={{ backgroundColor: "var(--theme-fill)", color: "var(--theme-text-muted)" }}
               >
-                <div className="flex items-center gap-2">
-                  <Search
-                    size={14}
-                    style={{ color: "var(--theme-primary)" }}
-                    className="transition"
-                  />
-                  <span>Search messages...</span>
-                </div>
-                <kbd
-                  className="text-[10px] px-1.5 py-0.5 rounded font-mono border"
-                  style={{
-                    backgroundColor: "var(--theme-bg-app)",
-                    borderColor: "var(--theme-border)",
-                  }}
-                >
-                  ⌘K
-                </kbd>
+                <Search size={16} />
+                <span className="flex-1 text-left text-[13px]" style={{ color: "var(--theme-text)", opacity: 0.8 }}>
+                  Search
+                </span>
+                <kbd className="font-sans text-[11px] font-medium opacity-80">⌘K</kbd>
               </button>
             </div>
           )
@@ -450,14 +714,14 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                       onClick={() => onSelectProject?.(project)}
                       className={`group flex items-center justify-between h-7 pl-5 pr-2 rounded-md text-[15px] transition cursor-pointer ${
                         isActive
-                          ? "shadow"
+                          ? "font-semibold"
                           : "hover:bg-black/5 dark:hover:bg-white/10"
                       }`}
                       style={
                         isActive
                           ? {
-                              backgroundColor: "var(--theme-primary)",
-                              color: "var(--theme-primary-text)",
+                              backgroundColor: "var(--theme-selected)",
+                              color: "var(--theme-text)",
                             }
                           : {
                               color: "var(--theme-text-primary)",
@@ -506,33 +770,200 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           </div>
         )}
 
-        {!showProjects && (
+        {/* Canvases Section — shown when toggled from rail */}
+        {showCanvas && (
+          <div>
+            <div className="space-y-0.5">
+              {canvases
+                .filter((c: any) =>
+                  (c.title || "Untitled canvas")
+                    .toLowerCase()
+                    .includes(canvasSearchQuery.trim().toLowerCase()),
+                )
+                .map((canvas: any) => {
+                  const isActive = currentCanvasId === canvas.id;
+                  const canDelete =
+                    canvas.createdById === currentUser?.id ||
+                    currentUser?.systemRole === "SUPER_ADMIN";
+
+                  return (
+                    <div
+                      key={canvas.id}
+                      onClick={() => onSelectCanvas?.(canvas.id)}
+                      className={`group flex items-center justify-between h-7 pl-5 pr-2 rounded-md text-[15px] transition cursor-pointer ${
+                        isActive
+                          ? "font-semibold"
+                          : "hover:bg-black/5 dark:hover:bg-white/10"
+                      }`}
+                      style={
+                        isActive
+                          ? {
+                              backgroundColor: "var(--theme-selected)",
+                              color: "var(--theme-text)",
+                            }
+                          : {
+                              color: "var(--theme-text-primary)",
+                            }
+                      }
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <Canvas size={14} className="shrink-0" />
+                        <span className="truncate">
+                          {canvas.title || "Untitled canvas"}
+                        </span>
+                      </div>
+
+                      {canDelete && onDeleteCanvas && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteCanvas(canvas.id);
+                          }}
+                          title="Delete canvas"
+                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition shrink-0"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+
+              {canvases.length === 0 && onOpenCreateCanvas && (
+                <button
+                  onClick={onOpenCreateCanvas}
+                  className="w-full text-left h-7 pl-5 pr-2 rounded-md text-[15px] hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-2 cursor-pointer"
+                  style={{ color: "var(--theme-text-muted)" }}
+                >
+                  <Plus size={12} />
+                  <span>Create a canvas...</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Docs Section — shown when toggled from rail */}
+        {showDocs && (
+          <div>
+            <div className="space-y-0.5">
+              {documents
+                .filter((doc) => {
+                  if (docActiveFilter === "project") return doc.isPublicInProject;
+                  if (docActiveFilter === "shared") {
+                    return (
+                      !doc.isPublicInProject &&
+                      doc.shares &&
+                      doc.shares.length > 0
+                    );
+                  }
+                  if (docActiveFilter === "private") {
+                    return (
+                      !doc.isPublicInProject &&
+                      doc.createdById === currentUser?.id &&
+                      (!doc.shares || doc.shares.length === 0)
+                    );
+                  }
+                  return true;
+                })
+                .filter((doc) =>
+                  (doc.title || "Untitled Document")
+                    .toLowerCase()
+                    .includes(docSearchQuery.trim().toLowerCase()),
+                )
+                .map((doc) => {
+                  const isActive = currentDocument?.id === doc.id;
+                  const isCreator = doc.createdById === currentUser?.id;
+                  const canDelete =
+                    isCreator || currentUser?.systemRole === "SUPER_ADMIN";
+
+                  return (
+                    <div
+                      key={doc.id}
+                      onClick={() => onSelectDocument?.(doc)}
+                      className={`group flex items-center justify-between h-7 pl-5 pr-2 rounded-md text-[15px] transition cursor-pointer ${
+                        isActive
+                          ? "font-semibold"
+                          : "hover:bg-black/5 dark:hover:bg-white/10"
+                      }`}
+                      style={
+                        isActive
+                          ? {
+                              backgroundColor: "var(--theme-selected)",
+                              color: "var(--theme-text)",
+                            }
+                          : {
+                              color: "var(--theme-text-primary)",
+                            }
+                      }
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <span className="text-sm shrink-0 leading-none">
+                          {doc.icon || "📄"}
+                        </span>
+                        <span className="truncate">
+                          {doc.title || "Untitled Document"}
+                        </span>
+                        {!doc.isPublicInProject && (
+                          <Lock size={12} className="shrink-0 opacity-60" />
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition shrink-0">
+                        {onShareDocument && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onShareDocument(doc);
+                            }}
+                            title="Share document"
+                            className="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition"
+                          >
+                            <Share2 size={13} />
+                          </button>
+                        )}
+                        {canDelete && onDeleteDocument && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteDocument(doc.id);
+                            }}
+                            title="Delete document"
+                            className="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+              {documents.length === 0 && onOpenCreateDoc && (
+                <button
+                  onClick={onOpenCreateDoc}
+                  className="w-full text-left h-7 pl-5 pr-2 rounded-md text-[15px] hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-2 cursor-pointer"
+                  style={{ color: "var(--theme-text-muted)" }}
+                >
+                  <Plus size={12} />
+                  <span>Create a document...</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!showProjects && !showCanvas && !showDocs && (
         <>
         {/* Channels Section */}
         <div>
-          <div
-            className="flex items-center justify-between h-7 px-2 text-[15px] font-medium select-none"
-            style={{ color: "var(--theme-text-muted)" }}
-          >
-            <button
-              onClick={() => setIsChannelsCollapsed((prev) => !prev)}
-              className="flex items-center gap-1.5 hover:text-[var(--theme-text)] transition cursor-pointer text-left focus:outline-none"
-            >
-              <ChevronDown
-                size={14}
-                className={`transition-transform duration-200 shrink-0 ${
-                  isChannelsCollapsed ? "-rotate-90" : "rotate-0"
-                }`}
-              />
-              <span>Channels</span>
-            </button>
-            <button
-              onClick={() => setShowCreateChannel(true)}
-              className="p-1 hover:opacity-80 rounded transition"
-            >
-              <Plus size={14} />
-            </button>
-          </div>
+          <SectionHeader
+            label="Channels"
+            collapsed={isChannelsCollapsed}
+            onToggle={() => setIsChannelsCollapsed((prev) => !prev)}
+            onAdd={() => setShowCreateChannel(true)}
+            addTitle="Create a channel"
+          />
 
           <Collapse open={!isChannelsCollapsed}>
             <div className="space-y-0.5">
@@ -547,91 +978,53 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                     <div
                       key={channel.id}
                       onClick={() => onSelectChannel(channel)}
-                      className={`group flex items-center justify-between h-7 pl-5 pr-2 rounded-md text-[15px] transition cursor-pointer ${
-                        isActive
-                          ? "shadow"
-                          : unread > 0
-                            ? "font-bold bg-black/5 dark:bg-white/10"
-                            : "hover:bg-black/5 dark:hover:bg-white/10"
-                      }`}
-                      style={
-                        isActive
-                          ? {
-                              backgroundColor: "var(--theme-primary)",
-                              color: "var(--theme-primary-text)",
-                            }
-                          : {
-                              color: "var(--theme-text-primary)",
-                            }
-                      }
+                      className={rowClass(isActive)}
+                      style={rowStyle(isActive)}
                     >
-                      <div className="flex items-center gap-2 truncate">
+                      {isActive && <ActiveBar />}
+                      <RowIcon>
                         {channel.isAnonymous ? (
-                          <span
-                            className="text-sm shrink-0 leading-none"
-                            title="Anonymous Channel"
-                          >
-                            🎭
-                          </span>
+                          <Mask size={18} aria-label="Anonymous channel" />
                         ) : channel.type === "PRIVATE" ? (
-                          <Lock
-                            size={15}
-                            className={`shrink-0 ${unread > 0 ? "" : "opacity-70"}`}
-                          />
+                          <Lock size={18} aria-label="Private channel" />
                         ) : (
-                          <Hash
-                            size={16}
-                            className={`shrink-0 ${unread > 0 ? "" : "opacity-70"}`}
-                          />
+                          <Hash size={16} />
                         )}
-                        <span className="truncate">{channel.name}</span>
-                        {channel.isAnonymous && (
-                          <span className="text-[9px] px-1 py-0.5 rounded bg-purple-100 dark:bg-purple-950/80 border border-purple-700/50 text-purple-700 dark:text-purple-300 font-semibold shrink-0">
-                            anon
-                          </span>
-                        )}
-                      </div>
+                      </RowIcon>
+                      <span {...rowLabel(isActive, unread > 0)}>{channel.name}</span>
 
-                      <div className="flex items-center gap-1.5">
-                        {unread > 0 && (
-                          <span className="px-1.5 py-0.5 bg-slack-green text-white text-[10px] font-bold rounded-full min-w-[18px] text-center leading-none">
-                            {unread}
-                          </span>
-                        )}
-
-                        {/* Active Call Indicator & Avatars */}
-                        {hasHuddle && (
-                          <span className="flex items-center gap-1 bg-slack-green/20 border border-slack-green/40 text-slack-green px-1.5 py-0.5 rounded-full text-[10px] font-bold animate-pulse">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slack-green" />
-                            LIVE
-                          </span>
-                        )}
-
-                        {/* Channel Call Action */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onStartHuddle(channel);
+                      {hasHuddle && (
+                        <span
+                          className="ml-2 shrink-0 flex items-center gap-1 px-1.5 h-5 rounded-full text-[10px] font-bold animate-pulse"
+                          style={{
+                            backgroundColor: "color-mix(in srgb, var(--theme-primary) 15%, transparent)",
+                            color: "var(--theme-primary)",
                           }}
-                          title={
-                            hasHuddle
-                              ? "Active Call - Click to join"
-                              : "Start Call"
-                          }
-                          style={
-                            hasHuddle
-                              ? undefined
-                              : { color: "var(--theme-text-muted)" }
-                          }
-                          className={`p-1 rounded transition ${
-                            hasHuddle
-                              ? "bg-slack-green text-white shadow-sm"
-                              : "opacity-0 group-hover:opacity-100 hover:bg-[var(--theme-bg-app)] dark:hover:bg-white/10"
-                          }`}
                         >
-                          <PhoneCall size={13} />
-                        </button>
-                      </div>
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "var(--theme-primary)" }} />
+                          LIVE
+                        </span>
+                      )}
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onStartHuddle(channel);
+                        }}
+                        title={hasHuddle ? "Active Call - Click to join" : "Start Call"}
+                        className={`ml-1 shrink-0 p-1 rounded transition ${
+                          hasHuddle ? "" : "hidden group-hover:block hover:bg-[var(--theme-fill)]"
+                        }`}
+                        style={
+                          hasHuddle
+                            ? { backgroundColor: "var(--theme-primary)", color: "var(--theme-primary-text)" }
+                            : { color: "var(--theme-text-muted)" }
+                        }
+                      >
+                        <PhoneCall size={13} />
+                      </button>
+
+                      {unread > 0 && <UnreadBadge count={unread} />}
                     </div>
                   );
                 })}
@@ -641,26 +1034,45 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 
         {/* Direct Messages Section */}
         <div>
-          <div
-            className="flex items-center justify-between h-7 px-2 text-[15px] font-medium select-none"
-            style={{ color: "var(--theme-text-muted)" }}
-          >
-            <button
-              onClick={() => setIsDmsCollapsed((prev) => !prev)}
-              className="flex items-center gap-1.5 hover:text-[var(--theme-text)] transition cursor-pointer text-left focus:outline-none"
-            >
-              <ChevronDown
-                size={14}
-                className={`transition-transform duration-200 shrink-0 ${
-                  isDmsCollapsed ? "-rotate-90" : "rotate-0"
-                }`}
-              />
-              <span>Direct messages</span>
-            </button>
-          </div>
+          <SectionHeader
+            label="Direct messages"
+            collapsed={isDmsCollapsed}
+            onToggle={() => setIsDmsCollapsed((prev) => !prev)}
+            onAdd={() => setShowNewDm(true)}
+            addTitle="New message"
+          />
 
           <Collapse open={!isDmsCollapsed}>
             <div className="space-y-0.5">
+              {showDmSearch && (
+                <div className="px-1 pt-1 pb-1.5">
+                  <div
+                    className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[13px]"
+                    style={{
+                      backgroundColor: "var(--theme-fill)",
+                      color: "var(--theme-text-primary)",
+                    }}
+                  >
+                    <Search size={12} className="shrink-0 opacity-60" />
+                    <input
+                      type="text"
+                      value={dmSearchQuery}
+                      onChange={(e) => setDmSearchQuery(e.target.value)}
+                      placeholder="Search users..."
+                      autoFocus
+                      className="bg-transparent border-none outline-none w-full text-xs placeholder:text-[var(--theme-text-muted)] focus:outline-none"
+                    />
+                    {dmSearchQuery && (
+                      <button
+                        onClick={() => setDmSearchQuery("")}
+                        className="opacity-60 hover:opacity-100 transition focus:outline-none"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
               {(() => {
                 // Collect users from members + any user from existing DIRECT channels (e.g. kicked users with chat history)
                 const userMap = new Map<string, { user: any; id: string }>();
@@ -691,12 +1103,40 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                     });
                   });
 
-                const dmList = Array.from(userMap.values());
+                let dmList = Array.from(userMap.values());
+
+                if (dmSearchQuery.trim()) {
+                  const query = dmSearchQuery.toLowerCase().trim();
+                  dmList = dmList.filter((m) => {
+                    const u = m.user;
+                    if (!u) return false;
+                    const name = (u.displayName || "").toLowerCase();
+                    const username = (u.username || "").toLowerCase();
+                    const email = (u.email || "").toLowerCase();
+                    return (
+                      name.includes(query) ||
+                      username.includes(query) ||
+                      email.includes(query)
+                    );
+                  });
+                }
+
+                if (dmList.length === 0 && dmSearchQuery.trim()) {
+                  return (
+                    <div
+                      className="px-3 py-2 text-xs text-center italic"
+                      style={{ color: "var(--theme-text-muted)" }}
+                    >
+                      No users found
+                    </div>
+                  );
+                }
 
                 return dmList.map((member) => {
                   const user = member.user;
                   if (!user) return null;
                   const userPresence = presence[user.id] || "offline";
+                  const inOrbit = isLiveOnline(liveStatus[user.id]);
                   const isSelf = user.id === currentUser?.id;
 
                   // Find matching DM channel to check selection and unread counts
@@ -734,56 +1174,31 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                     <div
                       key={member.id}
                       onClick={() => onSelectUserDM(user)}
-                      className={`flex items-center justify-between h-7 pl-5 pr-2 rounded-md text-[15px] transition cursor-pointer ${
-                        isSelectedDM
-                          ? "shadow"
-                          : unread > 0
-                            ? "font-bold bg-black/5 dark:bg-white/10"
-                            : "hover:bg-black/5 dark:hover:bg-white/10"
-                      }`}
-                      style={
-                        isSelectedDM
-                          ? {
-                              backgroundColor: "var(--theme-primary)",
-                              color: "var(--theme-primary-text)",
-                            }
-                          : {
-                              color: "var(--theme-text-primary)",
-                            }
-                      }
+                      className={rowClass(!!isSelectedDM)}
+                      style={rowStyle(!!isSelectedDM)}
                     >
-                      <div className="flex items-center gap-2 truncate min-w-0">
-                        <div className="relative shrink-0">
-                          <img
-                            src={
-                              user.avatarUrl ||
-                              `/api/avatar/bottts/svg?seed=${user.username}`
-                            }
-                            alt={user.displayName}
-                            className="w-5 h-5 rounded object-cover"
-                          />
-                          <span
-                            title={PRESENCE_STYLE[userPresence].label}
-                            className={`absolute bottom-0 right-0 w-[7px] h-[7px] rounded-full ${PRESENCE_STYLE[userPresence].dot}`}
-                            style={{ boxShadow: "0 0 0 1.5px var(--theme-bg-sidebar)" }}
-                          />
-                        </div>
-                        <span className="truncate">{user.displayName}</span>
+                      {isSelectedDM && <ActiveBar />}
+                      <span className="relative ml-2 mr-1 w-6 h-6 shrink-0">
+                        <Avatar name={user.displayName || user.username} src={user.avatarUrl} size={24} />
+                        {/* Dot = connected to Orbit (web/app) right now; check-in status lives in the pill */}
+                        <span
+                          title={inOrbit ? "In Orbit right now" : "Not in Orbit"}
+                          className={`absolute bottom-0 right-0 w-[7px] h-[7px] rounded-full ${inOrbit ? "bg-emerald-500" : "bg-black"}`}
+                          style={{
+                            boxShadow: `0 0 0 1.5px ${isSelectedDM ? "var(--theme-selected)" : "var(--theme-bg-sidebar)"}`,
+                          }}
+                        />
+                      </span>
+                      <span {...rowLabel(!!isSelectedDM, unread > 0)}>
+                        {user.displayName}
+                        <StatusEmoji presence={userPresence} breakReason={breakReasons[user.id]} />
                         {isSelf && (
-                          <span
-                            className="text-[10px] shrink-0"
-                            style={{ color: "var(--theme-text-muted)" }}
-                          >
+                          <span className="ml-1.5 text-[11px] font-normal" style={{ color: "var(--theme-text-muted)" }}>
                             you
                           </span>
                         )}
-                      </div>
-
-                      {unread > 0 && (
-                        <span className="px-1.5 py-0.5 bg-slack-green text-white text-[10px] font-bold rounded-full min-w-[18px] text-center leading-none shrink-0 ml-1">
-                          {unread}
-                        </span>
-                      )}
+                      </span>
+                      {unread > 0 && <UnreadBadge count={unread} />}
                     </div>
                   );
                 });
@@ -797,159 +1212,29 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 
       {/* Create Channel Modal */}
       {showCreateChannel && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-xl w-full max-w-md p-6 shadow-2xl">
-            <h2 className="text-xl font-bold text-[var(--theme-text)] mb-2 flex items-center gap-2">
-              <Hash className="text-slack-activeChannel" size={22} />
-              Create a channel
-            </h2>
-            <p className="text-sm text-[var(--theme-text-muted)] mb-5">
-              Channels are where conversations happen around a topic.
-            </p>
+        <CreateChannelModal
+          workspaceId={workspace.id}
+          members={members}
+          currentUserId={currentUser?.id}
+          onClose={() => setShowCreateChannel(false)}
+          onCreated={(channel) => {
+            onChannelCreated(channel);
+            setShowCreateChannel(false);
+          }}
+        />
+      )}
 
-            <form onSubmit={handleCreateChannel} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--theme-text)] mb-1">
-                  Name
-                </label>
-                <div className="flex items-center bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-lg px-3 py-2 text-sm text-[var(--theme-text-muted)]">
-                  <span>#</span>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. project-updates"
-                    value={channelName}
-                    onChange={(e) => setChannelName(e.target.value)}
-                    className="flex-1 bg-transparent text-[var(--theme-text)] focus:outline-none ml-1"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--theme-text)] mb-1">
-                  Topic (optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="What is this channel about?"
-                  value={channelTopic}
-                  onChange={(e) => setChannelTopic(e.target.value)}
-                  className="w-full bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-lg px-3 py-2 text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-slack-activeChannel text-sm"
-                />
-              </div>
-
-              {/* Channel Type / Privacy Cards */}
-              <div className="space-y-2 pt-1">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--theme-text)]">
-                  Channel Privacy
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div
-                    onClick={() => setIsPrivate(false)}
-                    className={`p-3 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
-                      !isPrivate
-                        ? "border-slack-green bg-slack-green/10 text-white shadow"
-                        : "border-[var(--theme-border)] bg-[var(--theme-bg-surface)] text-[var(--theme-text-muted)] hover:border-[var(--theme-border)]"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <Hash
-                        size={16}
-                        className={
-                          !isPrivate ? "text-slack-green" : "text-[var(--theme-text-muted)]"
-                        }
-                      />
-                      <span className="font-bold text-xs text-[var(--theme-text)]">
-                        Public
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-[var(--theme-text-muted)] leading-snug">
-                      Anyone in workspace can view &amp; join
-                    </span>
-                  </div>
-
-                  <div
-                    onClick={() => setIsPrivate(true)}
-                    className={`p-3 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
-                      isPrivate
-                        ? "border-slack-green bg-slack-green/10 text-white shadow"
-                        : "border-[var(--theme-border)] bg-[var(--theme-bg-surface)] text-[var(--theme-text-muted)] hover:border-[var(--theme-border)]"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <Lock
-                        size={16}
-                        className={
-                          isPrivate ? "text-slack-green" : "text-[var(--theme-text-muted)]"
-                        }
-                      />
-                      <span className="font-bold text-xs text-[var(--theme-text)]">
-                        Private
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-[var(--theme-text-muted)] leading-snug">
-                      Only invited people can view &amp; join
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Anonymous Discussion Mode Option */}
-              <div className="space-y-1.5 pt-1">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--theme-text)]">
-                  Discussion Mode
-                </label>
-                <div
-                  onClick={() => setIsAnonymous(!isAnonymous)}
-                  className={`p-3 rounded-xl border cursor-pointer transition flex items-start gap-3 ${
-                    isAnonymous
-                      ? "border-purple-500 bg-purple-950/30 text-white shadow"
-                      : "border-[var(--theme-border)] bg-[var(--theme-bg-surface)] text-[var(--theme-text)] hover:border-[var(--theme-border)]"
-                  }`}
-                >
-                  <span className="text-2xl shrink-0 select-none">🎭</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs text-[var(--theme-text)]">
-                        Anonymous Channel
-                      </span>
-                      <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase transition ${
-                          isAnonymous
-                            ? "bg-purple-600 text-white shadow-xs"
-                            : "bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)]"
-                        }`}
-                      >
-                        {isAnonymous ? "Enabled" : "Disabled"}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-[var(--theme-text-muted)] leading-snug mt-1">
-                      Ideal for critical discussions and open-ended feedback.
-                      Real names, avatars, and IDs are hidden. Each member gets
-                      a customizable pseudonym and emoji icon.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateChannel(false)}
-                  className="px-4 py-2 rounded-lg text-sm text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface)] transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-lg text-sm font-semibold bg-slack-green hover:bg-[#008a65] text-white transition"
-                >
-                  Create Channel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {showNewDm && (
+        <NewDirectMessageModal
+          members={members}
+          presence={presence}
+          currentUserId={currentUser?.id}
+          onClose={() => setShowNewDm(false)}
+          onSelectUser={(u) => {
+            setShowNewDm(false);
+            onSelectUserDM(u);
+          }}
+        />
       )}
 
       {/* Workspace Storage & File Management Modal */}

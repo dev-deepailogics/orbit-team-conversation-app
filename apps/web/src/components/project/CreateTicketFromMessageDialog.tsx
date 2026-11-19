@@ -1,22 +1,15 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Message, Project, ProjectColumn, Ticket, TicketPriority, WorkspaceMember } from '@orbit/types';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Message, Project, ProjectColumn, Ticket, WorkspaceMember } from '@orbit/types';
 import { api } from '../../lib/api';
-import { RichTextEditor, RichTextEditorRef } from '../chat/RichTextEditor';
-import {
-  X,
-  CheckSquare,
-  Columns3,
-  Calendar,
-  User,
-  Clock,
-  AlertCircle,
-  AlertTriangle,
-  CheckCircle2,
-  FolderKanban,
-  Plus,
-} from 'lucide-react';
+import { RichTextEditorRef } from '../chat/RichTextEditor';
+import { Plus, Board } from '@/components/ui/icons';
+import { TicketFields, TicketDraft, ProjectTile, saveTicketLabels } from './TicketModal';
+import { ModalShell, SelectField, SecondaryButton, PrimaryButton, ErrorNote } from '../channel/modalKit';
+import { useTicketAttachmentUpload, TicketAttachmentsField } from './TicketAttachments';
+import { getProjectMembers } from './projectViewUtils';
+import { useAuthStore } from '../../stores/authStore';
 
 interface CreateTicketFromMessageDialogProps {
   isOpen: boolean;
@@ -29,12 +22,15 @@ interface CreateTicketFromMessageDialogProps {
   onOpenCreateProject?: () => void;
 }
 
-const PRIORITIES: { value: TicketPriority; label: string; color: string; icon: any }[] = [
-  { value: 'LOW', label: 'Low', color: 'var(--theme-text-muted)', icon: CheckCircle2 },
-  { value: 'MEDIUM', label: 'Medium', color: '#3B82F6', icon: Clock },
-  { value: 'HIGH', label: 'High', color: '#F59E0B', icon: AlertCircle },
-  { value: 'URGENT', label: 'Urgent', color: '#EF4444', icon: AlertTriangle },
-];
+const EMPTY_DRAFT: TicketDraft = {
+  title: '',
+  columnId: '',
+  priority: 'MEDIUM',
+  type: 'TASK',
+  assigneeId: null,
+  dueDate: '',
+  labels: [],
+};
 
 export const CreateTicketFromMessageDialog: React.FC<CreateTicketFromMessageDialogProps> = ({
   isOpen,
@@ -50,19 +46,58 @@ export const CreateTicketFromMessageDialog: React.FC<CreateTicketFromMessageDial
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [columns, setColumns] = useState<ProjectColumn[]>([]);
-  const [columnId, setColumnId] = useState<string>('');
-  const [title, setTitle] = useState('');
-  const [priority, setPriority] = useState<TicketPriority>('MEDIUM');
-  const [assigneeId, setAssigneeId] = useState<string | null>(null);
-  const [dueDate, setDueDate] = useState<string>('');
+  const [draft, setDraft] = useState<TicketDraft>(EMPTY_DRAFT);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const upload = useTicketAttachmentUpload(workspaceId);
+  const currentUserId = useAuthStore((s) => s.user?.id);
 
-  // When dialog opens or message/projects change, set up initial values
+  // Assignees are limited to the selected project's people and follow the project picker.
+  const assignableMembers = useMemo(
+    () =>
+      getProjectMembers(
+        projects.find((p) => p.id === selectedProjectId),
+        members,
+        { currentUserId },
+      ),
+    [projects, selectedProjectId, members, currentUserId],
+  );
+
+  // Switching project drops an assignee who isn't on the new one.
+  useEffect(() => {
+    if (draft.assigneeId && !assignableMembers.some((m) => m.user?.id === draft.assigneeId)) {
+      setDraft((d) => ({ ...d, assigneeId: null }));
+    }
+  }, [assignableMembers, draft.assigneeId]);
+
+  const patch = (p: Partial<TicketDraft>) => setDraft((d) => ({ ...d, ...p }));
+
+  const loadProjectColumns = async (projId: string) => {
+    try {
+      // Only columns are needed; keep the ticket payload minimal.
+      const res = await api.get(`/api/projects/${projId}`, { params: { ticketLimit: 1 } });
+      const cols: ProjectColumn[] = res.data.columns || [];
+      setColumns(cols);
+      patch({ columnId: cols[0]?.id || '' });
+    } catch (err) {
+      console.error('Failed to load project columns', err);
+    }
+  };
+
   useEffect(() => {
     if (!isOpen || !message) return;
 
-    // Pick first project if available
+    // Carry over the message's own attachments by default
+    upload.setAttachments(
+      (message.attachments || []).map((a) => ({
+        id: a.id,
+        fileUrl: a.fileUrl,
+        fileName: a.fileName,
+        fileType: a.fileType,
+        fileSize: a.fileSize,
+      }))
+    );
+
     const proj = projects[0];
     if (proj) {
       setSelectedProjectId(proj.id);
@@ -70,73 +105,39 @@ export const CreateTicketFromMessageDialog: React.FC<CreateTicketFromMessageDial
     } else {
       setSelectedProjectId('');
       setColumns([]);
-      setColumnId('');
     }
 
-    // Extract title from message
     const cleanContent = (message.content || '').trim();
-    const firstLine = cleanContent.split('\n')[0]?.replace(/^[#*`\-~>\s]+/, '').trim() || 'New Ticket from Message';
-    setTitle(firstLine.slice(0, 100));
-
-    // Reset priority & assignee
-    setPriority('MEDIUM');
-    setAssigneeId(null);
-    setDueDate('');
+    const firstLine =
+      cleanContent.split('\n')[0]?.replace(/^[#*`\-~>\s]+/, '').trim() || 'New Ticket from Message';
+    setDraft({ ...EMPTY_DRAFT, title: firstLine.slice(0, 100) });
     setError('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, message, projects]);
-
-  const loadProjectColumns = async (projId: string) => {
-    try {
-      // Only columns are needed; keep the ticket payload minimal.
-      const res = await api.get(`/api/projects/${projId}`, { params: { ticketLimit: 1 } });
-      const cols = res.data.columns || [];
-      setColumns(cols);
-      if (cols.length > 0) {
-        setColumnId(cols[0].id);
-      } else {
-        setColumnId('');
-      }
-    } catch (err) {
-      console.error('Failed to load project columns', err);
-    }
-  };
-
-  const handleSelectProject = (projId: string) => {
-    setSelectedProjectId(projId);
-    loadProjectColumns(projId);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedProjectId) {
-      setError('Please select a project board first');
-      return;
-    }
-    if (!title.trim()) {
-      setError('Title cannot be empty');
-      return;
-    }
-    if (!columnId) {
-      setError('Please select a column');
-      return;
-    }
+    if (!selectedProjectId) return setError('Please select a project board first');
+    if (!draft.title.trim()) return setError('Title cannot be empty');
+    if (!draft.columnId) return setError('Please select a column');
 
     setIsSubmitting(true);
     setError('');
-
     const desc = editorRef.current?.getMarkdown()?.trim() || '';
 
     try {
       const res = await api.post(`/api/projects/${selectedProjectId}/tickets`, {
-        title: title.trim(),
+        title: draft.title.trim(),
         description: desc || null,
-        columnId,
-        priority,
-        assigneeId: assigneeId || null,
-        dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+        columnId: draft.columnId,
+        priority: draft.priority,
+        type: draft.type,
+        assigneeId: draft.assigneeId || null,
+        dueDate: draft.dueDate ? new Date(draft.dueDate).toISOString() : null,
+        images: upload.attachments,
       });
-
-      onTicketCreated?.(res.data);
+      const created = await saveTicketLabels(selectedProjectId, res.data, draft.labels);
+      onTicketCreated?.(created);
       onClose();
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to create ticket');
@@ -147,346 +148,88 @@ export const CreateTicketFromMessageDialog: React.FC<CreateTicketFromMessageDial
 
   if (!isOpen || !message) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in">
-      <div
-        className="rounded-2xl w-full max-w-xl p-6 shadow-2xl overflow-hidden relative border"
-        style={{
-          backgroundColor: 'var(--theme-bg-surface)',
-          borderColor: 'var(--theme-border)',
-          color: 'var(--theme-text-primary)',
-        }}
-      >
-        {/* Header */}
-        <div
-          className="flex items-center justify-between pb-4 border-b"
-          style={{ borderColor: 'var(--theme-border)' }}
-        >
-          <div className="flex items-center gap-2">
-            <span
-              className="text-xs font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border flex items-center gap-1.5"
-              style={{
-                color: 'var(--theme-primary)',
-                backgroundColor: 'rgba(var(--theme-primary-rgb, 0, 122, 90), 0.1)',
-                borderColor: 'var(--theme-primary)',
-              }}
-            >
-              <CheckSquare size={13} />
-              Create Ticket from Message
-            </span>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:opacity-80 transition"
-            style={{
-              color: 'var(--theme-text-muted)',
-              backgroundColor: 'var(--theme-bg-surface-hover)',
-            }}
-          >
-            <X size={18} />
-          </button>
-        </div>
+  const selectedProject = projects.find((p) => p.id === selectedProjectId);
 
-        {error && (
-          <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-600 dark:text-red-400">
-            {error}
-          </div>
-        )}
-
-        {projects.length === 0 ? (
-          <div className="py-8 text-center space-y-3">
-            <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto"
-              style={{
-                backgroundColor: 'var(--theme-bg-surface-hover)',
-                color: 'var(--theme-text-muted)',
-              }}
-            >
-              <FolderKanban size={24} />
-            </div>
-            <h4
-              className="text-sm font-semibold"
-              style={{ color: 'var(--theme-text-primary)' }}
-            >
-              No Project Boards in Workspace
-            </h4>
-            <p
-              className="text-xs max-w-sm mx-auto"
-              style={{ color: 'var(--theme-text-muted)' }}
-            >
-              You need at least one project board to convert messages into Kanban tickets.
-            </p>
-            <button
+  if (projects.length === 0) {
+    return (
+      <ModalShell
+        width={520}
+        title="Create ticket"
+        subtitle="Turn this message into a ticket on a project board."
+        onClose={onClose}
+        footer={
+          <>
+            <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
+            <PrimaryButton
               type="button"
               onClick={() => {
                 onClose();
                 onOpenCreateProject?.();
               }}
-              className="px-4 py-2 text-xs font-semibold rounded-xl shadow transition inline-flex items-center gap-1.5 cursor-pointer"
-              style={{
-                backgroundColor: 'var(--theme-primary)',
-                color: 'var(--theme-primary-text)',
-              }}
             >
-              <Plus size={15} />
-              Create Project Board
-            </button>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-            {/* Project Selection */}
-            <div>
-              <label
-                className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
-                style={{ color: 'var(--theme-text-muted)' }}
-              >
-                Target Project Board <span className="text-red-600 dark:text-red-400">*</span>
-              </label>
-              <select
-                value={selectedProjectId}
-                onChange={(e) => handleSelectProject(e.target.value)}
-                className="w-full rounded-xl px-3.5 py-2.5 text-sm transition font-medium border focus:outline-none cursor-pointer"
-                style={{
-                  backgroundColor: 'var(--theme-bg-surface-hover)',
-                  borderColor: 'var(--theme-border)',
-                  color: 'var(--theme-text-primary)',
-                }}
-              >
-                {projects.map((p) => (
-                  <option
-                    key={p.id}
-                    value={p.id}
-                    style={{
-                      backgroundColor: 'var(--theme-bg-surface)',
-                      color: 'var(--theme-text-primary)',
-                    }}
-                  >
-                    {p.icon || '📋'} {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+              <Plus size={16} />
+              Create project board
+            </PrimaryButton>
+          </>
+        }
+      >
+        <div className="flex flex-col items-center text-center gap-2 py-4">
+          <span
+            className="w-12 h-12 rounded-xl flex items-center justify-center"
+            style={{ backgroundColor: 'var(--theme-bg-surface-hover)', color: 'var(--theme-text-muted)' }}
+          >
+            <Board size={24} />
+          </span>
+          <p className="text-sm font-semibold" style={{ color: 'var(--theme-text)' }}>
+            No project boards yet
+          </p>
+          <p className="text-[13px] max-w-sm" style={{ color: 'var(--theme-text-muted)' }}>
+            You need at least one project board to turn messages into tickets.
+          </p>
+        </div>
+      </ModalShell>
+    );
+  }
 
-            {/* Title */}
-            <div>
-              <label
-                className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
-                style={{ color: 'var(--theme-text-muted)' }}
-              >
-                Title <span className="text-red-600 dark:text-red-400">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Ticket title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full rounded-xl px-3.5 py-2.5 text-sm transition font-medium border focus:outline-none"
-                style={{
-                  backgroundColor: 'var(--theme-bg-surface-hover)',
-                  borderColor: 'var(--theme-border)',
-                  color: 'var(--theme-text-primary)',
-                }}
-              />
-            </div>
-
-            {/* Description (Rich Text Editor pre-filled with message markdown) */}
-            <div>
-              <label
-                className="block text-xs font-semibold uppercase tracking-wider mb-1.5 flex items-center justify-between"
-                style={{ color: 'var(--theme-text-muted)' }}
-              >
-                <span>Description <span className="font-normal lowercase opacity-75">(rich formatting)</span></span>
-              </label>
-              <div
-                className="rounded-xl overflow-hidden transition border"
-                style={{
-                  backgroundColor: 'var(--theme-bg-surface-hover)',
-                  borderColor: 'var(--theme-border)',
-                }}
-              >
-                <RichTextEditor
-                  ref={editorRef}
-                  initialValue={message.content || ''}
-                  placeholder="Ticket description..."
-                  minHeight="80px"
-                />
-              </div>
-            </div>
-
-            {/* Column & Priority Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Column Status */}
-              <div>
-                <label
-                  className="block text-xs font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5"
-                  style={{ color: 'var(--theme-text-muted)' }}
-                >
-                  <Columns3 size={14} style={{ color: 'var(--theme-text-muted)' }} />
-                  Column / Status
-                </label>
-                <select
-                  value={columnId}
-                  onChange={(e) => setColumnId(e.target.value)}
-                  className="w-full rounded-xl px-3 py-2 text-xs border focus:outline-none transition cursor-pointer"
-                  style={{
-                    backgroundColor: 'var(--theme-bg-surface-hover)',
-                    borderColor: 'var(--theme-border)',
-                    color: 'var(--theme-text-primary)',
-                  }}
-                >
-                  {columns.map((c) => (
-                    <option
-                      key={c.id}
-                      value={c.id}
-                      style={{
-                        backgroundColor: 'var(--theme-bg-surface)',
-                        color: 'var(--theme-text-primary)',
-                      }}
-                    >
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Priority */}
-              <div>
-                <label
-                  className="block text-xs font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5"
-                  style={{ color: 'var(--theme-text-muted)' }}
-                >
-                  <Clock size={14} style={{ color: 'var(--theme-text-muted)' }} />
-                  Priority
-                </label>
-                <select
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value as TicketPriority)}
-                  className="w-full rounded-xl px-3 py-2 text-xs border focus:outline-none transition cursor-pointer"
-                  style={{
-                    backgroundColor: 'var(--theme-bg-surface-hover)',
-                    borderColor: 'var(--theme-border)',
-                    color: 'var(--theme-text-primary)',
-                  }}
-                >
-                  {PRIORITIES.map((p) => (
-                    <option
-                      key={p.value}
-                      value={p.value}
-                      style={{
-                        backgroundColor: 'var(--theme-bg-surface)',
-                        color: 'var(--theme-text-primary)',
-                      }}
-                    >
-                      {p.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Assignee & Due Date Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Assignee */}
-              <div>
-                <label
-                  className="block text-xs font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5"
-                  style={{ color: 'var(--theme-text-muted)' }}
-                >
-                  <User size={14} style={{ color: 'var(--theme-text-muted)' }} />
-                  Assignee
-                </label>
-                <select
-                  value={assigneeId || ''}
-                  onChange={(e) => setAssigneeId(e.target.value || null)}
-                  className="w-full rounded-xl px-3 py-2 text-xs border focus:outline-none transition cursor-pointer"
-                  style={{
-                    backgroundColor: 'var(--theme-bg-surface-hover)',
-                    borderColor: 'var(--theme-border)',
-                    color: 'var(--theme-text-primary)',
-                  }}
-                >
-                  <option
-                    value=""
-                    style={{
-                      backgroundColor: 'var(--theme-bg-surface)',
-                      color: 'var(--theme-text-primary)',
-                    }}
-                  >
-                    Unassigned
-                  </option>
-                  {members.map((m) => {
-                    const u = m.user;
-                    if (!u) return null;
-                    return (
-                      <option
-                        key={u.id}
-                        value={u.id}
-                        style={{
-                          backgroundColor: 'var(--theme-bg-surface)',
-                          color: 'var(--theme-text-primary)',
-                        }}
-                      >
-                        {u.displayName}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-
-              {/* Due Date */}
-              <div>
-                <label
-                  className="block text-xs font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1.5"
-                  style={{ color: 'var(--theme-text-muted)' }}
-                >
-                  <Calendar size={14} style={{ color: 'var(--theme-text-muted)' }} />
-                  Due Date
-                </label>
-                <input
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  className="w-full rounded-xl px-3 py-2 text-xs border focus:outline-none transition"
-                  style={{
-                    backgroundColor: 'var(--theme-bg-surface-hover)',
-                    borderColor: 'var(--theme-border)',
-                    color: 'var(--theme-text-primary)',
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Footer Buttons */}
-            <div
-              className="flex items-center justify-end gap-3 pt-3 border-t"
-              style={{ borderColor: 'var(--theme-border)' }}
-            >
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={isSubmitting}
-                className="px-4 py-2 text-xs hover:opacity-80 transition cursor-pointer"
-                style={{ color: 'var(--theme-text-muted)' }}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting || !title.trim() || !columnId}
-                className="px-5 py-2.5 disabled:opacity-50 text-xs font-semibold rounded-xl shadow-lg transition flex items-center gap-2 cursor-pointer active:scale-95"
-                style={{
-                  backgroundColor: 'var(--theme-primary)',
-                  color: 'var(--theme-primary-text)',
-                }}
-              >
-                <CheckSquare size={14} />
-                {isSubmitting ? 'Creating...' : 'Create Ticket'}
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
+  return (
+    <ModalShell
+      width={640}
+      title="Create ticket"
+      subtitle={`Add a ticket to the ${selectedProject?.name || 'selected'} board.`}
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      footer={
+        <>
+          <SecondaryButton onClick={onClose} disabled={isSubmitting}>
+            Cancel
+          </SecondaryButton>
+          <PrimaryButton disabled={isSubmitting || !draft.title.trim() || !draft.columnId}>
+            <Plus size={16} />
+            {isSubmitting ? 'Creating…' : 'Create ticket'}
+          </PrimaryButton>
+        </>
+      }
+    >
+      {error && <ErrorNote>{error}</ErrorNote>}
+      <TicketFields
+        draft={draft}
+        onChange={patch}
+        columns={columns}
+        members={assignableMembers}
+        editorRef={editorRef}
+        initialDescription={message.content || ''}
+        attachmentsField={<TicketAttachmentsField upload={upload} />}
+        projectField={
+          <SelectField
+            value={selectedProjectId}
+            options={projects.map((p) => ({ value: p.id, label: p.name, leading: <ProjectTile /> }))}
+            onChange={(id) => {
+              setSelectedProjectId(id);
+              loadProjectColumns(id);
+            }}
+          />
+        }
+      />
+    </ModalShell>
   );
 };

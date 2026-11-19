@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useState, useImperativeHandle, forwardRef } from 'react';
+import { Avatar } from '@/components/project/projectViewUtils';
 import {
   Bold,
   Italic,
@@ -14,7 +15,7 @@ import {
   FileCode,
   Link as LinkIcon,
   AtSign,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 
 export interface MentionUser {
   id: string;
@@ -44,6 +45,19 @@ interface RichTextEditorProps {
   className?: string;
   mentionUsers?: MentionUser[];
   autoFocus?: boolean;
+  /** Called with files (e.g. a screenshot) pasted from the clipboard; the paste is then not inserted into the text. */
+  onPasteFiles?: (files: File[]) => void;
+}
+
+// Browsers name every pasted screenshot "image.png"; give each a distinct, readable name.
+function namePastedFiles(files: File[]): File[] {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  return files.map((f, i) => {
+    if (f.name && !/^image\.[a-z0-9]+$/i.test(f.name)) return f;
+    const ext = (f.type.split('/')[1] || 'png').replace('jpeg', 'jpg').replace(/\+.*$/, '');
+    const suffix = files.length > 1 ? `-${i + 1}` : '';
+    return new File([f], `pasted-image-${stamp}${suffix}.${ext}`, { type: f.type });
+  });
 }
 
 function getInlineFormattingParent(node: Node | null, rootEl: HTMLElement): HTMLElement | null {
@@ -59,6 +73,43 @@ function getInlineFormattingParent(node: Node | null, rootEl: HTMLElement): HTML
     curr = curr.parentNode;
   }
   return null;
+}
+
+const CODE_BLOCK_PLACEHOLDER = '// type code here';
+
+/** Nearest ancestor (or self) with the given tag, stopping at the editor root. */
+function closestInEditor(node: Node | null, tag: string, rootEl: HTMLElement): HTMLElement | null {
+  let curr: Node | null = node;
+  while (curr && curr !== rootEl) {
+    if (curr.nodeType === Node.ELEMENT_NODE && (curr as HTMLElement).tagName.toLowerCase() === tag) {
+      return curr as HTMLElement;
+    }
+    curr = curr.parentNode;
+  }
+  return null;
+}
+
+/** Turn a code block back into plain lines (one div per line) and put the caret at its end. */
+function unwrapCodeBlock(pre: HTMLElement, sel: Selection) {
+  const text = (pre.textContent || '').replace(/​/g, '');
+  const lines = text === CODE_BLOCK_PLACEHOLDER ? [''] : text.split('\n');
+  const frag = document.createDocumentFragment();
+  let last: HTMLElement | null = null;
+  for (const line of lines) {
+    const div = document.createElement('div');
+    if (line) div.textContent = line;
+    else div.appendChild(document.createElement('br'));
+    frag.appendChild(div);
+    last = div;
+  }
+  pre.replaceWith(frag);
+  if (last) {
+    const range = document.createRange();
+    range.selectNodeContents(last);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
 }
 
 function isCursorAtEndOfNode(range: Range, inlineEl: HTMLElement): boolean {
@@ -204,6 +255,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       showToolbar = true,
       onKeyDown,
       onTyping,
+      onPasteFiles,
       onSubmit,
       minHeight = '60px',
       className = '',
@@ -447,6 +499,8 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       if (!sel || sel.rangeCount === 0) return;
 
       const range = sel.getRangeAt(0);
+      // Text in a code block is already code; inline code there would nest code inside code.
+      if (closestInEditor(range.commonAncestorContainer, 'pre', editor)) return;
       const selectedText = range.toString();
 
       if (selectedText) {
@@ -499,13 +553,30 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       if (!sel || sel.rangeCount === 0) return;
 
       const range = sel.getRangeAt(0);
+
+      // Already inside a code block: toggle it back to plain text instead of nesting another block.
+      const existingPre = closestInEditor(range.commonAncestorContainer, 'pre', editor);
+      if (existingPre) {
+        unwrapCodeBlock(existingPre, sel);
+        if (onTyping) onTyping(editor.innerText.replace(/​/g, ''));
+        return;
+      }
+
+      // Inside inline code: drop that formatting first so we never get code inside code.
+      const inlineCode = closestInEditor(range.commonAncestorContainer, 'code', editor);
+      if (inlineCode) {
+        const text = document.createTextNode(inlineCode.textContent || '');
+        inlineCode.replaceWith(text);
+        range.selectNodeContents(text);
+      }
+
       const selectedText = range.toString();
 
       const pre = document.createElement('pre');
       pre.className =
         'bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-lg p-2.5 my-1.5 font-mono text-xs text-[var(--theme-text)] block overflow-x-auto';
       const code = document.createElement('code');
-      code.textContent = selectedText || '// type code here';
+      code.textContent = selectedText || CODE_BLOCK_PLACEHOLDER;
       pre.appendChild(code);
 
       range.deleteContents();
@@ -604,7 +675,12 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         const sel = window.getSelection();
         if (sel && sel.rangeCount > 0) {
           const range = sel.getRangeAt(0);
-          if (range.collapsed && range.startContainer.nodeType === Node.TEXT_NODE) {
+          if (
+            range.collapsed &&
+            range.startContainer.nodeType === Node.TEXT_NODE &&
+            // Backticks inside a code block are literal code, not inline-code markers.
+            !closestInEditor(range.startContainer, 'pre', editor)
+          ) {
             const textNode = range.startContainer;
             const fullText = textNode.textContent || '';
             const beforeCursor = fullText.slice(0, range.startOffset);
@@ -688,6 +764,45 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
               document.execCommand('insertUnorderedList');
               if (onTyping) onTyping(editor.innerText.replace(/\u200B/g, ''));
               return;
+            }
+
+            // Auto-convert typed URL before space into a clickable link
+            if (node && node.nodeType === Node.TEXT_NODE && offset > 0) {
+              const textBefore = text.slice(0, offset);
+              const urlMatch = textBefore.match(/(https?:\/\/[^\s]+)$/);
+              if (urlMatch) {
+                const url = urlMatch[1];
+                const urlStart = textBefore.lastIndexOf(url);
+                const parentA = node.parentElement?.closest('a');
+                if (!parentA) {
+                  e.preventDefault();
+                  const fullText = node.textContent || '';
+                  const beforeUrl = fullText.slice(0, urlStart);
+                  const afterUrl = fullText.slice(offset);
+
+                  node.textContent = beforeUrl;
+
+                  const linkEl = document.createElement('a');
+                  linkEl.href = url;
+                  linkEl.target = '_blank';
+                  linkEl.rel = 'noreferrer';
+                  linkEl.className = 'text-blue-600 dark:text-blue-400 underline hover:opacity-80';
+                  linkEl.textContent = url;
+
+                  const spaceNode = document.createTextNode(' ' + afterUrl);
+                  node.parentNode?.insertBefore(linkEl, node.nextSibling);
+                  linkEl.parentNode?.insertBefore(spaceNode, linkEl.nextSibling);
+
+                  const newRange = document.createRange();
+                  newRange.setStart(spaceNode, 1);
+                  newRange.setEnd(spaceNode, 1);
+                  sel.removeAllRanges();
+                  sel.addRange(newRange);
+
+                  if (onTyping) onTyping(editor.innerText.replace(/\u200B/g, ''));
+                  return;
+                }
+              }
             }
           }
         }
@@ -820,6 +935,83 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         onTyping(editorRef.current.innerText.replace(/\u200B/g, ''));
       }
       checkMentionTrigger();
+    };
+
+    const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+      // 1. Check if clipboard contains files (e.g. copied screenshot, image, file)
+      const items = e.clipboardData?.items;
+      if (items && items.length > 0) {
+        const files: File[] = [];
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          if (item.kind === 'file') {
+            const file = item.getAsFile();
+            if (file) {
+              files.push(file);
+            }
+          }
+        }
+
+        if (files.length > 0 && onPasteFiles) {
+          e.preventDefault();
+          onPasteFiles(files);
+          return;
+        }
+      }
+
+      // 2. Also check e.clipboardData.files directly
+      if (e.clipboardData?.files && e.clipboardData.files.length > 0 && onPasteFiles) {
+        const fileList = Array.from(e.clipboardData.files);
+        if (fileList.length > 0) {
+          e.preventDefault();
+          onPasteFiles(fileList);
+          return;
+        }
+      }
+
+      // 3. Auto-link pasted URLs (e.g., https://... or http://...)
+      const pastedText = e.clipboardData?.getData('text/plain') || '';
+      const urlRegex = /^https?:\/\/[^\s]+$/i;
+      if (pastedText && urlRegex.test(pastedText.trim())) {
+        e.preventDefault();
+        const cleanUrl = pastedText.trim();
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+          const range = sel.getRangeAt(0);
+          range.deleteContents();
+
+          const linkEl = document.createElement('a');
+          linkEl.href = cleanUrl;
+          linkEl.target = '_blank';
+          linkEl.rel = 'noreferrer';
+          linkEl.className = 'text-blue-600 dark:text-blue-400 underline hover:opacity-80';
+          linkEl.textContent = cleanUrl;
+
+          range.insertNode(linkEl);
+
+          // Add trailing space / zero-width separator so typing continues normally outside the <a> tag
+          const postNode = document.createTextNode(' ');
+          linkEl.parentNode?.insertBefore(postNode, linkEl.nextSibling);
+
+          const newRange = document.createRange();
+          newRange.setStartAfter(postNode);
+          newRange.setEndAfter(postNode);
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+
+          if (editorRef.current && onTyping) {
+            onTyping(editorRef.current.innerText.replace(/\u200B/g, ''));
+          }
+          return;
+        }
+      }
+
+      // Allow default text paste flow, but update typing state on next tick
+      setTimeout(() => {
+        if (editorRef.current && onTyping) {
+          onTyping(editorRef.current.innerText.replace(/\u200B/g, ''));
+        }
+      }, 0);
     };
 
     return (
@@ -974,11 +1166,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
                     }`}
                   >
                     <div className="relative shrink-0">
-                      <img
-                        src={u.avatarUrl || `/api/avatar/bottts/svg?seed=${u.username}`}
-                        alt={u.displayName}
-                        className="w-5 h-5 rounded-md object-cover"
-                      />
+                      <Avatar name={u.displayName || u.username} src={u.avatarUrl} size={20} />
                       <span
                         className={`absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full ring-1 ring-[var(--theme-bg-surface)] ${
                           u.status === 'ONLINE' ? 'bg-slack-green' : 'bg-gray-500'
@@ -1004,13 +1192,14 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
           <div
             ref={editorRef}
             contentEditable
+            onPaste={handlePaste}
             onKeyDown={handleEditorKeyDown}
             onInput={handleInput}
             onKeyUp={checkMentionTrigger}
             onClick={checkMentionTrigger}
             style={{ minHeight, color: 'var(--theme-text-primary)' }}
             data-placeholder={placeholder}
-            className="w-full bg-transparent px-4 py-3 text-sm focus:outline-none overflow-y-auto max-h-60 leading-relaxed font-sans empty:before:content-[attr(data-placeholder)] empty:before:text-[var(--theme-text-muted)] empty:before:pointer-events-none [&_h1]:text-lg [&_h1]:font-bold [&_h1]:my-1 [&_h2]:text-base [&_h2]:font-bold [&_h2]:my-1 [&_b]:font-bold [&_strong]:font-bold [&_i]:italic [&_ul]:list-disc [&_ul]:list-inside [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:list-inside [&_ol]:my-1 [&_blockquote]:border-l-4 [&_blockquote]:border-slack-green [&_blockquote]:px-2.5 [&_blockquote]:py-1 [&_blockquote]:my-1 [&_blockquote]:rounded-r [&_blockquote]:italic [&_a]:text-blue-500 [&_a]:underline"
+            className="w-full bg-transparent px-[14px] py-[13px] text-sm focus:outline-none overflow-y-auto max-h-60 leading-5 font-sans empty:before:content-[attr(data-placeholder)] empty:before:text-[var(--theme-text-muted)] empty:before:pointer-events-none [&_h1]:text-lg [&_h1]:font-bold [&_h1]:my-1 [&_h2]:text-base [&_h2]:font-bold [&_h2]:my-1 [&_b]:font-bold [&_strong]:font-bold [&_i]:italic [&_ul]:list-disc [&_ul]:list-inside [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:list-inside [&_ol]:my-1 [&_blockquote]:border-l-4 [&_blockquote]:border-[var(--theme-primary)] [&_blockquote]:px-2.5 [&_blockquote]:py-1 [&_blockquote]:my-1 [&_blockquote]:rounded-r [&_blockquote]:italic [&_a]:text-[var(--theme-primary-hover)] [&_a]:underline"
           />
         </div>
       </div>

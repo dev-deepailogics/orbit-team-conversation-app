@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import EmojiPicker, { Theme, EmojiClickData, EmojiStyle } from 'emoji-picker-react';
-import { Search, Sparkles, X, Grid } from 'lucide-react';
+import { Search, Sparkles, X, Grid } from '@/components/ui/icons';
 import { getTopEmojis, recordEmojiUsage, POPULAR_REACTION_EMOJIS } from '../../lib/emojiStore';
 
 interface EmojiPickerPopoverProps {

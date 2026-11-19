@@ -13,7 +13,7 @@ import {
   ShieldCheck,
   Server,
   Zap,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 
 const FOOTER_COLUMNS = [
   {

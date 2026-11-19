@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Quote, Star, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Quote, Star, ShieldCheck } from '@/components/ui/icons';
 
 const TESTIMONIALS = [
   {

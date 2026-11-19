@@ -1,6 +1,7 @@
 import { prisma } from '@orbit/db';
 import { SOCKET_EVENTS } from '@orbit/types';
 import { getOrCreateSystemBot } from './systemBot.js';
+import { extractMentionTokens, matchMentionedUserIds } from './mentionParser.js';
 
 export async function handleMessageMentions({
   workspaceId,
@@ -21,18 +22,8 @@ export async function handleMessageMentions({
 }) {
   try {
     if (!content || !authorId || !workspaceId) return;
-
-    // 1. Extract mention tokens from content: e.g. @username or @firstname
-    const mentionRegex = /(?:^|[\s(])@([a-zA-Z0-9_\.\-]+)/g;
-    const tokens: string[] = [];
-    let match: RegExpExecArray | null;
-    while ((match = mentionRegex.exec(content)) !== null) {
-      if (match[1]) {
-        tokens.push(match[1].toLowerCase());
-      }
-    }
-
-    if (tokens.length === 0) return;
+    // Bail out before the member lookup below if there's no "@" at all.
+    if (extractMentionTokens(content).length === 0) return;
 
     // 2. Fetch channel details
     const channel = await prisma.channel.findUnique({
@@ -65,22 +56,9 @@ export async function handleMessageMentions({
     });
 
     // 5. Match users (case-insensitive username or displayName), excluding author
-    const matchedUsers = members
-      .map((m) => m.user)
-      .filter((u) => {
-        if (!u || u.id === authorId) return false;
-        const uUsername = u.username.toLowerCase();
-        const uDisplayName = u.displayName.toLowerCase();
-        return (
-          tokens.includes(uUsername) ||
-          tokens.includes(uDisplayName) ||
-          content.toLowerCase().includes(`@${uDisplayName}`) ||
-          content.toLowerCase().includes(`@${uUsername}`)
-        );
-      });
-
-    // Deduplicate target users
-    const uniqueTargets = Array.from(new Map(matchedUsers.map((u) => [u.id, u])).values());
+    const candidates = members.map((m) => m.user).filter((u): u is NonNullable<typeof u> => !!u);
+    const mentionedIds = new Set(matchMentionedUserIds(content, candidates, authorId));
+    const uniqueTargets = candidates.filter((u) => mentionedIds.has(u.id));
     if (uniqueTargets.length === 0) return;
 
     const locationText = isThreadReply

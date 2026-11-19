@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   LiveKitRoom,
-  VideoConference,
   RoomAudioRenderer,
   VideoTrack,
   useTracks,
@@ -24,10 +23,11 @@ import {
   Users,
   Monitor,
   MessageSquare,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 
 import { useHuddleStore } from '../../stores/huddleStore';
 import { ModernMeetingChat } from './ModernMeetingChat';
+import { CallConference } from './CallConference';
 
 
 // Screen Share Mini-Preview for Minimized Floating Dock
@@ -358,7 +358,7 @@ export const HuddleModal: React.FC = () => {
           {/* LiveKit WebRTC Video/Audio Conference Area + Modern Meeting Chat */}
           <div className="flex-1 bg-transparent relative overflow-hidden flex flex-row min-h-0 w-full">
             <div className="flex-1 flex flex-col min-w-0 min-h-0 relative">
-              <VideoConference />
+              <CallConference />
               <RoomAudioRenderer />
             </div>
 

@@ -29,6 +29,12 @@ enum ChannelType {
   GROUP_DIRECT
 }
 
+enum NotificationPreference {
+  ALL      // Notify on every new post (default)
+  MENTIONS // Notify only when the user is @mentioned
+  MUTED    // Never notify
+}
+
 enum NotificationType {
   MENTION
   DIRECT_MESSAGE
@@ -90,11 +96,47 @@ model User {
   availabilities    UserAvailability[]
   ticketComments    TicketComment[]
   identities        UserIdentity[]
+  refreshTokens     RefreshToken[]
+  todos             Todo[]
   createdCanvases   Canvas[]          @relation("CanvasCreator")
   createdRecordings Recording[]       @relation("RecordingCreator")
 
   @@index([email])
   @@index([username])
+}
+
+// Opaque, rotating refresh tokens (only the SHA-256 hash is stored). Every rotation keeps the same
+// familyId; presenting an already-rotated token revokes the whole family (stolen-token detection).
+// Personal quick to-dos: private to the user, not tied to a workspace.
+model Todo {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  text      String
+  done      Boolean   @default(false)
+  doneAt    DateTime? @map("done_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, done])
+  @@map("todos")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  familyId  String    @map("family_id")
+  provider  String?   // sign-in method of the session (e.g. "microsoft"); carried into new access tokens
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
 }
 
 // External sign-in identities (e.g. Microsoft Entra ID). Users are matched by
@@ -190,13 +232,14 @@ model Channel {
 }
 
 model ChannelMember {
-  id         String    @id @default(uuid())
-  channelId  String
-  userId     String
-  anonName   String?
-  anonEmoji  String?
-  joinedAt   DateTime  @default(now())
-  lastReadAt DateTime  @default(now())
+  id                     String                 @id @default(uuid())
+  channelId              String
+  userId                 String
+  anonName               String?
+  anonEmoji              String?
+  joinedAt               DateTime               @default(now())
+  lastReadAt             DateTime               @default(now())
+  notificationPreference NotificationPreference @default(ALL)
 
   channel    Channel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -218,6 +261,10 @@ model Message {
   content         String      @db.Text
   isEdited        Boolean     @default(false)
   isDeleted       Boolean     @default(false)
+  // Set only when someone other than the author deleted it (an admin), so the placeholder can say who. The name is
+  // kept as written at the time so it still reads correctly if that account is later renamed or removed.
+  deletedById     String?
+  deletedByName   String?
   isPinned        Boolean     @default(false)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
@@ -415,6 +462,14 @@ enum TicketPriority {
   URGENT
 }
 
+// What kind of work item a ticket is (Jira-style issue type)
+enum TicketType {
+  TASK
+  BUG
+  STORY
+  EPIC
+}
+
 model Project {
   id          String          @id @default(uuid())
   workspaceId String
@@ -472,6 +527,7 @@ model Ticket {
   title       String
   description String?        @db.Text
   priority    TicketPriority @default(MEDIUM)
+  type        TicketType     @default(TASK)
   orderIndex  Int            @default(0)
   dueDate     DateTime?
   createdById String

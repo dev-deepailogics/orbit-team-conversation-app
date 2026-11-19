@@ -62,7 +62,9 @@ async function login(claims: Record<string, unknown>) {
 
 const tokenFrom = (location: string) => {
   assert.match(location, /^http:\/\/localhost:3000\/login#token=/);
-  return app.jwt.verify<{ id: string }>(decodeURIComponent(location.split('#token=')[1]));
+  const fragment = new URLSearchParams(location.split('#')[1]);
+  assert.ok(fragment.get('refreshToken'), 'redirect carries a refresh token');
+  return app.jwt.verify<{ id: string }>(fragment.get('token')!);
 };
 
 before(async () => {

@@ -10,7 +10,8 @@ COPY packages/types/package.json ./packages/types/
 COPY packages/db/package.json ./packages/db/
 COPY apps/server/package.json ./apps/server/
 
-# --include=dev: build tools are devDependencies; a NODE_ENV=production build arg would skip them
+# Explicitly set NODE_ENV=development for the install step so devDependencies are never omitted
+ENV NODE_ENV=development
 RUN npm install --include=dev
 
 # Copy source files

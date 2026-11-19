@@ -16,6 +16,22 @@ export function setAuthToken(token: string | null) {
   authToken = token;
 }
 
+export function getAuthToken() {
+  return authToken;
+}
+
+// Registered by the auth store (which owns the refresh token) so the socket can renew an expired
+// access token without importing the store.
+let tokenRefresher: (() => Promise<string | null>) | null = null;
+
+export function setTokenRefresher(fn: (() => Promise<string | null>) | null) {
+  tokenRefresher = fn;
+}
+
+export function refreshAuthToken(): Promise<string | null> {
+  return tokenRefresher ? tokenRefresher() : Promise.resolve(null);
+}
+
 api.interceptors.request.use((config) => {
   if (authToken) {
     config.headers.Authorization = `Bearer ${authToken}`;

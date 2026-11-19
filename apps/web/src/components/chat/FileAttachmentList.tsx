@@ -17,8 +17,14 @@ import {
   ZoomOut,
   Maximize2,
   File,
-} from 'lucide-react';
+  PriorityUp,
+} from '@/components/ui/icons';
 import { api } from '../../lib/api';
+
+const fileTypeLabel = (fileName: string, category: string) => {
+  const ext = fileName.includes('.') ? fileName.split('.').pop()!.toUpperCase() : '';
+  return ext && ext.length <= 5 ? ext : category === 'other' ? 'File' : category.toUpperCase();
+};
 
 interface FileAttachmentListProps {
   attachments?: Attachment[];
@@ -45,7 +51,10 @@ export function getFileCategory(
   if (mime.startsWith('image/') || ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp'].includes(ext)) {
     return 'image';
   }
-  if (mime.startsWith('video/') || ['.mp4', '.webm', '.mov', '.avi', '.mkv'].includes(ext)) {
+  if (
+    mime.startsWith('video/') ||
+    ['.mp4', '.webm', '.ogg', '.mov', '.m4v', '.avi', '.mkv'].includes(ext)
+  ) {
     return 'video';
   }
   if (mime.startsWith('audio/') || ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac'].includes(ext)) {
@@ -101,16 +110,18 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  const [failedImageIds, setFailedImageIds] = useState<Record<string, boolean>>({});
+
   if (!attachments || attachments.length === 0) return null;
 
   const activeAttachments = attachments.filter((a) => !a.isDeleted);
   if (activeAttachments.length === 0) return null;
 
   const images = activeAttachments.filter(
-    (a) => getFileCategory(a.fileType, a.fileName) === 'image'
+    (a) => getFileCategory(a.fileType, a.fileName) === 'image' && !failedImageIds[a.id]
   );
   const nonImages = activeAttachments.filter(
-    (a) => getFileCategory(a.fileType, a.fileName) !== 'image'
+    (a) => getFileCategory(a.fileType, a.fileName) !== 'image' || failedImageIds[a.id]
   );
 
   const handleDeleteFile = async (e: React.MouseEvent, file: Attachment) => {
@@ -135,8 +146,10 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
   };
 
   const getFullFileUrl = (url: string) => {
+    if (!url) return '';
     if (url.startsWith('http')) return url;
-    return url;
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:4000';
+    return `${serverUrl.replace(/\/$/, '')}${url.startsWith('/') ? '' : '/'}${url}`;
   };
 
   const getDownloadUrl = (file: Attachment) => {
@@ -226,6 +239,9 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
                   alt={img.fileName}
                   className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
                   loading="lazy"
+                  onError={() => {
+                    setFailedImageIds((prev) => ({ ...prev, [img.id]: true }));
+                  }}
                 />
               </div>
 
@@ -337,58 +353,67 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
           return (
             <div
               key={file.id}
-              className="flex items-center justify-between gap-3 max-w-sm sm:max-w-md bg-[var(--theme-bg-surface)] hover:bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] hover:border-[var(--theme-border)] px-3.5 py-2.5 rounded-xl transition shadow-sm group"
+              className="flex items-center gap-[10px] w-[300px] max-w-full p-[10px] rounded-[10px] border transition group"
+              style={{ backgroundColor: 'var(--theme-bg-app)', borderColor: 'var(--theme-border)' }}
             >
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                {renderFileIcon(category)}
-                <div className="flex flex-col min-w-0 flex-1">
-                  <span
-                    className="text-xs font-semibold text-[var(--theme-text)] group-hover:text-[var(--theme-text)] truncate"
-                    title={file.fileName}
-                  >
-                    {file.fileName}
-                  </span>
-                  <div className="flex items-center gap-2 text-[11px] text-[var(--theme-text-muted)] font-mono">
-                    <span>{formatFileSize(file.fileSize)}</span>
-                    <span>•</span>
-                    <span className="uppercase text-[9px] px-1 py-0.2 bg-[var(--theme-bg-surface)] rounded font-bold text-[var(--theme-text)]">
-                      {category}
-                    </span>
-                  </div>
-                </div>
+              <span
+                className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                style={{ backgroundColor: 'var(--theme-bg-surface)', color: 'var(--theme-text-muted)' }}
+              >
+                {category === 'sheet' ? (
+                  <FileSpreadsheet size={18} />
+                ) : category === 'archive' ? (
+                  <FileArchive size={18} />
+                ) : category === 'code' ? (
+                  <FileCode size={18} />
+                ) : (
+                  <FileText size={18} />
+                )}
+              </span>
+              <div className="flex flex-col min-w-0 flex-1">
+                <span
+                  className="text-[13px] font-semibold truncate"
+                  style={{ color: 'var(--theme-text)' }}
+                  title={file.fileName}
+                >
+                  {file.fileName}
+                </span>
+                <span className="text-xs truncate" style={{ color: 'var(--theme-text-muted)' }}>
+                  {fileTypeLabel(file.fileName, category)} · {formatFileSize(file.fileSize)}
+                </span>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-0.5 shrink-0">
+                <a
+                  href={getDownloadUrl(file)}
+                  download={file.fileName}
+                  title="Download file"
+                  className="p-1 rounded-md transition opacity-0 group-hover:opacity-100 hover:bg-[var(--theme-fill-hover)]"
+                  style={{ color: 'var(--theme-text-muted)' }}
+                >
+                  <Download size={14} />
+                </a>
+                {(currentUser?.id === file.uploaderId || !file.uploaderId) && (
+                  <button
+                    onClick={(e) => handleDeleteFile(e, file)}
+                    disabled={deletingId === file.id}
+                    title="Delete file from server"
+                    className="p-1 rounded-md transition opacity-0 group-hover:opacity-100 hover:bg-[var(--theme-fill-hover)] hover:text-[#DC2626]"
+                    style={{ color: 'var(--theme-text-muted)' }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
                 <a
                   href={getFullFileUrl(file.fileUrl)}
                   target="_blank"
                   rel="noreferrer"
                   title="Open in new tab"
-                  className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition"
+                  className="p-0.5 rounded-md transition hover:bg-[var(--theme-fill-hover)]"
+                  style={{ color: 'var(--theme-text-muted)' }}
                 >
-                  <ExternalLink size={14} />
+                  <PriorityUp size={16} />
                 </a>
-
-                <a
-                  href={getDownloadUrl(file)}
-                  download={file.fileName}
-                  title="Download File"
-                  className="p-1.5 text-slack-green hover:text-[var(--theme-text)] hover:bg-slack-green/20 rounded-lg transition"
-                >
-                  <Download size={14} />
-                </a>
-
-                {(currentUser?.id === file.uploaderId || !file.uploaderId) && (
-                  <button
-                    onClick={(e) => handleDeleteFile(e, file)}
-                    disabled={deletingId === file.id}
-                    title="Delete File from Server"
-                    className="p-1.5 text-[var(--theme-text-muted)] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                )}
               </div>
             </div>
           );
@@ -397,7 +422,7 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
       {/* 4. Interactive Image Lightbox Modal */}
       {lightboxImage && (
         <div
-          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col items-center justify-between p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col items-center justify-between p-4 animate-in fade-in duration-150 text-white"
           onClick={() => setLightboxImage(null)}
           onKeyDown={(e) => {
             if (e.key === 'Escape') setLightboxImage(null);
@@ -406,12 +431,12 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
         >
           {/* Top Bar */}
           <div
-            className="w-full flex items-center justify-between text-[var(--theme-text)] z-10"
+            className="w-full flex items-center justify-between text-white z-10"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex flex-col">
-              <span className="font-bold text-sm truncate max-w-md">{lightboxImage.fileName}</span>
-              <span className="text-xs text-[var(--theme-text-muted)] font-mono">
+              <span className="font-bold text-sm truncate max-w-md text-white drop-shadow-sm">{lightboxImage.fileName}</span>
+              <span className="text-xs text-neutral-300 font-mono">
                 {formatFileSize(lightboxImage.fileSize)}
               </span>
             </div>
@@ -420,33 +445,33 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
               <button
                 onClick={() => setZoomLevel((z) => Math.max(0.5, z - 0.25))}
                 title="Zoom Out"
-                className="p-2 text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-xl transition"
+                className="p-2 text-neutral-200 hover:text-white hover:bg-white/10 rounded-xl transition"
               >
                 <ZoomOut size={18} />
               </button>
-              <span className="text-xs font-mono text-[var(--theme-text)]">{Math.round(zoomLevel * 100)}%</span>
+              <span className="text-xs font-mono text-neutral-200">{Math.round(zoomLevel * 100)}%</span>
               <button
                 onClick={() => setZoomLevel((z) => Math.min(3, z + 0.25))}
                 title="Zoom In"
-                className="p-2 text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-xl transition"
+                className="p-2 text-neutral-200 hover:text-white hover:bg-white/10 rounded-xl transition"
               >
                 <ZoomIn size={18} />
               </button>
               <button
                 onClick={() => setZoomLevel(1)}
                 title="Reset Zoom"
-                className="p-2 text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-xl transition"
+                className="p-2 text-neutral-200 hover:text-white hover:bg-white/10 rounded-xl transition"
               >
                 <Maximize2 size={18} />
               </button>
 
-              <span className="w-px h-6 bg-[var(--theme-bg-surface-hover)] mx-1" />
+              <span className="w-px h-6 bg-white/20 mx-1" />
 
               <a
                 href={getDownloadUrl(lightboxImage)}
                 download={lightboxImage.fileName}
                 title="Download"
-                className="p-2 bg-slack-green hover:bg-slack-green/90 text-white rounded-xl transition flex items-center gap-1.5 text-xs font-semibold"
+                className="p-2 bg-slack-green hover:bg-slack-green/90 text-white rounded-xl transition flex items-center gap-1.5 text-xs font-semibold shadow-sm"
               >
                 <Download size={16} />
                 <span>Download</span>
@@ -455,7 +480,7 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
               <button
                 onClick={() => setLightboxImage(null)}
                 title="Close (Esc)"
-                className="p-2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-xl transition"
+                className="p-2 text-neutral-300 hover:text-white hover:bg-white/10 rounded-xl transition"
               >
                 <X size={20} />
               </button>

@@ -11,7 +11,7 @@ import {
   Clock,
   Sparkles,
   ShieldCheck,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 
 interface FormState {
   name: string;

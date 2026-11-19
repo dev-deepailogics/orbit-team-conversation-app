@@ -12,7 +12,7 @@ import {
   ShieldCheck,
   Zap,
   Activity,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 
 interface Node {
   id: string;

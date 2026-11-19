@@ -1,8 +1,9 @@
+import { getThreadParticipantIds } from '../services/threadParticipants.js';
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { prisma } from '@orbit/db';
 import { SOCKET_EVENTS } from '@orbit/types';
 import { z } from 'zod';
-import { verifyMessageAccess, verifyWorkspaceMember } from '../utils/security.js';
+import { quotedMessageInclude, verifyMessageAccess, verifyQuotable, verifyWorkspaceMember } from '../utils/security.js';
 import { handleMessageMentions } from '../services/mentionService.js';
 import { getOrCreateAnonProfile, sanitizeMessageForViewer } from '../services/anonymousService.js';
 import { ACTIVITY_CHANNEL, postActivity } from '../services/systemBot.js';
@@ -186,14 +187,24 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     });
   });
 
-  // Get thread replies for a parent message
+  // Get thread replies for a parent message. Paged like the channel's messages: with `limit` (and `cursor` for older
+  // pages) it returns the newest `limit` replies, oldest to newest, plus hasMore/nextCursor for the page before them.
+  // Without either, it returns every reply (what older app builds expect).
   fastify.get('/:messageId/replies', { preHandler: [fastify.authenticate] }, async (request, reply) => {
     const { messageId } = request.params as { messageId: string };
     const userId = (request.user as { id: string }).id;
+    const { cursor, limit } = request.query as { cursor?: string; limit?: string };
+    const paged = cursor !== undefined || limit !== undefined;
+    const take = Math.min(Math.max(parseInt(limit ?? '', 10) || 30, 5), 100);
 
     // Verify tenant and channel access
     const access = await verifyMessageAccess(userId, messageId, reply);
     if (!access) return;
+
+    if (cursor) {
+      const inThread = await prisma.message.findFirst({ where: { id: cursor, parentMessageId: messageId }, select: { id: true } });
+      if (!inThread) return reply.status(400).send({ error: 'Invalid cursor' });
+    }
 
     const parentMessage = await prisma.message.findUnique({
       where: { id: messageId },
@@ -201,32 +212,28 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         user: {
           select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
         },
-        quotedMessage: {
-          include: {
-            user: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
-          },
-        },
+        quotedMessage: quotedMessageInclude,
         attachments: true,
         reactions: {
           include: {
             user: { select: { id: true, username: true, displayName: true } },
           },
         },
+        // The total, now that a client only holds the replies it has loaded
+        _count: { select: { replies: true } },
       },
     });
 
-    const replies = await prisma.message.findMany({
+    const rawReplies = await prisma.message.findMany({
       where: { parentMessageId: messageId },
-      orderBy: { createdAt: 'asc' },
+      // Paged: newest first (id breaks ties so the cursor is stable); flipped to chronological below
+      orderBy: paged ? [{ createdAt: 'desc' }, { id: 'desc' }] : { createdAt: 'asc' },
+      ...(paged ? { take: take + 1, ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}) } : {}),
       include: {
         user: {
           select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
         },
-        quotedMessage: {
-          include: {
-            user: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
-          },
-        },
+        quotedMessage: quotedMessageInclude,
         attachments: true,
         reactions: {
           include: {
@@ -236,13 +243,24 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       },
     });
 
+    const hasMore = paged && rawReplies.length > take;
+    const chunk = hasMore ? rawReplies.slice(0, take) : rawReplies;
+    const nextCursor = hasMore && chunk.length > 0 ? chunk[chunk.length - 1].id : null;
+    const replies = paged ? [...chunk].reverse() : chunk;
+
     const isAnon = access.channel.isAnonymous;
-    const sanitizedParent = sanitizeMessageForViewer(parentMessage, userId, isAnon);
+    const sanitizedParent = sanitizeMessageForViewer(
+      parentMessage && { ...parentMessage, replyCount: parentMessage._count.replies },
+      userId,
+      isAnon,
+    );
     const sanitizedReplies = replies.map((r) => sanitizeMessageForViewer(r, userId, isAnon));
 
     return reply.send({
       parent: sanitizedParent,
       replies: sanitizedReplies,
+      hasMore,
+      nextCursor,
     });
   });
 
@@ -262,6 +280,7 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     }
 
     const { content, attachments, quotedMessageId } = parseResult.data;
+    if (quotedMessageId && !(await verifyQuotable(userId, quotedMessageId, parent.channelId, reply))) return;
 
     let anonName: string | undefined;
     let anonEmoji: string | undefined;
@@ -319,11 +338,7 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         user: {
           select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
         },
-        quotedMessage: {
-          include: {
-            user: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
-          },
-        },
+        quotedMessage: quotedMessageInclude,
         attachments: true,
         reactions: true,
       },
@@ -352,6 +367,16 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           ...fullReplyMessage,
           isThreadReply: true,
         });
+      }
+    }
+
+    // Alert only the people in the thread (the parent's author and earlier repliers), not the whole channel. Everyone
+    // in the channel still gets the message:new above, so reply counts and an open thread stay current silently.
+    if (fastify.io) {
+      const threadPeople = await getThreadParticipantIds(parent.id, parent.channelId, userId);
+      const alert = access.channel.isAnonymous ? publicReply : fullReplyMessage;
+      for (const id of threadPeople) {
+        fastify.io.to(`user:${id}`).emit(SOCKET_EVENTS.THREAD_REPLY_NOTIFY, { ...alert, isThreadReply: true });
       }
     }
 
@@ -463,8 +488,16 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.status(400).send({ error: 'Cannot edit a deleted message' });
     }
 
-    if (access.message.userId !== userId && !access.isSuperAdmin) {
+    // Only the author edits a message. Admins (including super admins) can delete one, never rewrite what someone said.
+    if (access.message.userId !== userId) {
       return reply.status(403).send({ error: 'You can only edit your own messages' });
+    }
+
+    if (access.message.quotedMessageId) {
+      const quoted = await prisma.message.findUnique({ where: { id: access.message.quotedMessageId }, select: { channelId: true } });
+      if (quoted && quoted.channelId !== access.message.channelId) {
+        return reply.status(400).send({ error: 'Forwarded messages cannot be edited' });
+      }
     }
 
     const parseResult = editMessageSchema.safeParse(request.body);
@@ -482,11 +515,7 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         user: {
           select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
         },
-        quotedMessage: {
-          include: {
-            user: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
-          },
-        },
+        quotedMessage: quotedMessageInclude,
         attachments: {
           where: { isDeleted: false },
         },
@@ -545,6 +574,13 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.status(403).send({ error: 'You do not have permission to delete this message' });
     }
 
+    // When an admin deletes someone else's message, record who, so the placeholder can say "deleted by <name>"
+    let deletedBy: { deletedById: string; deletedByName: string } | null = null;
+    if (!isAuthor) {
+      const admin = await prisma.user.findUnique({ where: { id: userId }, select: { displayName: true, username: true } });
+      deletedBy = { deletedById: userId, deletedByName: admin?.displayName || admin?.username || 'an admin' };
+    }
+
     // Soft delete: set isDeleted to true, clear content, and unpin
     const updated = await prisma.message.update({
       where: { id: messageId },
@@ -552,16 +588,13 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         isDeleted: true,
         content: '',
         isPinned: false,
+        ...(deletedBy ?? {}),
       },
       include: {
         user: {
           select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
         },
-        quotedMessage: {
-          include: {
-            user: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
-          },
-        },
+        quotedMessage: quotedMessageInclude,
         attachments: true,
         reactions: {
           include: {
@@ -621,11 +654,7 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         bot: {
           select: { id: true, name: true, avatarUrl: true },
         },
-        quotedMessage: {
-          include: {
-            user: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
-          },
-        },
+        quotedMessage: quotedMessageInclude,
         attachments: {
           where: { isDeleted: false },
         },

@@ -1,21 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ProjectDocument, WorkspaceMember, UserProfile } from '@orbit/types';
 import { api } from '../../lib/api';
+import { Users, Globe, Link as LinkIcon, Check, Lock } from '@/components/ui/icons';
+import { Avatar } from './projectViewUtils';
 import {
-  X,
-  Globe,
-  Lock,
-  UserPlus,
-  Link as LinkIcon,
-  Check,
-  Trash2,
-  Shield,
-  Eye,
-  Edit3,
-  Users,
-} from 'lucide-react';
+  MenuItem,
+  ModalFrame,
+  PermissionButton,
+  Popover,
+  PrimaryButton,
+  SecondaryButton,
+  SectionLabel,
+} from './docsCanvasUi';
 
 interface ShareDocumentModalProps {
   document: ProjectDocument;
@@ -26,6 +24,8 @@ interface ShareDocumentModalProps {
   onDocumentUpdated: (doc: ProjectDocument) => void;
 }
 
+const PERMISSION_LABEL = { EDIT: 'Can edit', VIEW: 'Can view' } as const;
+
 export const ShareDocumentModal: React.FC<ShareDocumentModalProps> = ({
   document: doc,
   currentUser,
@@ -34,484 +34,357 @@ export const ShareDocumentModal: React.FC<ShareDocumentModalProps> = ({
   onClose,
   onDocumentUpdated,
 }) => {
+  const [query, setQuery] = useState('');
   const [selectedUserId, setSelectedUserId] = useState('');
+  const [showPicker, setShowPicker] = useState(false);
   const [selectedPermission, setSelectedPermission] = useState<'VIEW' | 'EDIT'>('EDIT');
-  const [isUpdatingPublic, setIsUpdatingPublic] = useState(false);
-  const [isAddingShare, setIsAddingShare] = useState(false);
-  const [isCopying, setIsCopying] = useState(false);
+  const [isBusy, setIsBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  if (!isOpen) return null;
 
   const isCreator = currentUser?.id === doc.createdById;
   const sharedUserIds = new Set((doc.shares || []).map((s) => s.userId));
 
-  // Available members to invite (excluding current creator and already shared users)
-  const availableMembers = members.filter(
-    (m) => m.userId !== doc.createdById && !sharedUserIds.has(m.userId)
-  );
+  const availableMembers = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return members.filter(
+      (m) =>
+        m.user &&
+        m.userId !== doc.createdById &&
+        !sharedUserIds.has(m.userId) &&
+        (!q ||
+          m.user.displayName.toLowerCase().includes(q) ||
+          m.user.username.toLowerCase().includes(q)),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [members, doc.createdById, doc.shares, query]);
 
-  // Toggle Project-wide public visibility
-  const handleToggleProjectPublic = async () => {
-    setIsUpdatingPublic(true);
+  if (!isOpen) return null;
+
+  const run = async (fn: () => Promise<{ data: ProjectDocument }>, failMsg: string) => {
+    setIsBusy(true);
     setError(null);
     try {
-      const res = await api.patch(
-        `/api/documents/${doc.id}`,
-        {
-          isPublicInProject: !doc.isPublicInProject,
-        }
-      );
+      const res = await fn();
       onDocumentUpdated(res.data);
+      return true;
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to update document visibility');
+      setError(err.response?.data?.error || failMsg);
+      return false;
     } finally {
-      setIsUpdatingPublic(false);
+      setIsBusy(false);
     }
   };
 
-  // Toggle Shareable Link with Token
-  const handleTogglePublicLink = async () => {
-    setError(null);
-    try {
-      const res = await api.patch(
-        `/api/documents/${doc.id}`,
-        {
-          isPublicLinkEnabled: !doc.isPublicLinkEnabled,
-        }
-      );
-      onDocumentUpdated(res.data);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to update share link settings');
-    }
-  };
+  const setShare = (userId: string, permission: 'VIEW' | 'EDIT') =>
+    run(() => api.post(`/api/documents/${doc.id}/shares`, { userId, permission }), 'Failed to share document with member');
 
-  // Add specific member share
-  const handleAddMemberShare = async () => {
+  const handleInvite = async () => {
     if (!selectedUserId) return;
-    setIsAddingShare(true);
-    setError(null);
-    try {
-      const res = await api.post(
-        `/api/documents/${doc.id}/shares`,
-        {
-          userId: selectedUserId,
-          permission: selectedPermission,
-        }
-      );
-      onDocumentUpdated(res.data);
+    if (await setShare(selectedUserId, selectedPermission)) {
       setSelectedUserId('');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to share document with member');
-    } finally {
-      setIsAddingShare(false);
+      setQuery('');
     }
   };
 
-  // Remove specific member share
-  const handleRemoveShare = async (targetUserId: string) => {
-    setError(null);
-    try {
-      const res = await api.delete(
-        `/api/documents/${doc.id}/shares/${targetUserId}`
-      );
-      onDocumentUpdated(res.data);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to remove member share');
-    }
-  };
+  const removeShare = (userId: string) =>
+    run(() => api.delete(`/api/documents/${doc.id}/shares/${userId}`), 'Failed to remove member share');
 
-  // Copy shareable link
-  const handleCopyLink = () => {
+  const patchDoc = (body: Partial<ProjectDocument>) =>
+    run(() => api.patch(`/api/documents/${doc.id}`, body), 'Failed to update sharing settings');
+
+  const handleCopyLink = async () => {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const shareUrl = `${origin}/share/doc/${doc.shareToken || doc.id}`;
-    navigator.clipboard.writeText(shareUrl);
-    setIsCopying(true);
-    setTimeout(() => setIsCopying(false), 2000);
+    const url = doc.isPublicLinkEnabled
+      ? `${origin}/share/doc/${doc.shareToken || doc.id}`
+      : `${origin}/app?view=docs&docId=${doc.id}`;
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
+
+  const selectedUser = members.find((m) => m.userId === selectedUserId)?.user;
+  const ownerName = doc.creator?.displayName || doc.creator?.username || 'Owner';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div
-        className="w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-        style={{
-          backgroundColor: 'var(--theme-bg-surface)',
-          borderColor: 'var(--theme-border)',
-          color: 'var(--theme-text-primary)',
-        }}
-      >
-        {/* Modal Header */}
-        <div
-          className="px-6 py-4 border-b flex items-center justify-between"
-          style={{ borderColor: 'var(--theme-border)' }}
-        >
-          <div className="flex items-center gap-2.5 truncate">
-            <span className="text-xl">{doc.icon || '📄'}</span>
-            <div className="truncate">
-              <h2 className="text-sm font-bold truncate">
-                Share & Permissions
-              </h2>
-              <p
-                className="text-xs truncate opacity-70"
-                style={{ color: 'var(--theme-text-muted)' }}
-              >
-                {doc.title || 'Untitled Document'}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Modal Body */}
-        <div className="p-6 space-y-6 overflow-y-auto">
-          {error && (
-            <div className="p-3 text-xs rounded-xl bg-red-500/15 border border-red-500/30 text-red-600 dark:text-red-400">
-              {error}
-            </div>
-          )}
-
-          {/* Section 1: Project-wide Visibility Toggle */}
-          <div
-            className="p-4 rounded-xl border flex items-center justify-between gap-4 transition"
-            style={{
-              backgroundColor: 'var(--theme-bg-app)',
-              borderColor: 'var(--theme-border)',
-            }}
-          >
-            <div className="flex items-start gap-3">
-              <div
-                className="p-2 rounded-lg mt-0.5 shrink-0"
-                style={{
-                  backgroundColor: doc.isPublicInProject
-                    ? 'rgba(16, 185, 129, 0.15)'
-                    : 'rgba(239, 68, 68, 0.15)',
-                  color: doc.isPublicInProject ? '#10B981' : '#EF4444',
-                }}
-              >
-                {doc.isPublicInProject ? <Globe size={18} /> : <Lock size={18} />}
-              </div>
-              <div>
-                <h4 className="text-xs font-bold flex items-center gap-2">
-                  Share with Workspace Project
-                  {doc.isPublicInProject && (
-                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                      Public in Project
-                    </span>
-                  )}
-                </h4>
-                <p
-                  className="text-[11px] mt-0.5 leading-relaxed"
-                  style={{ color: 'var(--theme-text-muted)' }}
-                >
-                  {doc.isPublicInProject
-                    ? 'All workspace members can view and collaborate on this document.'
-                    : 'Only you and specific members you invite below can see this document.'}
-                </p>
-              </div>
-            </div>
-
-            {isCreator && (
-              <button
-                disabled={isUpdatingPublic}
-                onClick={handleToggleProjectPublic}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  doc.isPublicInProject ? 'bg-emerald-500' : 'bg-gray-600'
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                    doc.isPublicInProject ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            )}
-          </div>
-
-          {/* Section 2: Invite Specific Members */}
-          <div>
+    <ModalFrame
+      width={560}
+      title={`Share "${doc.title || 'Untitled Document'}"`}
+      subtitle="Choose who can open this document."
+      onClose={onClose}
+      footerJustify="between"
+      footer={
+        <>
+          <SecondaryButton onClick={handleCopyLink} icon={copied ? <Check size={16} /> : <LinkIcon size={16} />}>
+            {copied ? 'Copied' : 'Copy link'}
+          </SecondaryButton>
+          <span className="flex-1" />
+          <PrimaryButton onClick={onClose}>Done</PrimaryButton>
+        </>
+      }
+    >
+      {isCreator && (
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 min-w-0">
             <label
-              className="block text-xs font-bold mb-2 flex items-center gap-1.5"
-              style={{ color: 'var(--theme-text-primary)' }}
-            >
-              <UserPlus size={14} style={{ color: 'var(--theme-primary)' }} />
-              Invite Specific Members
-            </label>
-            <div className="flex items-center gap-2">
-              <select
-                value={selectedUserId}
-                onChange={(e) => setSelectedUserId(e.target.value)}
-                className="flex-1 rounded-xl px-3 py-2 text-xs border bg-transparent focus:outline-none cursor-pointer"
-                style={{
-                  borderColor: 'var(--theme-border)',
-                  backgroundColor: 'var(--theme-bg-app)',
-                  color: 'var(--theme-text-primary)',
-                }}
-              >
-                <option value="" style={{ backgroundColor: 'var(--theme-bg-surface)' }}>
-                  Select a team member...
-                </option>
-                {availableMembers.map((m) => (
-                  <option
-                    key={m.userId}
-                    value={m.userId}
-                    style={{ backgroundColor: 'var(--theme-bg-surface)' }}
-                  >
-                    {m.user?.displayName || m.user?.username || m.userId} ({m.role})
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={selectedPermission}
-                onChange={(e) => setSelectedPermission(e.target.value as 'VIEW' | 'EDIT')}
-                className="rounded-xl px-3 py-2 text-xs border bg-transparent focus:outline-none cursor-pointer"
-                style={{
-                  borderColor: 'var(--theme-border)',
-                  backgroundColor: 'var(--theme-bg-app)',
-                  color: 'var(--theme-text-primary)',
-                }}
-              >
-                <option value="EDIT" style={{ backgroundColor: 'var(--theme-bg-surface)' }}>
-                  Can edit
-                </option>
-                <option value="VIEW" style={{ backgroundColor: 'var(--theme-bg-surface)' }}>
-                  Can view
-                </option>
-              </select>
-
-              <button
-                disabled={!selectedUserId || isAddingShare}
-                onClick={handleAddMemberShare}
-                className="px-4 py-2 rounded-xl text-xs font-semibold shadow transition disabled:opacity-50 active:scale-95"
-                style={{
-                  backgroundColor: 'var(--theme-primary)',
-                  color: 'var(--theme-primary-text)',
-                }}
-              >
-                {isAddingShare ? 'Adding...' : 'Invite'}
-              </button>
-            </div>
-          </div>
-
-          {/* Section 3: Who Has Access List */}
-          <div>
-            <h4
-              className="text-xs font-bold mb-2 flex items-center gap-1.5"
-              style={{ color: 'var(--theme-text-muted)' }}
-            >
-              <Users size={14} />
-              Who Has Access ({1 + (doc.shares?.length || 0)})
-            </h4>
-
-            <div
-              className="rounded-xl border divide-y overflow-hidden"
+              className="h-10 px-3 rounded-[10px] flex items-center gap-2 transition"
               style={{
-                borderColor: 'var(--theme-border)',
+                border: showPicker ? '1.5px solid var(--theme-primary)' : '1px solid var(--theme-border)',
                 backgroundColor: 'var(--theme-bg-app)',
+                color: 'var(--theme-text-muted)',
               }}
             >
-              {/* Document Creator / Owner */}
-              <div className="p-3 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs uppercase"
-                    style={{
-                      backgroundColor: 'var(--theme-bg-surface-hover)',
-                      color: 'var(--theme-text-primary)',
-                    }}
-                  >
-                    {doc.creator?.displayName?.charAt(0) || 'U'}
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold flex items-center gap-1.5">
-                      {doc.creator?.displayName || doc.creator?.username || 'Creator'}
-                      {currentUser?.id === doc.createdById && (
-                        <span className="text-[10px] opacity-60">(You)</span>
-                      )}
-                    </div>
-                    <div
-                      className="text-[10px] opacity-60"
-                      style={{ color: 'var(--theme-text-muted)' }}
+              <Users size={16} />
+              <input
+                value={selectedUser && !showPicker ? selectedUser.displayName : query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setSelectedUserId('');
+                  setShowPicker(true);
+                }}
+                onFocus={() => setShowPicker(true)}
+                onBlur={() => setTimeout(() => setShowPicker(false), 120)}
+                placeholder="Add people by name"
+                className="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-[var(--theme-text-muted)]"
+                style={{ color: 'var(--theme-text)' }}
+              />
+            </label>
+            {showPicker && (
+              <div
+                className="absolute left-0 right-0 top-full mt-1.5 z-50 max-h-56 overflow-y-auto rounded-xl border p-1.5 shadow-xl"
+                style={{ backgroundColor: 'var(--theme-bg-app)', borderColor: 'var(--theme-border)' }}
+              >
+                {availableMembers.length === 0 ? (
+                  <p className="px-2.5 py-2 text-[13px]" style={{ color: 'var(--theme-text-muted)' }}>
+                    No matching members
+                  </p>
+                ) : (
+                  availableMembers.map((m) => (
+                    <button
+                      key={m.userId}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setSelectedUserId(m.userId);
+                        setQuery('');
+                        setShowPicker(false);
+                      }}
+                      className="w-full h-10 px-2.5 rounded-lg flex items-center gap-2.5 text-left transition hover:bg-[var(--theme-fill-hover)]"
                     >
-                      @{doc.creator?.username}
-                    </div>
-                  </div>
-                </div>
-                <span
-                  className="text-[11px] font-semibold px-2 py-0.5 rounded-md flex items-center gap-1"
-                  style={{
-                    backgroundColor: 'var(--theme-bg-surface)',
-                    color: 'var(--theme-text-muted)',
+                      <Avatar name={m.user!.displayName} src={m.user!.avatarUrl} size={24} />
+                      <span className="flex-1 truncate text-[13px] font-medium" style={{ color: 'var(--theme-text)' }}>
+                        {m.user!.displayName}
+                      </span>
+                      <span className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>
+                        @{m.user!.username}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+          <Popover
+            width={140}
+            trigger={(_, toggle) => <PermissionButton label={PERMISSION_LABEL[selectedPermission]} onClick={toggle} />}
+          >
+            {(close) =>
+              (['EDIT', 'VIEW'] as const).map((p) => (
+                <MenuItem
+                  key={p}
+                  selected={p === selectedPermission}
+                  onClick={() => {
+                    setSelectedPermission(p);
+                    close();
                   }}
                 >
-                  <Shield size={11} /> Owner
-                </span>
-              </div>
+                  {PERMISSION_LABEL[p]}
+                </MenuItem>
+              ))
+            }
+          </Popover>
+          <PrimaryButton onClick={handleInvite} disabled={!selectedUserId || isBusy}>
+            Invite
+          </PrimaryButton>
+        </div>
+      )}
 
-              {/* Shared Users */}
-              {(doc.shares || []).map((share) => (
-                <div
-                  key={share.id}
-                  className="p-3 flex items-center justify-between group hover:bg-black/5 dark:hover:bg-white/5 transition"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div
-                      className="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs uppercase"
-                      style={{
-                        backgroundColor: 'var(--theme-bg-surface-hover)',
-                        color: 'var(--theme-text-primary)',
-                      }}
+      <div className="flex flex-col gap-2">
+        <SectionLabel>People with access</SectionLabel>
+        <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--theme-border)' }}>
+          <PersonRow
+            name={`${ownerName}${isCreator ? ' (you)' : ''}`}
+            avatarName={ownerName}
+            avatarUrl={doc.creator?.avatarUrl}
+            subtitle="Document owner"
+            right={
+              <span className="text-[13px] font-semibold" style={{ color: 'var(--theme-text-muted)' }}>
+                Owner
+              </span>
+            }
+          />
+          {(doc.shares || []).map((share) => {
+            const name = share.user?.displayName || share.user?.username || 'Member';
+            return (
+              <PersonRow
+                key={share.id}
+                divider
+                name={`${name}${share.userId === currentUser?.id ? ' (you)' : ''}`}
+                avatarName={name}
+                avatarUrl={share.user?.avatarUrl}
+                subtitle={PERMISSION_LABEL[share.permission]}
+                right={
+                  isCreator ? (
+                    <Popover
+                      width={160}
+                      trigger={(_, toggle) => (
+                        <PermissionButton label={PERMISSION_LABEL[share.permission]} onClick={toggle} />
+                      )}
                     >
-                      {share.user?.displayName?.charAt(0) || 'U'}
-                    </div>
-                    <div>
-                      <div className="text-xs font-semibold flex items-center gap-1.5">
-                        {share.user?.displayName || share.user?.username || 'Member'}
-                        {currentUser?.id === share.userId && (
-                          <span className="text-[10px] opacity-60">(You)</span>
-                        )}
-                      </div>
-                      <div
-                        className="text-[10px] opacity-60"
-                        style={{ color: 'var(--theme-text-muted)' }}
-                      >
-                        @{share.user?.username}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="text-[11px] font-medium px-2 py-0.5 rounded-md flex items-center gap-1"
-                      style={{
-                        backgroundColor: 'var(--theme-bg-surface)',
-                        color: 'var(--theme-text-primary)',
-                      }}
-                    >
-                      {share.permission === 'EDIT' ? (
+                      {(close) => (
                         <>
-                          <Edit3 size={11} className="text-blue-600 dark:text-blue-400" /> Can edit
-                        </>
-                      ) : (
-                        <>
-                          <Eye size={11} className="text-emerald-600 dark:text-emerald-400" /> Can view
+                          {(['EDIT', 'VIEW'] as const).map((p) => (
+                            <MenuItem
+                              key={p}
+                              selected={p === share.permission}
+                              onClick={() => {
+                                close();
+                                if (p !== share.permission) setShare(share.userId, p);
+                              }}
+                            >
+                              {PERMISSION_LABEL[p]}
+                            </MenuItem>
+                          ))}
+                          <MenuItem
+                            danger
+                            onClick={() => {
+                              close();
+                              removeShare(share.userId);
+                            }}
+                          >
+                            Remove access
+                          </MenuItem>
                         </>
                       )}
+                    </Popover>
+                  ) : (
+                    <span className="text-[13px] font-semibold" style={{ color: 'var(--theme-text-muted)' }}>
+                      {PERMISSION_LABEL[share.permission]}
                     </span>
-
-                    {isCreator && (
-                      <button
-                        onClick={() => handleRemoveShare(share.userId)}
-                        title="Remove access"
-                        className="p-1 rounded text-red-600 dark:text-red-400 opacity-60 hover:opacity-100 hover:bg-red-500/10 transition"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Section 4: Public Shareable Link Feature (Future-proof with token) */}
-          <div
-            className="p-4 rounded-xl border space-y-3"
-            style={{
-              borderColor: 'var(--theme-border)',
-              backgroundColor: 'var(--theme-bg-app)',
-            }}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <LinkIcon size={14} style={{ color: 'var(--theme-primary)' }} />
-                <span className="text-xs font-bold">Public Shareable Link</span>
-              </div>
-              {isCreator && (
-                <button
-                  onClick={handleTogglePublicLink}
-                  className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition ${
-                    doc.isPublicLinkEnabled
-                      ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
-                      : 'bg-[var(--theme-bg-app)] dark:bg-white/5 border-[var(--theme-border)] text-[var(--theme-text-muted)]'
-                  }`}
-                >
-                  {doc.isPublicLinkEnabled ? 'Link Enabled' : 'Enable Link'}
-                </button>
-              )}
-            </div>
-
-            <p
-              className="text-[11px] leading-relaxed"
-              style={{ color: 'var(--theme-text-muted)' }}
-            >
-              Share this document with external stakeholders via unique secure token link.
-            </p>
-
-            <div className="flex items-center gap-2">
-              <input
-                readOnly
-                value={
-                  typeof window !== 'undefined'
-                    ? `${window.location.origin}/share/doc/${doc.shareToken || doc.id}`
-                    : ''
+                  )
                 }
-                className="flex-1 text-xs rounded-xl px-3 py-2 border bg-transparent font-mono opacity-80 select-all"
-                style={{
-                  borderColor: 'var(--theme-border)',
-                  backgroundColor: 'var(--theme-bg-surface)',
-                  color: 'var(--theme-text-primary)',
-                }}
               />
-              <button
-                onClick={handleCopyLink}
-                className="px-3.5 py-2 rounded-xl text-xs font-semibold border transition flex items-center gap-1.5 active:scale-95"
-                style={{
-                  backgroundColor: isCopying
-                    ? 'rgba(16, 185, 129, 0.2)'
-                    : 'var(--theme-bg-surface)',
-                  borderColor: isCopying ? '#10B981' : 'var(--theme-border)',
-                  color: isCopying ? '#10B981' : 'var(--theme-text-primary)',
-                }}
-              >
-                {isCopying ? (
-                  <>
-                    <Check size={13} />
-                    <span>Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <LinkIcon size={13} />
-                    <span>Copy Link</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Modal Footer */}
-        <div
-          className="px-6 py-3 border-t flex justify-end"
-          style={{ borderColor: 'var(--theme-border)' }}
-        >
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold rounded-xl border transition hover:bg-black/5 dark:hover:bg-white/5"
-            style={{
-              borderColor: 'var(--theme-border)',
-              color: 'var(--theme-text-primary)',
-            }}
-          >
-            Done
-          </button>
+            );
+          })}
         </div>
       </div>
-    </div>
+
+      <div className="flex flex-col gap-2">
+        <SectionLabel>General access</SectionLabel>
+        <AccessRow
+          icon={doc.isPublicInProject ? <Globe size={16} /> : <Lock size={16} />}
+          title={doc.isPublicInProject ? 'Anyone in Orbit' : 'Restricted'}
+          subtitle={
+            doc.isPublicInProject ? 'Everyone in the workspace can open it' : 'Only people with access can open it'
+          }
+          value={doc.isPublicInProject ? 'Can edit' : 'No access'}
+          editable={isCreator}
+          options={[
+            { label: 'Can edit', active: doc.isPublicInProject, onSelect: () => patchDoc({ isPublicInProject: true }) },
+            { label: 'No access', active: !doc.isPublicInProject, onSelect: () => patchDoc({ isPublicInProject: false }) },
+          ]}
+        />
+        <AccessRow
+          icon={<LinkIcon size={16} />}
+          title="Anyone with the link"
+          subtitle={doc.isPublicLinkEnabled ? 'People outside Orbit can read it' : 'Public link is off'}
+          value={doc.isPublicLinkEnabled ? 'Can view' : 'Off'}
+          editable={isCreator}
+          options={[
+            { label: 'Can view', active: doc.isPublicLinkEnabled, onSelect: () => patchDoc({ isPublicLinkEnabled: true }) },
+            { label: 'Off', active: !doc.isPublicLinkEnabled, onSelect: () => patchDoc({ isPublicLinkEnabled: false }) },
+          ]}
+        />
+      </div>
+
+      {error && (
+        <p className="text-[13px]" style={{ color: '#DC2626' }}>
+          {error}
+        </p>
+      )}
+    </ModalFrame>
   );
 };
+
+const PersonRow: React.FC<{
+  name: string;
+  avatarName: string;
+  avatarUrl?: string | null;
+  subtitle: string;
+  right: React.ReactNode;
+  divider?: boolean;
+}> = ({ name, avatarName, avatarUrl, subtitle, right, divider }) => (
+  <div
+    className={`h-[52px] px-3 flex items-center gap-3 ${divider ? 'border-t' : ''}`}
+    style={{ borderColor: 'var(--theme-border)' }}
+  >
+    <Avatar name={avatarName} src={avatarUrl} size={32} />
+    <div className="flex-1 min-w-0">
+      <p className="text-sm font-semibold leading-5 truncate" style={{ color: 'var(--theme-text)' }}>
+        {name}
+      </p>
+      <p className="text-xs leading-4 truncate" style={{ color: 'var(--theme-text-muted)' }}>
+        {subtitle}
+      </p>
+    </div>
+    {right}
+  </div>
+);
+
+const AccessRow: React.FC<{
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  value: string;
+  editable: boolean;
+  options: { label: string; active: boolean; onSelect: () => void }[];
+}> = ({ icon, title, subtitle, value, editable, options }) => (
+  <div className="p-3 rounded-xl border flex items-center gap-3" style={{ borderColor: 'var(--theme-border)' }}>
+    <span
+      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+      style={{ backgroundColor: 'var(--theme-bg-surface-hover)', color: 'var(--theme-text-muted)' }}
+    >
+      {icon}
+    </span>
+    <div className="flex-1 min-w-0">
+      <p className="text-sm font-semibold leading-5 truncate" style={{ color: 'var(--theme-text)' }}>
+        {title}
+      </p>
+      <p className="text-xs leading-4 truncate" style={{ color: 'var(--theme-text-muted)' }}>
+        {subtitle}
+      </p>
+    </div>
+    {editable ? (
+      <Popover width={140} trigger={(_, toggle) => <PermissionButton label={value} onClick={toggle} />}>
+        {(close) =>
+          options.map((o) => (
+            <MenuItem
+              key={o.label}
+              selected={o.active}
+              onClick={() => {
+                close();
+                if (!o.active) o.onSelect();
+              }}
+            >
+              {o.label}
+            </MenuItem>
+          ))
+        }
+      </Popover>
+    ) : (
+      <span className="text-[13px] font-semibold" style={{ color: 'var(--theme-text-muted)' }}>
+        {value}
+      </span>
+    )}
+  </div>
+);

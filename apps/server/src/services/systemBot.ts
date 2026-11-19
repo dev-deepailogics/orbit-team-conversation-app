@@ -161,6 +161,7 @@ export async function sendTicketBotNotification({
   targetUserIds = [],
   channelId,
   io,
+  postToChannel = true,
 }: {
   workspaceId: string;
   actorName: string;
@@ -170,6 +171,8 @@ export async function sendTicketBotNotification({
   targetUserIds?: string[];
   channelId?: string | null;
   io?: any;
+  // False when the same save already posted its activity message (e.g. an assignment), so only the people are notified
+  postToChannel?: boolean;
 }) {
   try {
     const title = `Project: ${projectName}`;
@@ -192,6 +195,8 @@ export async function sendTicketBotNotification({
         io.to(`user:${uId}`).emit(SOCKET_EVENTS.NOTIFICATION_NEW, notif);
       }
     }
+
+    if (!postToChannel) return;
 
     // 2. Post activity message via Orbit Bot to the project's selected notification channel (or fallback to general)
     let targetChannelId = channelId;

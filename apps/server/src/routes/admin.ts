@@ -3,6 +3,7 @@ import { prisma } from '@orbit/db';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { ACTIVITY_CHANNEL, ACTIVITY_CHANNEL_TOPIC } from '../services/systemBot.js';
+import { revokeAllForUser } from '../services/tokens.js';
 import { createDemoWorkspace, demoEmailDomain } from '../services/demoWorkspace.js';
 
 const updateRoleSchema = z.object({
@@ -193,6 +194,8 @@ export const adminRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       },
     });
 
+    if (disabled) await revokeAllForUser(userId);
+
     if (disabled && fastify.io) {
       // Notify the deactivated user's sockets to immediately log out
       fastify.io.to(`user:${userId}`).emit('account:deactivated', {
@@ -221,6 +224,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       where: { id: userId },
       data: { passwordHash },
     });
+    await revokeAllForUser(userId);
 
     return reply.send({ success: true, message: 'Password has been reset successfully' });
   });

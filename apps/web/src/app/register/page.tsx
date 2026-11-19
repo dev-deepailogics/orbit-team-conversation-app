@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight } from "@/components/ui/icons";
 import { api } from "../../lib/api";
 import { useAuthStore, postAuthPath } from "../../stores/authStore";
 import {
@@ -14,6 +14,7 @@ import {
   authInputClass,
   authLabelClass,
   authButtonClass,
+  authLinkClass,
 } from "../../components/auth/AuthShell";
 
 export default function RegisterPage() {
@@ -38,7 +39,7 @@ export default function RegisterPage() {
         displayName,
         password,
       });
-      setAuth(res.data.user, res.data.accessToken);
+      setAuth(res.data.user, res.data.accessToken, res.data.refreshToken);
       router.push(postAuthPath());
     } catch (err: any) {
       setError(err.response?.data?.error || "Registration failed");
@@ -54,7 +55,7 @@ export default function RegisterPage() {
     >
       <AuthError message={error} />
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="displayName" className={authLabelClass}>
             Display Name
@@ -121,7 +122,7 @@ export default function RegisterPage() {
         <button
           type="submit"
           disabled={isLoading}
-          className={`${authButtonClass} !mt-8`}
+          className={`${authButtonClass} !mt-[22px]`}
         >
           <span>{isLoading ? "Creating Account..." : "Create Account"}</span>
           <ArrowRight size={20} />
@@ -130,11 +131,11 @@ export default function RegisterPage() {
 
       <MicrosoftSignIn label="Sign up with Microsoft" />
 
-      <p className="text-center text-sm text-slate-400 mt-6">
+      <p className="text-center text-[13px] mt-6 text-[var(--theme-text-muted)]">
         Already have an account?{" "}
         <Link
           href="/login"
-          className="text-sky-400 hover:text-sky-300 hover:underline font-medium"
+          className={authLinkClass}
         >
           Sign In
         </Link>

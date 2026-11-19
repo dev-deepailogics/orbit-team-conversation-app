@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight } from "lucide-react";
 import { api } from "../../lib/api";
 import { useAuthStore, postAuthPath } from "../../stores/authStore";
 import {
@@ -14,6 +13,7 @@ import {
   authInputClass,
   authLabelClass,
   authButtonClass,
+  authLinkClass,
 } from "../../components/auth/AuthShell";
 
 // Error codes sent back by the server's Microsoft callback (/api/auth/microsoft/callback).
@@ -39,9 +39,9 @@ export default function LoginPage() {
 
   // Finish a Microsoft sign-in: the server redirects here with #token=… or ?error=…
   useEffect(() => {
-    const token = new URLSearchParams(window.location.hash.slice(1)).get(
-      "token",
-    );
+    const fragment = new URLSearchParams(window.location.hash.slice(1));
+    const token = fragment.get("token");
+    const refreshToken = fragment.get("refreshToken");
     const errorCode = new URLSearchParams(window.location.search).get("error");
     if (!token && !errorCode) return;
     window.history.replaceState(null, "", window.location.pathname); // drop the token from the URL/history
@@ -53,6 +53,7 @@ export default function LoginPage() {
       return;
     }
     localStorage.setItem("orbit_token", token!);
+    if (refreshToken) localStorage.setItem("orbit_refresh_token", refreshToken);
     setIsLoading(true);
     fetchMe().then(() => {
       if (useAuthStore.getState().user) router.push(postAuthPath());
@@ -75,7 +76,7 @@ export default function LoginPage() {
         { email, password },
         { withCredentials: true },
       );
-      setAuth(res.data.user, res.data.accessToken);
+      setAuth(res.data.user, res.data.accessToken, res.data.refreshToken);
       router.push(postAuthPath());
     } catch (err: any) {
       setError(err.response?.data?.error || "Invalid email or password");
@@ -86,15 +87,15 @@ export default function LoginPage() {
 
   return (
     <AuthShell
-      title="Sign in to your workspace"
-      subtitle="Access your team, projects and workspace in one place."
+      title="Welcome back"
+      subtitle="Sign in to your Orbit workspace"
     >
       <AuthError message={error} />
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="email" className={authLabelClass}>
-            Email
+            Work email
           </label>
           <input
             id="email"
@@ -125,20 +126,19 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={isLoading}
-          className={`${authButtonClass} !mt-8`}
+          className={`${authButtonClass} !mt-[22px]`}
         >
-          <span>{isLoading ? "Signing in..." : "Sign In"}</span>
-          <ArrowRight size={20} />
+          {isLoading ? "Signing in…" : "Continue"}
         </button>
       </form>
 
       <MicrosoftSignIn />
 
-      <p className="text-center text-sm text-slate-400 mt-6">
+      <p className="text-center text-[13px] mt-6 text-[var(--theme-text-muted)]">
         Don&apos;t have an account?{" "}
         <Link
           href="/register"
-          className="text-sky-400 hover:text-sky-300 hover:underline font-medium"
+          className={authLinkClass}
         >
           Create an account
         </Link>
