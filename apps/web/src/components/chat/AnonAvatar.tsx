@@ -14,31 +14,42 @@ interface AnonAvatarProps {
   /** The anonymous persona name (never the real user). */
   name?: string | null;
   size?: number;
-  /** Shown on hover alongside the name, e.g. the persona emoji. */
+  /** The persona's assigned emoji; shown as the avatar. Falls back to initials when absent. */
   emoji?: string | null;
   rounded?: 'full' | 'square';
   className?: string;
 }
 
-/** Avatar for anonymous posts: the persona's initials on its colour. */
+/** Avatar for anonymous posts: the persona's emoji on a tint of its colour; the name shows on hover. */
 export const AnonAvatar: React.FC<AnonAvatarProps> = ({ name, size = 36, emoji, rounded = 'square', className = '' }) => {
   const persona = name?.trim() || 'Anonymous';
+  const color = anonColor(persona);
+  const glyph = emoji?.trim();
   return (
     <span
       role="img"
       aria-label={persona}
-      title={emoji ? `${emoji} ${persona}` : persona}
-      className={`inline-flex items-center justify-center shrink-0 select-none font-semibold leading-none ${className}`}
+      title={glyph ? `${glyph} ${persona}` : persona}
+      className={`inline-flex items-center justify-center shrink-0 select-none leading-none ${className}`}
       style={{
         width: size,
         height: size,
         borderRadius: rounded === 'full' ? '9999px' : Math.round(size * 0.28),
-        fontSize: Math.max(9, Math.round(size * 0.38)),
-        backgroundColor: anonColor(persona),
-        color: '#FFFFFF',
+        ...(glyph
+          ? {
+              fontSize: Math.max(11, Math.round(size * 0.55)),
+              backgroundColor: `color-mix(in srgb, ${color} 18%, transparent)`,
+              boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color} 35%, transparent)`,
+            }
+          : {
+              fontSize: Math.max(9, Math.round(size * 0.38)),
+              fontWeight: 600,
+              backgroundColor: color,
+              color: '#FFFFFF',
+            }),
       }}
     >
-      {initialsOf(persona)}
+      {glyph || initialsOf(persona)}
     </span>
   );
 };
