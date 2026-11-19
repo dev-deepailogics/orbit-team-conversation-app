@@ -95,11 +95,36 @@ const updateColumnSchema = z.object({
   orderIndex: z.number().int().optional(),
 });
 
+const TICKET_TYPES = ["TASK", "BUG", "STORY", "EPIC"] as const;
+
+// Which user-visible fields an update actually changes (the edit form re-sends every field on each save, so compare
+// with what's stored). Used to tell people a ticket was edited; checklist ticks, ordering and the git branch are too
+// minor to notify about.
+function describeTicketEdits(existing: any, data: z.infer<typeof updateTicketSchema>): string[] {
+  const text = (v: unknown) => (typeof v === "string" ? v.trim() : "") || null;
+  const changed: string[] = [];
+  if (data.title !== undefined && data.title !== existing.title) changed.push("title");
+  if (data.description !== undefined && text(data.description) !== text(existing.description)) changed.push("description");
+  if (data.priority !== undefined && data.priority !== existing.priority) changed.push("priority");
+  if (data.type !== undefined && data.type !== existing.type) changed.push("type");
+  if (data.dueDate !== undefined) {
+    const next = data.dueDate ? new Date(data.dueDate).getTime() : null;
+    const prev = existing.dueDate ? new Date(existing.dueDate).getTime() : null;
+    if (next !== prev) changed.push("due date");
+  }
+  if (data.storyPoints !== undefined && (data.storyPoints ?? null) !== (existing.storyPoints ?? null)) changed.push("story points");
+  if (data.labels !== undefined && JSON.stringify(data.labels ?? null) !== JSON.stringify(existing.labels ?? null)) changed.push("labels");
+  if (data.notes !== undefined && text(data.notes) !== text(existing.notes)) changed.push("notes");
+  if (data.testPlan !== undefined && text(data.testPlan) !== text(existing.testPlan)) changed.push("test plan");
+  return changed;
+}
+
 const createTicketSchema = z.object({
   columnId: z.string().uuid(),
   title: z.string().min(1).max(255),
   description: z.string().optional().nullable(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).default("MEDIUM"),
+  type: z.enum(TICKET_TYPES).default("TASK"),
   dueDate: z.string().optional().nullable(),
   assigneeId: userIdSchema.optional().nullable(),
   // Multi-assign: [{ uid: <user id>, name }]. assigneeId mirrors the first entry for older clients.
@@ -116,6 +141,7 @@ const updateTicketSchema = z.object({
   title: z.string().min(1).max(255).optional(),
   description: z.string().optional().nullable(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
+  type: z.enum(TICKET_TYPES).optional(),
   dueDate: z.string().optional().nullable(),
   assigneeId: userIdSchema.optional().nullable(),
   // Multi-assign: [{ uid: <user id>, name }]. assigneeId mirrors the first entry for older clients.
@@ -874,7 +900,7 @@ export const projectRoutes: FastifyPluginAsync = async (
           .send({ error: parseResult.error.errors[0].message });
       }
 
-      const { columnId, title, description, priority, dueDate, assignees, images } =
+      const { columnId, title, description, priority, type, dueDate, assignees, images } =
         parseResult.data;
       const assigneeId =
         parseResult.data.assigneeId ?? assignees?.[0]?.uid ?? null;
@@ -918,6 +944,7 @@ export const projectRoutes: FastifyPluginAsync = async (
           title,
           description,
           priority,
+          type,
           orderIndex: nextOrderIndex,
           dueDate: dueDate ? new Date(dueDate) : null,
           createdById: userId,
@@ -1023,6 +1050,7 @@ export const projectRoutes: FastifyPluginAsync = async (
         title,
         description,
         priority,
+        type,
         dueDate,
         assignees,
         orderIndex,
@@ -1054,10 +1082,14 @@ export const projectRoutes: FastifyPluginAsync = async (
         ? [...(existingTicket.events as any[])]
         : [];
 
+      const editedFields = describeTicketEdits(existingTicket, parseResult.data);
+      let movedToColumnName: string | null = null;
+
       if (columnId && columnId !== existingTicket.columnId) {
         const targetColumn = await prisma.projectColumn.findUnique({
           where: { id: columnId },
         });
+        movedToColumnName = targetColumn?.name ?? null;
         const actor = await prisma.user.findUnique({
           where: { id: userId },
           select: { displayName: true, username: true },
@@ -1081,10 +1113,20 @@ export const projectRoutes: FastifyPluginAsync = async (
       if (title !== undefined) dataToUpdate.title = title;
       if (description !== undefined) dataToUpdate.description = description;
       if (priority !== undefined) dataToUpdate.priority = priority;
+      if (type !== undefined) dataToUpdate.type = type;
       if (dueDate !== undefined)
         dataToUpdate.dueDate = dueDate ? new Date(dueDate) : null;
       if (assigneeId !== undefined) dataToUpdate.assigneeId = assigneeId;
       if (assignees !== undefined) dataToUpdate.assignees = assignees ?? [];
+      // The web form picks a single assignee and doesn't send the assignees list. Keep that list in step when the
+      // assignee changes, or it keeps people who were replaced and later re-assigning one of them looks like
+      // "already assigned", so they would never be told.
+      if (assignees === undefined && assigneeId !== undefined && assigneeId !== existingTicket.assigneeId) {
+        const picked = assigneeId
+          ? await prisma.user.findUnique({ where: { id: assigneeId }, select: { displayName: true, username: true } })
+          : null;
+        dataToUpdate.assignees = assigneeId ? [{ uid: assigneeId, name: picked?.displayName || picked?.username || "" }] : [];
+      }
       if (orderIndex !== undefined) dataToUpdate.orderIndex = orderIndex;
       if (gitbranch !== undefined) dataToUpdate.gitbranch = gitbranch;
       if (checklist !== undefined) dataToUpdate.checklist = checklist;
@@ -1130,21 +1172,53 @@ export const projectRoutes: FastifyPluginAsync = async (
         await createMissingTicketAttachments(images, project.workspaceId, userId);
       }
 
+      const notifyActor =
+        newAssigneeIds.length > 0 || editedFields.length > 0 || movedToColumnName
+          ? await prisma.user.findUnique({ where: { id: userId }, select: { displayName: true } })
+          : null;
+      const actorName = notifyActor?.displayName || "A team member";
+
       // Check if assignee changed
       if (newAssigneeIds.length > 0) {
-        const actor = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { displayName: true },
-        });
         await sendTicketBotNotification({
           workspaceId: project.workspaceId,
-          actorName: actor?.displayName || "A team member",
+          actorName,
           ticketTitle: updated.title,
           projectName: project.name,
           actionText: "assigned you to ticket",
           targetUserIds: newAssigneeIds,
           channelId: project.notificationChannelId,
           io: fastify.io,
+        });
+      }
+
+      // Edited fields, or a column change made from the edit form (drag and drop has its own route above): tell the
+      // people involved with the ticket (assignees, creator, watchers), except whoever just did it and anyone who
+      // was just told they were assigned.
+      if (editedFields.length > 0 || movedToColumnName) {
+        const stakeholders = new Set<string>([
+          ...(updated.assigneeId ? [updated.assigneeId] : []),
+          ...(Array.isArray(updated.assignees) ? (updated.assignees as any[]).map((a) => a?.uid) : []),
+          ...(updated.createdById ? [updated.createdById] : []),
+          ...(Array.isArray(updated.watchers) ? (updated.watchers as any[]).filter((w) => typeof w === "string") : []),
+        ]);
+        const targetUserIds = [...stakeholders].filter(
+          (id) => id && id !== userId && !newAssigneeIds.includes(id),
+        );
+        const parts: string[] = [];
+        if (editedFields.length > 0) parts.push(`edited ticket (${editedFields.join(", ")})`);
+        if (movedToColumnName) parts.push(editedFields.length > 0 ? `moved it to "${movedToColumnName}"` : `moved ticket to "${movedToColumnName}"`);
+        await sendTicketBotNotification({
+          workspaceId: project.workspaceId,
+          actorName,
+          ticketTitle: updated.title,
+          projectName: project.name,
+          actionText: parts.join(" and "),
+          targetUserIds,
+          channelId: project.notificationChannelId,
+          io: fastify.io,
+          // An assignment in the same save already put its message in the channel
+          postToChannel: newAssigneeIds.length === 0,
         });
       }
 

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Channel, Message, UserProfile } from "@orbit/types";
 import {
   Hash,
@@ -26,6 +26,7 @@ import {
   Trash2,
   ChevronDown,
   Mask,
+  Eye,
   Canvas,
   More,
   Users,
@@ -36,6 +37,8 @@ import {
   BellOff,
   Forward,
 } from "@/components/ui/icons";
+import { EyeOff } from "lucide-react";
+import { useAnonStore } from "../../stores/anonStore";
 import { Avatar, tint, relativeTime } from "../project/projectViewUtils";
 import { AnonAvatar } from "./AnonAvatar";
 import {
@@ -46,6 +49,7 @@ import {
 
 import { api } from "../../lib/api";
 import { getSocket } from "../../lib/socket";
+import { loadDraft, saveDraft, clearDraft } from "../../lib/drafts";
 import { useChatStore } from "../../stores/chatStore";
 import { EmojiPickerPopover } from "./EmojiPickerPopover";
 import { getTopEmojis, recordEmojiUsage } from "../../lib/emojiStore";
@@ -67,6 +71,7 @@ import { UserHoverCard } from "./UserHoverCard";
 import { Presence, PRESENCE_STYLE } from "../availability/useTeamPresence";
 import { useTimeFormat, formatMessageTime } from "../../lib/timeFormat";
 import { ForwardMessageDialog } from "./ForwardMessageDialog";
+import { MessageChangeNote } from "./MessageChangeNote";
 // Anonymous-feed warm accent (Figma amber/600); text uses a darker mix so it stays readable on any theme.
 const ANON_WARM = "#D97706";
 const ANON_WARM_TEXT = "color-mix(in srgb, #D97706 70%, var(--theme-text))";
@@ -197,6 +202,7 @@ interface ChatAreaProps {
   onChangeView: (view: "messages" | "whiteboard") => void;
   presence?: Record<string, Presence>;
   onHuddleUser?: (user: UserProfile) => void;
+  onOpenQuickCanvas?: () => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -220,9 +226,18 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onChangeView: setActiveView,
   presence = {},
   onHuddleUser,
+  onOpenQuickCanvas,
 }) => {
   const timeFormat = useTimeFormat();
-  const [content, setContent] = useState("");
+  // Unsent text for this channel, restored from this device when the composer mounts (see lib/drafts.ts).
+  const initialDraft = useMemo(
+    () => (currentUser ? loadDraft(currentUser.id, channel.id) : undefined),
+    [currentUser?.id, channel.id],
+  );
+  const [content, setContent] = useState(initialDraft ?? "");
+  useEffect(() => {
+    setContent(initialDraft ?? "");
+  }, [initialDraft, channel.id]);
   const sendingRef = useRef(false);
   const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(
     null,
@@ -246,6 +261,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showPinsModal, setShowPinsModal] = useState(false);
   const [showAnonPersonaModal, setShowAnonPersonaModal] = useState(false);
+  const revealAnon = useAnonStore((s) => s.reveal);
+  const toggleRevealAnon = useAnonStore((s) => s.toggleReveal);
   const [anonProfile, setAnonProfile] = useState<{
     anonName: string;
     anonEmoji: string;
@@ -502,6 +519,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   const handleTyping = (text: string) => {
     setContent(text);
+    if (currentUser)
+      saveDraft(
+        currentUser.id,
+        channel.id,
+        editorRef.current?.getMarkdown() ?? text,
+      );
     const socket = getSocket();
 
     if (currentUser) {
@@ -539,6 +562,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       if (cmd === "/call" || cmd === "/meet" || cmd === "/huddle") {
         editorRef.current?.clear();
         setContent("");
+        clearDraft(currentUser.id, channel.id);
         onStartHuddle(channel);
         return;
       }
@@ -554,6 +578,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         }
         editorRef.current?.clear();
         setContent("");
+        clearDraft(currentUser.id, channel.id);
         setReplyingToMessage(null);
         return;
       } catch (err: any) {
@@ -569,6 +594,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     // Clear input immediately so a second Enter can't resend
     editorRef.current?.clear();
     setContent("");
+    clearDraft(currentUser.id, channel.id); // cleared now, not after the request, so text typed while it sends isn't wiped
+    // Stop the typing indicator for everyone now, not after the request finishes
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    getSocket().emit("typing:stop", { channelId: channel.id });
     setAttachments([]);
     setReplyingToMessage(null);
 
@@ -589,6 +618,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       console.error("Failed to send message", err);
       setAttachments(sentAttachments);
       setReplyingToMessage(sentReplyTo);
+      // Put the unsent text back (unless the user already started a new one) so a failed send isn't lost
+      if (!editorRef.current?.getText()) {
+        editorRef.current?.setMarkdown(trimmed);
+        setContent(trimmed);
+        saveDraft(currentUser.id, channel.id, trimmed);
+      }
     } finally {
       sendingRef.current = false;
     }
@@ -650,6 +685,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
     const files = Array.from(fileList);
     setPendingCompressFiles(files);
+    setShowCompressModal(true);
+  };
+
+  // Pasted images/files (Ctrl+V) go through the same confirmation and upload as the file picker
+  const handlePasteFiles = (files: File[]) => {
+    setPendingCompressFiles((prev) =>
+      showCompressModal ? [...prev, ...files] : files,
+    );
     setShowCompressModal(true);
   };
 
@@ -1024,7 +1067,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
           {/* Actions */}
           <div className="flex items-center gap-2 shrink-0">
-            {channel.isAnonymous && anonProfile && (
+            {channel.isAnonymous && anonProfile && revealAnon && (
               <button
                 onClick={() => setShowAnonPersonaModal(true)}
                 title="Change your character name"
@@ -1306,6 +1349,22 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           </span>
           {anonProfile && (
             <button
+              onClick={toggleRevealAnon}
+              title={revealAnon ? "Hide your persona" : "Show your persona"}
+              aria-label={
+                revealAnon ? "Hide your persona" : "Show your persona"
+              }
+              className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition hover:brightness-95"
+              style={{
+                backgroundColor: tint(ANON_WARM, 14),
+                color: ANON_WARM_TEXT,
+              }}
+            >
+              {revealAnon ? <EyeOff size={15} /> : <Eye size={15} />}
+            </button>
+          )}
+          {anonProfile && (
+            <button
               onClick={() => setShowAnonPersonaModal(true)}
               className="font-semibold whitespace-nowrap hover:underline shrink-0"
               style={{ color: ANON_WARM_TEXT }}
@@ -1556,14 +1615,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       const isForward =
                         !!msg.quotedMessage &&
                         msg.quotedMessage.channelId !== msg.channelId;
-                      const canEdit =
-                        !msg.isDeleted &&
-                        (isSelf || isSuperAdmin) &&
-                        !isForward; // admins can delete a message, not edit it
+                      // Only the author edits (admins can delete, not edit); forwards are read-only copies.
+                      const canEdit = !msg.isDeleted && isSelf && !isForward;
                       const canDelete =
                         !msg.isDeleted && (isSelf || isWsAdmin || isSuperAdmin);
+                      // Your own persona stays hidden until you reveal it with the eye toggle.
+                      const hideSelfAnon = isAnon && isSelf && !revealAnon;
                       const authorName = isAnon
-                        ? msg.anonName || "Anonymous"
+                        ? hideSelfAnon
+                          ? "Anonymous"
+                          : msg.anonName || "Anonymous"
                         : isBot
                           ? msg.bot?.name
                           : msg.user?.displayName || "Unknown";
@@ -1718,18 +1779,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                                   className="text-xs"
                                   style={{ color: "var(--theme-text-muted)" }}
                                 >
-                                  {isAnon && isSelf ? "You · " : ""}
+                                  {isAnon && isSelf && revealAnon
+                                    ? "You · "
+                                    : ""}
                                   {formatMessageTime(msg.createdAt, timeFormat)}
                                 </span>
-                                {msg.isEdited && !msg.isDeleted && (
-                                  <span
-                                    className="text-[10px] italic select-none font-medium opacity-80"
-                                    style={{ color: "var(--theme-text-muted)" }}
-                                    title="Edited"
-                                  >
-                                    (edited)
-                                  </span>
-                                )}
+                                <MessageChangeNote
+                                  message={msg}
+                                  timeFormat={timeFormat}
+                                  className="text-[10px] opacity-80"
+                                />
                               </div>
 
                               {msg.isDeleted ? (
@@ -1741,7 +1800,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                                     size={13}
                                     className="opacity-60 shrink-0"
                                   />
-                                  <span>This message was deleted</span>
+                                  <span>
+                                    {(msg as any).deletedByName
+                                      ? `This message was deleted by ${(msg as any).deletedByName}`
+                                      : "This message was deleted"}
+                                  </span>
                                 </div>
                               ) : editingMessageId === msg.id ? (
                                 <div className="mt-2 space-y-2">
@@ -2475,6 +2538,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   <RichTextEditor
                     key={channel.id}
                     ref={editorRef}
+                    initialValue={initialDraft}
                     autoFocus={true}
                     placeholder={
                       isDragOver
@@ -2488,10 +2552,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     showToolbar={showFormatting}
                     mentionUsers={mentionUsers}
                     onTyping={(text) => handleTyping(text)}
-                    onPasteFiles={(files) => {
-                      setPendingCompressFiles(files);
-                      setShowCompressModal(true);
-                    }}
+                    onPasteFiles={handlePasteFiles}
                     onSubmit={() => handleSendMessage()}
                   />
 

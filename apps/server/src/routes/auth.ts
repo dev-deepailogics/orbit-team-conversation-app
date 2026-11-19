@@ -4,6 +4,7 @@ import { prisma } from '@orbit/db';
 import { z } from 'zod';
 import { randomBytes } from 'crypto';
 import { isDemoEmail } from '../services/demoWorkspace.js';
+import { ACCESS_TOKEN_TTL, issueRefreshToken, revokeAllForUser, revokeByToken, rotateRefreshToken } from '../services/tokens.js';
 import {
   createAuthorizeRequest,
   exchangeCodeForProfile,
@@ -92,7 +93,28 @@ const publicUser = (user: DbUser, provider?: string) => ({
   canChangePassword: !!user.passwordHash && !provider && !isDemoEmail(user.email),
 });
 
+const refreshSchema = z.object({ refreshToken: z.string().min(1) });
+
 export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
+  // Short-lived access JWT. The username is in the claims, so it is re-signed whenever it changes.
+  const signAccessToken = (user: DbUser, provider?: string | null) =>
+    fastify.jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        systemRole: user.systemRole,
+        ...(provider && { provider }), // keep the session's sign-in method
+      },
+      { expiresIn: ACCESS_TOKEN_TTL },
+    );
+
+  // New session = access token + a fresh refresh-token family.
+  const startSession = async (user: DbUser, provider?: string | null) => ({
+    accessToken: signAccessToken(user, provider),
+    refreshToken: await issueRefreshToken(user.id, provider),
+  });
+
   // Register
   fastify.post('/register', async (request, reply) => {
     const parseResult = registerSchema.safeParse(request.body);
@@ -128,14 +150,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       },
     });
 
-    const token = fastify.jwt.sign({
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      systemRole: user.systemRole,
-    });
-
-    return reply.status(201).send({ accessToken: token, user: publicUser(user) });
+    return reply.status(201).send({ ...(await startSession(user)), user: publicUser(user) });
   });
 
   // Login
@@ -179,14 +194,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       }
     }
 
-    const token = fastify.jwt.sign({
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      systemRole: user.systemRole,
-    });
-
-    return reply.send({ accessToken: token, user: publicUser(user) });
+    return reply.send({ ...(await startSession(user)), user: publicUser(user) });
   });
 
   // Sign in with Microsoft: redirect to the Entra ID authorize endpoint
@@ -267,15 +275,40 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
 
     if (user.disabled) return reply.redirect(loginError('account_deactivated'));
 
-    const token = fastify.jwt.sign({
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      systemRole: user.systemRole,
-      provider: 'microsoft',
-    });
+    const session = await startSession(user, 'microsoft');
     // URL fragment: never sent to any server or logged; the login page stores it and strips it.
-    return reply.redirect(`${clientUrl()}/login#token=${encodeURIComponent(token)}`);
+    return reply.redirect(
+      `${clientUrl()}/login#token=${encodeURIComponent(session.accessToken)}&refreshToken=${encodeURIComponent(session.refreshToken)}`,
+    );
+  });
+
+  // Swap a refresh token for a new access token + rotated refresh token.
+  fastify.post('/refresh', async (request, reply) => {
+    const parsed = refreshSchema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: 'refreshToken is required' });
+
+    const rotated = await rotateRefreshToken(parsed.data.refreshToken);
+    if (!rotated.ok) return reply.status(401).send({ error: 'Invalid or expired refresh token' });
+
+    const user = await prisma.user.findUnique({ where: { id: rotated.userId } });
+    if (!user) return reply.status(401).send({ error: 'Invalid or expired refresh token' });
+    if (user.disabled) {
+      await revokeAllForUser(user.id);
+      return reply.status(403).send({ error: 'Account is deactivated' });
+    }
+
+    return reply.send({
+      accessToken: signAccessToken(user, rotated.provider),
+      refreshToken: rotated.refreshToken,
+      user: publicUser(user, rotated.provider ?? undefined),
+    });
+  });
+
+  // Revoke this session's refresh token family. Always succeeds so clients can log out while offline-ish.
+  fastify.post('/logout', async (request, reply) => {
+    const parsed = refreshSchema.safeParse(request.body);
+    if (parsed.success) await revokeByToken(parsed.data.refreshToken).catch(() => {});
+    return reply.send({ success: true });
   });
 
   // Get current user profile
@@ -307,14 +340,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     }
 
     const user = await prisma.user.update({ where: { id }, data: parsed.data });
-    const accessToken = fastify.jwt.sign({
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      systemRole: user.systemRole,
-      ...(provider && { provider }), // keep the session's sign-in method
-    });
-    return reply.send({ accessToken, user: publicUser(user, provider) });
+    return reply.send({ accessToken: signAccessToken(user, provider), user: publicUser(user, provider) });
   });
 
   // Change own password. Not available to provider (Microsoft) sessions, accounts without a password, or demo accounts.
@@ -343,6 +369,9 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     }
 
     await prisma.user.update({ where: { id }, data: { passwordHash: await bcrypt.hash(newPassword, 10) } });
-    return reply.send({ success: true });
+    // Sign out every other device, then hand this one a fresh session.
+    await revokeAllForUser(id);
+    const fresh = await prisma.user.findUniqueOrThrow({ where: { id } });
+    return reply.send({ success: true, ...(await startSession(fresh)) });
   });
 };

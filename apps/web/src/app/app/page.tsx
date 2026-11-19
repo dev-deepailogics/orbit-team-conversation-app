@@ -27,6 +27,7 @@ import { WorkspaceSidebar } from "@/components/workspace/WorkspaceSidebar";
 import { ChannelSidebar } from "@/components/channel/ChannelSidebar";
 import { ChatArea } from "@/components/chat/ChatArea";
 import { ThreadSidebar } from "@/components/chat/ThreadSidebar";
+import { QuickTodos } from "@/components/layout/QuickTodos";
 import { HuddleModal } from "@/components/huddle/HuddleModal";
 import { IncomingCallDialog } from "@/components/huddle/IncomingCallDialog";
 import { AddMembersDialog } from "@/components/channel/AddMembersDialog";
@@ -55,6 +56,12 @@ import {
   Plus,
 } from "@/components/ui/icons";
 
+// How many thread replies are fetched at a time
+const THREAD_PAGE_SIZE = 30;
+
+// Longest a typing indicator stays up without a new typing:start (senders refresh it on every keystroke)
+const TYPING_TTL_MS = 6000;
+
 export default function AppDashboard() {
   const router = useRouter();
   const { user, token, isLoading, fetchMe, logout } = useAuthStore();
@@ -74,6 +81,8 @@ export default function AppDashboard() {
     updateMessage,
     setActiveThread,
     setThreadReplies,
+    prependThreadReplies,
+    threadHasMore,
     addThreadReply,
     setTypingUser,
     incrementUnread,
@@ -167,6 +176,7 @@ export default function AppDashboard() {
 
   // Message chunking & pagination
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [isLoadingOlderReplies, setIsLoadingOlderReplies] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
 
@@ -452,6 +462,65 @@ export default function AppDashboard() {
   };
 
   // 4d. Canvas creation and deletion handlers
+  const handleOpenOrCreateScopedCanvas = async (targetChannel?: Channel | null, targetProject?: any | null) => {
+    if (!currentWorkspace) return;
+    const ch = targetChannel !== undefined ? targetChannel : currentChannel;
+    const pr = targetProject !== undefined ? targetProject : currentProject;
+
+    try {
+      // 1. Fetch canvases linked to this channel or project
+      const params: any = { workspaceId: currentWorkspace.id };
+      if (ch) params.channelId = ch.id;
+      if (pr) params.projectId = pr.id;
+
+      const res = await api.get('/api/canvases', { params });
+      const linkedCanvases: any[] = res.data || [];
+
+      if (linkedCanvases.length > 0) {
+        // Open the existing linked canvas
+        setSelectedCanvasId(linkedCanvases[0].id);
+        setShowCanvasHub(true);
+        setShowDocsHub(false);
+        setShowOrgControl(false);
+        setShowProjectsPanel(false);
+      } else {
+        // Create canvas titled after channel or user DM or project
+        let canvasTitle = 'Untitled canvas';
+        if (ch) {
+          if (ch.type === 'DIRECT' || ch.type === 'GROUP_DIRECT') {
+            const others = (ch.members || [])
+              .filter((m: any) => m.userId !== user?.id)
+              .map((m: any) => m.user?.displayName || m.user?.username);
+            const otherName = others.filter(Boolean).join(', ') || ch.name;
+            canvasTitle = `${otherName} Canvas`;
+          } else {
+            canvasTitle = `${ch.name} Canvas`;
+          }
+        } else if (pr) {
+          canvasTitle = `${pr.name} Canvas`;
+        }
+
+        const createRes = await api.post('/api/canvases', {
+          workspaceId: currentWorkspace.id,
+          title: canvasTitle,
+          channelId: ch ? ch.id : undefined,
+          projectId: !ch && pr ? pr.id : undefined,
+        });
+
+        setCanvases((prev) => [createRes.data, ...prev]);
+        setSelectedCanvasId(createRes.data.id);
+        setShowCanvasHub(true);
+        setShowDocsHub(false);
+        setShowOrgControl(false);
+        setShowProjectsPanel(false);
+      }
+    } catch (err: any) {
+      console.error('Failed to open or create canvas', err);
+      // Fallback: open canvas hub
+      setShowCanvasHub(true);
+    }
+  };
+
   // Opens the canvas hub with its "New canvas" dialog (name, link, template)
   const handleCreateCanvas = () => {
     if (!currentWorkspace) return;
@@ -765,29 +834,36 @@ export default function AppDashboard() {
       if (granted) registerPush();
     });
 
+    // Chime + desktop notification for a message addressed to this user
+    const alertForMessage = (msg: any) => {
+      sounds.playMessageSound();
+      DesktopNotifier.send(
+        msg.user?.displayName || msg.bot?.name || "New Message",
+        msg.content,
+        msg.user?.avatarUrl || msg.bot?.avatarUrl,
+        () => {
+          window.focus();
+          const allChannels = useChatStore.getState().channels;
+          const targetChannel = allChannels.find((c) => c.id === msg.channelId);
+          if (targetChannel) {
+            handleSelectChannel(targetChannel);
+          }
+        },
+      );
+    };
+
     const onNewMessage = (msg: any) => {
       const activeChannel = currentChannelRef.current;
       const isFromOther = !msg.userId || msg.userId !== user.id;
 
-      // Play message chime if message is from another user or bot
-      if (isFromOther) {
-        sounds.playMessageSound();
-        DesktopNotifier.send(
-          msg.user?.displayName || msg.bot?.name || "New Message",
-          msg.content,
-          msg.user?.avatarUrl || msg.bot?.avatarUrl,
-          () => {
-            window.focus();
-            const allChannels = useChatStore.getState().channels;
-            const targetChannel = allChannels.find(
-              (c) => c.id === msg.channelId,
-            );
-            if (targetChannel) {
-              handleSelectChannel(targetChannel);
-            }
-          },
-        );
+      // Alert for channel messages from another user or bot. Thread replies reach everyone in the channel (to keep
+      // reply counts and open threads current), but only the people in the thread are alerted, via thread:reply_notify.
+      if (isFromOther && !msg.parentMessageId) {
+        alertForMessage(msg);
       }
+
+      // Their message arrived, so they are no longer typing it
+      if (msg.userId && !msg.parentMessageId) clearTyping(msg.channelId, msg.userId);
 
       if (msg.parentMessageId) {
         addThreadReply(msg);
@@ -814,17 +890,36 @@ export default function AppDashboard() {
       }
     };
 
-    const onTypingStart = ({ channelId, username }: any) => {
-      setTypingUser(channelId, username, true);
+    // Typing indicators are tracked per user id. They clear on typing:stop, when that person's message arrives, and
+    // after TYPING_TTL_MS without a refresh, so a lost stop event (closed tab, dropped connection) can't leave one stuck.
+    const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    const clearTyping = (channelId: string, userId: string) => {
+      const key = `${channelId}:${userId}`;
+      clearTimeout(typingTimers.get(key));
+      typingTimers.delete(key);
+      setTypingUser(channelId, { userId, username: "" }, false);
     };
 
-    const onTypingStop = ({ channelId }: any) => {
-      setTypingUser(channelId, "", false);
+    const onTypingStart = ({ channelId, username, userId }: any) => {
+      if (!channelId || !userId || userId === user.id) return;
+      setTypingUser(channelId, { userId, username }, true);
+      const key = `${channelId}:${userId}`;
+      clearTimeout(typingTimers.get(key));
+      typingTimers.set(
+        key,
+        setTimeout(() => clearTyping(channelId, userId), TYPING_TTL_MS),
+      );
+    };
+
+    const onTypingStop = ({ channelId, userId }: any) => {
+      if (channelId && userId) clearTyping(channelId, userId);
     };
 
     const onCallStarted = (callData: any) => {
-      // If someone else started a call, notify user
-      if (callData.hostUserId !== user.id) {
+      // If someone else started a call, notify user, unless we're already in that call
+      const huddle = useHuddleStore.getState();
+      const alreadyInCall = huddle.isActive && huddle.channelId === callData.channelId;
+      if (callData.hostUserId !== user.id && !alreadyInCall) {
         setIncomingCall(callData);
       }
       if (callData.channelId) {
@@ -834,7 +929,10 @@ export default function AppDashboard() {
 
     const onCallEnded = (payload: { channelId: string }) => {
       if (payload?.channelId) {
-        useHuddleStore.getState().clearChannelParticipants(payload.channelId);
+        const huddle = useHuddleStore.getState();
+        huddle.clearChannelParticipants(payload.channelId);
+        // The call is over, so stop ringing for it
+        if (huddle.incomingCall?.channelId === payload.channelId) huddle.dismissIncomingCall();
         setActiveHuddleChannel(null);
       }
     };
@@ -964,6 +1062,7 @@ export default function AppDashboard() {
 
     socket.on("account:deactivated", onAccountDeactivated);
     socket.on("message:new", onNewMessage);
+    socket.on("thread:reply_notify", alertForMessage);
     socket.on("message:reaction", onReaction);
     socket.on("message:updated", onMessageUpdated);
     socket.on("message:pinned", onMessagePinned);
@@ -997,12 +1096,15 @@ export default function AppDashboard() {
     return () => {
       socket.off("account:deactivated", onAccountDeactivated);
       socket.off("message:new", onNewMessage);
+      socket.off("thread:reply_notify", alertForMessage);
       socket.off("message:reaction", onReaction);
       socket.off("message:updated", onMessageUpdated);
       socket.off("message:pinned", onMessagePinned);
       socket.off("message:deleted", onMessageDeleted);
       socket.off("typing:start", onTypingStart);
       socket.off("typing:stop", onTypingStop);
+      typingTimers.forEach(clearTimeout);
+      typingTimers.clear();
       socket.off("huddle:started", onCallStarted);
       socket.off("channel:new", onChannelNew);
       socket.off("channel:updated", onChannelUpdated);
@@ -1014,13 +1116,36 @@ export default function AppDashboard() {
   }, [user, currentWorkspace]);
 
   // 6. Handle Opening Thread
+  // Replies load newest-first in pages (like channel messages); earlier ones come in as the user scrolls up
   const handleOpenThread = async (message: Message) => {
     setActiveThread(message);
     try {
-      const res = await api.get(`/api/messages/${message.id}/replies`);
-      setThreadReplies(res.data.replies || []);
+      const res = await api.get(`/api/messages/${message.id}/replies`, { params: { limit: THREAD_PAGE_SIZE } });
+      setThreadReplies(res.data.replies || [], message.id, {
+        hasMore: !!res.data.hasMore,
+        nextCursor: res.data.nextCursor || null,
+      });
     } catch (err) {
       console.error("Failed to load thread replies", err);
+    }
+  };
+
+  const handleLoadOlderReplies = async () => {
+    const { activeThread: thread, threadNextCursor } = useChatStore.getState();
+    if (!thread || !threadNextCursor || isLoadingOlderReplies) return;
+    setIsLoadingOlderReplies(true);
+    try {
+      const res = await api.get(`/api/messages/${thread.id}/replies`, {
+        params: { cursor: threadNextCursor, limit: THREAD_PAGE_SIZE },
+      });
+      prependThreadReplies(res.data.replies || [], thread.id, {
+        hasMore: !!res.data.hasMore,
+        nextCursor: res.data.nextCursor || null,
+      });
+    } catch (err) {
+      console.error("Failed to load earlier thread replies", err);
+    } finally {
+      setIsLoadingOlderReplies(false);
     }
   };
 
@@ -1519,7 +1644,7 @@ export default function AppDashboard() {
           channel={currentChannel}
           messages={messages}
           currentUser={user}
-          typingUsers={typingUsers[currentChannel.id] || []}
+          typingUsers={(typingUsers[currentChannel.id] || []).map((t) => t.username)}
           hasMoreMessages={hasMoreMessages}
           isLoadingOlder={isLoadingOlder}
           onLoadOlderMessages={handleLoadOlderMessages}
@@ -1541,6 +1666,7 @@ export default function AppDashboard() {
           }}
           activeView={chatView}
           onChangeView={setChatView}
+          onOpenQuickCanvas={() => handleOpenOrCreateScopedCanvas(currentChannel, null)}
         />
       ) : (
         <EmptyState
@@ -1645,6 +1771,9 @@ export default function AppDashboard() {
             currentUser={user}
             onClose={() => setActiveThread(null)}
             onReplyAdded={addThreadReply}
+            hasMoreReplies={threadHasMore}
+            isLoadingOlderReplies={isLoadingOlderReplies}
+            onLoadOlderReplies={handleLoadOlderReplies}
             members={members}
             onSelectUserDM={handleSelectUserDM}
             onSelectChannel={handleSelectChannel}
@@ -1777,6 +1906,9 @@ export default function AppDashboard() {
           }}
         />
       )}
+
+      {/* 13. Quick to-dos (Alt+T) */}
+      <QuickTodos />
     </div>
   );
 }

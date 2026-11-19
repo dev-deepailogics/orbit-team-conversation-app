@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Avatar } from '@/components/project/projectViewUtils';
 import { Message, UserProfile, Channel } from '@orbit/types';
 import { X, Send, CornerUpLeft, Smile, SmilePlus, Type, Paperclip, FileText, Loader2, Pencil, Trash2, ChevronDown } from '@/components/ui/icons';
 import { api } from '../../lib/api';
+import { useAnonStore } from '../../stores/anonStore';
+import { loadDraft, saveDraft, clearDraft } from '../../lib/drafts';
 import { useChatStore } from '../../stores/chatStore';
 import { EmojiPickerPopover } from './EmojiPickerPopover';
 import { AnonAvatar } from './AnonAvatar';
@@ -15,6 +17,7 @@ import { FileAttachmentList, formatFileSize, getFileCategory } from './FileAttac
 import { CompressFileConfirmModal } from './CompressFileConfirmModal';
 import { compressFile } from '../../lib/compression';
 import { useTimeFormat, formatMessageTime } from '../../lib/timeFormat';
+import { MessageChangeNote } from './MessageChangeNote';
 import { useResizableSidebar } from '../layout/useResizableSidebar';
 
 interface ThreadSidebarProps {
@@ -26,6 +29,10 @@ interface ThreadSidebarProps {
   members?: any[];
   onSelectUserDM?: (user: UserProfile) => void;
   onSelectChannel?: (channel: Channel) => void;
+  // Replies load newest-first in pages; these drive loading the earlier ones as the user scrolls up
+  hasMoreReplies?: boolean;
+  isLoadingOlderReplies?: boolean;
+  onLoadOlderReplies?: () => void;
 }
 
 export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
@@ -37,8 +44,21 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   members,
   onSelectUserDM,
   onSelectChannel,
+  hasMoreReplies = false,
+  isLoadingOlderReplies = false,
+  onLoadOlderReplies,
 }) => {
   const timeFormat = useTimeFormat();
+  // Unsent reply for this thread, restored from this device when the composer mounts (see lib/drafts.ts).
+  const draftScope = `thread:${parentMessage.id}`;
+  const initialDraft = useMemo(
+    () => (currentUser ? loadDraft(currentUser.id, draftScope) : undefined),
+    [currentUser?.id, draftScope],
+  );
+  const [content, setContent] = useState(initialDraft ?? '');
+  useEffect(() => {
+    setContent(initialDraft ?? '');
+  }, [initialDraft, draftScope]);
   const sidebar = useResizableSidebar({
     storageKey: 'orbit_thread_sidebar_width',
     defaultWidth: 384,
@@ -46,7 +66,6 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
     maxWidth: 720,
     side: 'right',
   });
-  const [content, setContent] = useState('');
   const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [threadAttachments, setThreadAttachments] = useState<any[]>([]);
@@ -120,10 +139,13 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   const isNearBottomRef = useRef(true);
   const [firstUnreadReplyId, setFirstUnreadReplyId] = useState<string | null>(null);
   const previousRepliesCountRef = useRef(0);
+  const previousScrollHeightRef = useRef(0); // set just before older replies are requested, to keep the view in place
   const editorRef = useRef<RichTextEditorRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isParentAnon = !!parentMessage.isAnonymous;
+  // The parent's reply count covers replies that haven't been loaded yet; never show fewer than are on screen
+  const totalReplies = Math.max(parentMessage.replyCount ?? 0, replies.length);
 
   const mentionUsers = React.useMemo(() => {
     if (isParentAnon) return [];
@@ -162,6 +184,14 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   }, []);
 
   useEffect(() => {
+    // Older replies were added above the ones on screen: keep the view exactly where it was, don't treat them as new
+    if (previousScrollHeightRef.current > 0 && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop += scrollContainerRef.current.scrollHeight - previousScrollHeightRef.current;
+      previousScrollHeightRef.current = 0;
+      previousRepliesCountRef.current = replies.length;
+      return;
+    }
+
     // Only auto-scroll if user is already near bottom OR if the new reply was sent by the current user
     if (replies.length > previousRepliesCountRef.current) {
       const lastReply = replies[replies.length - 1];
@@ -173,7 +203,9 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
       );
 
       if (isNearBottomRef.current || isSentByMe) {
-        repliesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        // The first replies of an opened thread jump to the bottom at once: a smooth scroll would pass through the top
+        // and trigger loading earlier replies that nobody asked for
+        repliesEndRef.current?.scrollIntoView({ behavior: previousRepliesCountRef.current === 0 ? 'auto' : 'smooth' });
         setFirstUnreadReplyId(null);
       } else {
         if (!isSentByMe) {
@@ -184,6 +216,17 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
     previousRepliesCountRef.current = replies.length;
   }, [replies, currentUser]);
 
+  // A request that fails or returns nothing new must not leave a stale height behind for the next real update
+  useEffect(() => {
+    if (!isLoadingOlderReplies) previousScrollHeightRef.current = 0;
+  }, [isLoadingOlderReplies]);
+
+  const loadOlderReplies = () => {
+    if (!hasMoreReplies || isLoadingOlderReplies || !onLoadOlderReplies) return;
+    if (scrollContainerRef.current) previousScrollHeightRef.current = scrollContainerRef.current.scrollHeight;
+    onLoadOlderReplies();
+  };
+
   const handleThreadScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
     const distanceFromBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
@@ -193,6 +236,9 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
     if (isNearBottom) {
       setFirstUnreadReplyId(null);
     }
+
+    // Close to the top: bring in the earlier replies
+    if (target.scrollTop <= 40) loadOlderReplies();
   };
 
   // Default to the reply input field when thread is opened or parent message changes
@@ -308,6 +354,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
       onReplyAdded(res.data);
       editorRef.current?.clear();
       setContent('');
+      if (currentUser) clearDraft(currentUser.id, draftScope);
       setThreadAttachments([]);
       setReplyingToMessage(null);
       setShowComposerEmoji(false);
@@ -330,10 +377,11 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   };
 
   const isParentSelf = parentMessage.isSelf || (!isParentAnon && parentMessage.userId === currentUser?.id);
-  const canEditParent = !parentMessage.isDeleted && (isParentSelf || isSuperAdmin);
+  const canEditParent = !parentMessage.isDeleted && isParentSelf; // admins can delete a message, not edit it
   const canDeleteParent = !parentMessage.isDeleted && (isParentSelf || isWsAdmin || isSuperAdmin);
+  const revealAnon = useAnonStore((s) => s.reveal);
   const authorName = isParentAnon
-    ? (parentMessage.anonName || 'Anonymous')
+    ? (isParentSelf && !revealAnon ? 'Anonymous' : (parentMessage.anonName || 'Anonymous'))
     : (parentMessage.user?.displayName || parentMessage.bot?.name || 'Unknown');
   const parentAnonEmoji = parentMessage.anonEmoji || '🎭';
   const avatarUrl = parentMessage.user?.avatarUrl || parentMessage.bot?.avatarUrl || `/api/avatar/bottts/svg?seed=${authorName}`;
@@ -386,23 +434,23 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                       : 'bg-[var(--theme-bg-surface)] text-[var(--theme-text)] border border-[var(--theme-border)]'
                   }`}
                 >
-                  {isParentSelf ? 'You (Anon)' : 'Anonymous'}
+                  {isParentSelf && revealAnon ? 'You (Anon)' : 'Anonymous'}
                 </span>
               )}
               <span className="text-[10px] text-[var(--theme-text-muted)]">
                 {formatMessageTime(parentMessage.createdAt, timeFormat)}
               </span>
-              {parentMessage.isEdited && !parentMessage.isDeleted && (
-                <span className="text-[9px] italic select-none text-[var(--theme-text-muted)] font-medium">
-                  (edited)
-                </span>
-              )}
+              <MessageChangeNote message={parentMessage} timeFormat={timeFormat} className="text-[9px]" />
             </div>
 
             {parentMessage.isDeleted ? (
               <div className="flex items-center gap-1.5 py-1 text-xs italic select-none text-[var(--theme-text-muted)]">
                 <Trash2 size={12} className="opacity-60 shrink-0" />
-                <span>This message was deleted</span>
+                <span>
+                  {(parentMessage as any).deletedByName
+                    ? `This message was deleted by ${(parentMessage as any).deletedByName}`
+                    : 'This message was deleted'}
+                </span>
               </div>
             ) : editingMessageId === parentMessage.id ? (
               <div className="mt-2 space-y-2">
@@ -589,19 +637,40 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
         {/* Reply Count Separator */}
         <div className="flex items-center gap-2 py-1">
           <span className="text-[11px] font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">
-            {replies.length} {replies.length === 1 ? 'Reply' : 'Replies'}
+            {totalReplies} {totalReplies === 1 ? 'Reply' : 'Replies'}
           </span>
           <div className="flex-1 h-px bg-[var(--theme-bg-surface-hover)]" />
         </div>
+
+        {/* Earlier replies: loaded automatically on scrolling up, or with this button */}
+        {hasMoreReplies && (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={loadOlderReplies}
+              disabled={isLoadingOlderReplies}
+              className="px-3 py-1 text-xs font-medium rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg-surface)] text-[var(--theme-text)] flex items-center gap-2 transition disabled:opacity-50 hover:opacity-85"
+            >
+              {isLoadingOlderReplies ? (
+                <>
+                  <Loader2 size={12} className="animate-spin" />
+                  <span>Loading earlier replies...</span>
+                </>
+              ) : (
+                <span>Load earlier replies</span>
+              )}
+            </button>
+          </div>
+        )}
 
         {/* Replies List */}
         {replies.map((reply, idx) => {
           const isReplyAnon = !!reply.isAnonymous || isParentAnon;
           const isReplySelf = reply.isSelf || (!isReplyAnon && reply.userId === currentUser?.id);
-          const canEditReply = !reply.isDeleted && (isReplySelf || isSuperAdmin);
+          const canEditReply = !reply.isDeleted && isReplySelf;
           const canDeleteReply = !reply.isDeleted && (isReplySelf || isWsAdmin || isSuperAdmin);
           const replyAuthor = isReplyAnon
-            ? (reply.anonName || 'Anonymous')
+            ? (isReplySelf && !revealAnon ? 'Anonymous' : (reply.anonName || 'Anonymous'))
             : (reply.user?.displayName || 'Unknown');
           const replyEmoji = reply.anonEmoji || '🎭';
           const replyAvatar = reply.user?.avatarUrl || `/api/avatar/bottts/svg?seed=${replyAuthor}`;
@@ -642,23 +711,21 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                           : 'bg-[var(--theme-bg-surface)] text-[var(--theme-text)] border border-[var(--theme-border)]'
                       }`}
                     >
-                      {isReplySelf ? 'You (Anon)' : 'Anonymous'}
+                      {isReplySelf && revealAnon ? 'You (Anon)' : 'Anonymous'}
                     </span>
                   )}
                   <span className="text-[10px] text-[var(--theme-text-muted)]">
                     {formatMessageTime(reply.createdAt, timeFormat)}
                   </span>
-                  {reply.isEdited && !reply.isDeleted && (
-                    <span className="text-[9px] italic select-none text-[var(--theme-text-muted)] font-medium">
-                      (edited)
-                    </span>
-                  )}
+                  <MessageChangeNote message={reply} timeFormat={timeFormat} className="text-[9px]" />
                 </div>
 
                 {reply.isDeleted ? (
                   <div className="flex items-center gap-1.5 py-1 text-xs italic select-none text-[var(--theme-text-muted)]">
                     <Trash2 size={12} className="opacity-60 shrink-0" />
-                    <span>This message was deleted</span>
+                    <span>
+                      {(reply as any).deletedByName ? `This message was deleted by ${(reply as any).deletedByName}` : 'This message was deleted'}
+                    </span>
                   </div>
                 ) : editingMessageId === reply.id ? (
                   <div className="mt-2 space-y-2">
@@ -953,17 +1020,21 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
           <RichTextEditor
             key={parentMessage.id}
             ref={editorRef}
+            initialValue={initialDraft}
             autoFocus={true}
             placeholder={isParentAnon ? 'Reply anonymously...' : 'Reply...'}
             showToolbar={showFormatting}
             mentionUsers={mentionUsers}
             minHeight="44px"
-            onTyping={(text) => setContent(text)}
-            onPasteFiles={(files) => {
-              setPendingCompressFiles(files);
-              setShowCompressModal(true);
+            onTyping={(text) => {
+              setContent(text);
+              if (currentUser) saveDraft(currentUser.id, draftScope, editorRef.current?.getMarkdown() ?? text);
             }}
             onSubmit={() => handleSendReply()}
+            onPasteFiles={(files) => {
+              setPendingCompressFiles((prev) => (showCompressModal ? [...prev, ...files] : files));
+              setShowCompressModal(true);
+            }}
           />
           <div className="flex items-center justify-between px-2 py-1.5 bg-[var(--theme-bg-app)] border-t border-[var(--theme-border)] rounded-b-lg">
             <div className="flex items-center gap-1">

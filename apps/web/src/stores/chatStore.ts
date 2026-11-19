@@ -1,6 +1,16 @@
 import { create } from 'zustand';
 import { Workspace, Channel, Message } from '@orbit/types';
 
+export interface ThreadPage {
+  hasMore: boolean;
+  nextCursor: string | null;
+}
+
+export interface TypingUser {
+  userId: string;
+  username: string;
+}
+
 interface ChatState {
   currentWorkspace: Workspace | null;
   channels: Channel[];
@@ -8,7 +18,10 @@ interface ChatState {
   messages: Message[];
   activeThread: Message | null;
   threadReplies: Message[];
-  typingUsers: { [channelId: string]: string[] };
+  threadHasMore: boolean;
+  threadNextCursor: string | null;
+  // Who is typing per channel, keyed by user id (typing:stop only carries the id, not the name)
+  typingUsers: { [channelId: string]: TypingUser[] };
   unreadCounts: { [channelId: string]: number };
 
   setCurrentWorkspace: (workspace: Workspace | null) => void;
@@ -20,9 +33,12 @@ interface ChatState {
   addMessage: (message: Message) => void;
   updateMessage: (message: Message) => void;
   setActiveThread: (message: Message | null) => void;
-  setThreadReplies: (replies: Message[]) => void;
+  // threadId: the thread these replies were fetched for; ignored if the open thread has changed since.
+  // page: whether older replies exist and where to continue from (replies load newest-first, like channel messages)
+  setThreadReplies: (replies: Message[], threadId?: string, page?: ThreadPage) => void;
+  prependThreadReplies: (older: Message[], threadId: string, page: ThreadPage) => void;
   addThreadReply: (reply: Message) => void;
-  setTypingUser: (channelId: string, username: string, isTyping: boolean) => void;
+  setTypingUser: (channelId: string, user: TypingUser, isTyping: boolean) => void;
   incrementUnread: (messageId: string, channelId: string) => void;
   clearUnread: (channelId: string) => void;
   /** Replace all counts with the server's (the open channel stays at 0). */
@@ -31,6 +47,9 @@ interface ChatState {
   reset: () => void;
 }
 
+// Thread replies already counted, so a reply delivered twice doesn't bump a reply count twice (bounded, oldest dropped)
+const countedReplyIds = new Set<string>();
+
 export const useChatStore = create<ChatState>((set) => ({
   currentWorkspace: null,
   channels: [],
@@ -38,6 +57,8 @@ export const useChatStore = create<ChatState>((set) => ({
   messages: [],
   activeThread: null,
   threadReplies: [],
+  threadHasMore: false,
+  threadNextCursor: null,
   typingUsers: {},
   unreadCounts: {},
 
@@ -49,6 +70,8 @@ export const useChatStore = create<ChatState>((set) => ({
       messages: [],
       activeThread: null,
       threadReplies: [],
+      threadHasMore: false,
+      threadNextCursor: null,
       typingUsers: {},
       unreadCounts: {},
     }),
@@ -115,30 +138,62 @@ export const useChatStore = create<ChatState>((set) => ({
         : null,
     })),
 
-  setActiveThread: (message) => set({ activeThread: message }),
-  setThreadReplies: (replies) => set({ threadReplies: replies }),
-  
+  setActiveThread: (message) =>
+    set((state) => ({
+      activeThread: message,
+      // Opening a different thread (or closing it): drop the previous thread's replies right away instead of showing
+      // them under the new parent until its own replies finish loading
+      ...(state.activeThread?.id === message?.id
+        ? {}
+        : { threadReplies: [], threadHasMore: false, threadNextCursor: null }),
+    })),
+  setThreadReplies: (replies, threadId, page) =>
+    set((state) => {
+      // A slow response for a thread that is no longer open must not overwrite the one that is
+      if (threadId && state.activeThread?.id !== threadId) return state;
+      return {
+        threadReplies: replies,
+        threadHasMore: page?.hasMore ?? false,
+        threadNextCursor: page?.nextCursor ?? null,
+      };
+    }),
+  prependThreadReplies: (older, threadId, page) =>
+    set((state) => {
+      if (state.activeThread?.id !== threadId) return state;
+      const have = new Set(state.threadReplies.map((r) => r.id));
+      return {
+        threadReplies: [...older.filter((r) => !have.has(r.id)), ...state.threadReplies],
+        threadHasMore: page.hasMore,
+        threadNextCursor: page.nextCursor,
+      };
+    }),
+
   addThreadReply: (reply) =>
     set((state) => {
-      if (state.threadReplies.some((r) => r.id === reply.id)) {
-        return state;
-      }
+      // A reply can arrive more than once (the HTTP response plus the socket echo, anonymous channels send two copies)
+      if (countedReplyIds.has(reply.id)) return state;
+      countedReplyIds.add(reply.id);
+      if (countedReplyIds.size > 1000) countedReplyIds.delete(countedReplyIds.values().next().value as string);
+
+      // Every thread reply in the workspace reaches this client, so only add it to the open thread's list when it is
+      // a reply to that thread; the reply count on the parent message is bumped either way.
+      const inOpenThread =
+        state.activeThread?.id === reply.parentMessageId && !state.threadReplies.some((r) => r.id === reply.id);
       return {
-        threadReplies: [...state.threadReplies, reply],
+        threadReplies: inOpenThread ? [...state.threadReplies, reply] : state.threadReplies,
         messages: state.messages.map((m) =>
-          m.id === reply.parentMessageId
-            ? { ...m, replyCount: (m.replyCount || 0) + 1 }
-            : m
+          m.id === reply.parentMessageId ? { ...m, replyCount: (m.replyCount || 0) + 1 } : m
         ),
       };
     }),
 
-  setTypingUser: (channelId, username, isTyping) =>
+  setTypingUser: (channelId, user, isTyping) =>
     set((state) => {
       const existing = state.typingUsers[channelId] || [];
-      const updated = isTyping
-        ? Array.from(new Set([...existing, username]))
-        : existing.filter((u) => u !== username);
+      const others = existing.filter((u) => u.userId !== user.userId);
+      // Nothing to change when removing someone who isn't listed (avoids a re-render for every stop event)
+      if (!isTyping && others.length === existing.length) return state;
+      const updated = isTyping ? [...others, user] : others;
       return {
         typingUsers: {
           ...state.typingUsers,

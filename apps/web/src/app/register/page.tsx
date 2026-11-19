@@ -39,7 +39,7 @@ export default function RegisterPage() {
         displayName,
         password,
       });
-      setAuth(res.data.user, res.data.accessToken);
+      setAuth(res.data.user, res.data.accessToken, res.data.refreshToken);
       router.push(postAuthPath());
     } catch (err: any) {
       setError(err.response?.data?.error || "Registration failed");

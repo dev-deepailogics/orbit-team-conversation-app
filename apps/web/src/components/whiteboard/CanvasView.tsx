@@ -40,6 +40,7 @@ interface CanvasViewProps {
   currentUser: UserProfile | null;
   // When set, only canvases linked to this channel/project are listed, and new ones are linked to it
   scope?: { channelId?: string; projectId?: string; label: string };
+  initialCanvasId?: string | null;
   onClose?: () => void;
   onOpenCanvasSidebar?: () => void;
   // Optional: owner names on cards; without it others' canvases show "Teammate"
@@ -71,6 +72,7 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   workspaceId,
   currentUser,
   scope,
+  initialCanvasId,
   onClose,
   onOpenCanvasSidebar,
   members = [],
@@ -118,7 +120,18 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     if (!controlled) setLocalSelectedId(null);
     api
       .get('/api/canvases', { params: { workspaceId, channelId: scope?.channelId, projectId: scope?.projectId } })
-      .then((res) => alive && setCanvases(res.data))
+      .then((res) => {
+        if (!alive) return;
+        setCanvases(res.data);
+        if (initialCanvasId) {
+          setSelectedId(initialCanvasId);
+        } else if (scope?.channelId || scope?.projectId) {
+          // If a linked canvas already exists in this scope, auto-open the most recently updated one
+          if (res.data.length > 0) {
+            setSelectedId(res.data[0].id);
+          }
+        }
+      })
       .catch((err) => console.error('Failed to load canvases', err))
       .finally(() => alive && setIsLoading(false));
     return () => {

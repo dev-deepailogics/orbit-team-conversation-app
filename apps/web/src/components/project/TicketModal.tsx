@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import { ProjectColumn, Ticket, TicketPriority, WorkspaceMember } from '@orbit/types';
+import { ProjectColumn, Ticket, TicketPriority, TicketType, WorkspaceMember } from '@orbit/types';
+import { TICKET_TYPES } from '../../lib/ticketTypes';
+import { TicketTypeIcon } from './TicketTypeIcon';
 import { api } from '../../lib/api';
 import { RichTextEditor, RichTextEditorRef } from '../chat/RichTextEditor';
 import { X, Trash2, Calendar, Plus, Board } from '@/components/ui/icons';
@@ -42,6 +44,7 @@ export interface TicketDraft {
   title: string;
   columnId: string;
   priority: TicketPriority;
+  type: TicketType;
   assigneeId: string | null;
   dueDate: string;
   // Stored as-is: labels may be strings or { name, color } objects.
@@ -106,6 +109,12 @@ export const TicketFields: React.FC<{
     display: <PriorityPill priority={p} />,
   }));
 
+  const typeOptions: SelectOption<TicketType>[] = TICKET_TYPES.map((t) => ({
+    value: t.value,
+    label: t.label,
+    display: <TicketTypeIcon type={t.value} showLabel />,
+  }));
+
   return (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -155,6 +164,9 @@ export const TicketFields: React.FC<{
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Type">
+          <SelectField value={draft.type} options={typeOptions} onChange={(type) => onChange({ type })} />
+        </Field>
         <Field label="Assignee">
           <SelectField
             value={draft.assigneeId ?? ''}
@@ -295,6 +307,7 @@ export const TicketModal: React.FC<TicketModalProps> = ({
     title: ticket?.title || initialTitle || '',
     columnId: ticket?.columnId || defaultColumnId || columns[0]?.id || '',
     priority: ticket?.priority || 'MEDIUM',
+    type: (ticket?.type as TicketType) || 'TASK',
     assigneeId: ticket?.assigneeId || null,
     dueDate: ticket?.dueDate ? new Date(ticket.dueDate).toISOString().split('T')[0] : '',
     labels: Array.isArray(ticket?.labels) ? ticket!.labels : [],
@@ -323,6 +336,7 @@ export const TicketModal: React.FC<TicketModalProps> = ({
       description: desc || null,
       columnId: draft.columnId,
       priority: draft.priority,
+      type: draft.type,
       assigneeId: draft.assigneeId || null,
       dueDate: draft.dueDate ? new Date(draft.dueDate).toISOString() : null,
       images: upload.attachments,

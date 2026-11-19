@@ -40,12 +40,24 @@ interface RichTextEditorProps {
   showToolbar?: boolean;
   onKeyDown?: (e: React.KeyboardEvent<HTMLDivElement>) => void;
   onTyping?: (text: string) => void;
-  onPasteFiles?: (files: File[]) => void;
   onSubmit?: () => void;
   minHeight?: string;
   className?: string;
   mentionUsers?: MentionUser[];
   autoFocus?: boolean;
+  /** Called with files (e.g. a screenshot) pasted from the clipboard; the paste is then not inserted into the text. */
+  onPasteFiles?: (files: File[]) => void;
+}
+
+// Browsers name every pasted screenshot "image.png"; give each a distinct, readable name.
+function namePastedFiles(files: File[]): File[] {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  return files.map((f, i) => {
+    if (f.name && !/^image\.[a-z0-9]+$/i.test(f.name)) return f;
+    const ext = (f.type.split('/')[1] || 'png').replace('jpeg', 'jpg').replace(/\+.*$/, '');
+    const suffix = files.length > 1 ? `-${i + 1}` : '';
+    return new File([f], `pasted-image-${stamp}${suffix}.${ext}`, { type: f.type });
+  });
 }
 
 function getInlineFormattingParent(node: Node | null, rootEl: HTMLElement): HTMLElement | null {
@@ -1180,9 +1192,9 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
           <div
             ref={editorRef}
             contentEditable
+            onPaste={handlePaste}
             onKeyDown={handleEditorKeyDown}
             onInput={handleInput}
-            onPaste={handlePaste}
             onKeyUp={checkMentionTrigger}
             onClick={checkMentionTrigger}
             style={{ minHeight, color: 'var(--theme-text-primary)' }}

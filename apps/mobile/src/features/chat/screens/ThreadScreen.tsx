@@ -27,6 +27,7 @@ export function ThreadScreen({ route, navigation }: ScreenProps<'Thread'>) {
   const channel = useWorkspaceStore(s => s.current?.channels.find(c => c.id === channelId));
   const thread = useChatStore(s => s.thread);
   const openThread = useChatStore(s => s.openThread);
+  const loadOlderReplies = useChatStore(s => s.loadOlderReplies);
   const closeThread = useChatStore(s => s.closeThread);
   const receiveMessage = useChatStore(s => s.receiveMessage);
   const setReactions = useChatStore(s => s.setReactions);
@@ -65,6 +66,8 @@ export function ThreadScreen({ route, navigation }: ScreenProps<'Thread'>) {
       : `${channelPrefix(channel)}${channelLabel(channel, myId)}`
     : undefined;
   const { parent, replies } = thread;
+  // The parent's count covers replies that aren't loaded yet; never show fewer than are on screen
+  const totalReplies = Math.max(parent?.replyCount ?? 0, replies.length);
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top', 'bottom']}>
@@ -95,8 +98,10 @@ export function ThreadScreen({ route, navigation }: ScreenProps<'Thread'>) {
                 onOpenImages={setGallery}
               />
             )}
-            // Slack's thread view: parent pinned to the top, replies flowing beneath it; new replies still follow you down.
-            maintainVisibleContentPosition={{ autoscrollToBottomThreshold: 0.2 }}
+            // Opens on the newest replies (like a channel); earlier ones load as you scroll up, ending at the parent,
+            // and new replies still follow you down.
+            maintainVisibleContentPosition={{ startRenderingFromBottom: true, autoscrollToBottomThreshold: 0.2 }}
+            onStartReached={loadOlderReplies}
             keyboardShouldPersistTaps="handled"
             ListHeaderComponent={
               <View className="pt-2">
@@ -110,10 +115,12 @@ export function ThreadScreen({ route, navigation }: ScreenProps<'Thread'>) {
                 />
                 <View className="my-3 flex-row items-center gap-3 px-4">
                   <Text className="text-sm font-bold text-muted-foreground">
-                    {replies.length === 1 ? '1 reply' : `${replies.length} replies`}
+                    {totalReplies === 1 ? '1 reply' : `${totalReplies} replies`}
                   </Text>
                   <View className="h-px flex-1 bg-border" />
-                  {thread.isLoading && <ActivityIndicator color={colors.mutedForeground} size="small" />}
+                  {(thread.isLoading || thread.isLoadingOlder) && (
+                    <ActivityIndicator color={colors.mutedForeground} size="small" />
+                  )}
                 </View>
                 {!!thread.error && <Text className="px-4 text-sm text-destructive">{thread.error}</Text>}
               </View>

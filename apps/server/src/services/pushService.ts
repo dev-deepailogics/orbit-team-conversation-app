@@ -1,3 +1,4 @@
+import { getThreadParticipantIds } from './threadParticipants.js';
 import webpush from 'web-push';
 import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getMessaging, type MulticastMessage } from 'firebase-admin/messaging';
@@ -95,6 +96,9 @@ async function sendToDevices(userIds: string[], push: MobilePush) {
 
 // Call record message (routes/huddles.ts); it rings via notifyCallStarted instead of a message push.
 export const CALL_STARTED = '📞 Started a call';
+// Entries logged in the call record's thread while the call is running (routes/huddles.ts); chat sent during the call goes there too.
+export const CALL_JOINED = '📞 Joined the call';
+export const CALL_LEFT = '📞 Left the call';
 
 export interface CallPush {
   channelId: string;
@@ -159,17 +163,22 @@ async function notifyMessage(io: any, messageId: string) {
   if (!msg || msg.isDeleted) return;
   // Call records: recipients were already rung by notifyCallStarted.
   if (msg.userId && msg.content === CALL_STARTED) return;
+  // Joins/leaves of a call, and chat typed during it, are logged in the call's thread for the record. Everyone in the
+  // call already saw them live, so they don't push.
+  if (msg.content === CALL_JOINED || msg.content === CALL_LEFT) return;
+  if (msg.parentMessageId) {
+    const parent = await prisma.message.findUnique({ where: { id: msg.parentMessageId }, select: { content: true } });
+    if (parent?.content.startsWith('📞')) {
+      const live = await prisma.huddle.findFirst({ where: { channelId: msg.channelId, isActive: true }, select: { id: true } });
+      if (live) return;
+    }
+  }
   console.log(`Push fan-out for message ${msg.id} in ${msg.channel.type} ${msg.channelId}`);
 
   // Thread replies only notify people in the thread (parent author + earlier repliers), like Slack.
   let participants: string[] | null = null;
   if (msg.parentMessageId) {
-    const thread = await prisma.message.findMany({
-      where: { OR: [{ id: msg.parentMessageId }, { parentMessageId: msg.parentMessageId }], userId: { not: null } },
-      select: { userId: true },
-      distinct: ['userId'],
-    });
-    participants = thread.map((t) => t.userId as string);
+    participants = await getThreadParticipantIds(msg.parentMessageId, msg.channelId, msg.userId);
   }
 
   const members = await prisma.channelMember.findMany({

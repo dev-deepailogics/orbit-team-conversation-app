@@ -22,7 +22,7 @@ export function setupSocketServer(
     })
     .catch(() => {});
 
-  // Socket Authentication Middleware
+  // Socket Authentication Middleware: a valid, unexpired JWT for an active account is the only way in.
   io.use(async (socket: Socket, next) => {
     const token =
       (socket.handshake.auth?.token as string) ||
@@ -31,54 +31,25 @@ export function setupSocketServer(
         "",
       ) as string);
 
-    if (token) {
-      try {
-        const decoded = fastify.jwt.verify(token) as {
-          id: string;
-          email: string;
-          username: string;
-        };
-        const user = await prisma.user.findUnique({
-          where: { id: decoded.id },
-          select: { id: true, disabled: true },
-        });
-        if (!user || user.disabled) {
-          return next(new Error("Account is deactivated"));
-        }
-        socket.data.userId = decoded.id;
-        socket.data.user = decoded;
-        return next();
-      } catch (err) {
-        // Fallback check if valid user id was sent directly (e.g. testing)
-        const fallbackUserId = socket.handshake.auth?.userId as string;
-        if (fallbackUserId) {
-          const user = await prisma.user.findUnique({
-            where: { id: fallbackUserId },
-          });
-          if (user && !user.disabled) {
-            socket.data.userId = user.id;
-            socket.data.user = user;
-            return next();
-          }
-        }
-        return next(new Error("Invalid socket authentication token"));
-      }
+    if (!token) {
+      return next(new Error('Authentication required for WebSocket connection'));
     }
 
-    // Direct fallback for userId if token is not available
-    const fallbackUserId = socket.handshake.auth?.userId as string;
-    if (fallbackUserId) {
+    try {
+      const decoded = fastify.jwt.verify(token) as { id: string; email: string; username: string };
       const user = await prisma.user.findUnique({
-        where: { id: fallbackUserId },
+        where: { id: decoded.id },
+        select: { id: true, disabled: true },
       });
-      if (user) {
-        socket.data.userId = user.id;
-        socket.data.user = user;
-        return next();
+      if (!user || user.disabled) {
+        return next(new Error('Account is deactivated'));
       }
+      socket.data.userId = decoded.id;
+      socket.data.user = decoded;
+      return next();
+    } catch {
+      return next(new Error('Invalid socket authentication token'));
     }
-
-    return next(new Error("Authentication required for WebSocket connection"));
   });
 
   io.on("connection", async (socket: Socket) => {

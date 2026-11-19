@@ -40,11 +40,11 @@ services:
     environment:
       NODE_ENV: production
       PORT: 4000
-      DATABASE_URL: postgresql://${POSTGRES_USER:-orbit_admin}:${POSTGRES_PASSWORD:-orbit_secret_password}@postgres:5432/${POSTGRES_DB:-orbit_db}?schema=public
-      REDIS_URL: redis://:${REDIS_PASSWORD:-orbit_redis_password}@redis:6379
-      JWT_SECRET: ${JWT_SECRET:-orbit_production_jwt_secret_key_change_me}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-orbit_admin}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-orbit_db}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set (openssl rand -hex 48)}
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-API_KEY_ORBIT}
-      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-orbit_livekit_secret_key_change_in_production}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET must be set}
       LIVEKIT_URL: http://livekit:7880
       NEXT_PUBLIC_LIVEKIT_URL: wss://${DOMAIN}/livekit
       CLIENT_URL: https://${DOMAIN}
@@ -71,7 +71,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-orbit_admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orbit_secret_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       POSTGRES_DB: ${POSTGRES_DB:-orbit_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -89,7 +89,7 @@ services:
     image: redis:7-alpine
     container_name: orbit-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-orbit_redis_password}
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
     volumes:
       - redis_data:/data
     healthcheck:
@@ -113,7 +113,7 @@ services:
     # Redis password and key/secret must match REDIS_PASSWORD / LIVEKIT_API_KEY / LIVEKIT_API_SECRET.
     command:
       - --config-body
-      - '{port: 7880, rtc: {tcp_port: 7881, port_range_start: 40000, port_range_end: 40050, use_external_ip: true}, redis: {address: "redis:6379", password: orbit_redis_password}, keys: {API_KEY_ORBIT: orbit_livekit_secret_key_change_in_production}, logging: {level: info}}'
+      - '{port: 7880, rtc: {tcp_port: 7881, port_range_start: 40000, port_range_end: 40050, use_external_ip: true}, redis: {address: "redis:6379", password: ${REDIS_PASSWORD}}, keys: {${LIVEKIT_API_KEY:-API_KEY_ORBIT}: ${LIVEKIT_API_SECRET}}, logging: {level: info}}'
     ports:
       - "7881:7881"
       - "40000-40050:40000-40050/udp"

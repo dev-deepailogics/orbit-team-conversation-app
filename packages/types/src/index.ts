@@ -201,6 +201,9 @@ export interface Message {
   content: string; // Markdown or rich text
   isEdited: boolean;
   isDeleted: boolean;
+  // When an admin (not the author) deleted the message: who. Absent when the author deleted it.
+  deletedById?: string | null;
+  deletedByName?: string | null;
   isPinned: boolean;
   createdAt: string;
   updatedAt: string;
@@ -315,6 +318,7 @@ export interface SlashCommandPayload {
 // 8. Projects & Kanban Boards (Trello-like)
 // ==========================================
 export type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+export type TicketType = "TASK" | "BUG" | "STORY" | "EPIC";
 
 export interface Project {
   id: string;
@@ -365,6 +369,7 @@ export interface Ticket {
   title: string;
   description: string | null;
   priority: TicketPriority;
+  type: TicketType;
   orderIndex: number;
   dueDate: string | null;
   createdById: string;
@@ -493,6 +498,8 @@ export const SOCKET_EVENTS = {
 
   // Presence & Notifications
   USER_STATUS_CHANGE: "user:status_change",
+  // Sent only to the people in a thread (not the whole channel) when someone replies in it
+  THREAD_REPLY_NOTIFY: "thread:reply_notify",
   NOTIFICATION_NEW: "notification:new",
 
   // Employee Availability & Time Tracking

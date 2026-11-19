@@ -7,7 +7,10 @@ interface ThreadState {
   parentId: string | null;
   parent: Message | null;
   replies: Message[];
+  hasMore: boolean; // earlier replies not loaded yet
+  nextCursor: string | null;
   isLoading: boolean;
+  isLoadingOlder: boolean;
   error: string;
 }
 
@@ -31,11 +34,21 @@ interface ChatState {
   setReactions: (messageId: string, reactions: Reaction[]) => void;
   setTyping: (channelId: string, userId: string, name: string | null) => void;
   openThread: (parentId: string) => Promise<void>;
+  loadOlderReplies: () => Promise<void>;
   closeThread: (parentId: string) => void;
   reset: () => void;
 }
 
-const emptyThread: ThreadState = { parentId: null, parent: null, replies: [], isLoading: false, error: '' };
+const emptyThread: ThreadState = {
+  parentId: null,
+  parent: null,
+  replies: [],
+  hasMore: false,
+  nextCursor: null,
+  isLoading: false,
+  isLoadingOlder: false,
+  error: '',
+};
 const initial = {
   channelId: null,
   messages: [],
@@ -164,11 +177,41 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const data = await getThread(parentId);
       if (get().thread.parentId !== parentId) return;
       set(s => ({
-        thread: { ...s.thread, parent: data.parent, replies: s.thread.replies.reduce(addUnique, data.replies), isLoading: false },
+        thread: {
+          ...s.thread,
+          parent: data.parent,
+          // keep replies that arrived live while this loaded
+          replies: s.thread.replies.reduce(addUnique, data.replies),
+          hasMore: data.hasMore,
+          nextCursor: data.nextCursor,
+          isLoading: false,
+        },
       }));
     } catch (err) {
       if (get().thread.parentId !== parentId) return;
       set(s => ({ thread: { ...s.thread, isLoading: false, error: getErrorMessage(err, 'Failed to load thread') } }));
+    }
+  },
+
+  loadOlderReplies: async () => {
+    const { parentId, hasMore, nextCursor, isLoadingOlder, isLoading } = get().thread;
+    if (!parentId || !hasMore || isLoadingOlder || isLoading) return;
+    set(s => ({ thread: { ...s.thread, isLoadingOlder: true } }));
+    try {
+      const page = await getThread(parentId, nextCursor);
+      if (get().thread.parentId !== parentId) return;
+      set(s => ({
+        thread: {
+          ...s.thread,
+          replies: s.thread.replies.reduce(addUnique, page.replies), // earlier page first, then what's already loaded
+          hasMore: page.hasMore,
+          nextCursor: page.nextCursor,
+          isLoadingOlder: false,
+        },
+      }));
+    } catch {
+      // Silent, like channel history: scrolling up again retries, and the replies on screen are unaffected.
+      if (get().thread.parentId === parentId) set(s => ({ thread: { ...s.thread, isLoadingOlder: false } }));
     }
   },
 

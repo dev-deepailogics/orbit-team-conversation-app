@@ -25,6 +25,7 @@ import {
   Loader2,
 } from '@/components/ui/icons';
 import { WorkspaceMember, ProjectColumn } from '@orbit/types';
+import { TicketTypeIcon } from './TicketTypeIcon';
 import { api } from '../../lib/api';
 import {
   Avatar,
@@ -301,6 +302,9 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
               ) : (
                 <Muted>Unassigned</Muted>
               )}
+            </Field>
+            <Field Icon={AlertTriangle} label="Type">
+              <TicketTypeIcon type={ticket.type} showLabel />
             </Field>
             <Field Icon={AlertTriangle} label="Priority">
               <PriorityPill priority={(ticket.priority || 'MEDIUM').toUpperCase()} size="lg" />

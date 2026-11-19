@@ -2,6 +2,9 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 
+import { TicketTypeIcon } from "./TicketTypeIcon";
+import { TICKET_TYPES } from "../../lib/ticketTypes";
+
 const TICKET_PAGE = 20;
 import {
   Project,
@@ -124,6 +127,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState("");
   const [filterPriority, setFilterPriority] = useState<string>("ALL");
+  const [filterType, setFilterType] = useState<string>("ALL");
   const [filterAssignee, setFilterAssignee] = useState<string>("ALL");
   const [filterLabel, setFilterLabel] = useState<string>("ALL");
   const [showSearch, setShowSearch] = useState(false);
@@ -143,6 +147,8 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
   );
   const [loadingCols, setLoadingCols] = useState<Record<string, boolean>>({});
   const loadingRef = useRef<Set<string>>(new Set());
+  // Which project the board has finished its first fetch for (success or failure), to drive the loading skeleton
+  const [loadedProjectId, setLoadedProjectId] = useState<string | null>(null);
 
   // Modals & Popovers
   const [showTicketModal, setShowTicketModal] = useState(false);
@@ -324,6 +330,8 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
         }
       } catch (err) {
         console.error("Failed to load project details", err);
+      } finally {
+        if (isMounted) setLoadedProjectId(initialProject.id);
       }
     };
 
@@ -331,6 +339,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
 
     setFilterAssignee("ALL");
     setFilterPriority("ALL");
+    setFilterType("ALL");
     setFilterLabel("ALL");
     setSearchQuery("");
     return () => {
@@ -672,6 +681,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
   };
 
   const filterTicket = (t: Ticket): boolean =>
+    (filterType === "ALL" || (t.type || "TASK") === filterType) &&
     matchesFilters(
       t,
       { query: searchQuery, assignee: filterAssignee, priority: filterPriority, label: filterLabel },
@@ -680,16 +690,20 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
     );
 
   const columns = project.columns || [];
+  // The project list carries no columns, so until the details arrive (and unless a cached copy exists) show a skeleton
+  const isBoardLoading =
+    loadedProjectId !== initialProject.id && project.columns === undefined;
   const totalTickets =
     project._count?.tickets ??
     columns.reduce((acc, c) => acc + (c.tickets?.length || 0), 0);
 
   const kinds = columnKinds(columns);
   const filtersActive =
-    !!searchQuery.trim() || filterPriority !== "ALL" || filterAssignee !== "ALL" || filterLabel !== "ALL";
+    !!searchQuery.trim() || filterPriority !== "ALL" || filterType !== "ALL" || filterAssignee !== "ALL" || filterLabel !== "ALL";
   const clearFilters = () => {
     setSearchQuery("");
     setFilterPriority("ALL");
+    setFilterType("ALL");
     setFilterAssignee("ALL");
     setFilterLabel("ALL");
     setShowSearch(false);
@@ -1025,6 +1039,15 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                   ]}
                 />
                 <FilterMenu
+                  label="Type"
+                  value={filterType}
+                  onChange={setFilterType}
+                  options={[
+                    { value: "ALL", label: "Any type" },
+                    ...TICKET_TYPES.map((t) => ({ value: t.value, label: t.label })),
+                  ]}
+                />
+                <FilterMenu
                   label="Label"
                   value={filterLabel}
                   onChange={setFilterLabel}
@@ -1254,6 +1277,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                         >
                           <div className="flex items-center justify-between gap-2">
                             <span className="flex items-center gap-1.5 min-w-0">
+                              <TicketTypeIcon type={ticket.type} size={13} />
                               <span className="text-xs font-medium truncate" style={{ color: "var(--theme-text-muted)" }}>
                                 {ticketKey(ticket)}
                               </span>
