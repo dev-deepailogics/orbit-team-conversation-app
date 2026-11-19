@@ -40,8 +40,10 @@ import { CanvasView } from "@/components/whiteboard/CanvasView";
 import { ProjectDocsView } from "@/components/project/ProjectDocsView";
 import { ShareDocumentModal } from "@/components/project/ShareDocumentModal";
 import { useTeamPresence } from "@/components/availability/useTeamPresence";
+import { Splash, WorkspaceSkeleton } from "@/components/brand/LoadingScreens";
+import { EmptyState } from "@/components/brand/EmptyState";
+import { OfflineOverlay } from "@/components/brand/OfflineScreen";
 import {
-  Layers,
   ShieldCheck,
   Building2,
   LogOut,
@@ -49,7 +51,7 @@ import {
   Copy,
   Check,
   Plus,
-} from "lucide-react";
+} from "@/components/ui/icons";
 
 export default function AppDashboard() {
   const router = useRouter();
@@ -112,6 +114,8 @@ export default function AppDashboard() {
   const [showDocsHub, setShowDocsHub] = useState(false);
   const [showProjectsPanel, setShowProjectsPanel] = useState(false);
   const [canvases, setCanvases] = useState<any[]>([]);
+  const [newCanvasSignal, setNewCanvasSignal] = useState(0);
+  const [newDocSignal, setNewDocSignal] = useState(0);
   const [selectedCanvasId, setSelectedCanvasId] = useState<string | null>(null);
   const [shareDocTarget, setShareDocTarget] = useState<any | null>(null);
   const [docsInitialId, setDocsInitialId] = useState<string | null>(null);
@@ -261,6 +265,7 @@ export default function AppDashboard() {
       let targetDocs: { docId: string | null } | null = null;
       if (typeof window !== "undefined") {
         const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get("search") === "1") setShowSearchModal(true);
         const urlView = urlParams.get("view");
         const urlChId = urlParams.get("channelId");
         const urlProjId = urlParams.get("projectId");
@@ -376,19 +381,14 @@ export default function AppDashboard() {
   };
 
   // 4d. Canvas creation and deletion handlers
-  const handleCreateCanvas = async () => {
+  // Opens the canvas hub with its "New canvas" dialog (name, link, template)
+  const handleCreateCanvas = () => {
     if (!currentWorkspace) return;
-    try {
-      const res = await api.post("/api/canvases", {
-        workspaceId: currentWorkspace.id,
-        title: "Untitled canvas",
-      });
-      setCanvases((prev) => [res.data, ...prev]);
-      setSelectedCanvasId(res.data.id);
-      setShowCanvasHub(true);
-    } catch (err: any) {
-      alert(err.response?.data?.error || "Failed to create canvas");
-    }
+    setShowDocsHub(false);
+    setShowOrgControl(false);
+    setSelectedCanvasId(null);
+    setShowCanvasHub(true);
+    setNewCanvasSignal((n) => n + 1);
   };
 
   const handleDeleteCanvas = async (canvasId: string) => {
@@ -406,22 +406,11 @@ export default function AppDashboard() {
   };
 
   // 4e. Document creation and deletion handlers
-  const handleCreateNewDoc = async () => {
+  // Opens Docs with its "New document" dialog (title, visibility, project)
+  const handleCreateNewDoc = () => {
     if (!currentWorkspace || !user) return;
-    try {
-      const res = await api.post("/api/documents", {
-        workspaceId: currentWorkspace.id,
-        title: "Untitled Document",
-        content: "",
-        icon: "📄",
-        isPublicInProject: true,
-      });
-      useProjectStore.getState().addDocument(res.data);
-      useProjectStore.getState().setCurrentDocument(res.data);
-      handleOpenDocs(res.data.id);
-    } catch (err: any) {
-      alert(err.response?.data?.error || "Failed to create document");
-    }
+    handleOpenDocs(null);
+    setNewDocSignal((n) => n + 1);
   };
 
   const handleDeleteDoc = async (docId: string) => {
@@ -883,33 +872,19 @@ export default function AppDashboard() {
     }
   };
 
-  if (isLoading || isDataLoading) {
-    return (
-      <div
-        className="h-screen w-screen flex flex-col items-center justify-center gap-3"
-        style={{ backgroundColor: "var(--theme-bg-app)" }}
-      >
-        <div
-          className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-xl animate-pulse"
-          style={{ backgroundColor: "var(--theme-primary)" }}
-        >
-          <Layers size={28} />
-        </div>
-        <span
-          className="text-sm font-semibold"
-          style={{ color: "var(--theme-text-muted)" }}
-        >
-          Loading Orbit...
-        </span>
-      </div>
-    );
-  }
+  if (isLoading) return <Splash />;
+  if (isDataLoading) return <WorkspaceSkeleton />;
 
   // Workspace rail feature shortcuts (Home / Canvas / Docs / Projects)
   const docsActive = showDocsHub && !!currentWorkspace;
   const canvasActive = showCanvasHub && !!currentWorkspace;
   const railProps = {
     presence,
+    members,
+    onOpenBotPortal: () => {
+      setIsMobileSidebarOpen(false);
+      setShowBotPortal(true);
+    },
     onLogout: logout,
     activeFeature: canvasActive
       ? ("canvas" as const)
@@ -972,6 +947,8 @@ export default function AppDashboard() {
       className="flex h-screen w-screen overflow-hidden relative"
       style={{ backgroundColor: "var(--theme-bg-app)" }}
     >
+      <OfflineOverlay />
+
       {/* Mobile Navigation Drawer (Backdrop + Slide-over Sidebars) */}
       {isMobileSidebarOpen && (
         <div className="fixed inset-0 z-50 flex md:hidden animate-in fade-in duration-200">
@@ -1312,11 +1289,20 @@ export default function AppDashboard() {
           initialDocId={docsInitialId}
           onDocChange={setDocsUrl}
           onOpenDocsSidebar={() => setIsMobileSidebarOpen(true)}
+          onOpenSearch={() => setShowSearchModal(true)}
+          newDocSignal={newDocSignal}
         />
       ) : showCanvasHub && currentWorkspace ? (
         <CanvasView
           workspaceId={currentWorkspace.id}
           currentUser={user}
+          members={members}
+          selectedCanvasId={selectedCanvasId}
+          onSelectCanvas={setSelectedCanvasId}
+          onOpenSearch={() => setShowSearchModal(true)}
+          newCanvasSignal={newCanvasSignal}
+          onCanvasCreated={(c) => setCanvases((prev) => [c, ...prev.filter((x) => x.id !== c.id)])}
+          onCanvasDeleted={(id) => setCanvases((prev) => prev.filter((x) => x.id !== id))}
           onClose={() => setShowCanvasHub(false)}
           onOpenCanvasSidebar={() => setIsMobileSidebarOpen(true)}
         />
@@ -1376,20 +1362,12 @@ export default function AppDashboard() {
           onChangeView={setChatView}
         />
       ) : (
-        <div className="flex-1 flex flex-col items-center justify-center text-[var(--theme-text-muted)] p-4 text-center">
-          <p className="text-base font-semibold text-[var(--theme-text)]">
-            No channel or project selected
-          </p>
-          <p className="text-xs text-[var(--theme-text-muted)] mt-1">
-            Select a channel, direct message, or project board to begin
-          </p>
-          <button
-            onClick={() => setIsMobileSidebarOpen(true)}
-            className="mt-4 md:hidden px-4 py-2 bg-slack-green hover:bg-[#008a65] text-white text-xs font-semibold rounded-lg shadow transition"
-          >
-            Browse Channels & Projects
-          </button>
-        </div>
+        <EmptyState
+          title="Nothing open yet"
+          body="Pick a channel, direct message, or project board to begin."
+          actionLabel="Browse channels"
+          onAction={() => setIsMobileSidebarOpen(true)}
+        />
       )}
 
       {/* Workspace Creation Modal for Admins */}
@@ -1550,6 +1528,28 @@ export default function AppDashboard() {
         channels={channels}
         members={members}
         onSelectMessage={handleSelectSearchedMessage}
+        onSelectChannel={(ch) => {
+          setShowSearchModal(false);
+          handleSelectChannel(ch);
+        }}
+        onSelectUser={(u) => {
+          setShowSearchModal(false);
+          handleSelectUserDM(u);
+        }}
+        onSelectProject={(p) => {
+          setShowSearchModal(false);
+          handleSelectProject(p);
+        }}
+        onSelectDocument={(doc) => {
+          setShowSearchModal(false);
+          setCurrentDocument(doc);
+          handleOpenDocs(doc.id);
+        }}
+        onSelectCanvas={(canvasId) => {
+          setShowSearchModal(false);
+          setSelectedCanvasId(canvasId);
+          setShowCanvasHub(true);
+        }}
       />
 
       {/* 10. Create Project Board Dialog */}

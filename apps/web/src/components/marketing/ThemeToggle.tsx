@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon } from '@/components/ui/icons';
 
 export function ThemeToggle({ className = '' }: { className?: string }) {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');

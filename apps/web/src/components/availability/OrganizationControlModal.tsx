@@ -21,7 +21,7 @@ import {
   ArrowRight,
   Shield,
   Activity,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { useTimeFormat, formatMessageTime } from '../../lib/timeFormat';
 
 const BREAK_REASONS = [

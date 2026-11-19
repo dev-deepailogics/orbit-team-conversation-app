@@ -9,7 +9,7 @@ import {
   FolderKanban,
   Clock,
   Sparkles,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 
 const SLIDES = [
   {

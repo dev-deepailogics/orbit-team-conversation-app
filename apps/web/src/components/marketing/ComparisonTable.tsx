@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Check, X, Sparkles, Shield, Zap } from 'lucide-react';
+import { Check, X, Sparkles, Shield, Zap } from '@/components/ui/icons';
 
 const COMPARISON_DATA = [
   {

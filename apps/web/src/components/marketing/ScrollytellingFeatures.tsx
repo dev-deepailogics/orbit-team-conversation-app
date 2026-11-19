@@ -16,7 +16,7 @@ import {
   Sparkles,
   Shield,
   Volume2,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 
 const STEPS = [
   {

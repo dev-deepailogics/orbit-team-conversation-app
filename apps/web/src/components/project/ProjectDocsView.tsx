@@ -1,40 +1,43 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useResizableSidebar } from '../layout/useResizableSidebar';
-import {
-  ProjectDocument,
-  UserProfile,
-  WorkspaceMember,
-  SOCKET_EVENTS,
-} from '@orbit/types';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { ProjectDocument, UserProfile, WorkspaceMember, SOCKET_EVENTS } from '@orbit/types';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
 import { useProjectStore } from '../../stores/projectStore';
 import { NotionEditor } from './NotionEditor';
 import { ShareDocumentModal } from './ShareDocumentModal';
+import { NewDocumentModal } from './NewDocumentModal';
+import { Avatar, relativeTime } from './projectViewUtils';
+import {
+  AvatarStack,
+  BackPill,
+  MenuItem,
+  MoreButton,
+  OutlinePill,
+  PageHeader,
+  Popover,
+  SaveMeta,
+  SearchField,
+  SearchOrbitButton,
+  SolidPill,
+  TabsRow,
+  Visibility,
+  VisibilityPill,
+} from './docsCanvasUi';
 import {
   Plus,
-  Search,
   FileText,
   Globe,
-  Lock,
   Share2,
+  Pencil,
   Trash2,
-  MoreVertical,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Sparkles,
-  Image as ImageIcon,
-  Smile,
-  Users,
-  Copy,
-  Clock,
-  ExternalLink,
-  X,
+  Filter,
+  SortDown,
   Link2,
-} from 'lucide-react';
+  Board,
+  Image as ImageIcon,
+} from '@/components/ui/icons';
 
 // Docs are workspace-level; a doc can optionally be linked to a project.
 interface ProjectDocsViewProps {
@@ -44,6 +47,9 @@ interface ProjectDocsViewProps {
   initialDocId?: string | null; // from the URL (?view=docs&docId=...)
   onDocChange?: (docId: string | null) => void;
   onOpenDocsSidebar?: () => void;
+  onOpenSearch?: () => void;
+  // Bump to open the New document dialog from outside (e.g. the sidebar's "+")
+  newDocSignal?: number;
 }
 
 const COVER_PRESETS = [
@@ -59,6 +65,22 @@ const COVER_PRESETS = [
 
 const EMOJI_PRESETS = ['📄', '📝', '💡', '🚀', '📚', '🎯', '⚡', '🎨', '🔬', '📌', '🛠️', '✨'];
 
+type DocTab = 'mine' | 'public' | 'shared';
+type SortKey = 'edited' | 'title' | 'created';
+
+const SORT_LABEL: Record<SortKey, string> = { edited: 'Last edited', title: 'Title', created: 'Date created' };
+
+export const visibilityOf = (doc: ProjectDocument): Visibility =>
+  doc.isPublicInProject ? 'public' : doc.shares && doc.shares.length > 0 ? 'shared' : 'draft';
+
+const VisibilityIcon: React.FC<{ v: Visibility }> = ({ v }) =>
+  v === 'public' ? <Globe size={12} /> : v === 'shared' ? <Share2 size={12} /> : <Pencil size={12} />;
+
+const editedLabel = (iso: string) => {
+  const rel = relativeTime(iso);
+  return rel === 'Just now' ? 'Edited just now' : `Edited ${rel === 'Yesterday' ? 'yesterday' : rel}`;
+};
+
 export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
   workspaceId,
   currentUser,
@@ -66,6 +88,8 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
   initialDocId,
   onDocChange,
   onOpenDocsSidebar,
+  onOpenSearch,
+  newDocSignal,
 }) => {
   const projects = useProjectStore((s) => s.projects);
   const {
@@ -79,10 +103,12 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
   } = useProjectStore();
 
   const [isLoadingDocs, setIsLoadingDocs] = useState(true);
+
+  // List page state
+  const [tab, setTab] = useState<DocTab>('mine');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<'all' | 'project' | 'shared' | 'private'>('all');
-  const sidebar = useResizableSidebar('orbit_docs_sidebar_width');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [visibilityFilter, setVisibilityFilter] = useState<Visibility | 'all'>('all');
+  const [sortKey, setSortKey] = useState<SortKey>('edited');
 
   // Active doc editing state
   const [docTitle, setDocTitle] = useState('');
@@ -90,21 +116,22 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
   const [docIcon, setDocIcon] = useState('📄');
   const [docCover, setDocCover] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
-  // Modals & Popovers
+  // Modals
   const [showShareModal, setShowShareModal] = useState(false);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showCoverPicker, setShowCoverPicker] = useState(false);
-  const [menuDocId, setMenuDocId] = useState<string | null>(null);
+  const [showNewDoc, setShowNewDoc] = useState(false);
+  const [shareTarget, setShareTarget] = useState<ProjectDocument | null>(null);
 
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 1. Fetch the workspace's documents
+  useEffect(() => {
+    if (newDocSignal) setShowNewDoc(true);
+  }, [newDocSignal]);
+
+  // 1. Fetch the workspace's documents. Without a doc in the URL the list page is shown.
   useEffect(() => {
     let isMounted = true;
 
-    // Immediately clear stale document from previous workspace
     if (currentDocument && currentDocument.workspaceId !== workspaceId) {
       setCurrentDocument(null);
     }
@@ -116,12 +143,9 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
         if (isMounted) {
           const docs: ProjectDocument[] = res.data;
           setDocuments(docs);
-          if (docs.length > 0) {
-            const wantedId = initialDocId || currentDocument?.id;
-            setCurrentDocument(docs.find((d) => d.id === wantedId) || docs[0]);
-          } else {
-            setCurrentDocument(null);
-          }
+          const wantedId =
+            initialDocId || (currentDocument?.workspaceId === workspaceId ? currentDocument.id : null);
+          setCurrentDocument((wantedId && docs.find((d) => d.id === wantedId)) || null);
         }
       } catch (err) {
         console.error('Failed to load documents', err);
@@ -186,7 +210,6 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
       setDocContent(currentDocument.content || '');
       setDocIcon(currentDocument.icon || '📄');
       setDocCover(currentDocument.coverImage || null);
-      setLastSavedAt(new Date(currentDocument.updatedAt));
     } else {
       setDocTitle('');
       setDocContent('');
@@ -209,7 +232,6 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
         try {
           const res = await api.patch(`/api/documents/${currentDocument.id}`, updates);
           updateDocument(res.data);
-          setLastSavedAt(new Date());
         } catch (err) {
           console.error('Failed to auto-save document', err);
         } finally {
@@ -220,389 +242,522 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
     [currentDocument, workspaceId, updateDocument]
   );
 
-  // Content change handler
   const handleContentChange = (newContent: string) => {
     setDocContent(newContent);
     triggerAutoSave({ content: newContent });
   };
 
-  // Title change handler
   const handleTitleChange = (newTitle: string) => {
     setDocTitle(newTitle);
-    triggerAutoSave({ title: newTitle });
+    if (newTitle.trim()) triggerAutoSave({ title: newTitle });
   };
 
-  // Icon change handler
   const handleIconSelect = (emoji: string) => {
     setDocIcon(emoji);
-    setShowEmojiPicker(false);
     triggerAutoSave({ icon: emoji });
   };
 
-  // Cover change handler
   const handleCoverSelect = (cover: string | null) => {
     setDocCover(cover);
-    setShowCoverPicker(false);
     triggerAutoSave({ coverImage: cover });
   };
 
-  // Create New Document
-  const handleCreateNewDoc = async () => {
-    try {
-      const res = await api.post('/api/documents', {
-        workspaceId,
-        title: 'Untitled Document',
-        content: '',
-        icon: '📄',
-        isPublicInProject: false, // Default private to creator until shared
-      });
-      addDocument(res.data);
-      setCurrentDocument(res.data);
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to create document');
-    }
-  };
-
-  // Delete Document
   const handleDeleteDoc = async (docId: string) => {
     if (!confirm('Are you sure you want to delete this document?')) return;
     try {
       await api.delete(`/api/documents/${docId}`);
       removeDocument(docId);
-      if (currentDocument?.id === docId) {
-        const remaining = documents.filter((d) => d.id !== docId);
-        setCurrentDocument(remaining[0] || null);
-      }
+      if (currentDocument?.id === docId) setCurrentDocument(null);
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to delete document');
     }
   };
 
-  const handleProjectLink = async (projectId: string) => {
+  const handleProjectLink = async (projectId: string | null) => {
     if (!currentDocument) return;
     try {
-      const res = await api.patch(`/api/documents/${currentDocument.id}`, { projectId: projectId || null });
+      const res = await api.patch(`/api/documents/${currentDocument.id}`, { projectId });
       updateDocument(res.data);
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to link document');
     }
   };
 
-  const projectLabel = (doc: ProjectDocument) => {
-    const p = doc.projectId && projects.find((pr) => pr.id === doc.projectId);
-    return p ? `${p.icon || '📋'} ${p.name}` : 'Not linked';
+  const linkedProject = (doc: ProjectDocument) =>
+    doc.projectId ? projects.find((p) => p.id === doc.projectId) || null : null;
+
+  const isMine = (doc: ProjectDocument) => doc.createdById === currentUser?.id;
+  const sharedWithMe = (doc: ProjectDocument) =>
+    !isMine(doc) && !!doc.shares?.some((s) => s.userId === currentUser?.id);
+
+  const tabDocs: Record<DocTab, ProjectDocument[]> = useMemo(
+    () => ({
+      mine: documents.filter(isMine),
+      public: documents.filter((d) => d.isPublicInProject),
+      shared: documents.filter(sharedWithMe),
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [documents, currentUser?.id]
+  );
+
+  const listDocs = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const list = tabDocs[tab].filter(
+      (d) =>
+        (visibilityFilter === 'all' || visibilityOf(d) === visibilityFilter) &&
+        (!q || d.title.toLowerCase().includes(q) || d.content.toLowerCase().includes(q))
+    );
+    return [...list].sort((a, b) =>
+      sortKey === 'title'
+        ? a.title.localeCompare(b.title)
+        : sortKey === 'created'
+          ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          : new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    );
+  }, [tabDocs, tab, searchQuery, visibilityFilter, sortKey]);
+
+  const ownerName = (doc: ProjectDocument) => {
+    const name = doc.creator?.displayName || doc.creator?.username || 'Team member';
+    return isMine(doc) ? `You (${name})` : name;
   };
 
-  // Filtered documents list
-  const filteredDocs = documents.filter((doc) => {
-    const matchesSearch =
-      doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.content.toLowerCase().includes(searchQuery.toLowerCase());
+  // ---------------- Editor ----------------
+  if (currentDocument) {
+    const visibility = visibilityOf(currentDocument);
+    const project = linkedProject(currentDocument);
+    const collaborators = [
+      ...(currentDocument.creator
+        ? [{ id: currentDocument.creator.id, name: currentDocument.creator.displayName, avatarUrl: currentDocument.creator.avatarUrl }]
+        : []),
+      ...(currentDocument.shares || [])
+        .filter((s) => s.user)
+        .map((s) => ({ id: s.userId, name: s.user!.displayName, avatarUrl: s.user!.avatarUrl })),
+    ];
 
-    if (!matchesSearch) return false;
-
-    if (activeFilter === 'project') return doc.isPublicInProject;
-    if (activeFilter === 'shared') return !doc.isPublicInProject && doc.createdById !== currentUser?.id;
-    if (activeFilter === 'private') return !doc.isPublicInProject && doc.createdById === currentUser?.id;
-
-    return true;
-  });
-
-  return (
-    <div
-      className="flex-1 flex h-full overflow-hidden select-none"
-      style={{
-        backgroundColor: 'var(--theme-bg-app)',
-        color: 'var(--theme-text-primary)',
-      }}
-    >
-      {/* 2. Main Document Canvas & Notion Editor    */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-        {/* Sidebar Toggle Button */}
-        <button
-          onClick={onOpenDocsSidebar || (() => setIsSidebarOpen((prev) => !prev))}
-          title="Documents"
-          className="absolute left-2.5 top-2.5 z-20 px-2 py-1.5 rounded-xl border shadow-sm opacity-80 hover:opacity-100 transition flex items-center gap-1 text-xs backdrop-blur-md"
-          style={{
-            backgroundColor: 'var(--theme-bg-surface)',
-            borderColor: 'var(--theme-border)',
-            color: 'var(--theme-text-primary)',
-          }}
+    return (
+      <div className="flex-1 flex flex-col h-full overflow-hidden" style={{ backgroundColor: 'var(--theme-bg-surface)' }}>
+        <div
+          className="h-16 shrink-0 border-b px-3 sm:px-5 flex items-center gap-3"
+          style={{ backgroundColor: 'var(--theme-bg-app)', borderColor: 'var(--theme-border)' }}
         >
-          <FileText size={14} />
-          <span className="text-[11px] font-semibold hidden sm:inline">Documents</span>
-        </button>
-
-        {currentDocument ? (
-          <div className="flex-1 flex flex-col h-full overflow-y-auto">
-            {/* Notion Cover Image Banner */}
-            <div className="relative group">
-              {docCover ? (
-                <div
-                  className="w-full h-36 md:h-44 transition-all"
-                  style={{
-                    background: docCover,
-                  }}
-                />
-              ) : (
-                <div
-                  className="w-full h-12 transition-all opacity-0 group-hover:opacity-100 flex items-center justify-end px-6"
-                  style={{ backgroundColor: 'var(--theme-bg-surface)' }}
-                />
-              )}
-
-              {/* Cover Controls (Appear on hover) */}
-              <div className="absolute right-4 bottom-3 opacity-0 group-hover:opacity-100 transition flex items-center gap-1.5 z-10">
-                <button
-                  onClick={() => setShowCoverPicker(true)}
-                  className="px-2.5 py-1 rounded-lg text-xs font-semibold backdrop-blur-md bg-black/50 text-white hover:bg-black/70 transition flex items-center gap-1"
-                >
-                  <ImageIcon size={12} />
-                  <span>{docCover ? 'Change Cover' : 'Add Cover'}</span>
-                </button>
-                {docCover && (
-                  <button
-                    onClick={() => handleCoverSelect(null)}
-                    className="px-2.5 py-1 rounded-lg text-xs font-semibold backdrop-blur-md bg-black/50 text-white hover:bg-black/70 transition"
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-
-              {/* Cover Picker Dropdown */}
-              {showCoverPicker && (
+          <BackPill label="Docs" onClick={() => setCurrentDocument(null)} />
+          <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <p className="text-[17px] font-bold leading-[22px] truncate" style={{ color: 'var(--theme-text)' }}>
+                {docTitle || 'Untitled Document'}
+              </p>
+              <span className="hidden sm:inline-flex">
+                <VisibilityPill visibility={visibility} icon={<VisibilityIcon v={visibility} />} />
+              </span>
+            </div>
+            <SaveMeta saving={isSaving} savedLabel={`Saved ${relativeTime(currentDocument.updatedAt).toLowerCase()}`}>
+              {project && (
                 <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setShowCoverPicker(false)}
-                  />
-                  <div
-                    className="absolute right-4 top-full mt-2 z-50 w-72 rounded-xl border p-3 shadow-2xl backdrop-blur-md"
-                    style={{
-                      backgroundColor: 'var(--theme-bg-surface)',
-                      borderColor: 'var(--theme-border)',
-                    }}
-                  >
-                    <div
-                      className="text-[10px] font-bold uppercase tracking-wider mb-2 opacity-60"
-                      style={{ color: 'var(--theme-text-muted)' }}
-                    >
-                      Choose Cover Gradient
-                    </div>
-                    <div className="grid grid-cols-4 gap-2">
-                      {COVER_PRESETS.map((preset, idx) => (
-                        <div
-                          key={idx}
-                          onClick={() => handleCoverSelect(preset)}
-                          className="h-10 rounded-lg cursor-pointer hover:scale-105 transition shadow-sm"
-                          style={{ background: preset }}
-                        />
-                      ))}
-                    </div>
-                  </div>
+                  <span>·</span>
+                  <span className="font-medium truncate" style={{ color: 'var(--theme-primary-hover)' }}>
+                    Linked to {project.name} board
+                  </span>
                 </>
               )}
-            </div>
-
-            {/* Notion Document Header */}
-            <div className="px-6 md:px-12 pt-4 pb-2 max-w-4xl w-full mx-auto space-y-4">
-              {/* Document Meta & Actions Bar */}
-              <div className="flex items-center justify-between gap-4">
-                {/* Save status & author */}
-                <div className="flex items-center gap-2 text-xs opacity-60">
-                  <div className="flex items-center gap-1">
-                    {isSaving ? (
-                      <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
-                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                        Saving...
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                        <Check size={13} /> Saved
-                      </span>
-                    )}
-                  </div>
-                  <span>•</span>
-                  <span>
-                    Created by {currentDocument.creator?.displayName || 'Team Member'}
-                  </span>
-                </div>
-
-                {/* Right Action buttons: Project link, Share & Options */}
-                <div className="flex items-center gap-2">
-                  <label
-                    className="flex items-center gap-1 text-[11px] shrink-0"
-                    style={{ color: 'var(--theme-text-muted)' }}
-                    title="Link to a project"
+            </SaveMeta>
+          </div>
+          <AvatarStack people={collaborators} />
+          <span className="hidden md:block">
+            <Popover
+              width={240}
+              trigger={(_, toggle) => (
+                <OutlinePill onClick={toggle} icon={<Link2 size={14} />} title="Link to a project board">
+                  {project ? project.name : 'Link to project'}
+                </OutlinePill>
+              )}
+            >
+              {(close) => (
+                <>
+                  <MenuItem
+                    selected={!project}
+                    onClick={() => {
+                      close();
+                      handleProjectLink(null);
+                    }}
                   >
-                    <Link2 size={13} />
-                    <select
-                      value={currentDocument.projectId || ''}
-                      onChange={(e) => handleProjectLink(e.target.value)}
-                      aria-label="Link document to project"
-                      className="border rounded-md px-1 py-0.5 text-[11px] max-w-[120px] sm:max-w-[180px] focus:outline-none"
-                      style={{
-                        backgroundColor: 'var(--theme-bg-surface)',
-                        borderColor: 'var(--theme-border)',
-                        color: 'var(--theme-text-primary)',
+                    Not linked
+                  </MenuItem>
+                  {projects.map((p) => (
+                    <MenuItem
+                      key={p.id}
+                      icon={<Board size={14} />}
+                      selected={p.id === project?.id}
+                      onClick={() => {
+                        close();
+                        handleProjectLink(p.id);
                       }}
                     >
-                      <option value="">Not linked</option>
-                      {projects.map((p) => (
-                        <option key={p.id} value={p.id}>{`${p.icon || '📋'} ${p.name}`}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <button
-                    onClick={() => setShowShareModal(true)}
-                    className="px-3 py-1.5 rounded-xl text-xs font-semibold border transition flex items-center gap-1.5 shadow-sm active:scale-95"
-                    style={{
-                      borderColor: 'var(--theme-border)',
-                      backgroundColor: 'var(--theme-bg-surface)',
-                      color: 'var(--theme-text-primary)',
+                      {p.name}
+                    </MenuItem>
+                  ))}
+                </>
+              )}
+            </Popover>
+          </span>
+          <SolidPill onClick={() => setShowShareModal(true)} icon={<Share2 size={14} />}>
+            Share
+          </SolidPill>
+          <Popover
+            width={244}
+            trigger={(_, toggle) => <MoreButton size={36} onClick={toggle} />}
+          >
+            {(close) => (
+              <>
+                <p className="px-2.5 pt-1 pb-1.5 text-[11px] font-semibold" style={{ color: 'var(--theme-text-muted)' }}>
+                  Icon
+                </p>
+                <div className="px-1.5 pb-1.5 grid grid-cols-6 gap-0.5">
+                  {EMOJI_PRESETS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => {
+                        handleIconSelect(emoji);
+                        close();
+                      }}
+                      className="h-8 rounded-lg text-lg transition hover:bg-[var(--theme-fill-hover)]"
+                      style={emoji === docIcon ? { backgroundColor: 'var(--theme-selected)' } : undefined}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+                <p className="px-2.5 pt-1 pb-1.5 text-[11px] font-semibold" style={{ color: 'var(--theme-text-muted)' }}>
+                  Cover
+                </p>
+                <div className="px-1.5 pb-1.5 grid grid-cols-4 gap-1.5">
+                  {COVER_PRESETS.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => {
+                        handleCoverSelect(preset);
+                        close();
+                      }}
+                      className="h-7 rounded-md transition hover:scale-105"
+                      style={{ background: preset, outline: preset === docCover ? '2px solid var(--theme-primary)' : undefined }}
+                    />
+                  ))}
+                </div>
+                {docCover && (
+                  <MenuItem
+                    icon={<ImageIcon size={14} />}
+                    onClick={() => {
+                      handleCoverSelect(null);
+                      close();
                     }}
                   >
-                    {currentDocument.isPublicInProject ? (
-                      <Globe size={13} className="text-emerald-600 dark:text-emerald-400" />
-                    ) : (
-                      <Lock size={13} className="text-amber-600 dark:text-amber-400" />
-                    )}
-                    <span>Share</span>
-                    {currentDocument.shares && currentDocument.shares.length > 0 && (
-                      <span
-                        className="text-[10px] px-1.5 py-0.2 rounded-full font-bold"
-                        style={{
-                          backgroundColor: 'var(--theme-bg-surface-hover)',
-                          color: 'var(--theme-primary)',
-                        }}
-                      >
-                        +{currentDocument.shares.length}
-                      </span>
-                    )}
-                  </button>
-
-                  <button
-                    onClick={() => handleDeleteDoc(currentDocument.id)}
-                    title="Delete document"
-                    className="p-1.5 rounded-xl border opacity-60 hover:opacity-100 hover:text-red-400 hover:border-red-500/30 transition"
-                    style={{
-                      borderColor: 'var(--theme-border)',
-                      backgroundColor: 'var(--theme-bg-surface)',
-                    }}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Document Icon & Title (Notion Style) */}
-              <div className="relative">
-                {/* Clickable Notion Emoji Icon */}
-                <div className="relative inline-block">
-                  <button
-                    onClick={() => setShowEmojiPicker((prev) => !prev)}
-                    title="Change document icon"
-                    className="text-4xl hover:scale-110 active:scale-95 transition transform -ml-1 p-1 rounded-xl hover:bg-black/5 dark:hover:bg-white/5"
-                  >
-                    {docIcon}
-                  </button>
-
-                  {/* Quick Emoji Picker Popover */}
-                  {showEmojiPicker && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-40"
-                        onClick={() => setShowEmojiPicker(false)}
-                      />
-                      <div
-                        className="absolute left-0 top-full mt-2 z-50 rounded-xl border p-2 shadow-2xl backdrop-blur-md flex items-center gap-1"
-                        style={{
-                          backgroundColor: 'var(--theme-bg-surface)',
-                          borderColor: 'var(--theme-border)',
-                        }}
-                      >
-                        {EMOJI_PRESETS.map((emoji) => (
-                          <button
-                            key={emoji}
-                            onClick={() => handleIconSelect(emoji)}
-                            className="text-lg p-1.5 rounded-lg hover:scale-125 transition"
-                          >
-                            {emoji}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Notion Title Input */}
-                <input
-                  type="text"
-                  value={docTitle}
-                  onChange={(e) => handleTitleChange(e.target.value)}
-                  placeholder="Untitled Document"
-                  className="w-full text-2xl md:text-3xl font-extrabold tracking-tight bg-transparent focus:outline-none placeholder:opacity-30 mt-2"
-                  style={{
-                    color: 'var(--theme-text-primary)',
+                    Remove cover
+                  </MenuItem>
+                )}
+                <div className="h-px my-1" style={{ backgroundColor: 'var(--theme-border)' }} />
+                <MenuItem
+                  danger
+                  icon={<Trash2 size={14} />}
+                  onClick={() => {
+                    close();
+                    handleDeleteDoc(currentDocument.id);
                   }}
-                />
-              </div>
-            </div>
+                >
+                  Delete document
+                </MenuItem>
+              </>
+            )}
+          </Popover>
+        </div>
 
-            {/* Rich Document Editor */}
-            <div className="flex-1 max-w-4xl w-full mx-auto flex flex-col px-4 md:px-8 pb-12">
-              <NotionEditor
-                value={docContent}
-                onChange={handleContentChange}
-                placeholder="Type '/' for blocks, headings, tables, pictures, checklists..."
+        <NotionEditor
+          variant="page"
+          value={docContent}
+          onChange={handleContentChange}
+          placeholder="Type '/' for blocks, headings, tables, pictures, checklists..."
+          pageHeader={
+            <div className="flex flex-col gap-3.5">
+              {docCover && <div className="h-28 rounded-[10px]" style={{ background: docCover }} />}
+              {docIcon !== '📄' && <span className="text-[34px] leading-none">{docIcon}</span>}
+              <input
+                type="text"
+                value={docTitle}
+                onChange={(e) => handleTitleChange(e.target.value)}
+                placeholder="Untitled Document"
+                aria-label="Document title"
+                className="w-full text-[30px] leading-[38px] font-bold bg-transparent outline-none placeholder:text-[var(--theme-text-muted)] placeholder:opacity-60"
+                style={{ color: 'var(--theme-text)' }}
               />
-            </div>
-          </div>
-        ) : (
-          /* Empty State when no document selected */
-          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-4">
-            <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center border shadow-lg"
-              style={{
-                backgroundColor: 'var(--theme-bg-surface)',
-                borderColor: 'var(--theme-border)',
-                color: 'var(--theme-primary)',
-              }}
-            >
-              <FileText size={32} />
-            </div>
-
-            <div className="max-w-sm space-y-1">
-              <h3 className="text-base font-bold">No Document Selected</h3>
-              <p className="text-xs leading-relaxed" style={{ color: 'var(--theme-text-muted)' }}>
-                Create rich documentation, specs, guides, and meeting notes.
+              <p className="text-[13px]" style={{ color: 'var(--theme-text-muted)' }}>
+                Created by {currentDocument.creator?.displayName || 'Team member'} ·{' '}
+                {editedLabel(currentDocument.updatedAt)}
+                {project && ` · ${project.name} board`}
               </p>
+              <div className="h-1.5" />
             </div>
+          }
+        />
 
-            <button
-              onClick={handleCreateNewDoc}
-              className="px-4 py-2 rounded-xl text-xs font-semibold shadow transition flex items-center gap-2 active:scale-95"
-              style={{
-                backgroundColor: 'var(--theme-primary)',
-                color: 'var(--theme-primary-text)',
-              }}
-            >
-              <Plus size={15} />
-              <span>Create First Document</span>
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Share Document Modal */}
-      {currentDocument && (
         <ShareDocumentModal
           document={currentDocument}
           currentUser={currentUser}
           members={members}
           isOpen={showShareModal}
           onClose={() => setShowShareModal(false)}
+          onDocumentUpdated={(updated) => updateDocument(updated)}
+        />
+      </div>
+    );
+  }
+
+  // ---------------- List ----------------
+  return (
+    <div className="flex-1 flex flex-col h-full overflow-hidden" style={{ backgroundColor: 'var(--theme-bg-app)' }}>
+      <div className="shrink-0 border-b" style={{ borderColor: 'var(--theme-border)' }}>
+        <PageHeader
+          icon={<FileText size={20} />}
+          title="Docs"
+          subtitle="Create documents, browse public drafts and docs shared with you"
+          right={
+            <>
+              {onOpenSearch && <SearchOrbitButton onClick={onOpenSearch} />}
+              {onOpenDocsSidebar && (
+                <button
+                  type="button"
+                  onClick={onOpenDocsSidebar}
+                  className="md:hidden h-8 px-2.5 rounded-lg text-[13px] font-medium transition hover:bg-[var(--theme-fill-hover)]"
+                  style={{ color: 'var(--theme-text-muted)' }}
+                >
+                  Menu
+                </button>
+              )}
+            </>
+          }
+        />
+        <TabsRow<DocTab>
+          tabs={[
+            { id: 'mine', label: 'My docs', count: tabDocs.mine.length },
+            { id: 'public', label: 'Public drafts', count: tabDocs.public.length },
+            { id: 'shared', label: 'Shared with me', count: tabDocs.shared.length },
+          ]}
+          active={tab}
+          onChange={setTab}
+          action={
+            <SolidPill onClick={() => setShowNewDoc(true)} icon={<Plus size={14} />}>
+              New document
+            </SolidPill>
+          }
+        />
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-6 py-4 flex flex-col gap-3.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <SearchField value={searchQuery} onChange={setSearchQuery} placeholder="Search documents" />
+          <Popover
+            align="left"
+            width={180}
+            trigger={(_, toggle) => (
+              <OutlinePill onClick={toggle} icon={<Filter size={14} />}>
+                Visibility: {visibilityFilter === 'all' ? 'All' : visibilityFilter[0].toUpperCase() + visibilityFilter.slice(1)}
+              </OutlinePill>
+            )}
+          >
+            {(close) =>
+              (['all', 'public', 'shared', 'draft'] as const).map((v) => (
+                <MenuItem
+                  key={v}
+                  selected={v === visibilityFilter}
+                  onClick={() => {
+                    setVisibilityFilter(v);
+                    close();
+                  }}
+                >
+                  {v === 'all' ? 'All' : v[0].toUpperCase() + v.slice(1)}
+                </MenuItem>
+              ))
+            }
+          </Popover>
+          <span className="flex-1" />
+          <Popover
+            width={180}
+            trigger={(_, toggle) => (
+              <OutlinePill onClick={toggle} icon={<SortDown size={14} />}>
+                {SORT_LABEL[sortKey]}
+              </OutlinePill>
+            )}
+          >
+            {(close) =>
+              (Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+                <MenuItem
+                  key={k}
+                  selected={k === sortKey}
+                  onClick={() => {
+                    setSortKey(k);
+                    close();
+                  }}
+                >
+                  {SORT_LABEL[k]}
+                </MenuItem>
+              ))
+            }
+          </Popover>
+        </div>
+
+        <div className="overflow-x-auto">
+          <div
+            className="min-w-[760px] rounded-xl border overflow-hidden"
+            style={{ borderColor: 'var(--theme-border)', boxShadow: '0 1px 2px rgba(20, 26, 46, 0.05)' }}
+          >
+            <div
+              className="h-9 px-5 border-b flex items-center gap-3 text-xs font-semibold tracking-[0.3px]"
+              style={{
+                backgroundColor: 'var(--theme-selected)',
+                borderColor: 'var(--theme-border)',
+                color: 'var(--theme-text-muted)',
+              }}
+            >
+              <span className="w-10 shrink-0" />
+              <span className="flex-1">Title</span>
+              <span className="w-[190px] shrink-0">Owner</span>
+              <span className="w-[120px] shrink-0">Visibility</span>
+              <span className="w-[140px] shrink-0">Last edited</span>
+              <span className="w-8 shrink-0" />
+            </div>
+
+            {isLoadingDocs ? (
+              <p className="h-[68px] px-5 flex items-center text-[13px]" style={{ color: 'var(--theme-text-muted)' }}>
+                Loading documents…
+              </p>
+            ) : listDocs.length === 0 ? (
+              <div className="py-10 flex flex-col items-center gap-3 text-center">
+                <p className="text-[13px]" style={{ color: 'var(--theme-text-muted)' }}>
+                  {searchQuery || visibilityFilter !== 'all'
+                    ? 'No documents match these filters.'
+                    : tab === 'shared'
+                      ? 'Nothing has been shared with you yet.'
+                      : 'No documents here yet.'}
+                </p>
+                {tab === 'mine' && !searchQuery && (
+                  <SolidPill onClick={() => setShowNewDoc(true)} icon={<Plus size={14} />}>
+                    New document
+                  </SolidPill>
+                )}
+              </div>
+            ) : (
+              listDocs.map((doc, i) => {
+                const v = visibilityOf(doc);
+                const project = linkedProject(doc);
+                const canDelete = isMine(doc) || currentUser?.systemRole === 'SUPER_ADMIN';
+                return (
+                  <div
+                    key={doc.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setCurrentDocument(doc)}
+                    onKeyDown={(e) => e.key === 'Enter' && setCurrentDocument(doc)}
+                    className={`h-[68px] px-5 flex items-center gap-3 cursor-pointer transition-colors hover:bg-[var(--theme-fill-hover)] ${
+                      i < listDocs.length - 1 ? 'border-b' : ''
+                    }`}
+                    style={{ borderColor: 'var(--theme-border)' }}
+                  >
+                    <span
+                      className="w-10 h-10 rounded-[10px] flex items-center justify-center shrink-0"
+                      style={{ backgroundColor: 'var(--theme-bg-surface)', color: 'var(--theme-accent)' }}
+                    >
+                      {doc.icon && doc.icon !== '📄' ? <span className="text-lg">{doc.icon}</span> : <FileText size={20} />}
+                    </span>
+                    <span className="flex-1 min-w-0 flex flex-col gap-0.5">
+                      <span className="text-sm font-semibold leading-5 truncate" style={{ color: 'var(--theme-text)' }}>
+                        {doc.title || 'Untitled Document'}
+                      </span>
+                      <span className="text-xs leading-4 truncate" style={{ color: 'var(--theme-text-muted)' }}>
+                        {project ? `Linked to ${project.name} board` : 'Not linked'}
+                      </span>
+                    </span>
+                    <span className="w-[190px] shrink-0 flex items-center gap-2 min-w-0">
+                      <Avatar
+                        name={doc.creator?.displayName || doc.creator?.username || '?'}
+                        src={doc.creator?.avatarUrl}
+                        size={26}
+                      />
+                      <span className="text-[13px] truncate" style={{ color: 'var(--theme-text)' }}>
+                        {ownerName(doc)}
+                      </span>
+                    </span>
+                    <span className="w-[120px] shrink-0">
+                      <VisibilityPill visibility={v} icon={<VisibilityIcon v={v} />} />
+                    </span>
+                    <span className="w-[140px] shrink-0 text-[13px] truncate" style={{ color: 'var(--theme-text-muted)' }}>
+                      {editedLabel(doc.updatedAt)}
+                    </span>
+                    <span onClick={(e) => e.stopPropagation()}>
+                      <Popover width={180} trigger={(_, toggle) => <MoreButton onClick={toggle} />}>
+                        {(close) => (
+                          <>
+                            <MenuItem
+                              icon={<FileText size={14} />}
+                              onClick={() => {
+                                close();
+                                setCurrentDocument(doc);
+                              }}
+                            >
+                              Open
+                            </MenuItem>
+                            <MenuItem
+                              icon={<Share2 size={14} />}
+                              onClick={() => {
+                                close();
+                                setShareTarget(doc);
+                              }}
+                            >
+                              Share
+                            </MenuItem>
+                            {canDelete && (
+                              <MenuItem
+                                danger
+                                icon={<Trash2 size={14} />}
+                                onClick={() => {
+                                  close();
+                                  handleDeleteDoc(doc.id);
+                                }}
+                              >
+                                Delete
+                              </MenuItem>
+                            )}
+                          </>
+                        )}
+                      </Popover>
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+
+      {showNewDoc && (
+        <NewDocumentModal
+          workspaceId={workspaceId}
+          projects={projects}
+          onClose={() => setShowNewDoc(false)}
+          onCreated={(doc, { openShare }) => {
+            setShowNewDoc(false);
+            addDocument(doc);
+            setCurrentDocument(doc);
+            if (openShare) setShowShareModal(true);
+          }}
+        />
+      )}
+
+      {shareTarget && (
+        <ShareDocumentModal
+          document={documents.find((d) => d.id === shareTarget.id) || shareTarget}
+          currentUser={currentUser}
+          members={members}
+          isOpen
+          onClose={() => setShareTarget(null)}
           onDocumentUpdated={(updated) => updateDocument(updated)}
         />
       )}

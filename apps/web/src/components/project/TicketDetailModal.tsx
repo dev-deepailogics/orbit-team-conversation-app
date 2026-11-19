@@ -1,19 +1,41 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   X,
   Edit,
   Copy,
   Check,
   Calendar,
-  AlertCircle,
-  Tag,
   Plus,
   Trash2,
-} from 'lucide-react';
+  Board,
+  Link2,
+  Share2,
+  More,
+  Flag,
+  User,
+  AlertTriangle,
+  Tag,
+  AtSign,
+  Send,
+  Code,
+  Summary,
+  Clock,
+  Loader2,
+} from '@/components/ui/icons';
 import { WorkspaceMember, ProjectColumn } from '@orbit/types';
 import { api } from '../../lib/api';
+import {
+  Avatar,
+  LabelChip,
+  PriorityPill,
+  StatusBadge,
+  relativeTime,
+  ticketAssignees,
+  ticketKey,
+  ticketLabels,
+} from './projectViewUtils';
 
 interface TicketDetailModalProps {
   projectId: string;
@@ -25,6 +47,8 @@ interface TicketDetailModalProps {
   onTicketUpdated?: (ticket: any) => void;
 }
 
+const DANGER = '#DC2626';
+
 export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
   projectId,
   ticket,
@@ -34,403 +58,504 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
   onEditTicket,
   onTicketUpdated,
 }) => {
-  const [copiedBranch, setCopiedBranch] = useState(false);
-  const [copiedTitle, setCopiedTitle] = useState(false);
-  const [copiedTicketId, setCopiedTicketId] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [showMenu, setShowMenu] = useState(false);
+  const [tab, setTab] = useState<'comments' | 'activity'>('comments');
+  const [comments, setComments] = useState<any[]>([]);
+  const [loadingComments, setLoadingComments] = useState(true);
+  const [newComment, setNewComment] = useState('');
+  const [sending, setSending] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [checklist, setChecklist] = useState<Array<{ id: string; text: string; completed: boolean }>>(
-    Array.isArray(ticket.checklist) ? ticket.checklist : []
+    Array.isArray(ticket.checklist) ? ticket.checklist : [],
   );
   const [newChecklistItem, setNewChecklistItem] = useState('');
   const [isSavingChecklist, setIsSavingChecklist] = useState(false);
 
-  // Copy helpers
-  const handleCopyBranch = (branch: string) => {
-    navigator.clipboard.writeText(branch);
-    setCopiedBranch(true);
-    setTimeout(() => setCopiedBranch(false), 2000);
-  };
+  useEffect(() => {
+    let alive = true;
+    setLoadingComments(true);
+    api
+      .get(`/api/projects/${projectId}/tickets/${ticket.id}/comments`)
+      .then((res) => alive && setComments(res.data || []))
+      .catch((err) => console.error('Failed to load ticket comments', err))
+      .finally(() => alive && setLoadingComments(false));
+    return () => {
+      alive = false;
+    };
+  }, [projectId, ticket.id]);
 
-  const handleCopyLinkOrTitle = (text: string) => {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const flash = (key: string, text: string) => {
     navigator.clipboard.writeText(text);
-    setCopiedTitle(true);
-    setTimeout(() => setCopiedTitle(false), 2000);
+    setCopied(key);
+    setTimeout(() => setCopied(null), 2000);
   };
 
-  // Checklist handlers
-  const handleToggleChecklist = async (id: string) => {
-    const nextList = checklist.map((item) =>
-      item.id === id ? { ...item, completed: !item.completed } : item
-    );
+  const key = ticketKey(ticket);
+  const handleShare = async () => {
+    const text = `${key} ${ticket.title}`;
+    if (typeof navigator !== 'undefined' && (navigator as any).share) {
+      try {
+        await (navigator as any).share({ title: text, text });
+        return;
+      } catch {
+        // cancelled: fall through to copy
+      }
+    }
+    flash('share', text);
+  };
+
+  const saveChecklist = async (nextList: typeof checklist) => {
     setChecklist(nextList);
     try {
-      const res = await api.put(`/api/projects/${projectId}/tickets/${ticket.id}`, {
-        checklist: nextList,
-      });
+      const res = await api.put(`/api/projects/${projectId}/tickets/${ticket.id}`, { checklist: nextList });
       onTicketUpdated?.(res.data);
     } catch (err) {
-      console.error('Failed to update checklist item', err);
+      console.error('Failed to update checklist', err);
     }
   };
 
   const handleAddChecklistItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newChecklistItem.trim()) return;
-
-    const newItem = {
-      id: `chk-${Date.now()}`,
-      text: newChecklistItem.trim(),
-      completed: false,
-    };
-    const nextList = [...checklist, newItem];
-    setChecklist(nextList);
+    setIsSavingChecklist(true);
+    await saveChecklist([...checklist, { id: `chk-${Date.now()}`, text: newChecklistItem.trim(), completed: false }]);
     setNewChecklistItem('');
+    setIsSavingChecklist(false);
+  };
 
+  const handleSendComment = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!newComment.trim() || sending) return;
     try {
-      setIsSavingChecklist(true);
-      const res = await api.put(`/api/projects/${projectId}/tickets/${ticket.id}`, {
-        checklist: nextList,
+      setSending(true);
+      const res = await api.post(`/api/projects/${projectId}/tickets/${ticket.id}/comments`, {
+        text: newComment.trim(),
+        type: 'text',
       });
-      onTicketUpdated?.(res.data);
-    } catch (err) {
-      console.error('Failed to add checklist item', err);
+      setComments((prev) => [...prev, res.data]);
+      setNewComment('');
+      setTab('comments');
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to send comment');
     } finally {
-      setIsSavingChecklist(false);
+      setSending(false);
     }
   };
 
-  const handleDeleteChecklistItem = async (id: string) => {
-    const nextList = checklist.filter((item) => item.id !== id);
-    setChecklist(nextList);
-    try {
-      const res = await api.put(`/api/projects/${projectId}/tickets/${ticket.id}`, {
-        checklist: nextList,
-      });
-      onTicketUpdated?.(res.data);
-    } catch (err) {
-      console.error('Failed to remove checklist item', err);
-    }
-  };
-
-  // Resolve priority badge color
-  const priority = (ticket.priority || 'MEDIUM').toUpperCase();
-  const priorityBadge =
-    priority === 'URGENT'
-      ? { text: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/30' }
-      : priority === 'HIGH'
-      ? { text: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/30' }
-      : priority === 'LOW'
-      ? { text: 'text-[var(--theme-text-muted)]', bg: 'bg-slate-500/10', border: 'border-slate-500/30' }
-      : { text: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/30' };
-
-  // Resolve assignee display
-  const assigneeName = ticket.assignee?.displayName || ticket.assignee?.username || null;
-  const assigneeInitial = assigneeName ? assigneeName.charAt(0).toUpperCase() : null;
-
-  // Due Date & Created Date
-  const dueDateFormatted = ticket.dueDate
-    ? new Date(ticket.dueDate).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      })
+  const column = columns.find((c) => c.id === ticket.columnId) ?? ticket.column ?? null;
+  const assignees = ticketAssignees(ticket, members);
+  const labels = ticketLabels(ticket);
+  const events: any[] = Array.isArray(ticket.events) ? [...ticket.events].reverse() : [];
+  const reporter =
+    ticket.creator ?? members.find((m) => m.userId === ticket.createdById)?.user ?? null;
+  const dueDate = ticket.dueDate
+    ? new Date(ticket.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : null;
+  const created = ticket.createdAt
+    ? new Date(ticket.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : null;
 
-  const createdDateFormatted = ticket.createdAt
-    ? new Date(ticket.createdAt).toLocaleDateString('en-US', {
-        month: 'numeric',
-        day: 'numeric',
-        year: 'numeric',
-      })
-    : null;
-
-  const labels = Array.isArray(ticket.labels) ? ticket.labels : [];
+  const iconBtn =
+    'w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition hover:bg-[var(--theme-fill-hover)]';
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in">
+    <div className="fixed inset-0 z-50 flex justify-end animate-in fade-in duration-150">
       <div
-        className="w-full max-w-2xl rounded-2xl border shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-150"
+        className="absolute inset-0"
+        style={{ backgroundColor: 'color-mix(in srgb, var(--theme-text) 24%, transparent)' }}
+        onClick={onClose}
+      />
+      <aside
+        role="dialog"
+        aria-label={`Ticket ${key}`}
+        className="relative w-full max-w-[480px] h-full border-l flex flex-col animate-in slide-in-from-right duration-200"
         style={{
-          backgroundColor: 'var(--theme-bg-surface, #1e293b)',
-          borderColor: 'var(--theme-border, #334155)',
-          color: 'var(--theme-text-primary, #ffffff)',
+          backgroundColor: 'var(--theme-bg-app)',
+          borderColor: 'var(--theme-border)',
+          boxShadow: '0 1px 40px rgba(20, 26, 46, 0.2)',
+          color: 'var(--theme-text)',
         }}
       >
-        {/* Top Header: Title, Copy link & Edit Button */}
-        <div
-          className="px-6 py-4 border-b flex items-center justify-between shrink-0 gap-4"
-          style={{ borderColor: 'var(--theme-border, #334155)' }}
-        >
-          <div className="flex-1 min-w-0 pr-2">
-            <h3 className="text-base font-bold text-[var(--theme-text)] leading-snug break-words">
-              {ticket.title}
-            </h3>
+        {/* Header */}
+        <div className="h-[60px] shrink-0 border-b px-5 flex items-center gap-2.5" style={{ borderColor: 'var(--theme-border)' }}>
+          <button
+            type="button"
+            onClick={() => flash('id', key)}
+            title="Copy ticket ID"
+            className="h-[26px] px-2 rounded-lg flex items-center gap-1.5 text-[13px] font-bold transition hover:brightness-95"
+            style={{ backgroundColor: 'var(--theme-bg-surface)', color: 'var(--theme-primary-hover)' }}
+          >
+            {copied === 'id' ? <Check size={14} /> : <Board size={14} />}
+            {key}
+          </button>
+          {column && <StatusBadge column={column} height={22} />}
+          <span className="flex-1" />
+          <button
+            type="button"
+            onClick={() => flash('link', ticket.title)}
+            title={copied === 'link' ? 'Copied' : 'Copy title'}
+            className={iconBtn}
+            style={{ color: 'var(--theme-text-muted)' }}
+          >
+            {copied === 'link' ? <Check size={18} /> : <Link2 size={18} />}
+          </button>
+          <button
+            type="button"
+            onClick={handleShare}
+            title={copied === 'share' ? 'Copied' : 'Share'}
+            className={iconBtn}
+            style={{ color: 'var(--theme-text-muted)' }}
+          >
+            {copied === 'share' ? <Check size={18} /> : <Share2 size={18} />}
+          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowMenu((v) => !v)}
+              title="More"
+              className={iconBtn}
+              style={{ color: 'var(--theme-text-muted)' }}
+            >
+              <More size={18} />
+            </button>
+            {showMenu && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
+                <div
+                  className="absolute right-0 top-full mt-1 z-20 w-44 rounded-xl border p-1.5 shadow-xl"
+                  style={{ backgroundColor: 'var(--theme-bg-app)', borderColor: 'var(--theme-border)' }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMenu(false);
+                      onClose();
+                      onEditTicket(ticket);
+                    }}
+                    className="w-full h-8 px-2 rounded-lg flex items-center gap-2 text-[13px] font-medium transition hover:bg-[var(--theme-fill-hover)]"
+                  >
+                    <Edit size={14} style={{ color: 'var(--theme-text-muted)' }} />
+                    Edit ticket
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMenu(false);
+                      flash('title', ticket.title);
+                    }}
+                    className="w-full h-8 px-2 rounded-lg flex items-center gap-2 text-[13px] font-medium transition hover:bg-[var(--theme-fill-hover)]"
+                  >
+                    <Copy size={14} style={{ color: 'var(--theme-text-muted)' }} />
+                    Copy title
+                  </button>
+                </div>
+              </>
+            )}
           </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Copy button */}
-            <button
-              onClick={() => handleCopyLinkOrTitle(ticket.title)}
-              title="Copy Title"
-              className="p-1.5 rounded-lg border border-[var(--theme-border)] hover:bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition"
-            >
-              {copiedTitle ? <Check size={14} className="text-emerald-600 dark:text-emerald-400" /> : <Copy size={14} />}
-            </button>
-
-            {/* Edit button */}
-            <button
-              onClick={() => {
-                onClose();
-                onEditTicket(ticket);
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition shadow-sm"
-            >
-              <Edit size={13} />
-              <span>Edit</span>
-            </button>
-
-            {/* Close 'X' */}
-            <button
-              onClick={onClose}
-              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] rounded-lg hover:bg-[var(--theme-bg-surface-hover)] transition ml-1"
-            >
-              <X size={18} />
-            </button>
-          </div>
+          <button type="button" onClick={onClose} title="Close" className={iconBtn} style={{ color: 'var(--theme-text-muted)' }}>
+            <X size={18} />
+          </button>
         </div>
 
-        {/* Scrollable Content Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 text-xs">
-          {/* Row: Git Branch */}
-          {ticket.gitbranch && (
-            <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-              <span className="font-semibold text-[var(--theme-text-muted)]">Git Branch</span>
-              <div className="flex items-center gap-2">
-                <span className="px-3 py-1.5 rounded-lg bg-[var(--theme-bg-app)] border border-[var(--theme-border)] font-mono text-xs text-[var(--theme-text)] break-all select-all">
-                  {ticket.gitbranch}
+        {/* Body */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 flex flex-col gap-4">
+          <h2 className="text-[22px] font-bold leading-7 break-words">{ticket.title}</h2>
+
+          <div className="flex flex-col gap-0.5">
+            <Field Icon={Flag} label="Status">
+              {column ? <StatusBadge column={column} /> : <Muted>—</Muted>}
+            </Field>
+            <Field Icon={User} label="Assignee">
+              {assignees.length ? (
+                <span className="flex items-center gap-3 flex-wrap">
+                  {assignees.map((u) => (
+                    <span key={u.id} className="flex items-center gap-2">
+                      <Avatar name={u.displayName} src={u.avatarUrl} size={24} />
+                      <span className="text-sm font-medium">{u.displayName}</span>
+                    </span>
+                  ))}
                 </span>
+              ) : (
+                <Muted>Unassigned</Muted>
+              )}
+            </Field>
+            <Field Icon={AlertTriangle} label="Priority">
+              <PriorityPill priority={(ticket.priority || 'MEDIUM').toUpperCase()} size="lg" />
+            </Field>
+            <Field Icon={Tag} label="Labels">
+              {labels.length ? (
+                <span className="flex items-center gap-1.5 flex-wrap">
+                  {labels.map((l) => (
+                    <LabelChip key={l.name} name={l.name} color={l.color} pill />
+                  ))}
+                </span>
+              ) : (
+                <Muted>—</Muted>
+              )}
+            </Field>
+            <Field Icon={Calendar} label="Due date">
+              {dueDate ? <span className="text-sm font-medium">{dueDate}</span> : <Muted>—</Muted>}
+            </Field>
+            <Field Icon={User} label="Reporter">
+              {reporter ? (
+                <span className="flex items-center gap-2">
+                  <Avatar name={reporter.displayName} src={reporter.avatarUrl} size={24} />
+                  <span className="text-sm font-medium">{reporter.displayName}</span>
+                </span>
+              ) : (
+                <Muted>—</Muted>
+              )}
+            </Field>
+            {ticket.storyPoints !== null && ticket.storyPoints !== undefined && (
+              <Field Icon={Summary} label="Story points">
+                <span className="text-sm font-medium">{ticket.storyPoints}</span>
+              </Field>
+            )}
+            {ticket.gitbranch && (
+              <Field Icon={Code} label="Git branch">
                 <button
-                  onClick={() => handleCopyBranch(ticket.gitbranch)}
-                  className="px-2.5 py-1.5 rounded-lg border border-[var(--theme-border)] text-xs font-medium hover:bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] hover:text-[var(--theme-text)] transition shrink-0"
+                  type="button"
+                  onClick={() => flash('branch', ticket.gitbranch)}
+                  title="Copy branch"
+                  className="h-6 max-w-full px-2 rounded-md flex items-center gap-1.5 font-mono text-xs truncate transition hover:brightness-95"
+                  style={{ backgroundColor: 'var(--theme-bg-surface)' }}
                 >
-                  {copiedBranch ? 'Copied!' : 'Copy'}
+                  <span className="truncate">{ticket.gitbranch}</span>
+                  {copied === 'branch' ? <Check size={12} /> : <Copy size={12} style={{ color: 'var(--theme-text-muted)' }} />}
                 </button>
-              </div>
-            </div>
+              </Field>
+            )}
+            {created && (
+              <Field Icon={Clock} label="Created">
+                <span className="text-sm font-medium">{created}</span>
+              </Field>
+            )}
+          </div>
+
+          <Section title="Description">
+            {ticket.description ? (
+              <p className="text-sm leading-[21px] whitespace-pre-wrap break-words">{ticket.description}</p>
+            ) : (
+              <Muted>No description provided.</Muted>
+            )}
+          </Section>
+
+          {ticket.testPlan && (
+            <Section title="Test plan">
+              <p className="text-sm leading-[21px] whitespace-pre-wrap break-words">{ticket.testPlan}</p>
+            </Section>
           )}
 
-          {/* Row: Description / Summary / Test Plan */}
-          <div className="grid grid-cols-[120px_1fr] items-start gap-4 pt-1">
-            <span className="font-semibold text-[var(--theme-text-muted)] pt-1">Description</span>
-            <div className="space-y-3 min-w-0">
-              {ticket.description ? (
-                <div className="text-[var(--theme-text)] leading-relaxed whitespace-pre-wrap font-sans text-xs bg-[var(--theme-bg-app)] p-3 rounded-xl border border-[var(--theme-border)]">
-                  {ticket.description}
+          <Section title={`Checklist${checklist.length ? ` · ${checklist.filter((c) => c.completed).length}/${checklist.length}` : ''}`}>
+            <div className="flex flex-col gap-1">
+              {checklist.map((item) => (
+                <div key={item.id} className="group h-8 px-1 rounded-lg flex items-center gap-2 hover:bg-[var(--theme-fill-hover)]">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      saveChecklist(checklist.map((c) => (c.id === item.id ? { ...c, completed: !c.completed } : c)))
+                    }
+                    className="w-4 h-4 rounded flex items-center justify-center shrink-0 border"
+                    style={
+                      item.completed
+                        ? { backgroundColor: 'var(--theme-primary)', borderColor: 'var(--theme-primary)', color: 'var(--theme-primary-text)' }
+                        : { borderColor: 'color-mix(in srgb, var(--theme-text) 20%, transparent)' }
+                    }
+                    title={item.completed ? 'Mark incomplete' : 'Mark complete'}
+                  >
+                    {item.completed && <Check size={10} />}
+                  </button>
+                  <span
+                    className={`flex-1 truncate text-sm ${item.completed ? 'line-through' : ''}`}
+                    style={{ color: item.completed ? 'var(--theme-text-muted)' : 'var(--theme-text)' }}
+                  >
+                    {item.text}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => saveChecklist(checklist.filter((c) => c.id !== item.id))}
+                    className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-md flex items-center justify-center"
+                    style={{ color: DANGER }}
+                    title="Remove item"
+                  >
+                    <Trash2 size={13} />
+                  </button>
                 </div>
-              ) : (
-                <p className="text-[var(--theme-text-muted)] italic">No description provided.</p>
-              )}
-
-              {ticket.testPlan && (
-                <div className="pt-2">
-                  <h5 className="font-bold text-[var(--theme-text)] text-xs mb-1">Test plan</h5>
-                  <div className="text-[var(--theme-text)] whitespace-pre-wrap bg-[var(--theme-bg-app)] p-3 rounded-xl border border-[var(--theme-border)]">
-                    {ticket.testPlan}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="border-t my-2" style={{ borderColor: 'var(--theme-border, #334155)' }} />
-
-          {/* Row: Ticket ID */}
-          <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-            <span className="font-semibold text-[var(--theme-text-muted)]">Ticket ID</span>
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-[var(--theme-text)]">
-                {ticket.issueNumber || ticket.customId || ticket.id.slice(0, 8)}
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  const displayId = String(ticket.issueNumber || ticket.customId || ticket.id.slice(0, 8));
-                  navigator.clipboard.writeText(displayId);
-                  setCopiedTicketId(true);
-                  setTimeout(() => setCopiedTicketId(false), 2000);
-                }}
-                className="flex items-center gap-1 px-2 py-0.5 rounded text-xs transition border hover:bg-black/5 dark:hover:bg-white/10"
-                style={{
-                  color: copiedTicketId ? '#22c55e' : 'var(--theme-text-muted)',
-                  borderColor: copiedTicketId ? '#22c55e' : 'var(--theme-border, #334155)',
-                }}
-                title="Copy Ticket ID"
-              >
-                {copiedTicketId ? (
-                  <>
-                    <Check size={12} className="text-emerald-500" />
-                    <span className="text-[11px] font-medium text-emerald-500">Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy size={12} />
-                    <span className="text-[11px] font-medium">Copy</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Row: Checklist */}
-          <div className="grid grid-cols-[120px_1fr] items-start gap-4">
-            <span className="font-semibold text-[var(--theme-text-muted)] pt-1.5">Checklist</span>
-            <div className="space-y-2.5">
-              <form onSubmit={handleAddChecklistItem} className="flex items-center gap-2">
+              ))}
+              <form onSubmit={handleAddChecklistItem} className="flex items-center gap-2 pt-1">
                 <input
                   type="text"
                   value={newChecklistItem}
                   onChange={(e) => setNewChecklistItem(e.target.value)}
-                  placeholder="Add checklist item..."
-                  className="flex-1 px-3 py-1.5 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] text-xs focus:outline-none focus:border-blue-500 transition"
+                  placeholder="Add checklist item…"
+                  className="flex-1 h-8 px-3 rounded-lg border text-[13px] outline-none bg-transparent focus:border-[var(--theme-primary)] placeholder:text-[var(--theme-text-muted)]"
+                  style={{ borderColor: 'var(--theme-border)' }}
                 />
                 <button
                   type="submit"
                   disabled={!newChecklistItem.trim() || isSavingChecklist}
-                  className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition disabled:opacity-40 shadow-sm"
+                  title="Add item"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center transition disabled:opacity-40"
+                  style={{ backgroundColor: 'var(--theme-fill)', color: 'var(--theme-text-muted)' }}
                 >
-                  Add
+                  <Plus size={14} />
                 </button>
               </form>
-
-              {checklist.length === 0 ? (
-                <p className="text-[var(--theme-text-muted)] text-xs py-1">No checklist items yet.</p>
-              ) : (
-                <div className="space-y-1.5 pt-1">
-                  {checklist.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between p-2 rounded-lg bg-[var(--theme-bg-app)] border border-[var(--theme-border)] text-xs group"
-                    >
-                      <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
-                        <input
-                          type="checkbox"
-                          checked={item.completed}
-                          onChange={() => handleToggleChecklist(item.id)}
-                          className="rounded border-[var(--theme-border)] text-blue-600 focus:ring-0 cursor-pointer"
-                        />
-                        <span
-                          className={`truncate ${
-                            item.completed ? 'line-through text-[var(--theme-text-muted)]' : 'text-[var(--theme-text)]'
-                          }`}
-                        >
-                          {item.text}
-                        </span>
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteChecklistItem(item.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1 text-[var(--theme-text-muted)] hover:text-rose-400 transition"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
-          </div>
+          </Section>
 
-          <div className="border-t my-2" style={{ borderColor: 'var(--theme-border, #334155)' }} />
-
-          {/* Row: Priority */}
-          <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-            <span className="font-semibold text-[var(--theme-text-muted)]">Priority</span>
-            <div>
-              <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold border ${priorityBadge.bg} ${priorityBadge.text} ${priorityBadge.border}`}
-              >
-                {priority}
-              </span>
-            </div>
-          </div>
-
-          {/* Row: Labels */}
-          <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-            <span className="font-semibold text-[var(--theme-text-muted)]">Labels</span>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {labels.length > 0 ? (
-                labels.map((lbl: any, idx: number) => {
-                  const labelText = typeof lbl === 'string' ? lbl : lbl?.name || 'Label';
-                  return (
-                    <span
-                      key={idx}
-                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
-                    >
-                      <Tag size={11} />
-                      {labelText}
-                    </span>
-                  );
-                })
-              ) : (
-                <span className="text-[var(--theme-text-muted)]">-</span>
-              )}
-            </div>
-          </div>
-
-          {/* Row: Assignees */}
-          <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-            <span className="font-semibold text-[var(--theme-text-muted)]">Assignees</span>
-            <div className="flex items-center gap-2">
-              {ticket.assignee ? (
-                <div className="flex items-center gap-2">
-                  <img
-                    src={
-                      ticket.assignee.avatarUrl ||
-                      `/api/avatar/bottts/svg?seed=${ticket.assignee.username}`
-                    }
-                    alt={ticket.assignee.displayName}
-                    className="w-6 h-6 rounded-full object-cover ring-1 ring-white/10"
-                  />
-                  <span className="text-[var(--theme-text)] font-medium">
-                    {ticket.assignee.displayName}
+          {/* Tabs */}
+          <div className="h-10 shrink-0 border-b flex items-start gap-5" style={{ borderColor: 'var(--theme-border)' }}>
+            {(
+              [
+                { id: 'comments', label: 'Comments', count: comments.length },
+                { id: 'activity', label: 'Activity', count: events.length },
+              ] as const
+            ).map((t) => {
+              const active = tab === t.id;
+              return (
+                <button key={t.id} type="button" onClick={() => setTab(t.id)} className="h-10 flex flex-col items-center">
+                  <span
+                    className="h-[38px] px-0.5 flex items-center gap-1.5"
+                    style={{ color: active ? 'var(--theme-primary-hover)' : 'var(--theme-text-muted)' }}
+                  >
+                    <span className={`text-sm ${active ? 'font-semibold' : 'font-medium'}`}>{t.label}</span>
+                    <span className="text-xs font-semibold">{t.count}</span>
                   </span>
+                  <span className="h-0.5 w-full" style={{ backgroundColor: active ? 'var(--theme-primary)' : 'transparent' }} />
+                </button>
+              );
+            })}
+          </div>
+
+          {tab === 'comments' ? (
+            loadingComments ? (
+              <span className="flex items-center gap-2 text-[13px]" style={{ color: 'var(--theme-text-muted)' }}>
+                <Loader2 size={14} className="animate-spin" /> Loading comments…
+              </span>
+            ) : comments.length === 0 ? (
+              <Muted>No comments yet. Start the discussion below.</Muted>
+            ) : (
+              comments.map((c) => {
+                const name = c.user?.displayName || c.username || 'Team member';
+                return (
+                  <div key={c.id} className="flex items-start gap-2.5">
+                    <Avatar name={name} src={c.user?.avatarUrl} size={28} />
+                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                      <span className="flex items-center gap-2">
+                        <span className="text-[13px] font-bold">{name}</span>
+                        {c.createdAt && (
+                          <span className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>
+                            {relativeTime(c.createdAt)}
+                          </span>
+                        )}
+                      </span>
+                      <p className="text-[13px] leading-[19px] whitespace-pre-wrap break-words">{c.text}</p>
+                    </div>
+                  </div>
+                );
+              })
+            )
+          ) : events.length === 0 ? (
+            <Muted>No activity recorded yet.</Muted>
+          ) : (
+            events.map((ev, i) => (
+              <div key={ev.id || i} className="flex items-start gap-2.5">
+                <Avatar name={ev.user || '?'} size={28} />
+                <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                  <span className="flex items-center gap-2">
+                    <span className="text-[13px] font-bold">{ev.user || 'Someone'}</span>
+                    {ev.date && (
+                      <span className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>
+                        {relativeTime(ev.date)}
+                      </span>
+                    )}
+                  </span>
+                  <p className="text-[13px] leading-[19px]" style={{ color: 'var(--theme-text-muted)' }}>
+                    {ev.action}
+                  </p>
                 </div>
-              ) : assigneeInitial ? (
-                <div className="w-6 h-6 rounded-full bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] font-bold flex items-center justify-center text-xs">
-                  {assigneeInitial}
-                </div>
-              ) : (
-                <span className="text-[var(--theme-text-muted)]">Unassigned</span>
-              )}
-            </div>
-          </div>
-
-          {/* Row: Story Points */}
-          <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-            <span className="font-semibold text-[var(--theme-text-muted)]">Story Points</span>
-            <span className="text-[var(--theme-text)] font-medium">
-              {ticket.storyPoints !== null && ticket.storyPoints !== undefined ? ticket.storyPoints : '-'}
-            </span>
-          </div>
-
-          {/* Row: Due Date */}
-          <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-            <span className="font-semibold text-[var(--theme-text-muted)]">Due Date</span>
-            <div className="flex items-center gap-1.5 text-[var(--theme-text)]">
-              <Calendar size={13} className="text-[var(--theme-text-muted)]" />
-              <span>{dueDateFormatted || '-'}</span>
-            </div>
-          </div>
-
-          {/* Row: Created Date */}
-          <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-            <span className="font-semibold text-[var(--theme-text-muted)]">Created</span>
-            <div className="flex items-center gap-1.5 text-[var(--theme-text)]">
-              <Calendar size={13} className="text-[var(--theme-text-muted)]" />
-              <span>{createdDateFormatted || '-'}</span>
-            </div>
-          </div>
+              </div>
+            ))
+          )}
         </div>
-      </div>
+
+        {/* Comment box */}
+        <form
+          onSubmit={handleSendComment}
+          className="shrink-0 border-t px-5 py-3 flex items-center gap-2"
+          style={{ borderColor: 'var(--theme-border)' }}
+        >
+          <label
+            className="flex-1 min-w-0 h-10 px-3 rounded-[10px] border flex items-center gap-2 focus-within:border-[var(--theme-primary)]"
+            style={{ borderColor: 'var(--theme-border)' }}
+          >
+            <input
+              ref={inputRef}
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="Add a comment…"
+              className="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-[var(--theme-text-muted)]"
+            />
+            <button
+              type="button"
+              title="Mention"
+              onClick={() => {
+                setNewComment((v) => `${v}${v && !v.endsWith(' ') ? ' ' : ''}@`);
+                inputRef.current?.focus();
+              }}
+              style={{ color: 'var(--theme-text-muted)' }}
+            >
+              <AtSign size={16} />
+            </button>
+          </label>
+          <button
+            type="submit"
+            disabled={!newComment.trim() || sending}
+            title="Send"
+            className="w-10 h-10 rounded-[10px] flex items-center justify-center shrink-0 transition hover:bg-[var(--theme-primary-hover)] disabled:opacity-50"
+            style={{ backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-text)' }}
+          >
+            <Send size={16} />
+          </button>
+        </form>
+      </aside>
     </div>
   );
 };
+
+const Field: React.FC<{ Icon: React.ElementType; label: string; children: React.ReactNode }> = ({
+  Icon,
+  label,
+  children,
+}) => (
+  <div className="min-h-[38px] flex items-center gap-2.5">
+    <span className="w-[120px] shrink-0 flex items-center gap-2" style={{ color: 'var(--theme-text-muted)' }}>
+      <Icon size={16} />
+      <span className="text-[13px]">{label}</span>
+    </span>
+    <div className="flex-1 min-w-0">{children}</div>
+  </div>
+);
+
+const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+  <div className="flex flex-col gap-1.5">
+    <p className="text-xs font-bold tracking-[0.5px]" style={{ color: 'var(--theme-text-muted)' }}>
+      {title}
+    </p>
+    {children}
+  </div>
+);
+
+const Muted: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <span className="text-[13px]" style={{ color: 'var(--theme-text-muted)' }}>
+    {children}
+  </span>
+);

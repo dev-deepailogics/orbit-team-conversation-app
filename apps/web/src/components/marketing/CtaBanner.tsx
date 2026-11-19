@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Terminal, ArrowRight, Github, Sparkles, ShieldCheck } from 'lucide-react';
+import { Terminal, ArrowRight, Github, Sparkles, ShieldCheck } from '@/components/ui/icons';
 
 export function CtaBanner() {
   return (

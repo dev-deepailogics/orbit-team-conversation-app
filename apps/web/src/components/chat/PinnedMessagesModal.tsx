@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { Avatar } from '@/components/project/projectViewUtils';
 import {
   X,
   Pin,
@@ -10,7 +11,7 @@ import {
   Paperclip,
   Loader2,
   Calendar,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { Channel, Message, UserProfile } from '@orbit/types';
 import { api } from '../../lib/api';
 import { useChatStore } from '../../stores/chatStore';
@@ -145,11 +146,7 @@ export const PinnedMessagesModal: React.FC<PinnedMessagesModalProps> = ({
                   {/* Top Bar: Author, Time */}
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2 min-w-0">
-                      <img
-                        src={avatarUrl}
-                        alt={authorName}
-                        className="w-7 h-7 rounded-md object-cover shrink-0"
-                      />
+                      <Avatar name={authorName} src={avatarUrl} size={28} />
                       <div className="min-w-0">
                         <span className="font-bold text-[var(--theme-text)] text-xs truncate block">
                           {authorName}

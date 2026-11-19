@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { Avatar } from '@/components/project/projectViewUtils';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -26,7 +27,7 @@ import {
   Loader2,
   Sparkles,
   Copy,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 
@@ -553,11 +554,7 @@ export default function AdminDashboardPage() {
                       return (
                         <tr key={u.id} className="hover:bg-white/[0.02] transition">
                           <td className="py-3 px-4 flex items-center gap-2.5">
-                            <img
-                              src={u.avatarUrl || `/api/avatar/bottts/svg?seed=${u.username}`}
-                              alt={u.displayName}
-                              className="w-8 h-8 rounded-xl object-cover border border-gray-700"
-                            />
+                            <Avatar name={u.displayName || u.username} src={u.avatarUrl} size={32} />
                             <div>
                               <span className="font-bold text-white block">{u.displayName}</span>
                               <span className="text-[11px] text-gray-400 font-mono">@{u.username}</span>

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { Avatar } from "@/components/project/projectViewUtils";
 import { Workspace, Channel, UserProfile, Project } from "@orbit/types";
 import { Presence, PRESENCE_STYLE } from "../availability/useTeamPresence";
 import { useResizableSidebar } from "../layout/useResizableSidebar";
@@ -19,11 +20,15 @@ import {
   Palette,
   Check,
   Building2,
-  PenTool,
+  
   FileText,
   Trash2,
   Share2,
-} from "lucide-react";
+  Canvas,
+  Board,
+  Pen,
+  Mask,
+} from "@/components/ui/icons";
 import { ProjectDocument } from "@orbit/types";
 import { api } from "../../lib/api";
 import { useChatStore } from "../../stores/chatStore";
@@ -31,6 +36,8 @@ import { WorkspaceStorageModal } from "../workspace/WorkspaceStorageModal";
 import { AddWorkspaceMemberDialog } from "../workspace/AddWorkspaceMemberDialog";
 import { ThemeModal } from "../theme/ThemeModal";
 import { OrganizationControlModal } from "../availability/OrganizationControlModal";
+import { CreateChannelModal } from "./CreateChannelModal";
+import { NewDirectMessageModal } from "./NewDirectMessageModal";
 
 /** Animates a section open/closed (grid 0fr -> 1fr). Collapsed content is inert so it can't be tabbed into. */
 const Collapse: React.FC<{ open: boolean; children: React.ReactNode }> = ({ open, children }) => (
@@ -42,6 +49,75 @@ const Collapse: React.FC<{ open: boolean; children: React.ReactNode }> = ({ open
   >
     <div className="min-h-0 overflow-hidden">{children}</div>
   </div>
+);
+
+const SectionHeader: React.FC<{
+  label: string;
+  collapsed: boolean;
+  onToggle: () => void;
+  onAdd?: () => void;
+  addTitle?: string;
+}> = ({ label, collapsed, onToggle, onAdd, addTitle }) => (
+  <div className="flex items-center h-[26px] pr-2 select-none" style={{ color: "var(--theme-section)" }}>
+    <button
+      onClick={onToggle}
+      className="flex-1 h-full flex items-center gap-1.5 pl-1 text-left text-xs font-semibold transition hover:opacity-75 focus:outline-none min-w-0"
+    >
+      <ChevronDown
+        size={14}
+        className={`transition-transform duration-200 ${collapsed ? "-rotate-90" : ""}`}
+      />
+      <span className="truncate">{label}</span>
+    </button>
+    {onAdd && (
+      <button
+        onClick={onAdd}
+        title={addTitle}
+        className="shrink-0 rounded transition hover:opacity-70"
+        style={{ color: "var(--theme-text-muted)" }}
+      >
+        <Plus size={16} />
+      </button>
+    )}
+  </div>
+);
+
+const ActiveBar = () => (
+  <span
+    className="absolute left-0 top-[6px] w-[3px] h-5 rounded-[2px]"
+    style={{ backgroundColor: "var(--theme-accent)" }}
+  />
+);
+
+const UnreadBadge: React.FC<{ count: number }> = ({ count }) => (
+  <span
+    className="ml-2 shrink-0 min-w-[22px] h-5 px-1.5 rounded-[10px] flex items-center justify-center text-xs font-bold"
+    style={{ backgroundColor: "var(--theme-accent)", color: "var(--theme-primary-text)" }}
+  >
+    {count}
+  </span>
+);
+
+const rowClass = (active: boolean) =>
+  `group relative flex items-center h-8 pr-3 rounded-lg cursor-pointer transition-colors ${
+    active ? "" : "hover:bg-[var(--theme-fill-hover)]"
+  }`;
+
+const rowStyle = (active: boolean): React.CSSProperties | undefined =>
+  active ? { backgroundColor: "var(--theme-selected)" } : undefined;
+
+const rowLabel = (active: boolean, unread = false) => ({
+  className: `flex-1 truncate text-sm ${active || unread ? "font-semibold" : ""}`,
+  style: { color: "var(--theme-text)", opacity: active || unread ? 1 : 0.9 },
+});
+
+const RowIcon: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <span
+    className="ml-[10px] mr-2 w-[18px] h-[18px] shrink-0 flex items-center justify-center"
+    style={{ color: "var(--theme-text-muted)" }}
+  >
+    {children}
+  </span>
 );
 
 interface ChannelSidebarProps {
@@ -122,15 +198,13 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   onMemberAdded,
 }) => {
   const [showCreateChannel, setShowCreateChannel] = useState(false);
-  const sidebar = useResizableSidebar("orbit_sidebar_width");
+  const sidebar = useResizableSidebar({ storageKey: "orbit_sidebar_width", defaultWidth: 208 });
+  const [isProjectsCollapsed, setIsProjectsCollapsed] = useState(false);
   const [showStorageModal, setShowStorageModal] = useState(false);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [showThemeModal, setShowThemeModal] = useState(false);
   const [showOrgControlModal, setShowOrgControlModal] = useState(false);
-  const [channelName, setChannelName] = useState("");
-  const [channelTopic, setChannelTopic] = useState("");
-  const [isPrivate, setIsPrivate] = useState(false);
-  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [showNewDm, setShowNewDm] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
   const workspaceMenuRef = useRef<HTMLDivElement>(null);
@@ -170,30 +244,6 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
     currentUserMember?.role === "ADMIN" ||
     workspace.ownerId === currentUser?.id;
 
-  const handleCreateChannel = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!channelName) return;
-    try {
-      const res = await api.post(
-        `/api/channels/workspaces/${workspace.id}/channels`,
-        {
-          name: channelName.toLowerCase().replace(/[^a-z0-9-]/g, "-"),
-          topic: channelTopic,
-          type: isPrivate ? "PRIVATE" : "PUBLIC",
-          isAnonymous,
-        },
-      );
-      onChannelCreated(res.data);
-      setShowCreateChannel(false);
-      setChannelName("");
-      setChannelTopic("");
-      setIsPrivate(false);
-      setIsAnonymous(false);
-    } catch (err: any) {
-      alert(err.response?.data?.error || "Failed to create channel");
-    }
-  };
-
   const copyInviteLink = () => {
     const inviteLink = `${window.location.origin}/join/${(workspace as any).inviteCode || workspace.id}`;
     navigator.clipboard.writeText(inviteLink);
@@ -203,10 +253,9 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 
   return (
     <div
-      className="relative w-64 md:w-[var(--sidebar-w)] border-r flex flex-col h-full select-none"
+      className="relative w-64 md:w-[var(--sidebar-w)] shrink-0 flex flex-col h-full select-none"
       style={{
         backgroundColor: "var(--theme-bg-sidebar)",
-        borderColor: "var(--theme-border)",
         ...sidebar.style,
       }}
     >
@@ -215,34 +264,34 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
       {/* Workspace Header with Dropdown */}
       <div
         ref={workspaceMenuRef}
-        className="relative h-14 border-b px-3 sm:px-4 flex items-center justify-between font-bold select-none z-30"
+        className="relative h-14 shrink-0 border-b pl-4 pr-3 flex items-center justify-between gap-2.5 select-none z-30"
         style={{
-          borderColor: "var(--theme-border)",
+          borderColor: "var(--theme-fill)",
           color: "var(--theme-text-primary)",
         }}
       >
         {showProjects ? (
-          <span className="flex items-center gap-1.5 truncate font-bold text-sm sm:text-base">
-            <FolderKanban size={16} style={{ color: "var(--theme-primary)" }} />
+          <span className="flex items-center gap-2 truncate font-bold text-[17px]">
+            <Board size={18} style={{ color: "var(--theme-text-muted)" }} />
             Projects & Boards
           </span>
         ) : showCanvas ? (
-          <span className="flex items-center gap-1.5 truncate font-bold text-sm sm:text-base">
-            <PenTool size={16} style={{ color: "var(--theme-primary)" }} />
+          <span className="flex items-center gap-2 truncate font-bold text-[17px]">
+            <Canvas size={18} style={{ color: "var(--theme-text-muted)" }} />
             Canvases
           </span>
         ) : showDocs ? (
-          <span className="flex items-center gap-1.5 truncate font-bold text-sm sm:text-base">
-            <FileText size={16} style={{ color: "var(--theme-primary)" }} />
+          <span className="flex items-center gap-2 truncate font-bold text-[17px]">
+            <FileText size={18} style={{ color: "var(--theme-text-muted)" }} />
             Docs
           </span>
         ) : (
           <button
             onClick={() => setShowWorkspaceMenu((prev) => !prev)}
             title="Workspace options"
-            className="flex items-center gap-1.5 truncate rounded-lg px-2 py-1.5 -ml-1.5 transition hover:bg-black/5 dark:hover:bg-white/10 group text-left min-w-0"
+            className="flex-1 flex items-center justify-between gap-1.5 rounded-lg py-1 -ml-1.5 pl-1.5 pr-0.5 transition hover:bg-[var(--theme-fill-hover)] text-left min-w-0"
           >
-            <span className="truncate font-bold text-sm sm:text-base">
+            <span className="truncate font-bold text-[17px] leading-tight">
               {workspace.name}
             </span>
             <ChevronDown
@@ -331,12 +380,12 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           ) : (
             <>
               <button
-                onClick={() => setShowAddMemberModal(true)}
-                title="Invite & Add Members"
-                style={{ color: "var(--theme-text-muted)" }}
-                className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10 hover:opacity-100"
+                onClick={() => setShowNewDm(true)}
+                title="New message"
+                className="w-8 h-8 rounded-lg flex items-center justify-center transition hover:brightness-95"
+                style={{ backgroundColor: "var(--theme-fill)", color: "var(--theme-text-muted)" }}
               >
-                <UserPlus size={18} />
+                <Pen size={18} />
               </button>
               {onCloseMobile && (
                 <button
@@ -443,6 +492,17 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 className="h-px my-1"
                 style={{ backgroundColor: "var(--theme-border)" }}
               />
+
+              <button
+                onClick={() => {
+                  setShowWorkspaceMenu(false);
+                  setShowAddMemberModal(true);
+                }}
+                className="w-full px-3.5 py-2 text-left text-xs flex items-center gap-2.5 transition hover:bg-[var(--theme-fill-hover)]"
+              >
+                <UserPlus size={15} style={{ color: "var(--theme-primary)" }} />
+                <span>Invite & Add Members</span>
+              </button>
 
               {/* Copy Invite Link */}
               <button
@@ -609,34 +669,18 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           </div>
         ) : (
           onOpenSearch && (
-            <div className="px-1 mb-2">
+            <div className="px-1">
               <button
                 onClick={onOpenSearch}
                 title="Search messages (Cmd+K / Ctrl+K)"
-                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs transition group hover:opacity-85"
-                style={{
-                  backgroundColor: "var(--theme-bg-surface)",
-                  borderColor: "var(--theme-border)",
-                  color: "var(--theme-text-muted)",
-                }}
+                className="w-full h-8 flex items-center gap-[9px] pl-[9px] pr-4 rounded-lg transition hover:brightness-95"
+                style={{ backgroundColor: "var(--theme-fill)", color: "var(--theme-text-muted)" }}
               >
-                <div className="flex items-center gap-2">
-                  <Search
-                    size={14}
-                    style={{ color: "var(--theme-primary)" }}
-                    className="transition"
-                  />
-                  <span>Search messages...</span>
-                </div>
-                <kbd
-                  className="text-[10px] px-1.5 py-0.5 rounded font-mono border"
-                  style={{
-                    backgroundColor: "var(--theme-bg-app)",
-                    borderColor: "var(--theme-border)",
-                  }}
-                >
-                  ⌘K
-                </kbd>
+                <Search size={16} />
+                <span className="flex-1 text-left text-[13px]" style={{ color: "var(--theme-text)", opacity: 0.8 }}>
+                  Search
+                </span>
+                <kbd className="font-sans text-[11px] font-medium opacity-80">⌘K</kbd>
               </button>
             </div>
           )
@@ -664,14 +708,14 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                       onClick={() => onSelectProject?.(project)}
                       className={`group flex items-center justify-between h-7 pl-5 pr-2 rounded-md text-[15px] transition cursor-pointer ${
                         isActive
-                          ? "shadow"
+                          ? "font-semibold"
                           : "hover:bg-black/5 dark:hover:bg-white/10"
                       }`}
                       style={
                         isActive
                           ? {
-                              backgroundColor: "var(--theme-primary)",
-                              color: "var(--theme-primary-text)",
+                              backgroundColor: "var(--theme-selected)",
+                              color: "var(--theme-text)",
                             }
                           : {
                               color: "var(--theme-text-primary)",
@@ -742,14 +786,14 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                       onClick={() => onSelectCanvas?.(canvas.id)}
                       className={`group flex items-center justify-between h-7 pl-5 pr-2 rounded-md text-[15px] transition cursor-pointer ${
                         isActive
-                          ? "shadow font-semibold"
+                          ? "font-semibold"
                           : "hover:bg-black/5 dark:hover:bg-white/10"
                       }`}
                       style={
                         isActive
                           ? {
-                              backgroundColor: "var(--theme-primary)",
-                              color: "var(--theme-primary-text)",
+                              backgroundColor: "var(--theme-selected)",
+                              color: "var(--theme-text)",
                             }
                           : {
                               color: "var(--theme-text-primary)",
@@ -757,7 +801,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                       }
                     >
                       <div className="flex items-center gap-2 truncate">
-                        <PenTool size={14} className="shrink-0" />
+                        <Canvas size={14} className="shrink-0" />
                         <span className="truncate">
                           {canvas.title || "Untitled canvas"}
                         </span>
@@ -833,14 +877,14 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                       onClick={() => onSelectDocument?.(doc)}
                       className={`group flex items-center justify-between h-7 pl-5 pr-2 rounded-md text-[15px] transition cursor-pointer ${
                         isActive
-                          ? "shadow font-semibold"
+                          ? "font-semibold"
                           : "hover:bg-black/5 dark:hover:bg-white/10"
                       }`}
                       style={
                         isActive
                           ? {
-                              backgroundColor: "var(--theme-primary)",
-                              color: "var(--theme-primary-text)",
+                              backgroundColor: "var(--theme-selected)",
+                              color: "var(--theme-text)",
                             }
                           : {
                               color: "var(--theme-text-primary)",
@@ -905,31 +949,59 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 
         {!showProjects && !showCanvas && !showDocs && (
         <>
+        {/* Projects & Boards Section */}
+        {(projects.length > 0 || onOpenCreateProject) && (
+          <div>
+            <SectionHeader
+              label="Projects & boards"
+              collapsed={isProjectsCollapsed}
+              onToggle={() => setIsProjectsCollapsed((prev) => !prev)}
+            />
+            <Collapse open={!isProjectsCollapsed}>
+              <div className="space-y-0.5">
+                {projects
+                  .filter((p) => (p.status || "active").toLowerCase() === "active")
+                  .map((project) => {
+                    const isActive = currentProject?.id === project.id;
+                    return (
+                      <div
+                        key={project.id}
+                        onClick={() => onSelectProject?.(project)}
+                        className={rowClass(isActive)}
+                        style={rowStyle(isActive)}
+                      >
+                        {isActive && <ActiveBar />}
+                        <RowIcon>
+                          <Board size={18} />
+                        </RowIcon>
+                        <span {...rowLabel(isActive)}>{project.name}</span>
+                      </div>
+                    );
+                  })}
+                {projects.length === 0 && onOpenCreateProject && (
+                  <button onClick={onOpenCreateProject} className={`w-full text-left ${rowClass(false)}`}>
+                    <RowIcon>
+                      <Plus size={16} />
+                    </RowIcon>
+                    <span className="flex-1 truncate text-sm" style={{ color: "var(--theme-text-muted)" }}>
+                      Create a project board
+                    </span>
+                  </button>
+                )}
+              </div>
+            </Collapse>
+          </div>
+        )}
+
         {/* Channels Section */}
         <div>
-          <div
-            className="flex items-center justify-between h-7 px-2 text-[15px] font-medium select-none"
-            style={{ color: "var(--theme-text-muted)" }}
-          >
-            <button
-              onClick={() => setIsChannelsCollapsed((prev) => !prev)}
-              className="flex items-center gap-1.5 hover:text-[var(--theme-text)] transition cursor-pointer text-left focus:outline-none"
-            >
-              <ChevronDown
-                size={14}
-                className={`transition-transform duration-200 shrink-0 ${
-                  isChannelsCollapsed ? "-rotate-90" : "rotate-0"
-                }`}
-              />
-              <span>Channels</span>
-            </button>
-            <button
-              onClick={() => setShowCreateChannel(true)}
-              className="p-1 hover:opacity-80 rounded transition"
-            >
-              <Plus size={14} />
-            </button>
-          </div>
+          <SectionHeader
+            label="Channels"
+            collapsed={isChannelsCollapsed}
+            onToggle={() => setIsChannelsCollapsed((prev) => !prev)}
+            onAdd={() => setShowCreateChannel(true)}
+            addTitle="Create a channel"
+          />
 
           <Collapse open={!isChannelsCollapsed}>
             <div className="space-y-0.5">
@@ -944,91 +1016,53 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                     <div
                       key={channel.id}
                       onClick={() => onSelectChannel(channel)}
-                      className={`group flex items-center justify-between h-7 pl-5 pr-2 rounded-md text-[15px] transition cursor-pointer ${
-                        isActive
-                          ? "shadow"
-                          : unread > 0
-                            ? "font-bold bg-black/5 dark:bg-white/10"
-                            : "hover:bg-black/5 dark:hover:bg-white/10"
-                      }`}
-                      style={
-                        isActive
-                          ? {
-                              backgroundColor: "var(--theme-primary)",
-                              color: "var(--theme-primary-text)",
-                            }
-                          : {
-                              color: "var(--theme-text-primary)",
-                            }
-                      }
+                      className={rowClass(isActive)}
+                      style={rowStyle(isActive)}
                     >
-                      <div className="flex items-center gap-2 truncate">
+                      {isActive && <ActiveBar />}
+                      <RowIcon>
                         {channel.isAnonymous ? (
-                          <span
-                            className="text-sm shrink-0 leading-none"
-                            title="Anonymous Channel"
-                          >
-                            🎭
-                          </span>
+                          <Mask size={18} aria-label="Anonymous channel" />
                         ) : channel.type === "PRIVATE" ? (
-                          <Lock
-                            size={15}
-                            className={`shrink-0 ${unread > 0 ? "" : "opacity-70"}`}
-                          />
+                          <Lock size={18} aria-label="Private channel" />
                         ) : (
-                          <Hash
-                            size={16}
-                            className={`shrink-0 ${unread > 0 ? "" : "opacity-70"}`}
-                          />
+                          <Hash size={16} />
                         )}
-                        <span className="truncate">{channel.name}</span>
-                        {channel.isAnonymous && (
-                          <span className="text-[9px] px-1 py-0.5 rounded bg-purple-100 dark:bg-purple-950/80 border border-purple-700/50 text-purple-700 dark:text-purple-300 font-semibold shrink-0">
-                            anon
-                          </span>
-                        )}
-                      </div>
+                      </RowIcon>
+                      <span {...rowLabel(isActive, unread > 0)}>{channel.name}</span>
 
-                      <div className="flex items-center gap-1.5">
-                        {unread > 0 && (
-                          <span className="px-1.5 py-0.5 bg-slack-green text-white text-[10px] font-bold rounded-full min-w-[18px] text-center leading-none">
-                            {unread}
-                          </span>
-                        )}
-
-                        {/* Active Call Indicator & Avatars */}
-                        {hasHuddle && (
-                          <span className="flex items-center gap-1 bg-slack-green/20 border border-slack-green/40 text-slack-green px-1.5 py-0.5 rounded-full text-[10px] font-bold animate-pulse">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slack-green" />
-                            LIVE
-                          </span>
-                        )}
-
-                        {/* Channel Call Action */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onStartHuddle(channel);
+                      {hasHuddle && (
+                        <span
+                          className="ml-2 shrink-0 flex items-center gap-1 px-1.5 h-5 rounded-full text-[10px] font-bold animate-pulse"
+                          style={{
+                            backgroundColor: "color-mix(in srgb, var(--theme-primary) 15%, transparent)",
+                            color: "var(--theme-primary)",
                           }}
-                          title={
-                            hasHuddle
-                              ? "Active Call - Click to join"
-                              : "Start Call"
-                          }
-                          style={
-                            hasHuddle
-                              ? undefined
-                              : { color: "var(--theme-text-muted)" }
-                          }
-                          className={`p-1 rounded transition ${
-                            hasHuddle
-                              ? "bg-slack-green text-white shadow-sm"
-                              : "opacity-0 group-hover:opacity-100 hover:bg-[var(--theme-bg-app)] dark:hover:bg-white/10"
-                          }`}
                         >
-                          <PhoneCall size={13} />
-                        </button>
-                      </div>
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "var(--theme-primary)" }} />
+                          LIVE
+                        </span>
+                      )}
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onStartHuddle(channel);
+                        }}
+                        title={hasHuddle ? "Active Call - Click to join" : "Start Call"}
+                        className={`ml-1 shrink-0 p-1 rounded transition ${
+                          hasHuddle ? "" : "hidden group-hover:block hover:bg-[var(--theme-fill)]"
+                        }`}
+                        style={
+                          hasHuddle
+                            ? { backgroundColor: "var(--theme-primary)", color: "var(--theme-primary-text)" }
+                            : { color: "var(--theme-text-muted)" }
+                        }
+                      >
+                        <PhoneCall size={13} />
+                      </button>
+
+                      {unread > 0 && <UnreadBadge count={unread} />}
                     </div>
                   );
                 })}
@@ -1038,44 +1072,22 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 
         {/* Direct Messages Section */}
         <div>
-          <div
-            className="flex items-center justify-between h-7 px-2 text-[15px] font-medium select-none group/dm-header"
-            style={{ color: "var(--theme-text-muted)" }}
-          >
-            <button
-              onClick={() => setIsDmsCollapsed((prev) => !prev)}
-              className="flex items-center gap-1.5 hover:text-[var(--theme-text)] transition cursor-pointer text-left focus:outline-none flex-1 truncate"
-            >
-              <ChevronDown
-                size={14}
-                className={`transition-transform duration-200 shrink-0 ${
-                  isDmsCollapsed ? "-rotate-90" : "rotate-0"
-                }`}
-              />
-              <span>Direct messages</span>
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (isDmsCollapsed) setIsDmsCollapsed(false);
-                setShowDmSearch((prev) => !prev);
-              }}
-              title="Search users"
-              className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 hover:text-[var(--theme-text)] transition shrink-0 focus:outline-none opacity-70 group-hover/dm-header:opacity-100"
-            >
-              <Search size={14} />
-            </button>
-          </div>
+          <SectionHeader
+            label="Direct messages"
+            collapsed={isDmsCollapsed}
+            onToggle={() => setIsDmsCollapsed((prev) => !prev)}
+            onAdd={() => setShowNewDm(true)}
+            addTitle="New message"
+          />
 
           <Collapse open={!isDmsCollapsed}>
             <div className="space-y-0.5">
               {showDmSearch && (
-                <div className="px-2 pt-1 pb-1.5">
+                <div className="px-1 pt-1 pb-1.5">
                   <div
-                    className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs border"
+                    className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[13px]"
                     style={{
-                      backgroundColor: "var(--theme-surface, rgba(255,255,255,0.04))",
-                      borderColor: "var(--theme-border, rgba(255,255,255,0.1))",
+                      backgroundColor: "var(--theme-fill)",
                       color: "var(--theme-text-primary)",
                     }}
                   >
@@ -1199,56 +1211,29 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                     <div
                       key={member.id}
                       onClick={() => onSelectUserDM(user)}
-                      className={`flex items-center justify-between h-7 pl-5 pr-2 rounded-md text-[15px] transition cursor-pointer ${
-                        isSelectedDM
-                          ? "shadow"
-                          : unread > 0
-                            ? "font-bold bg-black/5 dark:bg-white/10"
-                            : "hover:bg-black/5 dark:hover:bg-white/10"
-                      }`}
-                      style={
-                        isSelectedDM
-                          ? {
-                              backgroundColor: "var(--theme-primary)",
-                              color: "var(--theme-primary-text)",
-                            }
-                          : {
-                              color: "var(--theme-text-primary)",
-                            }
-                      }
+                      className={rowClass(!!isSelectedDM)}
+                      style={rowStyle(!!isSelectedDM)}
                     >
-                      <div className="flex items-center gap-2 truncate min-w-0">
-                        <div className="relative shrink-0">
-                          <img
-                            src={
-                              user.avatarUrl ||
-                              `/api/avatar/bottts/svg?seed=${user.username}`
-                            }
-                            alt={user.displayName}
-                            className="w-5 h-5 rounded object-cover"
-                          />
-                          <span
-                            title={PRESENCE_STYLE[userPresence].label}
-                            className={`absolute bottom-0 right-0 w-[7px] h-[7px] rounded-full ${PRESENCE_STYLE[userPresence].dot}`}
-                            style={{ boxShadow: "0 0 0 1.5px var(--theme-bg-sidebar)" }}
-                          />
-                        </div>
-                        <span className="truncate">{user.displayName}</span>
+                      {isSelectedDM && <ActiveBar />}
+                      <span className="relative ml-2 mr-1 w-6 h-6 shrink-0">
+                        <Avatar name={user.displayName || user.username} src={user.avatarUrl} size={24} />
+                        <span
+                          title={PRESENCE_STYLE[userPresence].label}
+                          className={`absolute left-4 top-4 w-2.5 h-2.5 rounded-full ${PRESENCE_STYLE[userPresence].dot}`}
+                          style={{
+                            boxShadow: `0 0 0 2px ${isSelectedDM ? "var(--theme-selected)" : "var(--theme-bg-sidebar)"}`,
+                          }}
+                        />
+                      </span>
+                      <span {...rowLabel(!!isSelectedDM, unread > 0)}>
+                        {user.displayName}
                         {isSelf && (
-                          <span
-                            className="text-[10px] shrink-0"
-                            style={{ color: "var(--theme-text-muted)" }}
-                          >
+                          <span className="ml-1.5 text-[11px] font-normal" style={{ color: "var(--theme-text-muted)" }}>
                             you
                           </span>
                         )}
-                      </div>
-
-                      {unread > 0 && (
-                        <span className="px-1.5 py-0.5 bg-slack-green text-white text-[10px] font-bold rounded-full min-w-[18px] text-center leading-none shrink-0 ml-1">
-                          {unread}
-                        </span>
-                      )}
+                      </span>
+                      {unread > 0 && <UnreadBadge count={unread} />}
                     </div>
                   );
                 });
@@ -1262,159 +1247,29 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 
       {/* Create Channel Modal */}
       {showCreateChannel && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-xl w-full max-w-md p-6 shadow-2xl">
-            <h2 className="text-xl font-bold text-[var(--theme-text)] mb-2 flex items-center gap-2">
-              <Hash className="text-slack-activeChannel" size={22} />
-              Create a channel
-            </h2>
-            <p className="text-sm text-[var(--theme-text-muted)] mb-5">
-              Channels are where conversations happen around a topic.
-            </p>
+        <CreateChannelModal
+          workspaceId={workspace.id}
+          members={members}
+          currentUserId={currentUser?.id}
+          onClose={() => setShowCreateChannel(false)}
+          onCreated={(channel) => {
+            onChannelCreated(channel);
+            setShowCreateChannel(false);
+          }}
+        />
+      )}
 
-            <form onSubmit={handleCreateChannel} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--theme-text)] mb-1">
-                  Name
-                </label>
-                <div className="flex items-center bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-lg px-3 py-2 text-sm text-[var(--theme-text-muted)]">
-                  <span>#</span>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. project-updates"
-                    value={channelName}
-                    onChange={(e) => setChannelName(e.target.value)}
-                    className="flex-1 bg-transparent text-[var(--theme-text)] focus:outline-none ml-1"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--theme-text)] mb-1">
-                  Topic (optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="What is this channel about?"
-                  value={channelTopic}
-                  onChange={(e) => setChannelTopic(e.target.value)}
-                  className="w-full bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-lg px-3 py-2 text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-slack-activeChannel text-sm"
-                />
-              </div>
-
-              {/* Channel Type / Privacy Cards */}
-              <div className="space-y-2 pt-1">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--theme-text)]">
-                  Channel Privacy
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div
-                    onClick={() => setIsPrivate(false)}
-                    className={`p-3 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
-                      !isPrivate
-                        ? "border-slack-green bg-slack-green/10 text-white shadow"
-                        : "border-[var(--theme-border)] bg-[var(--theme-bg-surface)] text-[var(--theme-text-muted)] hover:border-[var(--theme-border)]"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <Hash
-                        size={16}
-                        className={
-                          !isPrivate ? "text-slack-green" : "text-[var(--theme-text-muted)]"
-                        }
-                      />
-                      <span className="font-bold text-xs text-[var(--theme-text)]">
-                        Public
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-[var(--theme-text-muted)] leading-snug">
-                      Anyone in workspace can view &amp; join
-                    </span>
-                  </div>
-
-                  <div
-                    onClick={() => setIsPrivate(true)}
-                    className={`p-3 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
-                      isPrivate
-                        ? "border-slack-green bg-slack-green/10 text-white shadow"
-                        : "border-[var(--theme-border)] bg-[var(--theme-bg-surface)] text-[var(--theme-text-muted)] hover:border-[var(--theme-border)]"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <Lock
-                        size={16}
-                        className={
-                          isPrivate ? "text-slack-green" : "text-[var(--theme-text-muted)]"
-                        }
-                      />
-                      <span className="font-bold text-xs text-[var(--theme-text)]">
-                        Private
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-[var(--theme-text-muted)] leading-snug">
-                      Only invited people can view &amp; join
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Anonymous Discussion Mode Option */}
-              <div className="space-y-1.5 pt-1">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--theme-text)]">
-                  Discussion Mode
-                </label>
-                <div
-                  onClick={() => setIsAnonymous(!isAnonymous)}
-                  className={`p-3 rounded-xl border cursor-pointer transition flex items-start gap-3 ${
-                    isAnonymous
-                      ? "border-purple-500 bg-purple-950/30 text-white shadow"
-                      : "border-[var(--theme-border)] bg-[var(--theme-bg-surface)] text-[var(--theme-text)] hover:border-[var(--theme-border)]"
-                  }`}
-                >
-                  <span className="text-2xl shrink-0 select-none">🎭</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs text-[var(--theme-text)]">
-                        Anonymous Channel
-                      </span>
-                      <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase transition ${
-                          isAnonymous
-                            ? "bg-purple-600 text-white shadow-xs"
-                            : "bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text-muted)]"
-                        }`}
-                      >
-                        {isAnonymous ? "Enabled" : "Disabled"}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-[var(--theme-text-muted)] leading-snug mt-1">
-                      Ideal for critical discussions and open-ended feedback.
-                      Real names, avatars, and IDs are hidden. Each member gets
-                      a customizable pseudonym and emoji icon.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateChannel(false)}
-                  className="px-4 py-2 rounded-lg text-sm text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface)] transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-lg text-sm font-semibold bg-slack-green hover:bg-[#008a65] text-white transition"
-                >
-                  Create Channel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {showNewDm && (
+        <NewDirectMessageModal
+          members={members}
+          presence={presence}
+          currentUserId={currentUser?.id}
+          onClose={() => setShowNewDm(false)}
+          onSelectUser={(u) => {
+            setShowNewDm(false);
+            onSelectUserDM(u);
+          }}
+        />
       )}
 
       {/* Workspace Storage & File Management Modal */}

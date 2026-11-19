@@ -30,7 +30,8 @@ import {
   ChevronDown,
   X,
   ExternalLink,
-} from 'lucide-react';
+  Link as LinkIcon,
+} from '@/components/ui/icons';
 import { api } from '../../lib/api';
 
 export type BlockType =
@@ -65,7 +66,30 @@ interface NotionEditorProps {
   onChange: (value: string) => void;
   placeholder?: string;
   readOnly?: boolean;
+  // 'page' renders the doc on a centered 700px sheet below a full-width toolbar
+  variant?: 'page' | 'plain';
+  // Rendered at the top of the sheet in 'page' variant (doc title, meta line)
+  pageHeader?: React.ReactNode;
 }
+
+const BLOCK_LABELS: Record<BlockType, string> = {
+  p: 'Paragraph',
+  h1: 'Heading 1',
+  h2: 'Heading 2',
+  h3: 'Heading 3',
+  bullet: 'Bulleted list',
+  number: 'Numbered list',
+  todo: 'To-do list',
+  callout: 'Callout',
+  quote: 'Quote',
+  code: 'Code block',
+  table: 'Table',
+  image: 'Image',
+  divider: 'Divider',
+};
+
+// Block types that hold their own content shape; inserting them never converts text in place
+const INSERT_ONLY: BlockType[] = ['table', 'image', 'divider', 'code'];
 
 // Generate unique ID
 function uid(): string {
@@ -321,9 +345,12 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
   onChange,
   placeholder = 'Write on the sheet directly, or type \'/\' for blocks...',
   readOnly = false,
+  variant = 'plain',
+  pageHeader,
 }) => {
   const [blocks, setBlocks] = useState<NotionBlock[]>(() => parseMarkdownToBlocks(value));
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
+  const [showStyleMenu, setShowStyleMenu] = useState(false);
 
   // Slash commands popup state
   const [slashMenu, setSlashMenu] = useState<{
@@ -604,6 +631,43 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
       : true
   );
 
+  const focusedId = lastFocusedBlockRef.current || activeBlockId;
+  const focusedBlock = blocks.find((b) => b.id === focusedId) || null;
+  const activeType: BlockType = focusedBlock?.type ?? 'p';
+
+  // Toolbar: set the focused block's type, or insert when the type carries its own content shape
+  const applyBlockType = (type: BlockType) => {
+    setShowStyleMenu(false);
+    if (!focusedBlock || INSERT_ONLY.includes(type)) {
+      insertBlockAfter(focusedId, type);
+      return;
+    }
+    convertBlockType(focusedBlock.id, focusedBlock.type === type && type !== 'p' ? 'p' : type);
+  };
+
+  // Inline formatting is stored as markdown around the selection in the focused text block
+  const wrapSelection = (before: string, after = before) => {
+    if (!focusedBlock || focusedBlock.type === 'code') return;
+    const el = document.getElementById(`input-${focusedBlock.id}`) as HTMLTextAreaElement | null;
+    if (!el) return;
+    const text = focusedBlock.content;
+    const start = el.selectionStart ?? text.length;
+    const end = el.selectionEnd ?? start;
+    setBlockContent(focusedBlock.id, {
+      content: text.slice(0, start) + before + text.slice(start, end) + after + text.slice(end),
+    });
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(start + before.length, end + before.length);
+    });
+  };
+
+  const insertLink = () => {
+    if (!focusedBlock) return;
+    const url = window.prompt('Link URL');
+    if (url?.trim()) wrapSelection('[', `](${url.trim()})`);
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden select-text">
       {/* Hidden File Input for Image Upload */}
@@ -615,129 +679,91 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
         className="hidden"
       />
 
-      {/* ========================================== */}
-      {/* 1. Floating WYSIWYG Formatting Toolbar     */}
-      {/* ========================================== */}
+      {/* Formatting toolbar */}
       {!readOnly && (
         <div
-          className="border-b px-2 sm:px-4 py-1.5 sm:py-2 flex items-center justify-between gap-1 sm:gap-2 overflow-x-auto shrink-0 select-none shadow-sm scrollbar-none"
-          style={{
-            backgroundColor: 'var(--theme-bg-surface)',
-            borderColor: 'var(--theme-border)',
-          }}
+          className="h-12 border-b px-3 sm:px-6 flex items-center gap-1 overflow-x-auto shrink-0 select-none scrollbar-none"
+          style={{ backgroundColor: 'var(--theme-bg-app)', borderColor: 'var(--theme-border)' }}
         >
-          {/* Quick Insert Blocks */}
-          <div className="flex items-center gap-1 shrink-0">
-            <span className="text-[10px] font-bold uppercase tracking-wider opacity-50 mr-1 hidden sm:inline"
-              style={{ color: 'var(--theme-text-muted)' }}
-            >
-              Insert on Sheet:
-            </span>
-
+          <div className="relative shrink-0">
             <button
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => insertBlockAfter(lastFocusedBlockRef.current || activeBlockId, 'h1')}
-              title="Add Heading 1 at cursor"
-              className="p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-1 text-xs font-bold"
+              onClick={() => setShowStyleMenu((v) => !v)}
+              className="h-8 px-2.5 rounded-lg border flex items-center gap-1.5 text-[13px] font-medium transition hover:bg-[var(--theme-fill-hover)]"
+              style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}
             >
-              <Heading1 size={15} />
-              <span className="hidden md:inline text-[11px]">H1</span>
+              {BLOCK_LABELS[activeType]}
+              <ChevronDown size={14} style={{ color: 'var(--theme-text-muted)' }} />
             </button>
-
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => insertBlockAfter(lastFocusedBlockRef.current || activeBlockId, 'h2')}
-              title="Add Heading 2 at cursor"
-              className="p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-1 text-xs font-bold"
-            >
-              <Heading2 size={15} />
-              <span className="hidden md:inline text-[11px]">H2</span>
-            </button>
-
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => insertBlockAfter(lastFocusedBlockRef.current || activeBlockId, 'todo')}
-              title="Add To-do Task at cursor"
-              className="p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-1 text-xs"
-            >
-              <CheckSquare size={15} className="text-emerald-600 dark:text-emerald-400" />
-              <span className="hidden md:inline text-[11px]">To-do</span>
-            </button>
-
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => insertBlockAfter(lastFocusedBlockRef.current || activeBlockId, 'bullet')}
-              title="Add Bulleted List at cursor"
-              className="p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition"
-            >
-              <List size={15} />
-            </button>
-
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => insertBlockAfter(lastFocusedBlockRef.current || activeBlockId, 'table')}
-              title="Add Interactive Table at cursor"
-              className="p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-1 text-xs"
-            >
-              <TableIcon size={15} className="text-blue-600 dark:text-blue-400" />
-              <span className="hidden md:inline text-[11px]">Table</span>
-            </button>
-
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => insertBlockAfter(lastFocusedBlockRef.current || activeBlockId, 'image')}
-              title="Add Picture / Image at cursor"
-              className="p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-1 text-xs"
-            >
-              <ImageIcon size={15} className="text-pink-600 dark:text-pink-400" />
-              <span className="hidden md:inline text-[11px]">Picture</span>
-            </button>
-
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => insertBlockAfter(lastFocusedBlockRef.current || activeBlockId, 'callout')}
-              title="Add Callout Box at cursor"
-              className="p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center gap-1 text-xs"
-            >
-              <Sparkles size={15} className="text-amber-600 dark:text-amber-400" />
-              <span className="hidden md:inline text-[11px]">Callout</span>
-            </button>
-
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => insertBlockAfter(lastFocusedBlockRef.current || activeBlockId, 'quote')}
-              title="Add Quote at cursor"
-              className="p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition"
-            >
-              <Quote size={15} />
-            </button>
-
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => insertBlockAfter(lastFocusedBlockRef.current || activeBlockId, 'code')}
-              title="Add Code Block at cursor"
-              className="p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition"
-            >
-              <FileCode size={15} />
-            </button>
-
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => insertBlockAfter(lastFocusedBlockRef.current || activeBlockId, 'divider')}
-              title="Add Divider at cursor"
-              className="p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition"
-            >
-              <Minus size={15} />
-            </button>
+            {showStyleMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowStyleMenu(false)} />
+                <div
+                  className="fixed z-50 mt-1.5 w-60 max-h-80 overflow-y-auto rounded-xl border p-1.5 shadow-xl"
+                  style={{ backgroundColor: 'var(--theme-bg-app)', borderColor: 'var(--theme-border)' }}
+                >
+                  {allSlashOptions.map((opt) => (
+                    <button
+                      key={opt.type}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => applyBlockType(opt.type)}
+                      className="w-full h-8 px-2.5 rounded-lg flex items-center gap-2.5 text-left text-[13px] transition hover:bg-[var(--theme-fill-hover)]"
+                      style={{
+                        color: 'var(--theme-text)',
+                        backgroundColor: opt.type === activeType ? 'var(--theme-selected)' : undefined,
+                      }}
+                    >
+                      <opt.icon size={15} style={{ color: 'var(--theme-text-muted)' }} />
+                      <span className="flex-1 truncate">{BLOCK_LABELS[opt.type]}</span>
+                      {opt.type === activeType && <Check size={12} style={{ color: 'var(--theme-primary)' }} />}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
-          <div className="text-[11px] opacity-60 font-medium hidden lg:flex items-center gap-1 shrink-0"
-            style={{ color: 'var(--theme-text-muted)' }}
-          >
-            <span>Type</span>
-            <kbd className="px-1.5 py-0.5 rounded border text-[10px] bg-[var(--theme-bg-app)] dark:bg-white/10">/</kbd>
-            <span>anywhere to insert blocks</span>
-          </div>
+          <ToolbarSep />
+          <ToolButton title="Bold" onClick={() => wrapSelection('**')}>
+            <span className="text-[15px] font-bold">B</span>
+          </ToolButton>
+          <ToolButton title="Italic" onClick={() => wrapSelection('_')}>
+            <span className="text-[15px] font-medium italic">I</span>
+          </ToolButton>
+          <ToolButton title="Underline" onClick={() => wrapSelection('<u>', '</u>')}>
+            <span className="text-[15px] font-medium underline">U</span>
+          </ToolButton>
+          <ToolbarSep />
+          <ToolButton title="Bulleted list" active={activeType === 'bullet'} onClick={() => applyBlockType('bullet')}>
+            <List size={18} />
+          </ToolButton>
+          <ToolButton title="Numbered list" active={activeType === 'number'} onClick={() => applyBlockType('number')}>
+            <ListOrdered size={18} />
+          </ToolButton>
+          <ToolButton title="Quote" active={activeType === 'quote'} onClick={() => applyBlockType('quote')}>
+            <Quote size={18} />
+          </ToolButton>
+          <ToolbarSep />
+          <ToolButton title="Link" onClick={insertLink}>
+            <LinkIcon size={18} />
+          </ToolButton>
+          <ToolButton title="Image" onClick={() => applyBlockType('image')}>
+            <ImageIcon size={18} />
+          </ToolButton>
+          <ToolButton title="Code block" active={activeType === 'code'} onClick={() => applyBlockType('code')}>
+            <Code size={18} />
+          </ToolButton>
+
+          <span className="ml-auto pl-3 text-[11px] font-medium hidden lg:flex items-center gap-1 shrink-0" style={{ color: 'var(--theme-text-muted)' }}>
+            Type
+            <kbd
+              className="px-1.5 py-0.5 rounded-md border text-[10px] font-sans"
+              style={{ borderColor: 'color-mix(in srgb, var(--theme-text) 20%, transparent)' }}
+            >
+              /
+            </kbd>
+            for more blocks
+          </span>
         </div>
       )}
 
@@ -745,13 +771,36 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
       {/* 2. WYSIWYG Document Canvas Sheet           */}
       {/* ========================================== */}
       <div
-        className="flex-1 overflow-y-auto px-3 sm:px-8 md:px-12 py-4 sm:py-6 space-y-1 relative"
+        className={
+          variant === 'page'
+            ? 'flex-1 overflow-y-auto flex justify-center px-3 sm:px-6 pt-7 pb-12'
+            : 'flex-1 overflow-y-auto'
+        }
+        style={variant === 'page' ? { backgroundColor: 'var(--theme-bg-surface)' } : undefined}
+      >
+      <div
+        className={
+          variant === 'page'
+            ? 'w-full max-w-[700px] h-fit rounded-xl border px-6 py-8 sm:p-14 flex flex-col gap-3.5 relative'
+            : 'px-3 sm:px-8 md:px-12 py-4 sm:py-6 space-y-1 relative'
+        }
+        style={
+          variant === 'page'
+            ? {
+                backgroundColor: 'var(--theme-bg-app)',
+                borderColor: 'var(--theme-border)',
+                boxShadow: '0 8px 12px rgba(20, 26, 46, 0.05), 0 1px 1px rgba(20, 26, 46, 0.05)',
+              }
+            : undefined
+        }
         onClick={() => {
           if (blocks.length === 0) {
             insertBlockAfter('', 'p');
           }
         }}
       >
+        {variant === 'page' && pageHeader}
+        <div className={variant === 'page' ? 'space-y-1' : 'contents'}>
         {blocks.map((block, index) => (
           <div
             key={block.id}
@@ -802,7 +851,7 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
                   }}
                   placeholder="Heading 1"
                   readOnly={readOnly}
-                  className="text-2xl md:text-3xl font-extrabold tracking-tight mt-4 mb-1 border-b pb-1"
+                  className="text-[24px] leading-8 font-bold mt-2"
                 />
               )}
 
@@ -819,7 +868,7 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
                   }}
                   placeholder="Heading 2"
                   readOnly={readOnly}
-                  className="text-xl md:text-2xl font-bold tracking-tight mt-3 mb-1"
+                  className="text-[20px] leading-7 font-bold mt-1.5"
                 />
               )}
 
@@ -836,7 +885,7 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
                   }}
                   placeholder="Heading 3"
                   readOnly={readOnly}
-                  className="text-base md:text-lg font-bold tracking-tight mt-2 mb-0.5"
+                  className="text-[17px] leading-6 font-semibold mt-1"
                 />
               )}
 
@@ -853,7 +902,7 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
                   }}
                   placeholder={index === 0 ? placeholder : 'Write text directly on sheet or type \'/\'...'}
                   readOnly={readOnly}
-                  className="text-sm md:text-base leading-relaxed py-0.5"
+                  className="text-[15px] leading-6"
                 />
               )}
 
@@ -877,7 +926,7 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
                     }}
                     placeholder="To-do task"
                     readOnly={readOnly}
-                    className={`text-sm md:text-base leading-relaxed flex-1 ${
+                    className={`text-[15px] leading-6 flex-1 ${
                       block.checked ? 'line-through opacity-50' : ''
                     }`}
                   />
@@ -886,8 +935,8 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
 
               {/* Bullet List */}
               {block.type === 'bullet' && (
-                <div className="flex items-start gap-2.5 py-0.5">
-                  <span className="text-lg leading-none mt-1 opacity-70 select-none">•</span>
+                <div className="flex items-start gap-2.5">
+                  <span className="w-1.5 h-1.5 rounded-full mt-[9px] shrink-0 select-none" style={{ backgroundColor: 'var(--theme-text-muted)' }} />
                   <AutoGrowingInput
                     id={`input-${block.id}`}
                     value={block.content}
@@ -899,7 +948,7 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
                     }}
                     placeholder="List item"
                     readOnly={readOnly}
-                    className="text-sm md:text-base leading-relaxed flex-1"
+                    className="text-[15px] leading-6 flex-1"
                   />
                 </div>
               )}
@@ -907,7 +956,7 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
               {/* Numbered List */}
               {block.type === 'number' && (
                 <div className="flex items-start gap-2 py-0.5">
-                  <span className="text-xs font-semibold mt-1 opacity-70 select-none w-5 text-right shrink-0">
+                  <span className="text-[15px] leading-6 select-none w-5 text-right shrink-0" style={{ color: 'var(--theme-text-muted)' }}>
                     {index + 1}.
                   </span>
                   <AutoGrowingInput
@@ -921,7 +970,7 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
                     }}
                     placeholder="Numbered step"
                     readOnly={readOnly}
-                    className="text-sm md:text-base leading-relaxed flex-1"
+                    className="text-[15px] leading-6 flex-1"
                   />
                 </div>
               )}
@@ -929,15 +978,13 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
               {/* Callout Box (Editable Directly on Sheet) */}
               {block.type === 'callout' && (
                 <div
-                  className="p-3.5 my-2 rounded-xl border flex items-start gap-3 shadow-sm transition"
+                  className="p-3.5 my-1 rounded-xl border flex items-start gap-3 transition"
                   style={{
                     backgroundColor: 'var(--theme-bg-surface)',
-                    borderColor: 'var(--theme-border)',
-                    borderLeftWidth: '4px',
-                    borderLeftColor: 'var(--theme-primary)',
+                    borderColor: 'color-mix(in srgb, var(--theme-primary) 40%, transparent)',
                   }}
                 >
-                  <span className="text-xl shrink-0 select-none">{block.emoji || '💡'}</span>
+                  <span className="text-lg leading-5 shrink-0 select-none">{block.emoji || '💡'}</span>
                   <AutoGrowingInput
                     id={`input-${block.id}`}
                     value={block.content}
@@ -949,7 +996,7 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
                     }}
                     placeholder="Important note or callout message..."
                     readOnly={readOnly}
-                    className="text-sm leading-relaxed flex-1"
+                    className="text-[13px] leading-5 flex-1"
                   />
                 </div>
               )}
@@ -957,12 +1004,8 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
               {/* Blockquote */}
               {block.type === 'quote' && (
                 <div
-                  className="border-l-4 pl-3.5 py-1 my-2 rounded-r italic"
-                  style={{
-                    borderLeftColor: 'var(--theme-primary)',
-                    backgroundColor: 'var(--theme-bg-surface)',
-                    color: 'var(--theme-text-muted)',
-                  }}
+                  className="border-l-2 pl-3 my-1"
+                  style={{ borderLeftColor: 'var(--theme-primary)' }}
                 >
                   <AutoGrowingInput
                     id={`input-${block.id}`}
@@ -975,7 +1018,7 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
                     }}
                     placeholder="Quotation..."
                     readOnly={readOnly}
-                    className="text-sm leading-relaxed italic"
+                    className="text-[15px] leading-6 italic"
                   />
                 </div>
               )}
@@ -983,7 +1026,7 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
               {/* Code Block (Directly Editable on Sheet) */}
               {block.type === 'code' && (
                 <div
-                  className="rounded-xl border p-3 my-2 font-mono text-xs overflow-hidden"
+                  className="rounded-[10px] border p-3 my-1 font-mono text-xs overflow-hidden"
                   style={{
                     backgroundColor: 'var(--theme-bg-surface)',
                     borderColor: 'var(--theme-border)',
@@ -1140,10 +1183,38 @@ export const NotionEditor: React.FC<NotionEditorProps> = ({
             )}
           </div>
         ))}
+        </div>
+      </div>
       </div>
     </div>
   );
 };
+
+const ToolButton: React.FC<{
+  title: string;
+  onClick: () => void;
+  active?: boolean;
+  children: React.ReactNode;
+}> = ({ title, onClick, active, children }) => (
+  <button
+    title={title}
+    onMouseDown={(e) => e.preventDefault()}
+    onClick={onClick}
+    className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center transition hover:bg-[var(--theme-fill-hover)]"
+    style={{
+      color: 'var(--theme-text)',
+      backgroundColor: active ? 'var(--theme-selected)' : undefined,
+    }}
+  >
+    {children}
+  </button>
+);
+
+const ToolbarSep = () => (
+  <span className="flex items-center px-1.5 shrink-0">
+    <span className="w-px h-5" style={{ backgroundColor: 'var(--theme-border)' }} />
+  </span>
+);
 
 // ==========================================
 // Auto-Growing Inline Text Input Component
@@ -1196,7 +1267,7 @@ const AutoGrowingInput: React.FC<AutoGrowingInputProps> = ({
       placeholder={placeholder}
       readOnly={readOnly}
       rows={1}
-      className={`w-full bg-transparent resize-none focus:outline-none placeholder:opacity-30 overflow-hidden ${className}`}
+      className={`w-full bg-transparent resize-none focus:outline-none placeholder:text-[var(--theme-text-muted)] placeholder:opacity-60 overflow-hidden ${className}`}
       style={{
         color: 'var(--theme-text-primary)',
         borderColor: 'var(--theme-border)',

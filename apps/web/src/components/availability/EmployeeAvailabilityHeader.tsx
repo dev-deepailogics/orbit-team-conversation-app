@@ -4,7 +4,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
 import { SOCKET_EVENTS, UserAvailabilityRecord } from '@orbit/types';
-import { Clock, Coffee, Play, LogOut, AlertTriangle, X } from 'lucide-react';
+import { Clock, Coffee, LogOut, AlertTriangle, Check, ChevronRight, User, Settings } from '@/components/ui/icons';
+import { useAuthStore } from '../../stores/authStore';
+import { Avatar } from '../project/projectViewUtils';
+
+// Semantic presence colours from the Figma guideline (fixed across themes)
+const WORKING = '#1F9D63';
+const BREAK = '#D97706';
+const tint = (c: string, pct = 14) => `color-mix(in srgb, ${c} ${pct}%, transparent)`;
 
 const BREAK_REASONS = [
   'Lunch',
@@ -24,7 +31,11 @@ export const formatElapsed = (secs: number) => {
 
 export const EmployeeAvailabilityHeader: React.FC<{
   currentUserId?: string;
-}> = ({ currentUserId }) => {
+  onViewProfile?: () => void;
+  onOpenSettings?: () => void;
+  onSignOut?: () => void;
+}> = ({ currentUserId, onViewProfile, onOpenSettings, onSignOut }) => {
+  const me = useAuthStore((s) => s.user);
   const [availability, setAvailability] = useState<UserAvailabilityRecord | null>(null);
   const [serverTimeOffset, setServerTimeOffset] = useState<number>(0);
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
@@ -136,7 +147,9 @@ export const EmployeeAvailabilityHeader: React.FC<{
   const handleStartBreak = async () => {
     if (isActionLocked) return;
     lockActions();
-    const reason = selectedBreakReason === 'Other' ? customBreakReason.trim() || 'Other' : selectedBreakReason;
+    const note = customBreakReason.trim();
+    const reason =
+      selectedBreakReason === 'Other' ? note || 'Other' : note ? `${selectedBreakReason} · ${note}` : selectedBreakReason;
     try {
       const res = await api.post('/api/availability/break/start', { reason });
       setAvailability(res.data.availability);
@@ -184,8 +197,13 @@ export const EmployeeAvailabilityHeader: React.FC<{
   const isAvailable = availability?.isAvailable ?? false;
   const isOnBreak = availability?.isOnBreak ?? false;
 
-  const menuItem =
-    'w-full px-3 py-2 rounded-lg text-[13px] font-medium flex items-center gap-2 text-left transition hover:bg-[var(--theme-bg-surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed';
+  const closeMenus = () => {
+    setShowStatusDropdown(false);
+    setShowBreakModal(false);
+  };
+
+  const myName = me?.displayName || me?.username || 'You';
+  const lastBreakReason = (availability?.breaks || []).slice(-1)[0]?.breakReason;
 
   return (
     <>
@@ -195,19 +213,19 @@ export const EmployeeAvailabilityHeader: React.FC<{
           onClick={() => (isAvailable ? setShowStatusDropdown((prev) => !prev) : handleCheckIn())}
           disabled={isActionLocked && !isAvailable}
           title={isOnBreak ? `On break · ${formattedTime}` : isAvailable ? `Working · ${formattedTime}` : 'Check in'}
-          className={`relative w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 hover:rounded-2xl select-none ${
+          className="relative w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 hover:rounded-2xl select-none"
+          style={
             isOnBreak
-              ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500/50'
+              ? { backgroundColor: tint(BREAK, 15), color: BREAK, boxShadow: `0 0 0 1px ${tint(BREAK, 50)}` }
               : isAvailable
-              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-              : ''
-          }`}
-          style={isAvailable ? undefined : { backgroundColor: 'var(--theme-bg-surface)', color: 'var(--theme-text-primary)' }}
+              ? { backgroundColor: tint(WORKING, 15), color: WORKING }
+              : { backgroundColor: 'var(--theme-fill)', color: 'var(--theme-text-muted)' }
+          }
         >
           {isOnBreak && (
             <>
-              <span className="absolute inset-0 rounded-[inherit] bg-amber-500/30 animate-glow pointer-events-none" />
-              <span className="absolute inset-0 rounded-[inherit] border-2 border-amber-500 animate-ripple pointer-events-none" />
+              <span className="absolute inset-0 rounded-[inherit] animate-glow pointer-events-none" style={{ backgroundColor: tint(BREAK, 30) }} />
+              <span className="absolute inset-0 rounded-[inherit] border-2 animate-ripple pointer-events-none" style={{ borderColor: BREAK }} />
             </>
           )}
           {isAvailable ? (
@@ -219,147 +237,210 @@ export const EmployeeAvailabilityHeader: React.FC<{
           )}
         </button>
 
-        {showStatusDropdown && isAvailable && (
-          <div
-            className="absolute left-full top-0 ml-3 z-50 w-40 rounded-xl p-1.5 shadow-2xl border border-[var(--theme-border)] text-[var(--theme-text)] animate-in fade-in zoom-in-95 duration-150"
-            style={{ backgroundColor: 'var(--theme-bg-surface)' }}
-          >
-            {isOnBreak ? (
-              <button
-                type="button"
+        {(showStatusDropdown || showBreakModal) && isAvailable && (
+          <div className="absolute left-full bottom-0 ml-3 z-50 flex items-end gap-2 animate-in fade-in zoom-in-95 duration-150">
+            {/* Status menu */}
+            <div
+              className="w-[288px] rounded-[14px] border p-2 flex flex-col gap-0.5"
+              style={{
+                backgroundColor: 'var(--theme-bg-app)',
+                borderColor: 'var(--theme-border)',
+                boxShadow: '0 12px 16px rgba(20, 26, 46, 0.2)',
+              }}
+            >
+              <div className="px-2.5 py-2 flex items-center gap-2.5">
+                <Avatar name={myName} src={me?.avatarUrl} size={36} />
+                <span className="flex flex-col min-w-0">
+                  <span className="text-sm font-bold truncate" style={{ color: 'var(--theme-text)' }}>
+                    {myName}
+                  </span>
+                  <span className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>
+                    Set your status
+                  </span>
+                </span>
+              </div>
+
+              <StatusOption
+                icon="/icons/status-on.svg"
+                title="Available"
+                subtitle={isOnBreak ? 'Resume work and go back online' : `Reachable and online · ${formattedTime}`}
+                selected={!isOnBreak}
                 disabled={isActionLocked}
                 onClick={() => {
-                  setShowStatusDropdown(false);
+                  if (!isOnBreak) return;
+                  closeMenus();
                   handleResumeWork();
                 }}
-                className={menuItem}
-              >
-                <Play size={15} className="text-emerald-500" /> Resume
-              </button>
-            ) : (
-              <button
-                type="button"
+              />
+              <StatusOption
+                icon="/icons/status-away.svg"
+                title="Break"
+                subtitle={isOnBreak ? `On break${lastBreakReason ? ` · ${lastBreakReason}` : ''}` : 'Pause notifications for a while'}
+                selected={isOnBreak}
+                expanded={!isOnBreak && showBreakModal}
+                trailing={isOnBreak ? undefined : 'chevron'}
                 disabled={isActionLocked}
                 onClick={() => {
-                  setShowStatusDropdown(false);
-                  setShowBreakModal(true);
+                  if (!isOnBreak) setShowBreakModal((v) => !v);
                 }}
-                className={menuItem}
-              >
-                <Coffee size={15} className="text-amber-500" /> Break
-              </button>
-            )}
-            <button
-              type="button"
-              disabled={isActionLocked}
-              onClick={() => {
-                setShowStatusDropdown(false);
-                handleRequestCheckout();
-              }}
-              className={`${menuItem} hover:text-rose-500`}
-            >
-              <LogOut size={15} /> Checkout
-            </button>
-          </div>
-        )}
-      </div>
-      {/* Break Reason Modal */}
-      {showBreakModal && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-2xl w-full max-w-sm p-5 shadow-2xl">
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--theme-border)]">
-              <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-bold text-sm">
-                <Coffee size={16} />
-                <span>Select Break Reason</span>
-              </div>
-              <button
-                onClick={() => setShowBreakModal(false)}
-                className="p-1 rounded-lg text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]"
-              >
-                <X size={16} />
-              </button>
-            </div>
+              />
+              <StatusOption
+                icon="/icons/status-off.svg"
+                title="Checkout"
+                subtitle="Done for the day · notifications off"
+                disabled={isActionLocked}
+                onClick={() => {
+                  closeMenus();
+                  handleRequestCheckout();
+                }}
+              />
 
-            <div className="space-y-3 mb-5">
-              <label className="text-xs font-semibold text-[var(--theme-text)] block">
-                Choose reason for your break:
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {BREAK_REASONS.map((reason) => (
-                  <button
-                    key={reason}
-                    type="button"
-                    onClick={() => setSelectedBreakReason(reason)}
-                    className={`px-3 py-2 rounded-xl text-xs font-medium border text-left transition ${
-                      selectedBreakReason === reason
-                        ? 'bg-amber-500/20 border-amber-500/50 text-amber-700 dark:text-amber-300 font-bold'
-                        : 'bg-[var(--theme-bg-surface-hover)] border-[var(--theme-border)] text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]'
-                    }`}
-                  >
-                    {reason}
-                  </button>
-                ))}
-              </div>
-
-              {selectedBreakReason === 'Other' && (
-                <input
-                  type="text"
-                  placeholder="Specify break reason..."
-                  value={customBreakReason}
-                  onChange={(e) => setCustomBreakReason(e.target.value)}
-                  className="w-full mt-2 px-3 py-2 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] text-xs text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-amber-500"
-                />
+              {(onViewProfile || onOpenSettings || onSignOut) && (
+                <>
+                  <div className="py-1">
+                    <div className="h-px" style={{ backgroundColor: 'var(--theme-border)' }} />
+                  </div>
+                  {onViewProfile && (
+                    <MenuLink Icon={User} label="View profile" onClick={() => { closeMenus(); onViewProfile(); }} />
+                  )}
+                  {onOpenSettings && (
+                    <MenuLink Icon={Settings} label="Settings" onClick={() => { closeMenus(); onOpenSettings(); }} />
+                  )}
+                  {onSignOut && (
+                    <MenuLink Icon={LogOut} label="Sign out" onClick={() => { closeMenus(); onSignOut(); }} />
+                  )}
+                </>
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-2">
-              <button
-                onClick={() => setShowBreakModal(false)}
-                className="px-3.5 py-1.5 rounded-xl text-xs font-medium text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]"
+            {/* Break options */}
+            {showBreakModal && !isOnBreak && (
+              <div
+                className="w-[300px] rounded-[14px] border p-4 flex flex-col gap-3"
+                style={{
+                  backgroundColor: 'var(--theme-bg-app)',
+                  borderColor: 'var(--theme-border)',
+                  boxShadow: '0 12px 16px rgba(20, 26, 46, 0.2)',
+                }}
               >
-                Cancel
-              </button>
-              <button
-                onClick={handleStartBreak}
-                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition shadow-lg"
-              >
-                Start Break
-              </button>
-            </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: tint(BREAK, 16), color: BREAK }}>
+                    <Coffee size={16} />
+                  </span>
+                  <span className="text-[15px] font-bold" style={{ color: 'var(--theme-text)' }}>
+                    Take a break
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  {BREAK_REASONS.map((reason) => {
+                    const on = selectedBreakReason === reason;
+                    return (
+                      <button
+                        key={reason}
+                        type="button"
+                        onClick={() => setSelectedBreakReason(reason)}
+                        className={`w-full h-[38px] px-3 rounded-[10px] border flex items-center gap-2.5 text-left text-sm transition ${
+                          on ? 'font-semibold' : 'font-medium hover:bg-[var(--theme-fill-hover)]'
+                        }`}
+                        style={{
+                          backgroundColor: on ? tint(BREAK, 16) : 'var(--theme-bg-app)',
+                          borderColor: on ? BREAK : 'var(--theme-border)',
+                          color: 'var(--theme-text)',
+                        }}
+                      >
+                        <span
+                          className="w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0"
+                          style={{ borderColor: on ? BREAK : 'var(--theme-border)' }}
+                        >
+                          {on && <span className="w-2 h-2 rounded-full" style={{ backgroundColor: BREAK }} />}
+                        </span>
+                        {reason}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-xs font-semibold" style={{ color: 'var(--theme-text-muted)' }}>
+                    {selectedBreakReason === 'Other' ? 'Break reason' : 'Custom message (optional)'}
+                  </span>
+                  <input
+                    type="text"
+                    value={customBreakReason}
+                    onChange={(e) => setCustomBreakReason(e.target.value)}
+                    placeholder={selectedBreakReason === 'Other' ? 'Specify break reason' : 'Back in 30 minutes'}
+                    className="h-10 px-3 rounded-[10px] border text-sm outline-none focus:border-[var(--theme-primary)] placeholder:text-[var(--theme-text-muted)]"
+                    style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)', backgroundColor: 'var(--theme-bg-app)' }}
+                  />
+                </label>
+
+                <div className="pt-1 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowBreakModal(false)}
+                    className="flex-1 h-9 px-[14px] rounded-[18px] border text-[13px] font-medium transition hover:bg-[var(--theme-fill-hover)]"
+                    style={{ borderColor: 'var(--theme-border)', backgroundColor: 'var(--theme-bg-app)', color: 'var(--theme-text)' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isActionLocked}
+                    onClick={async () => {
+                      await handleStartBreak();
+                      setShowStatusDropdown(false);
+                    }}
+                    className="flex-1 h-9 px-4 rounded-[18px] flex items-center justify-center gap-1.5 text-[13px] font-semibold transition hover:brightness-95 disabled:opacity-50"
+                    style={{ backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-text)' }}
+                  >
+                    <Coffee size={15} />
+                    Start break
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Checkout 8-Hour Warning Confirmation Modal */}
+      {/* Checkout 8-hour warning */}
       {showCheckoutConfirm && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-[var(--theme-bg-surface)] border border-amber-500/30 rounded-2xl w-full max-w-md p-6 shadow-2xl">
-            <div className="flex items-center gap-3 mb-3 text-amber-600 dark:text-amber-400">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div
+            className="w-full max-w-md rounded-2xl border p-6 flex flex-col gap-4 shadow-2xl"
+            style={{ backgroundColor: 'var(--theme-bg-app)', borderColor: 'var(--theme-border)' }}
+          >
+            <div className="flex items-center gap-3">
+              <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(BREAK, 16), color: BREAK }}>
                 <AlertTriangle size={20} />
-              </div>
+              </span>
               <div>
-                <h4 className="text-sm font-bold text-[var(--theme-text)]">Under 8 Hours Shift Warning</h4>
-                <p className="text-xs text-[var(--theme-text-muted)]">Total active working time: {checkoutWarningHours} hours</p>
+                <h4 className="text-[15px] font-bold" style={{ color: 'var(--theme-text)' }}>
+                  Under 8 hours shift
+                </h4>
+                <p className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>
+                  Total active working time: {checkoutWarningHours} hours
+                </p>
               </div>
             </div>
-
-            <p className="text-xs text-[var(--theme-text)] leading-relaxed mb-5 bg-[var(--theme-bg-surface-hover)] border border-[var(--theme-border)] p-3 rounded-xl">
+            <p className="text-[13px] leading-[19px] rounded-[10px] p-3" style={{ backgroundColor: 'var(--theme-bg-surface)', color: 'var(--theme-text)' }}>
               Your total working hours are currently less than 8 hours. Are you sure you want to checkout and end your shift?
             </p>
-
-            <div className="flex items-center justify-end gap-2.5">
+            <div className="flex items-center justify-end gap-2">
               <button
                 onClick={() => setShowCheckoutConfirm(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] transition"
+                className="h-9 px-[14px] rounded-[18px] border text-[13px] font-medium transition hover:bg-[var(--theme-fill-hover)]"
+                style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}
               >
-                Stay Checked In
+                Stay checked in
               </button>
               <button
                 onClick={executeCheckout}
-                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition shadow-lg"
+                className="h-9 px-4 rounded-[18px] text-[13px] font-semibold text-white transition hover:brightness-95"
+                style={{ backgroundColor: '#DC2626' }}
               >
-                Yes, Checkout
+                Yes, checkout
               </button>
             </div>
           </div>
@@ -368,3 +449,51 @@ export const EmployeeAvailabilityHeader: React.FC<{
     </>
   );
 };
+
+const StatusOption: React.FC<{
+  icon: string;
+  title: string;
+  subtitle: string;
+  selected?: boolean;
+  expanded?: boolean;
+  trailing?: 'chevron';
+  disabled?: boolean;
+  onClick: () => void;
+}> = ({ icon, title, subtitle, selected, expanded, trailing, disabled, onClick }) => (
+  <button
+    type="button"
+    disabled={disabled}
+    onClick={onClick}
+    className={`w-full h-11 px-2.5 rounded-[10px] flex items-center gap-2.5 text-left transition disabled:opacity-50 ${
+      selected ? '' : 'hover:bg-[var(--theme-fill-hover)]'
+    }`}
+    style={{ backgroundColor: selected || expanded ? 'var(--theme-selected)' : undefined }}
+  >
+    <img src={icon} alt="" width={14} height={14} className="shrink-0" />
+    <span className="flex-1 min-w-0 flex flex-col">
+      <span
+        className={`text-sm ${selected ? 'font-bold' : 'font-medium'}`}
+        style={{ color: selected ? 'var(--theme-primary-hover)' : 'var(--theme-text)' }}
+      >
+        {title}
+      </span>
+      <span className="text-[11px] truncate" style={{ color: 'var(--theme-text-muted)' }}>
+        {subtitle}
+      </span>
+    </span>
+    {selected && <Check size={16} style={{ color: 'var(--theme-primary-hover)' }} />}
+    {trailing === 'chevron' && <ChevronRight size={14} style={{ color: 'var(--theme-text-muted)' }} />}
+  </button>
+);
+
+const MenuLink: React.FC<{ Icon: React.ElementType; label: string; onClick: () => void }> = ({ Icon, label, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="w-full h-9 px-2.5 rounded-[10px] flex items-center gap-2.5 text-left text-sm font-medium transition hover:bg-[var(--theme-fill-hover)]"
+    style={{ color: 'var(--theme-text)' }}
+  >
+    <Icon size={17} style={{ color: 'var(--theme-text-muted)' }} />
+    {label}
+  </button>
+);

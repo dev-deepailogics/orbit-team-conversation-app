@@ -19,35 +19,51 @@ import { useProjectStore } from "../../stores/projectStore";
 import { TicketModal } from "./TicketModal";
 import { TicketDetailModal } from "./TicketDetailModal";
 import { ProjectViewSwitcher } from "./ProjectViewSwitcher";
+import { ProjectListView } from "./ProjectListView";
+import { ProjectSummaryView } from "./ProjectSummaryView";
 import { IssueChatModal } from "./IssueChatModal";
 import { IssueTimelineModal } from "./IssueTimelineModal";
 import {
   Plus,
   Search,
   Filter,
-  MoreVertical,
   Calendar,
-  User,
   Clock,
-  AlertCircle,
-  AlertTriangle,
-  CheckCircle2,
   Trash2,
   Edit2,
   X,
   MessageSquare,
-  ArrowLeft,
   Columns3,
   Check,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
   Bell,
-  GripVertical,
   Eye,
-  Tag,
-  GitBranch,
-} from "lucide-react";
+  Board,
+  More,
+  Loader2,
+} from "@/components/ui/icons";
+import {
+  Avatar,
+  FilterMenu,
+  LabelChip,
+  PRIORITY_META,
+  PrimaryPill,
+  PriorityPill,
+  ToolbarPill,
+  columnKinds,
+  commentCount,
+  formatShortDate,
+  isOverdue,
+  matchesFilters,
+  ticketAssignees,
+  ticketKey,
+  ticketLabels,
+} from "./projectViewUtils";
+
+const DONE_GREEN = "#1F9D63";
+const DANGER = "#DC2626";
 
 interface ProjectBoardViewProps {
   project: Project;
@@ -57,36 +73,6 @@ interface ProjectBoardViewProps {
   onBackToChat: () => void;
   onDeleteProject?: (projectId: string) => void;
 }
-
-const PRIORITY_BADGES: Record<
-  TicketPriority,
-  { label: string; bg: string; text: string; icon: any }
-> = {
-  LOW: {
-    label: "Low",
-    bg: "bg-slate-500/20",
-    text: "text-[var(--theme-text-muted)]",
-    icon: CheckCircle2,
-  },
-  MEDIUM: {
-    label: "Medium",
-    bg: "bg-blue-500/20",
-    text: "text-blue-600 dark:text-blue-400",
-    icon: Clock,
-  },
-  HIGH: {
-    label: "High",
-    bg: "bg-amber-500/20",
-    text: "text-amber-600 dark:text-amber-400",
-    icon: AlertCircle,
-  },
-  URGENT: {
-    label: "Urgent",
-    bg: "bg-red-500/20",
-    text: "text-red-600 dark:text-red-400",
-    icon: AlertTriangle,
-  },
-};
 
 const COLUMN_COLORS = [
   "#3B82F6", // Blue
@@ -131,6 +117,10 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [filterPriority, setFilterPriority] = useState<string>("ALL");
   const [filterAssignee, setFilterAssignee] = useState<string>("ALL");
+  const [filterLabel, setFilterLabel] = useState<string>("ALL");
+  const [showSearch, setShowSearch] = useState(false);
+  const [rangeDays, setRangeDays] = useState<7 | 30 | 90>(30);
+  const [colMenuId, setColMenuId] = useState<string | null>(null);
 
   // Ticket paging: columns whose older tickets are fully loaded / loading now
   const [exhaustedCols, setExhaustedCols] = useState<Record<string, boolean>>({});
@@ -314,6 +304,50 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
       isMounted = false;
     };
   }, [initialProject.id, setCurrentProject]);
+
+  // List and Summary need every ticket, not just the board's first page per column.
+  const [loadingAll, setLoadingAll] = useState(false);
+  const needsAllTickets = activeSection === "list" || activeSection === "summary";
+  const projectLoaded = !!currentProject && currentProject.id === initialProject.id;
+  useEffect(() => {
+    if (!needsAllTickets || !projectLoaded) return;
+    let cancelled = false;
+    const loadAll = async () => {
+      setLoadingAll(true);
+      try {
+        const cols = useProjectStore.getState().currentProject?.columns || [];
+        await Promise.all(
+          cols.map(async (col) => {
+            let loaded = col.tickets?.length || 0;
+            if (exhaustedCols[col.id] || loaded < TICKET_PAGE) return;
+            while (!cancelled) {
+              const res = await api.get<Ticket[]>(
+                `/api/projects/${initialProject.id}/columns/${col.id}/tickets`,
+                { params: { skip: loaded, take: TICKET_PAGE } },
+              );
+              if (cancelled) return;
+              appendTickets(col.id, res.data);
+              loaded += res.data.length;
+              if (res.data.length < TICKET_PAGE) {
+                setExhaustedCols((prev) => ({ ...prev, [col.id]: true }));
+                return;
+              }
+            }
+          }),
+        );
+      } catch (err) {
+        console.error("Failed to load all tickets", err);
+      } finally {
+        if (!cancelled) setLoadingAll(false);
+      }
+    };
+    loadAll();
+    return () => {
+      cancelled = true;
+      setLoadingAll(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsAllTickets, projectLoaded, initialProject.id]);
 
   const hasMoreTickets = (column: ProjectColumn) =>
     !exhaustedCols[column.id] && (column.tickets?.length || 0) >= TICKET_PAGE;
@@ -604,388 +638,335 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
     }
   };
 
-  // Filtered tickets helper
-  const filterTicket = (t: Ticket): boolean => {
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const matchTitle = t.title.toLowerCase().includes(q);
-      const matchDesc = t.description?.toLowerCase().includes(q);
-      if (!matchTitle && !matchDesc) return false;
-    }
-
-    if (filterPriority !== "ALL" && t.priority !== filterPriority) {
-      return false;
-    }
-
-    if (filterAssignee !== "ALL") {
-      if (filterAssignee === "UNASSIGNED") {
-        if (t.assigneeId) return false;
-      } else if (filterAssignee === "ME") {
-        if (t.assigneeId !== currentUser?.id) return false;
-      } else if (t.assigneeId !== filterAssignee) {
-        return false;
-      }
-    }
-
-    return true;
-  };
+  const filterTicket = (t: Ticket): boolean =>
+    matchesFilters(
+      t,
+      { query: searchQuery, assignee: filterAssignee, priority: filterPriority, label: filterLabel },
+      members,
+      currentUser?.id,
+    );
 
   const columns = project.columns || [];
   const totalTickets =
     project._count?.tickets ??
     columns.reduce((acc, c) => acc + (c.tickets?.length || 0), 0);
 
+  const kinds = columnKinds(columns);
+  const filtersActive =
+    !!searchQuery.trim() || filterPriority !== "ALL" || filterAssignee !== "ALL" || filterLabel !== "ALL";
+  const clearFilters = () => {
+    setSearchQuery("");
+    setFilterPriority("ALL");
+    setFilterAssignee("ALL");
+    setFilterLabel("ALL");
+    setShowSearch(false);
+  };
+  const allLabels = Array.from(
+    new Set(columns.flatMap((c) => (c.tickets || []).flatMap((t) => ticketLabels(t).map((l) => l.name)))),
+  ).sort();
+  const projectTeam = (() => {
+    const seen = new Map<string, UserProfile>();
+    columns.forEach((c) => c.tickets?.forEach((t) => ticketAssignees(t, members).forEach((u) => seen.set(u.id, u))));
+    return Array.from(seen.values());
+  })();
+  const loadedTickets = columns.reduce((acc, c) => acc + (c.tickets?.length || 0), 0);
+  const boardIsEmpty = projectLoaded && loadedTickets === 0 && !columns.some(hasMoreTickets);
+  const openCreateTicket = (columnId?: string) => {
+    setEditingTicket(null);
+    setTargetColumnId(columnId ?? columns[0]?.id);
+    setShowTicketModal(true);
+  };
+  const VIEW_SUBTITLE: Record<string, string> = {
+    board: "Project board. Drag tickets between columns to update their status.",
+    list: "Project list. Sort and review every ticket in one table.",
+    summary: "Project summary. Track progress, workload and recent activity.",
+  };
+
   return (
     <div
       className="flex-1 flex flex-col h-full overflow-hidden select-none"
       style={{
-        backgroundColor: "var(--theme-bg-app)",
-        color: "var(--theme-text-primary)",
+        backgroundColor: "var(--theme-bg-surface)",
+        color: "var(--theme-text)",
       }}
     >
-      {/* Top Project Header (Focused on Project Identity & View Navigation) */}
-      <div
-        className="h-14 border-b px-3 sm:px-6 flex items-center justify-between gap-2 shrink-0"
-        style={{
-          backgroundColor: "var(--theme-bg-surface)",
-          borderColor: "var(--theme-border)",
-        }}
+      {/* Header: project row + view row */}
+      <header
+        className="shrink-0 border-b"
+        style={{ backgroundColor: "var(--theme-bg-app)", borderColor: "var(--theme-border)" }}
       >
-        {/* Left: Back Button + Project Identity */}
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-          <button
-            onClick={onBackToChat}
-            title="Back to Channel Chat"
-            className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition flex items-center gap-1 text-xs shrink-0"
-            style={{ color: "var(--theme-text-muted)" }}
-          >
-            <ArrowLeft size={16} />
-            <span className="hidden md:inline">Back</span>
-          </button>
-
-          <span
-            className="w-px h-5 shrink-0"
-            style={{ backgroundColor: "var(--theme-border)" }}
-          />
-
-          {/* Project Identity: Icon, Title & Description (Always visible on mobile) */}
-          <div className="flex items-center gap-2 min-w-0">
-            <span
-              style={{ backgroundColor: (project.color || "#007A5A") + "25" }}
-              className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-sm sm:text-base shrink-0 shadow-sm"
+        <div className="h-16 px-3 sm:px-6 flex items-center gap-4">
+          <div className="flex-1 min-w-0 flex items-center gap-3">
+            <button
+              onClick={onBackToChat}
+              title="Back to Channel Chat"
+              className="w-8 h-8 -ml-1 rounded-lg flex items-center justify-center shrink-0 transition hover:bg-[var(--theme-fill-hover)]"
+              style={{ color: "var(--theme-text-muted)" }}
             >
-              {project.icon || "📋"}
+              <ChevronLeft size={18} />
+            </button>
+            <span
+              className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0"
+              style={{ backgroundColor: "var(--theme-selected)", color: "var(--theme-primary-hover)" }}
+            >
+              {project.icon ? <span className="text-lg leading-none">{project.icon}</span> : <Board size={20} />}
             </span>
-            <div className="min-w-0">
-              <h1
-                className="text-xs sm:text-sm font-bold truncate leading-tight"
-                style={{ color: "var(--theme-text-primary)" }}
-                title={project.name}
-              >
+            <div className="min-w-0 flex flex-col">
+              <h1 className="text-[17px] font-bold leading-[22px] truncate" title={project.name}>
                 {project.name}
               </h1>
-              {project.description && (
-                <p
-                  className="text-[10px] sm:text-[11px] truncate opacity-60 hidden md:block"
-                  style={{ color: "var(--theme-text-muted)" }}
-                >
-                  {project.description}
-                </p>
-              )}
+              <p
+                className="text-[13px] leading-[18px] truncate hidden sm:block"
+                style={{ color: "var(--theme-text-muted)" }}
+              >
+                {project.description || VIEW_SUBTITLE[activeSection] || VIEW_SUBTITLE.board}
+              </p>
             </div>
+            {projectTeam.length > 0 && (
+              <div className="hidden md:flex items-center px-1.5 py-1 shrink-0">
+                {projectTeam.slice(0, 4).map((u, i) => (
+                  <Avatar
+                    key={u.id}
+                    name={u.displayName}
+                    src={u.avatarUrl}
+                    size={28}
+                    ring="var(--theme-bg-app)"
+                    className={i ? "-ml-[5px]" : ""}
+                  />
+                ))}
+                {projectTeam.length > 4 && (
+                  <span
+                    className="-ml-[5px] w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold"
+                    style={{
+                      backgroundColor: "var(--theme-bg-surface-hover)",
+                      color: "var(--theme-text)",
+                      boxShadow: "0 0 0 2px var(--theme-bg-app)",
+                    }}
+                  >
+                    +{projectTeam.length - 4}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
-        </div>
 
-        {/* Right: View Switcher (Moved to right) + Project Options Menu */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <ProjectViewSwitcher
-            activeSection={activeSection}
-            onSectionChange={(sec) => setActiveSection(sec as any)}
-            ticketCount={totalTickets}
-            docCount={documents.length}
-          />
-
-          {/* Subtle kebab menu for project settings */}
+          {/* Project options */}
           <div className="relative shrink-0">
             <button
               onClick={() => setShowProjectMenu(!showProjectMenu)}
-              title="Project Options"
-              className="p-1.5 sm:p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition"
+              title="Project options"
+              className="w-10 h-10 rounded-xl flex items-center justify-center transition hover:bg-[var(--theme-fill-hover)]"
               style={{ color: "var(--theme-text-muted)" }}
             >
-              <MoreVertical size={16} />
+              <More size={20} />
             </button>
-
             {showProjectMenu && (
               <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowProjectMenu(false)} />
                 <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setShowProjectMenu(false)}
-                />
-                <div
-                  className="absolute right-0 top-full mt-1.5 w-48 rounded-xl border shadow-xl z-50 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+                  className="absolute right-0 top-full mt-1.5 w-64 rounded-[14px] border p-2 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100"
                   style={{
-                    backgroundColor: "var(--theme-bg-surface)",
+                    backgroundColor: "var(--theme-bg-app)",
                     borderColor: "var(--theme-border)",
+                    boxShadow: "0 12px 16px rgba(20, 26, 46, 0.2)",
                   }}
                 >
-                  <div
-                    className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider opacity-50 border-b mb-1"
-                    style={{
-                      borderColor: "var(--theme-border)",
-                      color: "var(--theme-text-muted)",
-                    }}
+                  <p
+                    className="px-2.5 py-1.5 text-[11px] font-bold tracking-[0.6px]"
+                    style={{ color: "var(--theme-text-muted)" }}
                   >
-                    Project Settings
-                  </div>
-                  <button
+                    PROJECT
+                  </p>
+                  <MenuRow
+                    Icon={Edit2}
+                    label="Edit project"
                     onClick={() => {
                       setShowProjectMenu(false);
                       handleOpenEditProject();
                     }}
-                    className="w-full px-3 py-2 text-xs text-left flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/10 transition"
-                    style={{ color: "var(--theme-text-primary)" }}
+                  />
+                  <MenuRow
+                    Icon={Columns3}
+                    label="Add column"
+                    onClick={() => {
+                      setShowProjectMenu(false);
+                      setActiveSection("board" as any);
+                      setShowAddColumn(true);
+                    }}
+                  />
+                  <label
+                    className="h-10 px-2.5 flex items-center gap-2.5 rounded-[10px] text-sm"
+                    title="Channel where Orbit Bot broadcasts board activities"
                   >
-                    <Edit2 size={14} className="text-blue-600 dark:text-blue-400" />
-                    <span>Edit Project</span>
-                  </button>
-                  <button
+                    <span
+                      className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                      style={{ backgroundColor: "var(--theme-bg-surface-hover)", color: "var(--theme-text-muted)" }}
+                    >
+                      <Bell size={16} />
+                    </span>
+                    <span className="font-medium shrink-0">Notify</span>
+                    <select
+                      value={project.notificationChannelId || ""}
+                      onChange={(e) => handleUpdateNotificationChannel(e.target.value)}
+                      className="flex-1 min-w-0 bg-transparent text-[13px] font-semibold focus:outline-none cursor-pointer truncate text-right"
+                      style={{ color: "var(--theme-primary-hover)" }}
+                    >
+                      {channels.length > 0 ? (
+                        channels.map((ch) => (
+                          <option key={ch.id} value={ch.id}>
+                            #{ch.name}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="">#general</option>
+                      )}
+                    </select>
+                  </label>
+                  <div className="py-1">
+                    <div className="h-px" style={{ backgroundColor: "var(--theme-border)" }} />
+                  </div>
+                  <MenuRow
+                    Icon={Trash2}
+                    label="Delete project"
+                    danger
                     onClick={() => {
                       setShowProjectMenu(false);
                       handleDeleteProject();
                     }}
-                    className="w-full px-3 py-2 text-xs text-left flex items-center gap-2 text-red-500 hover:bg-red-500/10 transition"
-                  >
-                    <Trash2 size={14} />
-                    <span>Delete Project</span>
-                  </button>
+                  />
                 </div>
               </>
             )}
           </div>
         </div>
-      </div>
+
+        <div className="h-12 px-3 sm:px-6 flex items-center justify-between gap-3">
+          <ProjectViewSwitcher
+            activeSection={activeSection}
+            onSectionChange={(sec) => setActiveSection(sec as any)}
+          />
+          <div className="flex items-center gap-2 min-w-0 overflow-x-auto">
+            {loadingAll && (
+              <span
+                className="flex items-center gap-1.5 text-xs whitespace-nowrap shrink-0"
+                style={{ color: "var(--theme-text-muted)" }}
+              >
+                <Loader2 size={12} className="animate-spin" />
+                Loading all tickets…
+              </span>
+            )}
+            {activeSection === "summary" ? (
+              <FilterMenu
+                plain
+                label="Range"
+                icon={<Calendar size={14} style={{ color: "var(--theme-text-muted)" }} />}
+                value={String(rangeDays)}
+                options={[7, 30, 90].map((d) => ({ value: String(d), label: `Last ${d} days` }))}
+                onChange={(v) => setRangeDays(Number(v) as 7 | 30 | 90)}
+              />
+            ) : (
+              <>
+                {showSearch && (
+                  <div
+                    className="h-8 w-52 px-3 rounded-2xl border flex items-center gap-2 shrink-0"
+                    style={{ borderColor: "var(--theme-border)", backgroundColor: "var(--theme-bg-app)" }}
+                  >
+                    <Search size={14} style={{ color: "var(--theme-text-muted)" }} />
+                    <input
+                      autoFocus
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search tickets"
+                      className="flex-1 min-w-0 bg-transparent outline-none text-[13px]"
+                      style={{ color: "var(--theme-text)" }}
+                    />
+                    {searchQuery && (
+                      <button onClick={() => setSearchQuery("")} title="Clear" style={{ color: "var(--theme-text-muted)" }}>
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                )}
+                <ToolbarPill
+                  active={filtersActive}
+                  title={filtersActive ? "Clear all filters" : "Search tickets"}
+                  onClick={() => (filtersActive ? clearFilters() : setShowSearch((v) => !v))}
+                >
+                  <Filter size={14} />
+                  Filters
+                  {filtersActive && <X size={12} />}
+                </ToolbarPill>
+                <FilterMenu
+                  label="Assignee"
+                  value={filterAssignee}
+                  onChange={setFilterAssignee}
+                  options={[
+                    { value: "ALL", label: "Anyone" },
+                    { value: "ME", label: "Assigned to me" },
+                    { value: "UNASSIGNED", label: "Unassigned" },
+                    ...members.filter((m) => m.user).map((m) => ({ value: m.userId, label: m.user!.displayName })),
+                  ]}
+                />
+                <FilterMenu
+                  label="Priority"
+                  value={filterPriority}
+                  onChange={setFilterPriority}
+                  options={[
+                    { value: "ALL", label: "Any priority" },
+                    ...(Object.keys(PRIORITY_META) as TicketPriority[]).map((p) => ({
+                      value: p,
+                      label: PRIORITY_META[p].label,
+                    })),
+                  ]}
+                />
+                <FilterMenu
+                  label="Label"
+                  value={filterLabel}
+                  onChange={setFilterLabel}
+                  options={[{ value: "ALL", label: "Any label" }, ...allLabels.map((l) => ({ value: l, label: l }))]}
+                />
+              </>
+            )}
+            <PrimaryPill onClick={() => openCreateTicket()} disabled={columns.length === 0}>
+              <Plus size={14} />
+              Create ticket
+            </PrimaryPill>
+          </div>
+        </div>
+      </header>
 
       {activeSection === "board" ? (
-        <>
-          {/* Dedicated Board Action & Filter Toolbar */}
-          <div
-            className="border-b px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2 sm:gap-3 text-xs shrink-0"
-            style={{
-              backgroundColor: "var(--theme-bg-surface)",
-              borderColor: "var(--theme-border)",
-            }}
-          >
-            {/* Left: Search & Filter Controls */}
-            <div className="flex items-center gap-2 flex-wrap flex-1 min-w-[200px]">
-              {/* Search input */}
-              <div className="relative flex-1 sm:flex-initial sm:w-60 min-w-[140px]">
-                <Search
-                  size={14}
-                  className="absolute left-2.5 top-1/2 -translate-y-1/2 opacity-50"
-                  style={{ color: "var(--theme-text-muted)" }}
+        !projectLoaded ? (
+          <BoardSkeleton />
+        ) : boardIsEmpty ? (
+          <EmptyBoard
+            projectName={project.name}
+            hasColumns={columns.length > 0}
+            onCreateTicket={() => openCreateTicket()}
+            onAddColumn={() => setShowAddColumn(true)}
+            addColumnForm={
+              showAddColumn ? (
+                <AddColumnForm
+                  name={newColumnName}
+                  color={newColumnColor}
+                  onName={setNewColumnName}
+                  onColor={setNewColumnColor}
+                  onCancel={() => setShowAddColumn(false)}
+                  onSubmit={handleCreateColumn}
                 />
-                <input
-                  type="text"
-                  placeholder="Filter tickets..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full border rounded-lg pl-8 pr-7 py-1.5 text-xs focus:outline-none transition shadow-sm"
-                  style={{
-                    backgroundColor: "var(--theme-bg-app)",
-                    borderColor: "var(--theme-border)",
-                    color: "var(--theme-text-primary)",
-                  }}
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 hover:opacity-100 opacity-60"
-                    style={{ color: "var(--theme-text-muted)" }}
-                  >
-                    <X size={12} />
-                  </button>
-                )}
-              </div>
-
-              {/* Priority Filter */}
-              <div
-                className="flex items-center gap-1 border rounded-lg px-2 py-1 shadow-sm"
-                style={{
-                  backgroundColor: "var(--theme-bg-app)",
-                  borderColor: "var(--theme-border)",
-                }}
-              >
-                <Filter
-                  size={12}
-                  className="opacity-60"
-                  style={{ color: "var(--theme-text-muted)" }}
-                />
-                <select
-                  value={filterPriority}
-                  onChange={(e) => setFilterPriority(e.target.value)}
-                  className="bg-transparent text-xs focus:outline-none cursor-pointer"
-                  style={{ color: "var(--theme-text-primary)" }}
-                >
-                  <option value="ALL">All Priorities</option>
-                  <option value="URGENT">🔥 Urgent</option>
-                  <option value="HIGH">High</option>
-                  <option value="MEDIUM">Medium</option>
-                  <option value="LOW">Low</option>
-                </select>
-              </div>
-
-              {/* Assignee Filter */}
-              <div
-                className="flex items-center gap-1 border rounded-lg px-2 py-1 shadow-sm"
-                style={{
-                  backgroundColor: "var(--theme-bg-app)",
-                  borderColor: "var(--theme-border)",
-                }}
-              >
-                <User
-                  size={12}
-                  className="opacity-60"
-                  style={{ color: "var(--theme-text-muted)" }}
-                />
-                <select
-                  value={filterAssignee}
-                  onChange={(e) => setFilterAssignee(e.target.value)}
-                  className="bg-transparent text-xs focus:outline-none cursor-pointer max-w-[100px] sm:max-w-[130px] truncate"
-                  style={{ color: "var(--theme-text-primary)" }}
-                >
-                  <option value="ALL">All Assignees</option>
-                  <option value="ME">Assigned to Me</option>
-                  <option value="UNASSIGNED">Unassigned</option>
-                  {members.map((m) => {
-                    const u = m.user;
-                    if (!u) return null;
-                    return (
-                      <option key={u.id} value={u.id}>
-                        {u.displayName}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-
-              {/* Reset filter pill if active */}
-              {(searchQuery ||
-                filterPriority !== "ALL" ||
-                filterAssignee !== "ALL") && (
-                <button
-                  onClick={() => {
-                    setSearchQuery("");
-                    setFilterPriority("ALL");
-                    setFilterAssignee("ALL");
-                  }}
-                  className="text-[11px] font-medium px-2 py-0.5 rounded-md hover:opacity-80 transition"
-                  style={{
-                    backgroundColor: "var(--theme-bg-surface-hover)",
-                    color: "var(--theme-text-muted)",
-                  }}
-                >
-                  Clear filters
-                </button>
-              )}
-            </div>
-
-            {/* Right: Board Specific Actions (Channel broadcast, Add Column, New Ticket) */}
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
-              {/* Notification Channel Selector */}
-              <div
-                className="flex items-center gap-1 border rounded-lg px-2 sm:px-2.5 py-1.5 text-xs shadow-sm"
-                style={{
-                  backgroundColor: "var(--theme-bg-app)",
-                  borderColor: "var(--theme-border)",
-                  color: "var(--theme-text-primary)",
-                }}
-                title="Channel where Orbit Bot broadcasts board activities"
-              >
-                <Bell
-                  size={13}
-                  className="shrink-0"
-                  style={{ color: "var(--theme-primary)" }}
-                />
-                <span
-                  className="text-[11px] hidden xl:inline opacity-70"
-                  style={{ color: "var(--theme-text-muted)" }}
-                >
-                  Notify:
-                </span>
-                <select
-                  value={project.notificationChannelId || ""}
-                  onChange={(e) =>
-                    handleUpdateNotificationChannel(e.target.value)
-                  }
-                  className="bg-transparent text-xs font-semibold focus:outline-none cursor-pointer max-w-[90px] sm:max-w-[140px] truncate"
-                  style={{ color: "var(--theme-text-primary)" }}
-                >
-                  {channels && channels.length > 0 ? (
-                    channels.map((ch) => (
-                      <option
-                        key={ch.id}
-                        value={ch.id}
-                        style={{
-                          backgroundColor: "var(--theme-bg-surface)",
-                          color: "var(--theme-text-primary)",
-                        }}
-                      >
-                        #{ch.name}
-                      </option>
-                    ))
-                  ) : (
-                    <option
-                      value=""
-                      style={{
-                        backgroundColor: "var(--theme-bg-surface)",
-                        color: "var(--theme-text-primary)",
-                      }}
-                    >
-                      #general
-                    </option>
-                  )}
-                </select>
-              </div>
-
-              {/* Add Column Button */}
-              <button
-                onClick={() => setShowAddColumn(true)}
-                className="px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg border transition flex items-center gap-1.5 active:scale-95 hover:bg-black/5 dark:hover:bg-white/10 shadow-sm"
-                style={{
-                  backgroundColor: "var(--theme-bg-app)",
-                  borderColor: "var(--theme-border)",
-                  color: "var(--theme-text-primary)",
-                }}
-              >
-                <Columns3 size={14} />
-                <span className="hidden sm:inline">Add Column</span>
-              </button>
-
-              {/* New Ticket Button */}
-              <button
-                onClick={() => {
-                  setEditingTicket(null);
-                  setTargetColumnId(columns[0]?.id);
-                  setShowTicketModal(true);
-                }}
-                className="px-3 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg shadow-sm transition flex items-center gap-1.5 active:scale-95"
-                style={{
-                  backgroundColor: "var(--theme-primary)",
-                  color: "var(--theme-primary-text)",
-                }}
-              >
-                <Plus size={15} />
-                <span>New Ticket</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Kanban Board Horizontal Scroll Area */}
-          <div className="flex-1 overflow-x-auto overflow-y-hidden p-4 sm:p-6 flex items-start gap-4">
+              ) : null
+            }
+          />
+        ) : (
+          <div className="flex-1 min-h-0 overflow-x-auto px-3 sm:px-6 py-4 flex items-stretch gap-4">
             {columns.map((column, colIndex) => {
               const colTickets = (column.tickets || []).filter(filterTicket);
               const isDragTarget = dragOverColId === column.id;
+              const isTicketDropTarget =
+                isDragTarget &&
+                !!draggedTicketId &&
+                !colTickets.some((t) => t.id === draggedTicketId);
+              const done = kinds[column.id] === "done";
 
               return (
                 <div
@@ -993,45 +974,28 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                   onDragOver={(e) => handleDragOver(e, column.id)}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, column.id)}
-                  className={`w-72 sm:w-80 shrink-0 border rounded-2xl flex flex-col max-h-full transition-all duration-200 ${
-                    isDragTarget ? "ring-2 ring-slack-green/40 shadow-xl" : ""
+                  className={`flex-1 min-w-[272px] max-w-[420px] rounded-[14px] p-2 flex flex-col gap-2 min-h-0 transition-colors ${
+                    draggedColId === column.id ? "opacity-50" : ""
                   }`}
                   style={{
-                    backgroundColor: "var(--theme-bg-surface)",
-                    borderColor: isDragTarget
-                      ? "var(--theme-primary)"
-                      : "var(--theme-border)",
+                    backgroundColor: isDragTarget ? "var(--theme-bg-surface)" : "var(--theme-selected)",
+                    outline: isDragTarget ? "2px dashed var(--theme-primary)" : undefined,
+                    outlineOffset: -2,
                   }}
                 >
-                  {/* Column Header (Draggable for reordering) */}
+                  {/* Column header (drag to reorder) */}
                   <div
                     draggable
                     onDragStart={(e) => {
                       e.stopPropagation();
                       setDraggedColId(column.id);
-                      e.dataTransfer.setData(
-                        "text/plain",
-                        JSON.stringify({ type: "column", columnId: column.id }),
-                      );
+                      e.dataTransfer.setData("text/plain", JSON.stringify({ type: "column", columnId: column.id }));
                       e.dataTransfer.effectAllowed = "move";
                     }}
-                    className={`p-3.5 border-b flex items-center justify-between shrink-0 cursor-move ${
-                      draggedColId === column.id ? "opacity-50" : ""
-                    }`}
-                    style={{
-                      borderColor: "var(--theme-border)",
-                    }}
+                    onDragEnd={() => setDraggedColId(null)}
+                    className="h-8 px-2 flex items-center justify-between gap-2 shrink-0 cursor-grab active:cursor-grabbing"
                   >
-                    <div className="flex items-center gap-2 flex-1 min-w-0 mr-1.5">
-                      <GripVertical
-                        size={13}
-                        className="shrink-0"
-                        style={{ color: "var(--theme-text-muted)" }}
-                      />
-                      <span
-                        style={{ backgroundColor: column.color || "#3B82F6" }}
-                        className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs"
-                      />
+                    <div className="flex items-center gap-2 min-w-0">
                       {editingColId === column.id ? (
                         <input
                           type="text"
@@ -1040,15 +1004,14 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                           onChange={(e) => setEditingColName(e.target.value)}
                           onBlur={() => handleUpdateColumnName(column.id)}
                           onKeyDown={(e) => {
-                            if (e.key === "Enter")
-                              handleUpdateColumnName(column.id);
+                            if (e.key === "Enter") handleUpdateColumnName(column.id);
                             if (e.key === "Escape") setEditingColId(null);
                           }}
-                          className="border rounded px-2 py-0.5 text-xs font-bold w-full"
+                          className="h-7 min-w-0 rounded-md border px-2 text-[13px] font-bold outline-none"
                           style={{
-                            backgroundColor: "var(--theme-bg-surface-hover)",
-                            borderColor: "var(--theme-border)",
-                            color: "var(--theme-text-primary)",
+                            backgroundColor: "var(--theme-bg-app)",
+                            borderColor: "var(--theme-primary)",
+                            color: "var(--theme-text)",
                           }}
                         />
                       ) : (
@@ -1057,463 +1020,328 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                             setEditingColId(column.id);
                             setEditingColName(column.name);
                           }}
-                          title="Double-click to rename column"
-                          className="text-xs font-bold truncate cursor-pointer hover:opacity-80"
-                          style={{ color: "var(--theme-text-primary)" }}
+                          title="Double-click to rename"
+                          className="text-[13px] font-bold truncate"
                         >
                           {column.name}
                         </h3>
                       )}
                       <span
-                        className="text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0"
-                        style={{
-                          backgroundColor: "var(--theme-bg-surface-hover)",
-                          color: "var(--theme-text-muted)",
-                        }}
+                        className="h-5 min-w-5 px-[7px] rounded-[10px] flex items-center justify-center text-xs font-semibold shrink-0"
+                        style={{ backgroundColor: "var(--theme-border)", color: "var(--theme-text-muted)" }}
                       >
                         {colTickets.length}
                       </span>
                     </div>
-
-                    <div className="flex items-center gap-0.5">
-                      {/* Reorder Column Left */}
-                      <button
-                        disabled={colIndex === 0}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleMoveColumn(column.id, "left");
-                        }}
-                        title="Move column left"
-                        className="p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded disabled:opacity-20 transition"
-                        style={{ color: "var(--theme-text-muted)" }}
-                      >
-                        <ChevronLeft size={13} />
-                      </button>
-
-                      {/* Reorder Column Right */}
-                      <button
-                        disabled={colIndex === columns.length - 1}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleMoveColumn(column.id, "right");
-                        }}
-                        title="Move column right"
-                        className="p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded disabled:opacity-20 transition"
-                        style={{ color: "var(--theme-text-muted)" }}
-                      >
-                        <ChevronRight size={13} />
-                      </button>
-
-                      {/* Quick Add Ticket to this Column */}
+                    <div className="flex items-center gap-0.5 shrink-0">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setEditingTicket(null);
-                          setTargetColumnId(column.id);
-                          setShowTicketModal(true);
+                          openCreateTicket(column.id);
                         }}
                         title="Add ticket to this column"
-                        className="p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded transition"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center transition hover:bg-[var(--theme-fill)]"
                         style={{ color: "var(--theme-text-muted)" }}
                       >
-                        <Plus size={15} />
+                        <Plus size={16} />
                       </button>
-
-                      {/* Column Settings / Delete */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteColumn(column.id, column.name);
-                        }}
-                        title="Delete column"
-                        className="p-1 hover:bg-red-500/20 rounded text-red-600 dark:text-red-400 transition"
-                      >
-                        <Trash2 size={13} />
-                      </button>
+                      <div className="relative">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setColMenuId(colMenuId === column.id ? null : column.id);
+                          }}
+                          title="Column options"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center transition hover:bg-[var(--theme-fill)]"
+                          style={{ color: "var(--theme-text-muted)" }}
+                        >
+                          <More size={16} />
+                        </button>
+                        {colMenuId === column.id && (
+                          <>
+                            <div className="fixed inset-0 z-40" onClick={() => setColMenuId(null)} />
+                            <div
+                              className="absolute right-0 top-full mt-1 w-48 rounded-xl border p-1.5 z-50 flex flex-col gap-0.5 shadow-xl"
+                              style={{ backgroundColor: "var(--theme-bg-app)", borderColor: "var(--theme-border)" }}
+                            >
+                              <MenuRow
+                                compact
+                                Icon={Edit2}
+                                label="Rename"
+                                onClick={() => {
+                                  setColMenuId(null);
+                                  setEditingColId(column.id);
+                                  setEditingColName(column.name);
+                                }}
+                              />
+                              <MenuRow
+                                compact
+                                Icon={ChevronLeft}
+                                label="Move left"
+                                disabled={colIndex === 0}
+                                onClick={() => {
+                                  setColMenuId(null);
+                                  handleMoveColumn(column.id, "left");
+                                }}
+                              />
+                              <MenuRow
+                                compact
+                                Icon={ChevronRight}
+                                label="Move right"
+                                disabled={colIndex === columns.length - 1}
+                                onClick={() => {
+                                  setColMenuId(null);
+                                  handleMoveColumn(column.id, "right");
+                                }}
+                              />
+                              <MenuRow
+                                compact
+                                danger
+                                Icon={Trash2}
+                                label="Delete column"
+                                onClick={() => {
+                                  setColMenuId(null);
+                                  handleDeleteColumn(column.id, column.name);
+                                }}
+                              />
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Column Tickets List (Scrollable vertically) */}
+                  {/* Tickets */}
                   <div
-                    className="flex-1 overflow-y-auto p-2.5 space-y-2.5 min-h-[150px]"
+                    className="flex-1 min-h-[120px] overflow-y-auto flex flex-col gap-2"
                     onScroll={(e) => {
                       const el = e.currentTarget;
-                      if (el.scrollHeight - el.scrollTop - el.clientHeight < 200) {
-                        loadMoreTickets(column);
-                      }
+                      if (el.scrollHeight - el.scrollTop - el.clientHeight < 200) loadMoreTickets(column);
                     }}
                   >
                     {colTickets.map((ticket) => {
-                      const isBeingDragged = draggedTicketId === ticket.id;
-                      const priorityMeta =
-                        PRIORITY_BADGES[ticket.priority] ||
-                        PRIORITY_BADGES.MEDIUM;
-                      const PriorityIcon = priorityMeta.icon;
-
-                      const isOverdue =
-                        ticket.dueDate &&
-                        new Date(ticket.dueDate).getTime() < Date.now() &&
-                        column.name.toLowerCase() !== "done" &&
-                        column.name.toLowerCase() !== "completed";
-
-                      const watchersList = Array.isArray(ticket.watchers)
-                        ? ticket.watchers
-                        : [];
-                      const isWatching = currentUser
-                        ? watchersList.includes(currentUser.id)
-                        : false;
-                      const commentCount =
-                        (ticket as any)._count?.comments ||
-                        ((ticket as any).comments?.length ?? 0);
-
+                      const overdue = isOverdue(ticket, done);
+                      const people = ticketAssignees(ticket, members);
+                      const labels = ticketLabels(ticket);
+                      const comments = commentCount(ticket);
                       return (
                         <div
                           key={ticket.id}
                           draggable
                           onDragStart={(e) => handleDragStart(e, ticket)}
+                          onDragEnd={() => {
+                            setDraggedTicketId(null);
+                            setDragOverColId(null);
+                          }}
                           onClick={() => {
                             setEditingTicket(ticket);
                             setTargetColumnId(column.id);
                             setShowTicketModal(true);
                           }}
-                          className={`border rounded-2xl p-3.5 shadow-sm transition-all duration-150 cursor-grab active:cursor-grabbing hover:shadow-md relative group ${
-                            isOverdue ? "border-t-[3px]" : ""
-                          } ${
-                            isBeingDragged
-                              ? "opacity-40 scale-95 border-dashed ring-2 ring-slack-green"
-                              : ""
+                          className={`group relative shrink-0 rounded-xl border p-3 flex flex-col gap-2.5 cursor-grab active:cursor-grabbing transition-shadow hover:shadow-md ${
+                            draggedTicketId === ticket.id ? "opacity-40" : ""
                           }`}
                           style={{
-                            backgroundColor: "var(--theme-bg-surface-hover)",
+                            backgroundColor: "var(--theme-bg-app)",
                             borderColor: "var(--theme-border)",
-                            ...(isOverdue && { borderTopColor: "#ef4444" }),
+                            boxShadow: "0 1px 1px rgba(20, 26, 46, 0.05)",
                           }}
                         >
-                          {/* Top Header: ID badge on left & 4 Action Buttons on right */}
-                          <div className="flex items-center justify-between gap-2 mb-2.5">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-600 text-white shadow-xs">
-                                ID:{" "}
-                                {ticket.issueNumber ||
-                                  ticket.customId ||
-                                  ticket.id.slice(0, 5)}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="flex items-center gap-1.5 min-w-0">
+                              <span
+                                className="w-4 h-4 rounded flex items-center justify-center shrink-0"
+                                style={{
+                                  backgroundColor: done ? DONE_GREEN : "var(--theme-selected)",
+                                  color: done ? "#FFFFFF" : "var(--theme-text-muted)",
+                                }}
+                              >
+                                <Check size={10} />
                               </span>
-
-                              {/* Labels */}
-                              {ticket.labels &&
-                                Array.isArray(ticket.labels) &&
-                                ticket.labels.length > 0 && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                                    <Tag size={10} />
-                                    {typeof ticket.labels[0] === "string"
-                                      ? ticket.labels[0]
-                                      : ticket.labels[0]?.name || "Dev"}
-                                  </span>
-                                )}
-                            </div>
-
-                            {/* Top-Right 4 Action Buttons */}
-                            <div className="flex items-center gap-1 shrink-0">
-                              {/* 1. Eye Button (View Ticket Details) */}
-                              <button
-                                type="button"
-                                title="View Ticket Details"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setViewingDetailTicket(ticket);
-                                }}
-                                className="p-1 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] transition"
-                              >
-                                <Eye size={13} />
-                              </button>
-
-                              {/* 2. Chat Button (With count badge) */}
-                              <button
-                                type="button"
-                                title="Issue Chat & Notes"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setChatTicket(ticket);
-                                }}
-                                className="p-1 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] transition relative"
-                              >
-                                <MessageSquare size={13} />
-                                {commentCount > 0 && (
-                                  <span className="absolute -top-1 -right-1 px-1 min-w-[14px] h-[14px] rounded-full text-[9px] font-bold bg-rose-500 text-white flex items-center justify-center shadow-xs">
-                                    {commentCount}
-                                  </span>
-                                )}
-                              </button>
-
-                              {/* 3. Clock Button (Issue Timeline) */}
-                              <button
-                                type="button"
-                                title="Issue Timeline & Activity"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setTimelineTicket(ticket);
-                                }}
-                                className="p-1 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] transition"
-                              >
-                                <Clock size={13} />
-                              </button>
-
-                              {/* 4. Trash Button (Delete Ticket) */}
-                              <button
-                                type="button"
-                                title="Delete issue"
-                                onClick={(e) =>
-                                  handleDeleteTicketDirect(ticket, e)
-                                }
-                                className="p-1 rounded-full text-[var(--theme-text-muted)] hover:text-rose-400 hover:bg-rose-500/10 transition"
-                              >
-                                <Trash2 size={13} />
-                              </button>
-                            </div>
+                              <span className="text-xs font-medium truncate" style={{ color: "var(--theme-text-muted)" }}>
+                                {ticketKey(ticket)}
+                              </span>
+                            </span>
+                            <PriorityPill priority={ticket.priority} size="sm" />
                           </div>
 
-                          {/* Ticket Title */}
-                          <h4 className="text-xs font-bold leading-snug mb-1.5 break-words text-[var(--theme-text)]">
-                            {ticket.title}
-                          </h4>
-
-                          {/* Description Preview */}
-                          {ticket.description && (
-                            <p className="text-[11px] line-clamp-2 mb-2 leading-relaxed text-[var(--theme-text-muted)]">
-                              {ticket.description}
-                            </p>
-                          )}
-
-                          {/* Git Branch Badge */}
-                          {ticket.gitbranch && (
-                            <div className="mb-2.5">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--theme-bg-app)] border border-[var(--theme-border)] font-mono text-[10px] text-[var(--theme-text)] max-w-full truncate">
-                                <GitBranch
-                                  size={10}
-                                  className="shrink-0 text-[var(--theme-text-muted)]"
-                                />
-                                <span className="truncate">
-                                  {ticket.gitbranch}
-                                </span>
-                              </span>
-                            </div>
-                          )}
-
-                          {/* Footer: Due Date pill & Assignee Avatar */}
+                          {/* Quick actions (hover) */}
                           <div
-                            className="flex items-center justify-between pt-2 border-t text-[11px]"
-                            style={{ borderColor: "var(--theme-border)" }}
+                            className="absolute top-2 right-2 hidden group-hover:flex items-center gap-0.5 rounded-lg border p-0.5"
+                            style={{
+                              backgroundColor: "var(--theme-bg-app)",
+                              borderColor: "var(--theme-border)",
+                              boxShadow: "0 1px 3px rgba(20, 26, 46, 0.14)",
+                            }}
                           >
-                            {/* Due Date */}
-                            {ticket.dueDate ? (
-                              <div
-                                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
-                                  isOverdue
-                                    ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/40"
-                                    : "bg-[var(--theme-bg-surface)] text-[var(--theme-text)] border-[var(--theme-border)]"
-                                }`}
+                            {[
+                              { title: "View ticket details", Icon: Eye, run: () => setViewingDetailTicket(ticket) },
+                              { title: "Issue chat & notes", Icon: MessageSquare, run: () => setChatTicket(ticket) },
+                              { title: "Issue timeline", Icon: Clock, run: () => setTimelineTicket(ticket) },
+                            ].map(({ title, Icon, run }) => (
+                              <button
+                                key={title}
+                                type="button"
+                                title={title}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  run();
+                                }}
+                                className="w-6 h-6 rounded-md flex items-center justify-center transition hover:bg-[var(--theme-fill-hover)]"
+                                style={{ color: "var(--theme-text-muted)" }}
                               >
-                                <Calendar
-                                  size={11}
-                                  className={
-                                    isOverdue
-                                      ? "text-rose-600 dark:text-rose-400"
-                                      : "text-[var(--theme-text-muted)]"
-                                  }
-                                />
-                                <span>
-                                  {new Date(ticket.dueDate).toLocaleDateString(
-                                    undefined,
-                                    {
-                                      year: "numeric",
-                                      month: "2-digit",
-                                      day: "2-digit",
-                                    },
-                                  )}
-                                </span>
-                                {isOverdue && (
-                                  <AlertCircle
-                                    size={12}
-                                    className="text-rose-600 dark:text-rose-400 ml-0.5"
-                                  />
-                                )}
-                              </div>
-                            ) : (
-                              <div />
-                            )}
-
-                            {/* Assignee Avatar */}
-                            {ticket.assignee ? (
-                              <div
-                                title={`Assigned to ${ticket.assignee.displayName}`}
-                                className="flex items-center gap-1.5"
-                              >
-                                <img
-                                  src={
-                                    ticket.assignee.avatarUrl ||
-                                    `/api/avatar/bottts/svg?seed=${ticket.assignee.username}`
-                                  }
-                                  alt={ticket.assignee.displayName}
-                                  className="w-6 h-6 rounded-full object-cover ring-1 ring-black/20 dark:ring-white/20"
-                                />
-                                <span
-                                  className="text-[10px] font-medium hidden sm:inline max-w-[80px] truncate"
-                                  style={{ color: "var(--theme-text-primary)" }}
-                                >
-                                  {ticket.assignee.displayName}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-[10px] flex items-center gap-1 text-[var(--theme-text-muted)]">
-                                <User size={11} />
-                                Unassigned
-                              </span>
-                            )}
+                                <Icon size={14} />
+                              </button>
+                            ))}
+                            <button
+                              type="button"
+                              title="Delete ticket"
+                              onClick={(e) => handleDeleteTicketDirect(ticket, e)}
+                              className="w-6 h-6 rounded-md flex items-center justify-center transition hover:bg-[var(--theme-fill-hover)]"
+                              style={{ color: DANGER }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           </div>
+
+                          <p
+                            className="text-sm font-semibold leading-5 break-words"
+                            style={{ color: done ? "var(--theme-text-muted)" : "var(--theme-text)" }}
+                          >
+                            {ticket.title}
+                          </p>
+
+                          {labels.length > 0 && (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {labels.map((l) => (
+                                <LabelChip key={l.name} name={l.name} color={l.color} />
+                              ))}
+                            </div>
+                          )}
+
+                          {(ticket.dueDate || comments > 0 || people.length > 0) && (
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="flex items-center gap-3 min-w-0">
+                                {ticket.dueDate && (
+                                  <span
+                                    className={`flex items-center gap-1 text-xs ${overdue ? "font-semibold" : "font-medium"}`}
+                                    style={{ color: overdue ? DANGER : "var(--theme-text-muted)" }}
+                                  >
+                                    <Calendar size={13} />
+                                    {formatShortDate(ticket.dueDate)}
+                                  </span>
+                                )}
+                                {comments > 0 && (
+                                  <button
+                                    type="button"
+                                    title="Open discussion"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setChatTicket(ticket);
+                                    }}
+                                    className="flex items-center gap-1 text-xs font-medium hover:opacity-80"
+                                    style={{ color: "var(--theme-text-muted)" }}
+                                  >
+                                    <MessageSquare size={13} />
+                                    {comments}
+                                  </button>
+                                )}
+                              </span>
+                              {people.length > 0 && (
+                                <span className="flex items-center shrink-0" title={people.map((p) => p.displayName).join(", ")}>
+                                  {people.slice(0, 2).map((u, i) => (
+                                    <Avatar
+                                      key={u.id}
+                                      name={u.displayName}
+                                      src={u.avatarUrl}
+                                      size={24}
+                                      ring={i ? "var(--theme-bg-app)" : undefined}
+                                      className={i ? "-ml-1.5" : ""}
+                                    />
+                                  ))}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
+
+                    {isTicketDropTarget && (
+                      <div
+                        className="h-[72px] shrink-0 rounded-xl flex items-center justify-center text-[13px] font-semibold"
+                        style={{
+                          backgroundColor: "var(--theme-bg-surface)",
+                          border: "1.5px dashed var(--theme-primary)",
+                          color: "var(--theme-primary-hover)",
+                        }}
+                      >
+                        Drop ticket here
+                      </div>
+                    )}
 
                     {hasMoreTickets(column) && (
                       <button
                         onClick={() => loadMoreTickets(column)}
                         disabled={loadingCols[column.id]}
-                        className="w-full py-2 text-[11px] font-medium rounded-lg hover:bg-[var(--theme-bg-surface-hover)] disabled:opacity-60"
+                        className="w-full h-8 shrink-0 rounded-lg text-xs font-medium transition hover:bg-[var(--theme-fill-hover)] disabled:opacity-60"
                         style={{ color: "var(--theme-text-muted)" }}
                       >
                         {loadingCols[column.id] ? "Loading…" : "Load older tickets"}
                       </button>
                     )}
 
-                    {colTickets.length === 0 && !hasMoreTickets(column) && (
+                    {colTickets.length === 0 && !hasMoreTickets(column) && !isTicketDropTarget && (
                       <div
-                        className="h-24 border border-dashed rounded-xl flex items-center justify-center text-[11px]"
-                        style={{
-                          borderColor: "var(--theme-border)",
-                          color: "var(--theme-text-muted)",
-                        }}
+                        className="h-[72px] shrink-0 rounded-xl border border-dashed flex items-center justify-center text-xs"
+                        style={{ borderColor: "var(--theme-border)", color: "var(--theme-text-muted)" }}
                       >
-                        No tickets
+                        {filtersActive ? "No matching tickets" : "No tickets"}
                       </div>
                     )}
-                  </div>
-
-                  {/* Add Ticket Shortcut at column bottom */}
-                  <div
-                    className="p-2 border-t shrink-0"
-                    style={{ borderColor: "var(--theme-border)" }}
-                  >
-                    <button
-                      onClick={() => {
-                        setEditingTicket(null);
-                        setTargetColumnId(column.id);
-                        setShowTicketModal(true);
-                      }}
-                      className="w-full py-1.5 px-2 rounded-lg text-xs hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center justify-center gap-1.5"
-                      style={{ color: "var(--theme-text-muted)" }}
-                    >
-                      <Plus size={14} />
-                      <span>Add ticket</span>
-                    </button>
                   </div>
                 </div>
               );
             })}
 
-            {/* Add Column Button Card */}
+            {/* Add column */}
             {showAddColumn ? (
-              <div
-                className="w-72 sm:w-80 shrink-0 border rounded-2xl p-4 shadow-xl"
-                style={{
-                  backgroundColor: "var(--theme-bg-surface)",
-                  borderColor: "var(--theme-primary)",
-                }}
-              >
-                <h4
-                  className="text-xs font-bold mb-2"
-                  style={{ color: "var(--theme-text-primary)" }}
-                >
-                  Create New Column
-                </h4>
-                <form onSubmit={handleCreateColumn} className="space-y-3">
-                  <input
-                    type="text"
-                    autoFocus
-                    required
-                    placeholder="Column Name (e.g. QA, Review, Staging)"
-                    value={newColumnName}
-                    onChange={(e) => setNewColumnName(e.target.value)}
-                    className="w-full border rounded-xl px-3 py-2 text-xs focus:outline-none"
-                    style={{
-                      backgroundColor: "var(--theme-bg-surface-hover)",
-                      borderColor: "var(--theme-border)",
-                      color: "var(--theme-text-primary)",
-                    }}
-                  />
-
-                  <div>
-                    <label
-                      className="block text-[10px] uppercase font-semibold mb-1"
-                      style={{ color: "var(--theme-text-muted)" }}
-                    >
-                      Header Color
-                    </label>
-                    <div className="flex items-center gap-1.5">
-                      {COLUMN_COLORS.map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() => setNewColumnColor(c)}
-                          style={{ backgroundColor: c }}
-                          className={`w-5 h-5 rounded-full transition transform hover:scale-110 ${
-                            newColumnColor === c
-                              ? "ring-2 ring-offset-1 scale-110"
-                              : ""
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-end gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowAddColumn(false)}
-                      className="px-3 py-1.5 text-xs hover:opacity-80 transition"
-                      style={{ color: "var(--theme-text-muted)" }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={!newColumnName.trim()}
-                      className="px-3.5 py-1.5 disabled:opacity-50 text-xs font-semibold rounded-lg shadow transition"
-                      style={{
-                        backgroundColor: "var(--theme-primary)",
-                        color: "var(--theme-primary-text)",
-                      }}
-                    >
-                      Add Column
-                    </button>
-                  </div>
-                </form>
-              </div>
+              <AddColumnForm
+                name={newColumnName}
+                color={newColumnColor}
+                onName={setNewColumnName}
+                onColor={setNewColumnColor}
+                onCancel={() => setShowAddColumn(false)}
+                onSubmit={handleCreateColumn}
+              />
             ) : (
               <button
                 onClick={() => setShowAddColumn(true)}
-                className="w-72 sm:w-80 shrink-0 h-16 rounded-2xl border-2 border-dashed transition flex items-center justify-center gap-2 text-xs font-semibold hover:opacity-80"
-                style={{
-                  borderColor: "var(--theme-border)",
-                  backgroundColor: "var(--theme-bg-surface)",
-                  color: "var(--theme-text-muted)",
-                }}
+                className="w-[272px] shrink-0 h-12 rounded-[14px] border-2 border-dashed flex items-center justify-center gap-2 text-[13px] font-semibold transition hover:bg-[var(--theme-fill-hover)]"
+                style={{ borderColor: "var(--theme-border)", color: "var(--theme-text-muted)" }}
               >
                 <Plus size={16} />
-                <span>Add another column</span>
+                Add column
               </button>
             )}
           </div>
-        </>
+        )
+      ) : activeSection === "list" ? (
+        <ProjectListView
+          project={project}
+          members={members}
+          loadingAll={loadingAll}
+          filterTicket={filterTicket}
+          onOpenTicket={setViewingDetailTicket}
+        />
+      ) : activeSection === "summary" ? (
+        <ProjectSummaryView
+          project={project}
+          members={members}
+          currentUser={currentUser}
+          rangeDays={rangeDays}
+          onOpenTicket={setViewingDetailTicket}
+        />
       ) : null}
 
       {/* Ticket Create / Edit Modal */}
@@ -1786,3 +1614,195 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
     </div>
   );
 };
+
+const MenuRow: React.FC<{
+  Icon: React.ElementType;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+  disabled?: boolean;
+  compact?: boolean;
+}> = ({ Icon, label, onClick, danger, disabled, compact }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    className={`w-full flex items-center gap-2.5 text-left font-medium transition hover:bg-[var(--theme-fill-hover)] disabled:opacity-40 disabled:pointer-events-none ${
+      compact ? "h-8 px-2 rounded-lg text-[13px]" : "h-10 px-2.5 rounded-[10px] text-sm"
+    }`}
+    style={{ color: danger ? DANGER : "var(--theme-text)" }}
+  >
+    {compact ? (
+      <Icon size={14} style={{ color: danger ? DANGER : "var(--theme-text-muted)" }} />
+    ) : (
+      <span
+        className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+        style={{
+          backgroundColor: "var(--theme-bg-surface-hover)",
+          color: danger ? DANGER : "var(--theme-text-muted)",
+        }}
+      >
+        <Icon size={16} />
+      </span>
+    )}
+    <span className="truncate">{label}</span>
+  </button>
+);
+
+const SkeletonBar: React.FC<{ className: string }> = ({ className }) => (
+  <span className={`block ${className}`} style={{ backgroundColor: "var(--theme-border)" }} />
+);
+
+const BoardSkeleton: React.FC = () => (
+  <div className="flex-1 min-h-0 overflow-hidden px-3 sm:px-6 py-4 flex items-start gap-4 animate-pulse">
+    {[0, 1, 2, 3].map((col) => (
+      <div
+        key={col}
+        className="flex-1 min-w-[272px] max-w-[420px] rounded-xl p-2 flex flex-col gap-2"
+        style={{ backgroundColor: "var(--theme-selected)" }}
+      >
+        <SkeletonBar className="h-3.5 w-20 rounded" />
+        {[0, 1, 2].map((card) => (
+          <div
+            key={card}
+            className="rounded-xl border p-3 flex flex-col gap-2"
+            style={{ backgroundColor: "var(--theme-bg-app)", borderColor: "var(--theme-border)" }}
+          >
+            <SkeletonBar className="h-3 w-full rounded-md" />
+            <SkeletonBar className="h-3 w-[70px] rounded-md" />
+            <div className="flex items-center gap-2">
+              <SkeletonBar className="h-2.5 w-10 rounded-md" />
+              <span className="flex-1" />
+              <SkeletonBar className="w-5 h-5 rounded-full" />
+            </div>
+          </div>
+        ))}
+      </div>
+    ))}
+  </div>
+);
+
+const EmptyBoard: React.FC<{
+  projectName: string;
+  hasColumns: boolean;
+  onCreateTicket: () => void;
+  onAddColumn: () => void;
+  addColumnForm: React.ReactNode;
+}> = ({ projectName, hasColumns, onCreateTicket, onAddColumn, addColumnForm }) => (
+  <div className="flex-1 min-h-0 overflow-y-auto flex flex-col items-center justify-center p-4">
+    {addColumnForm ?? (
+      <div className="flex flex-col items-center justify-center gap-3 p-8">
+        <span
+          className="w-[72px] h-[72px] rounded-full flex items-center justify-center"
+          style={{ backgroundColor: "var(--theme-bg-app)", color: "var(--theme-text-muted)" }}
+        >
+          <Board size={32} />
+        </span>
+        <p className="text-[17px] font-bold" style={{ color: "var(--theme-text)" }}>
+          No tickets yet
+        </p>
+        <p className="w-[360px] max-w-full text-sm leading-[21px] text-center" style={{ color: "var(--theme-text-muted)" }}>
+          {hasColumns
+            ? `Create the first ticket for ${projectName}.`
+            : `Add a column to ${projectName} to start tracking tickets.`}
+        </p>
+        <div className="flex items-center gap-2 pt-1">
+          {hasColumns ? (
+            <button
+              type="button"
+              onClick={onCreateTicket}
+              className="h-9 px-4 rounded-[18px] flex items-center gap-1.5 text-[13px] font-semibold transition hover:bg-[var(--theme-primary-hover)]"
+              style={{ backgroundColor: "var(--theme-primary)", color: "var(--theme-primary-text)" }}
+            >
+              <Plus size={15} />
+              Create ticket
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={onAddColumn}
+            className="h-9 px-3.5 rounded-[18px] border flex items-center gap-1.5 text-[13px] font-medium transition hover:bg-[var(--theme-fill-hover)]"
+            style={{
+              backgroundColor: hasColumns ? "var(--theme-bg-app)" : "var(--theme-primary)",
+              borderColor: hasColumns ? "var(--theme-border)" : "transparent",
+              color: hasColumns ? "var(--theme-text)" : "var(--theme-primary-text)",
+            }}
+          >
+            <Columns3 size={15} />
+            Add column
+          </button>
+        </div>
+      </div>
+    )}
+  </div>
+);
+
+const AddColumnForm: React.FC<{
+  name: string;
+  color: string;
+  onName: (v: string) => void;
+  onColor: (v: string) => void;
+  onCancel: () => void;
+  onSubmit: (e: React.FormEvent) => void;
+}> = ({ name, color, onName, onColor, onCancel, onSubmit }) => (
+  <form
+    onSubmit={onSubmit}
+    className="w-[272px] shrink-0 self-start rounded-[14px] border p-3 flex flex-col gap-3"
+    style={{
+      backgroundColor: "var(--theme-bg-app)",
+      borderColor: "var(--theme-primary)",
+      boxShadow: "0 1px 4px rgba(20, 26, 46, 0.16)",
+    }}
+  >
+    <p className="text-[13px] font-bold" style={{ color: "var(--theme-text)" }}>
+      New column
+    </p>
+    <input
+      type="text"
+      autoFocus
+      required
+      placeholder="Column name (e.g. QA, Review)"
+      value={name}
+      onChange={(e) => onName(e.target.value)}
+      className="h-9 w-full rounded-[10px] border px-3 text-[13px] outline-none focus:border-[var(--theme-primary)]"
+      style={{
+        backgroundColor: "var(--theme-bg-app)",
+        borderColor: "var(--theme-border)",
+        color: "var(--theme-text)",
+      }}
+    />
+    <div className="flex items-center gap-1.5">
+      {COLUMN_COLORS.map((c) => (
+        <button
+          key={c}
+          type="button"
+          title={c}
+          onClick={() => onColor(c)}
+          className="w-5 h-5 rounded-full transition hover:scale-110"
+          style={{
+            backgroundColor: c,
+            boxShadow: color === c ? `0 0 0 2px var(--theme-bg-app), 0 0 0 4px ${c}` : undefined,
+          }}
+        />
+      ))}
+    </div>
+    <div className="flex items-center justify-end gap-2">
+      <button
+        type="button"
+        onClick={onCancel}
+        className="h-8 px-3 rounded-2xl text-[13px] font-medium transition hover:bg-[var(--theme-fill-hover)]"
+        style={{ color: "var(--theme-text-muted)" }}
+      >
+        Cancel
+      </button>
+      <button
+        type="submit"
+        disabled={!name.trim()}
+        className="h-8 px-3.5 rounded-2xl text-[13px] font-semibold transition hover:bg-[var(--theme-primary-hover)] disabled:opacity-50"
+        style={{ backgroundColor: "var(--theme-primary)", color: "var(--theme-primary-text)" }}
+      >
+        Add column
+      </button>
+    </div>
+  </form>
+);

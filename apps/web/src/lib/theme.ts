@@ -37,6 +37,9 @@ export const THEME_PRESETS: ThemeConfig[] = [
     secondaryColor: '#2D5855',
     borderColor: '#DBE7E4', // slate/200
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    selectedColor: '#D5E6E2',
+    accentColor: '#2D5855',
+    sectionColor: '#3E6F68',
   },
   {
     id: 'mint-teal-dark',
@@ -54,6 +57,8 @@ export const THEME_PRESETS: ThemeConfig[] = [
     secondaryColor: '#5EEAD4', // brand/300
     borderColor: '#304842', // slate/700
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    selectedColor: '#134E4A', // brand/900 (bg/selected, dark)
+    sectionColor: '#8BA7A1', // slate/400 (text/muted, dark)
   },
   {
     id: 'navy-glass',
@@ -351,9 +356,17 @@ export function applyTheme(theme: ThemeConfig) {
   root.style.setProperty('--theme-secondary', theme.secondaryColor);
   root.style.setProperty('--theme-border', theme.borderColor);
   // Themes saved before presets had fonts lack fontFamily; take it from the preset by id
-  const font = theme.fontFamily ?? THEME_PRESETS.find((p) => p.id === theme.id)?.fontFamily;
-  if (font) root.style.setProperty('--theme-font', font);
-  else root.style.removeProperty('--theme-font');
+  const preset = THEME_PRESETS.find((p) => p.id === theme.id);
+  const optional: [string, string | undefined][] = [
+    ['--theme-font', theme.fontFamily ?? preset?.fontFamily],
+    ['--theme-selected', theme.selectedColor ?? preset?.selectedColor],
+    ['--theme-accent', theme.accentColor ?? preset?.accentColor],
+    ['--theme-section', theme.sectionColor ?? preset?.sectionColor],
+  ];
+  for (const [prop, value] of optional) {
+    if (value) root.style.setProperty(prop, value);
+    else root.style.removeProperty(prop);
+  }
 
   // 2. Synchronize Light / Dark theme class on document element
   const isLight = isLightColor(theme.backgroundColor) || isLightColor(theme.sidebarColor);

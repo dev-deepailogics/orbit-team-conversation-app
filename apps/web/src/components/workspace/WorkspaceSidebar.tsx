@@ -1,13 +1,36 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Avatar } from '@/components/project/projectViewUtils';
 import Link from 'next/link';
 import { Workspace, UserProfile } from '@orbit/types';
-import { Plus, Layers, ShieldCheck, PenTool, FileText, Home, FolderKanban } from 'lucide-react';
+import {
+  Plus,
+  Layers,
+  ShieldCheck,
+  Canvas,
+  FileText,
+  Home,
+  Board,
+  Settings,
+  Pinwheel,
+  User,
+  Palette,
+  Bot,
+  HardDrive,
+  Link2,
+  LogOut,
+  ChevronRight,
+  ChevronDown,
+  Check,
+} from '@/components/ui/icons';
 import { api } from '../../lib/api';
 import { EmployeeAvailabilityHeader } from '../availability/EmployeeAvailabilityHeader';
 import { Presence, PRESENCE_STYLE } from '../availability/useTeamPresence';
 import { ProfileModal, defaultAvatar } from '../profile/ProfileModal';
+import { ThemeModal } from '../theme/ThemeModal';
+import { WorkspaceStorageModal } from './WorkspaceStorageModal';
+import { useChatStore } from '../../stores/chatStore';
 
 interface WorkspaceSidebarProps {
   workspaces: Workspace[];
@@ -21,11 +44,13 @@ interface WorkspaceSidebarProps {
   onOpenCanvas?: () => void;
   onOpenDocs?: () => void;
   onOpenProjects?: () => void;
+  onOpenBotPortal?: () => void;
+  members?: any[];
   presence?: Record<string, Presence>;
   onLogout: () => void;
 }
 
-const railLabel = 'text-[10px] font-semibold leading-none';
+const railLabel = 'mt-1 w-16 text-center text-[10px] font-medium leading-3';
 
 export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   workspaces,
@@ -38,15 +63,39 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   onOpenCanvas,
   onOpenDocs,
   onOpenProjects,
+  onOpenBotPortal,
+  members = [],
   presence = {},
   onLogout,
 }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [themeExpanded, setThemeExpanded] = useState(false);
+  const [themeModalTab, setThemeModalTab] = useState<'presets' | 'custom' | null>(null);
+  const [showStorage, setShowStorage] = useState(false);
+  const [copiedInvite, setCopiedInvite] = useState(false);
+  const settingsRef = useRef<HTMLDivElement>(null);
   const myPresence = (currentUser && presence[currentUser.id]) || 'offline';
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const myMembership = members.find((m: any) => m.userId === currentUser?.id || m.user?.id === currentUser?.id);
+  const isAdminOrOwner =
+    currentUser?.systemRole === 'SUPER_ADMIN' ||
+    myMembership?.role === 'OWNER' ||
+    myMembership?.role === 'ADMIN' ||
+    (!!currentWorkspace && currentWorkspace.ownerId === currentUser?.id);
+
+  useEffect(() => {
+    if (!showSettings) return;
+    const close = (e: MouseEvent) => {
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) setShowSettings(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showSettings]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,16 +114,48 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
     }
   };
 
+  const copyInviteLink = () => {
+    if (!currentWorkspace) return;
+    navigator.clipboard.writeText(
+      `${window.location.origin}/join/${(currentWorkspace as any).inviteCode || currentWorkspace.id}`,
+    );
+    setCopiedInvite(true);
+    setTimeout(() => setCopiedInvite(false), 2500);
+  };
+
+  const closeMenuThen = (fn: () => void) => () => {
+    setShowSettings(false);
+    setThemeExpanded(false);
+    fn();
+  };
+
+  const ActiveBar = ({ top = 6 }: { top?: number }) => (
+    <span
+      className="absolute left-0 w-[3px] h-8 rounded-[2px]"
+      style={{ top, backgroundColor: 'var(--theme-accent)' }}
+    />
+  );
+
   return (
     <div
-      className="w-[68px] border-r flex flex-col items-center py-3 gap-3 select-none z-20"
+      className="w-16 shrink-0 border-r flex flex-col items-center select-none z-20"
       style={{
         backgroundColor: 'var(--theme-bg-workspace)',
-        borderColor: 'var(--theme-border)',
+        borderColor: 'var(--theme-fill)',
       }}
     >
+      {/* Brand mark */}
+      <button
+        onClick={onGoHome}
+        disabled={!onGoHome}
+        title="Orbit"
+        className="mt-[17px] mb-3 shrink-0 rounded-lg transition hover:opacity-80 disabled:cursor-default"
+      >
+        <Pinwheel size={34} />
+      </button>
+
       {/* Workspace Icons */}
-      <div className="min-h-0 shrink flex flex-col items-center gap-3 overflow-y-auto w-full px-2">
+      <div className="min-h-0 shrink flex flex-col items-center gap-2 overflow-y-auto w-full py-1">
         {workspaces.map((ws) => {
           const isActive = currentWorkspace?.id === ws.id;
           return (
@@ -82,66 +163,49 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
               key={ws.id}
               onClick={() => onSelectWorkspace(ws)}
               title={ws.name}
-              className={`relative group w-11 h-11 rounded-xl flex items-center justify-center font-bold text-base transition-all duration-200 ${
-                isActive
-                  ? 'rounded-2xl shadow-lg ring-2 ring-white/20'
-                  : 'hover:rounded-2xl hover:opacity-90'
-              }`}
-              style={{
-                backgroundColor: isActive ? 'var(--theme-primary)' : 'var(--theme-bg-surface)',
-                color: isActive ? 'var(--theme-primary-text)' : 'var(--theme-text-primary)',
-              }}
+              className="relative w-full flex justify-center shrink-0"
             >
-              {/* Active Indicator bar */}
-              {isActive && (
-                <span className="absolute -left-2 w-1.5 h-7 bg-white rounded-r-full" />
-              )}
-              {ws.iconUrl ? (
-                <img src={ws.iconUrl} alt={ws.name} className="w-7 h-7 rounded-lg" />
-              ) : (
-                ws.name.substring(0, 2).toUpperCase()
-              )}
+              {isActive && <ActiveBar />}
+              <span
+                className={`w-11 h-11 rounded-xl flex items-center justify-center text-[13px] font-bold overflow-hidden transition-colors ${
+                  isActive ? '' : 'hover:brightness-95'
+                }`}
+                style={{
+                  backgroundColor: isActive ? 'var(--theme-selected)' : 'var(--theme-fill)',
+                  color: isActive ? 'var(--theme-accent)' : 'var(--theme-text)',
+                }}
+              >
+                {ws.iconUrl ? (
+                  <img src={ws.iconUrl} alt={ws.name} className="w-7 h-7 rounded-lg object-cover" />
+                ) : (
+                  ws.name.substring(0, 2).toUpperCase()
+                )}
+              </span>
             </button>
           );
         })}
-
-        {/* Add Workspace Button (Only for Super Admin and Workspace Admins) */}
-        {(currentUser?.systemRole === 'SUPER_ADMIN' || currentUser?.systemRole === 'WORKSPACE_ADMIN') && (
-          <button
-            onClick={() => setShowCreateModal(true)}
-            title="Create a Workspace"
-            style={{
-              borderColor: 'var(--theme-border)',
-              color: 'var(--theme-text-muted)',
-              backgroundColor: 'var(--theme-bg-surface)',
-            }}
-            className="w-11 h-11 rounded-xl border border-dashed hover:opacity-100 hover:border-gray-400 flex items-center justify-center transition-all duration-200"
-          >
-            <Plus size={20} />
-          </button>
-        )}
 
         {/* Super Admin Control Center Button */}
         {currentUser?.systemRole === 'SUPER_ADMIN' && (
           <Link
             href="/admin"
             title="Super Admin Control Center"
-            className="w-11 h-11 rounded-xl bg-purple-900/30 border border-purple-500/40 text-purple-600 dark:text-purple-400 hover:bg-purple-600 hover:text-white flex items-center justify-center transition-all duration-200 shadow-lg group relative"
+            className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center transition hover:brightness-95"
+            style={{ backgroundColor: 'var(--theme-fill)', color: 'var(--theme-accent)' }}
           >
-            <ShieldCheck size={20} className="transition group-hover:scale-110" />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-purple-500 rounded-full animate-ping" />
+            <ShieldCheck size={20} />
           </Link>
         )}
       </div>
 
       {/* Feature Shortcuts */}
       {currentWorkspace && (
-        <div className="flex flex-col items-center gap-2 w-full px-1 pt-3 border-t" style={{ borderColor: 'var(--theme-border)' }}>
+        <nav className="mt-4 flex flex-col items-center gap-2 w-full">
           {([
             { key: 'home', label: 'Home', Icon: Home, onClick: onGoHome },
-            { key: 'canvas', label: 'Canvas', Icon: PenTool, onClick: onOpenCanvas },
+            { key: 'canvas', label: 'Canvas', Icon: Canvas, onClick: onOpenCanvas },
             { key: 'docs', label: 'Docs', Icon: FileText, onClick: onOpenDocs },
-            { key: 'projects', label: 'Projects', Icon: FolderKanban, onClick: onOpenProjects },
+            { key: 'projects', label: 'Projects', Icon: Board, onClick: onOpenProjects },
           ] as const).map(({ key, label, Icon, onClick }) => {
             const isActive = activeFeature === key;
             return (
@@ -150,53 +214,140 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                 onClick={onClick}
                 disabled={!onClick}
                 title={label}
-                className="group flex flex-col items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="group relative w-full flex flex-col items-center disabled:opacity-40 disabled:cursor-not-allowed"
               >
+                {isActive && <ActiveBar />}
                 <span
-                  className="w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 group-hover:rounded-2xl"
+                  className={`w-11 h-11 rounded-xl flex items-center justify-center transition-colors ${
+                    isActive ? '' : 'group-enabled:group-hover:bg-[var(--theme-fill-hover)]'
+                  }`}
                   style={{
-                    backgroundColor: isActive ? 'var(--theme-primary)' : 'var(--theme-bg-surface)',
-                    color: isActive ? 'var(--theme-primary-text)' : 'var(--theme-text-primary)',
+                    backgroundColor: isActive ? 'var(--theme-selected)' : undefined,
+                    color: isActive ? 'var(--theme-text)' : 'var(--theme-text-muted)',
                   }}
                 >
                   <Icon size={20} />
                 </span>
-                <span className={railLabel} style={{ color: isActive ? 'var(--theme-text-primary)' : 'var(--theme-text-muted)' }}>
+                <span
+                  className={railLabel}
+                  style={{ color: isActive ? 'var(--theme-text)' : 'var(--theme-text-muted)' }}
+                >
                   {label}
                 </span>
               </button>
             );
           })}
-
-          <div className="flex flex-col items-center gap-1">
-            <EmployeeAvailabilityHeader currentUserId={currentUser?.id} />
-            <span className={railLabel} style={{ color: 'var(--theme-text-muted)' }}>Status</span>
-          </div>
-        </div>
+        </nav>
       )}
 
-      {/* Profile */}
-      {currentUser && (
-        <button
-          onClick={() => setShowProfile(true)}
-          title={`${currentUser.displayName} · ${PRESENCE_STYLE[myPresence].label}`}
-          className="group mt-auto flex flex-col items-center gap-1 shrink-0"
-        >
-          <span className="relative w-11 h-11">
-            <img
-              src={currentUser.avatarUrl || defaultAvatar(currentUser.username)}
-              alt={currentUser.displayName}
-              className="w-11 h-11 rounded-xl object-cover transition-all duration-200 group-hover:rounded-2xl"
-              style={{ backgroundColor: 'var(--theme-bg-surface)' }}
-            />
+      <div className="mt-auto pt-4 pb-5 flex flex-col items-center gap-4 shrink-0">
+        {currentWorkspace && (
+          <EmployeeAvailabilityHeader
+            currentUserId={currentUser?.id}
+            onViewProfile={() => setShowProfile(true)}
+            onOpenSettings={() => setShowSettings(true)}
+            onSignOut={onLogout}
+          />
+        )}
+
+        {/* Add Workspace (Super Admin and Workspace Admins) */}
+        {(currentUser?.systemRole === 'SUPER_ADMIN' || currentUser?.systemRole === 'WORKSPACE_ADMIN') && (
+          <button
+            onClick={() => setShowCreateModal(true)}
+            title="Create a Workspace"
+            className="w-9 h-9 rounded-full flex items-center justify-center transition hover:brightness-95"
+            style={{ backgroundColor: 'var(--theme-fill)', color: 'var(--theme-text-muted)' }}
+          >
+            <Plus size={18} />
+          </button>
+        )}
+
+        {/* Settings */}
+        {currentUser && (
+          <div ref={settingsRef} className="relative">
+            <button
+              onClick={() => setShowSettings((v) => !v)}
+              title="Settings"
+              className="w-8 h-8 rounded-lg flex items-center justify-center transition hover:bg-[var(--theme-fill-hover)]"
+              style={{
+                color: showSettings ? 'var(--theme-text)' : 'var(--theme-text-muted)',
+                backgroundColor: showSettings ? 'var(--theme-fill)' : undefined,
+              }}
+            >
+              <Settings size={20} />
+            </button>
+
+            {showSettings && (
+              <div
+                className="absolute left-full bottom-0 ml-3 w-[264px] rounded-[14px] border p-2 flex flex-col gap-0.5 z-50 animate-in fade-in zoom-in-95 duration-150"
+                style={{
+                  backgroundColor: 'var(--theme-bg-app)',
+                  borderColor: 'var(--theme-border)',
+                  boxShadow: '0 12px 16px rgba(20, 26, 46, 0.2)',
+                  color: 'var(--theme-text)',
+                }}
+              >
+                <p
+                  className="px-2.5 py-1.5 text-[11px] font-bold tracking-[0.6px]"
+                  style={{ color: 'var(--theme-text-muted)' }}
+                >
+                  SETTINGS
+                </p>
+
+                <SettingsRow Icon={User} label="Profile & status" onClick={closeMenuThen(() => setShowProfile(true))} />
+
+                <SettingsRow
+                  Icon={Palette}
+                  label="Theme & appearance"
+                  expanded={themeExpanded}
+                  onClick={() => setThemeExpanded((v) => !v)}
+                />
+                {themeExpanded && (
+                  <>
+                    <SettingsSubRow label="Theme templates" onClick={closeMenuThen(() => setThemeModalTab('presets'))} />
+                    <SettingsSubRow label="Custom theme" badge="New" onClick={closeMenuThen(() => setThemeModalTab('custom'))} />
+                  </>
+                )}
+
+                {onOpenBotPortal && (
+                  <SettingsRow Icon={Bot} label="Bot & app integrations" onClick={closeMenuThen(onOpenBotPortal)} />
+                )}
+                {currentWorkspace && (
+                  <SettingsRow Icon={HardDrive} label="Workspace storage" onClick={closeMenuThen(() => setShowStorage(true))} />
+                )}
+                {currentWorkspace && (
+                  <SettingsRow
+                    Icon={copiedInvite ? Check : Link2}
+                    label={copiedInvite ? 'Invite link copied' : 'Invite link'}
+                    onClick={copyInviteLink}
+                  />
+                )}
+
+                <div className="py-1">
+                  <div className="h-px" style={{ backgroundColor: 'var(--theme-border)' }} />
+                </div>
+
+                <SettingsRow Icon={LogOut} label="Sign out" onClick={closeMenuThen(onLogout)} />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Profile */}
+        {currentUser && (
+          <button
+            onClick={() => setShowProfile(true)}
+            title={`${currentUser.displayName} · ${PRESENCE_STYLE[myPresence].label}`}
+            className="relative w-6 h-6 shrink-0 rounded-full transition hover:opacity-85"
+          >
+            <Avatar name={currentUser.displayName || currentUser.username} src={currentUser.avatarUrl} size={24} />
             <span
-              className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ${PRESENCE_STYLE[myPresence].dot}`}
+              className={`absolute left-4 top-4 w-2.5 h-2.5 rounded-full ${PRESENCE_STYLE[myPresence].dot}`}
               style={{ boxShadow: '0 0 0 2px var(--theme-bg-workspace)' }}
             />
-          </span>
-          <span className={railLabel} style={{ color: 'var(--theme-text-muted)' }}>Profile</span>
-        </button>
-      )}
+          </button>
+        )}
+      </div>
 
       {showProfile && currentUser && (
         <ProfileModal
@@ -208,12 +359,41 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
         />
       )}
 
+      {themeModalTab && (
+        <ThemeModal
+          isOpen
+          initialTab={themeModalTab}
+          onClose={() => setThemeModalTab(null)}
+          workspace={currentWorkspace}
+          isAdminOrOwner={isAdminOrOwner}
+          onOpenProfile={() => {
+            setThemeModalTab(null);
+            setShowProfile(true);
+          }}
+          onSignOut={onLogout}
+        />
+      )}
+
+      {showStorage && currentWorkspace && currentUser && (
+        <WorkspaceStorageModal
+          workspace={currentWorkspace}
+          currentUser={currentUser}
+          onClose={() => setShowStorage(false)}
+          onFileDeleted={(id) => useChatStore.getState().removeAttachment(id)}
+          onOpenProfile={() => {
+            setShowStorage(false);
+            setShowProfile(true);
+          }}
+          onSignOut={onLogout}
+        />
+      )}
+
       {/* Create Workspace Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-xl w-full max-w-md p-6 shadow-2xl">
             <h2 className="text-xl font-bold text-[var(--theme-text)] mb-2 flex items-center gap-2">
-              <Layers className="text-slack-activeChannel" size={22} />
+              <Layers style={{ color: 'var(--theme-primary)' }} size={22} />
               Create a new workspace
             </h2>
             <p className="text-sm text-[var(--theme-text-muted)] mb-5">
@@ -236,7 +416,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                       setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '-'));
                     }
                   }}
-                  className="w-full bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-lg px-3 py-2 text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-slack-activeChannel text-sm"
+                  className="w-full bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-lg px-3 py-2 text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-[var(--theme-primary)] text-sm"
                 />
               </div>
 
@@ -268,7 +448,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 rounded-lg text-sm font-semibold bg-slack-green hover:bg-[#008a65] text-white transition disabled:opacity-50"
+                  className="px-5 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-50 bg-[var(--theme-primary)] hover:bg-[var(--theme-primary-hover)] text-[var(--theme-primary-text)]"
                 >
                   {isSubmitting ? 'Creating...' : 'Create Workspace'}
                 </button>
@@ -280,3 +460,58 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
     </div>
   );
 };
+
+const SettingsRow: React.FC<{
+  Icon: React.ElementType;
+  label: string;
+  onClick: () => void;
+  expanded?: boolean;
+}> = ({ Icon, label, onClick, expanded }) => (
+  <button
+    onClick={onClick}
+    className="w-full h-10 px-2.5 flex items-center gap-2.5 rounded-[10px] text-left transition-colors hover:bg-[var(--theme-fill-hover)]"
+  >
+    <span
+      className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+      style={{ backgroundColor: 'var(--theme-bg-surface-hover)', color: 'var(--theme-text-muted)' }}
+    >
+      <Icon size={16} />
+    </span>
+    <span
+      className={`flex-1 truncate text-sm ${expanded ? 'font-semibold' : 'font-medium'}`}
+      style={{ color: expanded ? 'var(--theme-primary-hover)' : 'var(--theme-text)' }}
+    >
+      {label}
+    </span>
+    {expanded === undefined ? (
+      <ChevronRight size={14} style={{ color: 'var(--theme-text-muted)' }} />
+    ) : (
+      <ChevronDown
+        size={14}
+        className={`transition-transform ${expanded ? 'rotate-180' : ''}`}
+        style={{ color: 'var(--theme-text-muted)' }}
+      />
+    )}
+  </button>
+);
+
+const SettingsSubRow: React.FC<{ label: string; onClick: () => void; badge?: string }> = ({ label, onClick, badge }) => (
+  <button
+    onClick={onClick}
+    className="group w-full h-9 pl-[38px] pr-2.5 flex items-center gap-2 rounded-[10px] text-left text-sm font-medium transition-colors hover:bg-[var(--theme-selected)]"
+    style={{ color: 'var(--theme-text)' }}
+  >
+    <span
+      className="w-1.5 h-1.5 rounded-full shrink-0 bg-[var(--theme-border)] group-hover:bg-[var(--theme-primary)]"
+    />
+    <span className="flex-1 truncate group-hover:text-[var(--theme-primary-hover)] group-hover:font-semibold">{label}</span>
+    {badge && (
+      <span
+        className="h-[18px] px-[7px] rounded-[9px] flex items-center text-[10px] font-bold"
+        style={{ backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-text)' }}
+      >
+        {badge}
+      </span>
+    )}
+  </button>
+);

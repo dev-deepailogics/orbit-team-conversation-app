@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { X, Clock } from 'lucide-react';
+import { X, Clock } from '@/components/ui/icons';
 import { WorkspaceMember, ProjectColumn } from '@orbit/types';
 
 interface IssueTimelineModalProps {
