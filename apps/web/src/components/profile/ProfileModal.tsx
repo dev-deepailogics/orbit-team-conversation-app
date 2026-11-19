@@ -46,11 +46,21 @@ interface ProfileModalProps {
   presence: Presence;
   onClose: () => void;
   onLogout: () => void;
+  /** 'page' fills the app's main content area like the other views; 'modal' overlays the app. */
+  variant?: 'modal' | 'page';
 }
 
 type Tab = 'overview' | 'preferences';
 
-export const ProfileModal: React.FC<ProfileModalProps> = ({ user, workspaceId, presence, onClose, onLogout }) => {
+export const ProfileModal: React.FC<ProfileModalProps> = ({
+  user,
+  workspaceId,
+  presence,
+  onClose,
+  onLogout,
+  variant = 'modal',
+}) => {
+  const isPage = variant === 'page';
   const setAuth = useAuthStore((s) => s.setAuth);
   const workspace = useChatStore((s) => s.currentWorkspace);
   const channels = useChatStore((s) => s.channels);
@@ -79,12 +89,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, workspaceId, p
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30_000);
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
+    if (!isPage) window.addEventListener('keydown', onKey);
     return () => {
       clearInterval(id);
       window.removeEventListener('keydown', onKey);
     };
-  }, [onClose]);
+  }, [onClose, isPage]);
 
   const presets = AVATAR_STYLES.flatMap((style) =>
     [user.username, `${user.username}-alt`].map((seed) => `/api/avatar/${style}/svg?seed=${encodeURIComponent(seed)}`),
@@ -188,14 +198,21 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, workspaceId, p
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center z-50 pt-6 px-3 sm:px-4"
-      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+      className={
+        isPage
+          ? 'flex-1 min-w-0 h-full flex'
+          : 'fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center z-50 pt-6 px-3 sm:px-4'
+      }
+      onMouseDown={isPage ? undefined : (e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        role="dialog"
-        aria-modal="true"
+        {...(isPage ? {} : { role: 'dialog', 'aria-modal': true })}
         aria-label="Your profile"
-        className="w-full max-w-[1168px] h-[min(900px,calc(100vh-48px))] rounded-2xl border overflow-hidden flex flex-col shadow-2xl"
+        className={
+          isPage
+            ? 'w-full h-full overflow-hidden flex flex-col'
+            : 'w-full max-w-[1168px] h-[min(900px,calc(100vh-48px))] rounded-2xl border overflow-hidden flex flex-col shadow-2xl'
+        }
         style={{ backgroundColor: 'var(--theme-bg-app)', borderColor: 'var(--theme-border)' }}
       >
         {/* Header */}

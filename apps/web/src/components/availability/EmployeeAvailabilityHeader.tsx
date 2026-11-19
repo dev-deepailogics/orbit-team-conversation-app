@@ -4,9 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
 import { SOCKET_EVENTS, UserAvailabilityRecord } from '@orbit/types';
-import { Clock, Coffee, LogOut, AlertTriangle, Check, ChevronRight, User, Settings } from '@/components/ui/icons';
-import { useAuthStore } from '../../stores/authStore';
-import { Avatar } from '../project/projectViewUtils';
+import { Clock, Coffee, AlertTriangle, Check, ChevronRight } from '@/components/ui/icons';
 
 // Semantic presence colours from the Figma guideline (fixed across themes)
 const WORKING = '#1F9D63';
@@ -31,11 +29,7 @@ export const formatElapsed = (secs: number) => {
 
 export const EmployeeAvailabilityHeader: React.FC<{
   currentUserId?: string;
-  onViewProfile?: () => void;
-  onOpenSettings?: () => void;
-  onSignOut?: () => void;
-}> = ({ currentUserId, onViewProfile, onOpenSettings, onSignOut }) => {
-  const me = useAuthStore((s) => s.user);
+}> = ({ currentUserId }) => {
   const [availability, setAvailability] = useState<UserAvailabilityRecord | null>(null);
   const [serverTimeOffset, setServerTimeOffset] = useState<number>(0);
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
@@ -202,7 +196,6 @@ export const EmployeeAvailabilityHeader: React.FC<{
     setShowBreakModal(false);
   };
 
-  const myName = me?.displayName || me?.username || 'You';
   const lastBreakReason = (availability?.breaks || []).slice(-1)[0]?.breakReason;
 
   return (
@@ -248,18 +241,6 @@ export const EmployeeAvailabilityHeader: React.FC<{
                 boxShadow: '0 12px 16px rgba(20, 26, 46, 0.2)',
               }}
             >
-              <div className="px-2.5 py-2 flex items-center gap-2.5">
-                <Avatar name={myName} src={me?.avatarUrl} size={36} />
-                <span className="flex flex-col min-w-0">
-                  <span className="text-sm font-bold truncate" style={{ color: 'var(--theme-text)' }}>
-                    {myName}
-                  </span>
-                  <span className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>
-                    Set your status
-                  </span>
-                </span>
-              </div>
-
               <StatusOption
                 icon="/icons/status-on.svg"
                 title="Available"
@@ -294,23 +275,6 @@ export const EmployeeAvailabilityHeader: React.FC<{
                   handleRequestCheckout();
                 }}
               />
-
-              {(onViewProfile || onOpenSettings || onSignOut) && (
-                <>
-                  <div className="py-1">
-                    <div className="h-px" style={{ backgroundColor: 'var(--theme-border)' }} />
-                  </div>
-                  {onViewProfile && (
-                    <MenuLink Icon={User} label="View profile" onClick={() => { closeMenus(); onViewProfile(); }} />
-                  )}
-                  {onOpenSettings && (
-                    <MenuLink Icon={Settings} label="Settings" onClick={() => { closeMenus(); onOpenSettings(); }} />
-                  )}
-                  {onSignOut && (
-                    <MenuLink Icon={LogOut} label="Sign out" onClick={() => { closeMenus(); onSignOut(); }} />
-                  )}
-                </>
-              )}
             </div>
 
             {/* Break options */}
@@ -483,17 +447,5 @@ const StatusOption: React.FC<{
     </span>
     {selected && <Check size={16} style={{ color: 'var(--theme-primary-hover)' }} />}
     {trailing === 'chevron' && <ChevronRight size={14} style={{ color: 'var(--theme-text-muted)' }} />}
-  </button>
-);
-
-const MenuLink: React.FC<{ Icon: React.ElementType; label: string; onClick: () => void }> = ({ Icon, label, onClick }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className="w-full h-9 px-2.5 rounded-[10px] flex items-center gap-2.5 text-left text-sm font-medium transition hover:bg-[var(--theme-fill-hover)]"
-    style={{ color: 'var(--theme-text)' }}
-  >
-    <Icon size={17} style={{ color: 'var(--theme-text-muted)' }} />
-    {label}
   </button>
 );

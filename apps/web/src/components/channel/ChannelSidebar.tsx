@@ -199,7 +199,6 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 }) => {
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const sidebar = useResizableSidebar({ storageKey: "orbit_sidebar_width", defaultWidth: 208 });
-  const [isProjectsCollapsed, setIsProjectsCollapsed] = useState(false);
   const [showStorageModal, setShowStorageModal] = useState(false);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [showThemeModal, setShowThemeModal] = useState(false);
@@ -949,50 +948,6 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 
         {!showProjects && !showCanvas && !showDocs && (
         <>
-        {/* Projects & Boards Section */}
-        {(projects.length > 0 || onOpenCreateProject) && (
-          <div>
-            <SectionHeader
-              label="Projects & boards"
-              collapsed={isProjectsCollapsed}
-              onToggle={() => setIsProjectsCollapsed((prev) => !prev)}
-            />
-            <Collapse open={!isProjectsCollapsed}>
-              <div className="space-y-0.5">
-                {projects
-                  .filter((p) => (p.status || "active").toLowerCase() === "active")
-                  .map((project) => {
-                    const isActive = currentProject?.id === project.id;
-                    return (
-                      <div
-                        key={project.id}
-                        onClick={() => onSelectProject?.(project)}
-                        className={rowClass(isActive)}
-                        style={rowStyle(isActive)}
-                      >
-                        {isActive && <ActiveBar />}
-                        <RowIcon>
-                          <Board size={18} />
-                        </RowIcon>
-                        <span {...rowLabel(isActive)}>{project.name}</span>
-                      </div>
-                    );
-                  })}
-                {projects.length === 0 && onOpenCreateProject && (
-                  <button onClick={onOpenCreateProject} className={`w-full text-left ${rowClass(false)}`}>
-                    <RowIcon>
-                      <Plus size={16} />
-                    </RowIcon>
-                    <span className="flex-1 truncate text-sm" style={{ color: "var(--theme-text-muted)" }}>
-                      Create a project board
-                    </span>
-                  </button>
-                )}
-              </div>
-            </Collapse>
-          </div>
-        )}
-
         {/* Channels Section */}
         <div>
           <SectionHeader

@@ -42,6 +42,7 @@ import { ShareDocumentModal } from "@/components/project/ShareDocumentModal";
 import { useTeamPresence } from "@/components/availability/useTeamPresence";
 import { Splash, WorkspaceSkeleton } from "@/components/brand/LoadingScreens";
 import { EmptyState } from "@/components/brand/EmptyState";
+import { ProfileModal } from "@/components/profile/ProfileModal";
 import { OfflineOverlay } from "@/components/brand/OfflineScreen";
 import {
   ShieldCheck,
@@ -115,6 +116,11 @@ export default function AppDashboard() {
   const [showProjectsPanel, setShowProjectsPanel] = useState(false);
   const [canvases, setCanvases] = useState<any[]>([]);
   const [newCanvasSignal, setNewCanvasSignal] = useState(0);
+  const [showProfilePage, setShowProfilePage] = useState(false);
+  // The canvas hub is toggled from several places; any of them leaves the profile page.
+  useEffect(() => {
+    if (showCanvasHub) setShowProfilePage(false);
+  }, [showCanvasHub]);
   const [newDocSignal, setNewDocSignal] = useState(0);
   const [selectedCanvasId, setSelectedCanvasId] = useState<string | null>(null);
   const [shareDocTarget, setShareDocTarget] = useState<any | null>(null);
@@ -263,9 +269,11 @@ export default function AppDashboard() {
       let targetProject: Project | null = null;
       let targetIsOrgControl = false;
       let targetDocs: { docId: string | null } | null = null;
+      let targetProfile = false;
       if (typeof window !== "undefined") {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get("search") === "1") setShowSearchModal(true);
+        if (urlParams.get("view") === "profile") targetProfile = true;
         const urlView = urlParams.get("view");
         const urlChId = urlParams.get("channelId");
         const urlProjId = urlParams.get("projectId");
@@ -295,6 +303,7 @@ export default function AppDashboard() {
       }
       // Docs open on top of the default channel so Home has somewhere to go back to
       if (targetDocs && !targetIsOrgControl) handleOpenDocs(targetDocs.docId);
+      if (targetProfile) openProfilePage();
     } catch (err) {
       console.error("Failed to load workspace details", err);
     }
@@ -324,6 +333,7 @@ export default function AppDashboard() {
 
   // 4. Handle Channel Selection (Chunked Initial Load)
   const handleSelectChannel = async (channel: Channel) => {
+    setShowProfilePage(false);
     setShowOrgControl(false);
     setShowCanvasHub(false);
     setShowDocsHub(false);
@@ -356,6 +366,7 @@ export default function AppDashboard() {
 
   // 4b. Handle Project Selection
   const handleSelectProject = (project: Project) => {
+    setShowProfilePage(false);
     setShowOrgControl(false);
     setShowCanvasHub(false);
     setShowDocsHub(false);
@@ -367,6 +378,7 @@ export default function AppDashboard() {
 
   // 4c. Handle Organization Control URL Sync
   const handleOpenOrgControl = (subview?: string) => {
+    setShowProfilePage(false);
     setShowOrgControl(true);
     setShowCanvasHub(false);
     setShowDocsHub(false);
@@ -435,6 +447,7 @@ export default function AppDashboard() {
   };
 
   const handleOpenDocs = (docId: string | null = null) => {
+    setShowProfilePage(false);
     setShowCanvasHub(false);
     setShowOrgControl(false);
     setDocsInitialId(docId);
@@ -459,6 +472,20 @@ export default function AppDashboard() {
         window.history.replaceState(null, "", window.location.pathname);
       }
     }
+  };
+
+  // Profile: a full page in the main area (?view=profile)
+  const openProfilePage = () => {
+    setShowCanvasHub(false);
+    setShowDocsHub(false);
+    setShowOrgControl(false);
+    setIsMobileSidebarOpen(false);
+    setShowProfilePage(true);
+    if (typeof window !== "undefined") window.history.replaceState(null, "", "?view=profile");
+  };
+  const closeProfilePage = () => {
+    setShowProfilePage(false);
+    syncUrlToCurrent();
   };
 
   // 4a. Load Older Messages (Cursor-based Pagination)
@@ -886,7 +913,10 @@ export default function AppDashboard() {
       setShowBotPortal(true);
     },
     onLogout: logout,
-    activeFeature: canvasActive
+    onOpenProfile: openProfilePage,
+    activeFeature: showProfilePage
+      ? null
+      : canvasActive
       ? ("canvas" as const)
       : docsActive
       ? ("docs" as const)
@@ -896,6 +926,7 @@ export default function AppDashboard() {
     // Home: back to the channel / project view
     onGoHome: currentWorkspace
       ? () => {
+          setShowProfilePage(false);
           setShowCanvasHub(false);
           setShowDocsHub(false);
           setShowOrgControl(false);
@@ -1281,6 +1312,15 @@ export default function AppDashboard() {
             </div>
           </div>
         </div>
+      ) : showProfilePage && user ? (
+        <ProfileModal
+          variant="page"
+          user={user}
+          workspaceId={currentWorkspace?.id}
+          presence={presence[user.id] || "offline"}
+          onClose={closeProfilePage}
+          onLogout={logout}
+        />
       ) : docsActive && currentWorkspace ? (
         <ProjectDocsView
           workspaceId={currentWorkspace.id}

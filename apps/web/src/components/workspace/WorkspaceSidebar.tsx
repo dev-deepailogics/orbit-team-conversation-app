@@ -27,7 +27,7 @@ import {
 import { api } from '../../lib/api';
 import { EmployeeAvailabilityHeader } from '../availability/EmployeeAvailabilityHeader';
 import { Presence, PRESENCE_STYLE } from '../availability/useTeamPresence';
-import { ProfileModal, defaultAvatar } from '../profile/ProfileModal';
+import { ProfileModal } from '../profile/ProfileModal';
 import { ThemeModal } from '../theme/ThemeModal';
 import { WorkspaceStorageModal } from './WorkspaceStorageModal';
 import { useChatStore } from '../../stores/chatStore';
@@ -45,6 +45,8 @@ interface WorkspaceSidebarProps {
   onOpenDocs?: () => void;
   onOpenProjects?: () => void;
   onOpenBotPortal?: () => void;
+  // Opens the profile as a page in the main area; falls back to the profile modal
+  onOpenProfile?: () => void;
   members?: any[];
   presence?: Record<string, Presence>;
   onLogout: () => void;
@@ -64,6 +66,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   onOpenDocs,
   onOpenProjects,
   onOpenBotPortal,
+  onOpenProfile,
   members = [],
   presence = {},
   onLogout,
@@ -75,7 +78,18 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   const [themeModalTab, setThemeModalTab] = useState<'presets' | 'custom' | null>(null);
   const [showStorage, setShowStorage] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
-  const settingsRef = useRef<HTMLDivElement>(null);
+  const [showAccount, setShowAccount] = useState(false);
+  const openProfile = () => (onOpenProfile ? onOpenProfile() : setShowProfile(true));
+  const accountRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showAccount) return;
+    const close = (e: MouseEvent) => {
+      if (accountRef.current && !accountRef.current.contains(e.target as Node)) setShowAccount(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showAccount]);
   const myPresence = (currentUser && presence[currentUser.id]) || 'offline';
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -91,7 +105,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   useEffect(() => {
     if (!showSettings) return;
     const close = (e: MouseEvent) => {
-      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) setShowSettings(false);
+      if (accountRef.current && !accountRef.current.contains(e.target as Node)) setShowSettings(false);
     };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
@@ -242,12 +256,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
 
       <div className="mt-auto pt-4 pb-5 flex flex-col items-center gap-4 shrink-0">
         {currentWorkspace && (
-          <EmployeeAvailabilityHeader
-            currentUserId={currentUser?.id}
-            onViewProfile={() => setShowProfile(true)}
-            onOpenSettings={() => setShowSettings(true)}
-            onSignOut={onLogout}
-          />
+          <EmployeeAvailabilityHeader currentUserId={currentUser?.id} />
         )}
 
         {/* Add Workspace (Super Admin and Workspace Admins) */}
@@ -262,21 +271,49 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           </button>
         )}
 
-        {/* Settings */}
+        {/* Profile */}
         {currentUser && (
-          <div ref={settingsRef} className="relative">
+          <div ref={accountRef} className="relative">
             <button
-              onClick={() => setShowSettings((v) => !v)}
-              title="Settings"
-              className="w-8 h-8 rounded-lg flex items-center justify-center transition hover:bg-[var(--theme-fill-hover)]"
-              style={{
-                color: showSettings ? 'var(--theme-text)' : 'var(--theme-text-muted)',
-                backgroundColor: showSettings ? 'var(--theme-fill)' : undefined,
-              }}
+              onClick={() => setShowAccount((v) => !v)}
+              title={`${currentUser.displayName} · ${PRESENCE_STYLE[myPresence].label}`}
+              className="relative w-6 h-6 shrink-0 rounded-full transition hover:opacity-85 block"
             >
-              <Settings size={20} />
+              <Avatar name={currentUser.displayName || currentUser.username} src={currentUser.avatarUrl} size={24} />
+              <span
+                className={`absolute left-4 top-4 w-2.5 h-2.5 rounded-full ${PRESENCE_STYLE[myPresence].dot}`}
+                style={{ boxShadow: '0 0 0 2px var(--theme-bg-workspace)' }}
+              />
             </button>
 
+            {showAccount && (
+              <div
+                className="absolute left-full bottom-0 ml-3 w-[288px] rounded-[14px] border p-2 flex flex-col gap-0.5 z-50 animate-in fade-in zoom-in-95 duration-150"
+                style={{
+                  backgroundColor: 'var(--theme-bg-app)',
+                  borderColor: 'var(--theme-border)',
+                  boxShadow: '0 12px 16px rgba(20, 26, 46, 0.2)',
+                }}
+              >
+                <div className="px-2.5 py-2 flex items-center gap-2.5">
+                  <Avatar name={currentUser.displayName || currentUser.username} src={currentUser.avatarUrl} size={36} />
+                  <span className="flex flex-col min-w-0">
+                    <span className="text-sm font-bold truncate" style={{ color: 'var(--theme-text)' }}>
+                      {currentUser.displayName || currentUser.username}
+                    </span>
+                    <span className="text-xs truncate" style={{ color: 'var(--theme-text-muted)' }}>
+                      {PRESENCE_STYLE[myPresence].label}
+                    </span>
+                  </span>
+                </div>
+                <div className="py-1">
+                  <div className="h-px" style={{ backgroundColor: 'var(--theme-border)' }} />
+                </div>
+                <AccountRow Icon={User} label="View profile" onClick={() => { setShowAccount(false); openProfile(); }} />
+                <AccountRow Icon={Settings} label="Settings" onClick={() => { setShowAccount(false); setShowSettings(true); }} />
+                <AccountRow Icon={LogOut} label="Sign out" onClick={() => { setShowAccount(false); onLogout(); }} />
+              </div>
+            )}
             {showSettings && (
               <div
                 className="absolute left-full bottom-0 ml-3 w-[264px] rounded-[14px] border p-2 flex flex-col gap-0.5 z-50 animate-in fade-in zoom-in-95 duration-150"
@@ -294,7 +331,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                   SETTINGS
                 </p>
 
-                <SettingsRow Icon={User} label="Profile & status" onClick={closeMenuThen(() => setShowProfile(true))} />
+                <SettingsRow Icon={User} label="Profile & status" onClick={closeMenuThen(() => openProfile())} />
 
                 <SettingsRow
                   Icon={Palette}
@@ -332,21 +369,6 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
             )}
           </div>
         )}
-
-        {/* Profile */}
-        {currentUser && (
-          <button
-            onClick={() => setShowProfile(true)}
-            title={`${currentUser.displayName} · ${PRESENCE_STYLE[myPresence].label}`}
-            className="relative w-6 h-6 shrink-0 rounded-full transition hover:opacity-85"
-          >
-            <Avatar name={currentUser.displayName || currentUser.username} src={currentUser.avatarUrl} size={24} />
-            <span
-              className={`absolute left-4 top-4 w-2.5 h-2.5 rounded-full ${PRESENCE_STYLE[myPresence].dot}`}
-              style={{ boxShadow: '0 0 0 2px var(--theme-bg-workspace)' }}
-            />
-          </button>
-        )}
       </div>
 
       {showProfile && currentUser && (
@@ -368,7 +390,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           isAdminOrOwner={isAdminOrOwner}
           onOpenProfile={() => {
             setThemeModalTab(null);
-            setShowProfile(true);
+            openProfile();
           }}
           onSignOut={onLogout}
         />
@@ -382,7 +404,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           onFileDeleted={(id) => useChatStore.getState().removeAttachment(id)}
           onOpenProfile={() => {
             setShowStorage(false);
-            setShowProfile(true);
+            openProfile();
           }}
           onSignOut={onLogout}
         />
@@ -492,6 +514,18 @@ const SettingsRow: React.FC<{
         style={{ color: 'var(--theme-text-muted)' }}
       />
     )}
+  </button>
+);
+
+const AccountRow: React.FC<{ Icon: React.ElementType; label: string; onClick: () => void }> = ({ Icon, label, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="w-full h-9 px-2.5 rounded-[10px] flex items-center gap-2.5 text-left text-sm font-medium transition hover:bg-[var(--theme-fill-hover)]"
+    style={{ color: 'var(--theme-text)' }}
+  >
+    <Icon size={17} style={{ color: 'var(--theme-text-muted)' }} />
+    {label}
   </button>
 );
 
