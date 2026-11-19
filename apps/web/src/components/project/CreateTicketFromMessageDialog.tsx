@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Message, Project, ProjectColumn, Ticket, WorkspaceMember } from '@orbit/types';
 import { api } from '../../lib/api';
 import { RichTextEditorRef } from '../chat/RichTextEditor';
@@ -8,6 +8,8 @@ import { Plus, Board } from '@/components/ui/icons';
 import { TicketFields, TicketDraft, ProjectTile, saveTicketLabels } from './TicketModal';
 import { ModalShell, SelectField, SecondaryButton, PrimaryButton, ErrorNote } from '../channel/modalKit';
 import { useTicketAttachmentUpload, TicketAttachmentsField } from './TicketAttachments';
+import { getProjectMembers } from './projectViewUtils';
+import { useAuthStore } from '../../stores/authStore';
 
 interface CreateTicketFromMessageDialogProps {
   isOpen: boolean;
@@ -47,6 +49,25 @@ export const CreateTicketFromMessageDialog: React.FC<CreateTicketFromMessageDial
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const upload = useTicketAttachmentUpload(workspaceId);
+  const currentUserId = useAuthStore((s) => s.user?.id);
+
+  // Assignees are limited to the selected project's people and follow the project picker.
+  const assignableMembers = useMemo(
+    () =>
+      getProjectMembers(
+        projects.find((p) => p.id === selectedProjectId),
+        members,
+        { currentUserId },
+      ),
+    [projects, selectedProjectId, members, currentUserId],
+  );
+
+  // Switching project drops an assignee who isn't on the new one.
+  useEffect(() => {
+    if (draft.assigneeId && !assignableMembers.some((m) => m.user?.id === draft.assigneeId)) {
+      setDraft((d) => ({ ...d, assigneeId: null }));
+    }
+  }, [assignableMembers, draft.assigneeId]);
 
   const patch = (p: Partial<TicketDraft>) => setDraft((d) => ({ ...d, ...p }));
 
@@ -192,7 +213,7 @@ export const CreateTicketFromMessageDialog: React.FC<CreateTicketFromMessageDial
         draft={draft}
         onChange={patch}
         columns={columns}
-        members={members}
+        members={assignableMembers}
         editorRef={editorRef}
         initialDescription={message.content || ''}
         attachmentsField={<TicketAttachmentsField upload={upload} />}

@@ -59,6 +59,7 @@ import {
   columnKinds,
   commentCount,
   formatShortDate,
+  getProjectMembers,
   isOverdue,
   matchesFilters,
   ticketAssignees,
@@ -129,46 +130,12 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
   const [rangeDays, setRangeDays] = useState<7 | 30 | 90>(30);
   const [colMenuId, setColMenuId] = useState<string | null>(null);
 
-  const projectMembers = useMemo(() => {
-    const roster = [
-      ...(Array.isArray(project.assignedEmployees)
-        ? (project.assignedEmployees as any[])
-        : []),
-      ...(Array.isArray(project.selectedManagers)
-        ? (project.selectedManagers as any[])
-        : []),
-    ];
-    if (roster.length === 0) return members;
-
-    const matchedIds = new Set<string>();
-    for (const entry of roster) {
-      if (!entry) continue;
-      const uid = typeof entry === "string" ? undefined : entry.uid;
-      const name = (
-        typeof entry === "string" ? entry : entry.name || ""
-      ).toLowerCase();
-      const match = members.find(
-        (m) =>
-          (uid && m.user?.id === uid) ||
-          (name && m.user?.displayName?.toLowerCase() === name),
-      );
-      if (match?.user) matchedIds.add(match.user.id);
-    }
-    // The creator and the current viewer can always be assigned tickets too,
-    // even if neither is formally in the roster.
-    const creator = members.find((m) => m.user?.id === project.createdById);
-    if (creator?.user) matchedIds.add(creator.user.id);
-    const viewer = members.find((m) => m.user?.id === currentUser?.id);
-    if (viewer?.user) matchedIds.add(viewer.user.id);
-
-    return members.filter((m) => m.user && matchedIds.has(m.user.id));
-  }, [
-    project.assignedEmployees,
-    project.selectedManagers,
-    project.createdById,
-    currentUser?.id,
-    members,
-  ]);
+  // Only people on this project (plus creator/viewer) can be picked as assignees.
+  const projectMembers = useMemo(
+    () => getProjectMembers(project, members, { currentUserId: currentUser?.id }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [project.assignedEmployees, project.selectedManagers, project.createdById, currentUser?.id, members],
+  );
 
   // Ticket paging: columns whose older tickets are fully loaded / loading now
   const [exhaustedCols, setExhaustedCols] = useState<Record<string, boolean>>(
@@ -1483,7 +1450,16 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
           columns={columns}
           defaultColumnId={targetColumnId}
           ticket={editingTicket}
-          members={members}
+          members={
+            // Keep an existing assignee selectable when editing, even if they've left the project.
+            editingTicket?.assigneeId &&
+            !projectMembers.some((m) => m.user?.id === editingTicket.assigneeId)
+              ? getProjectMembers(project, members, {
+                  currentUserId: currentUser?.id,
+                  alwaysInclude: [editingTicket.assigneeId],
+                })
+              : projectMembers
+          }
           onClose={() => {
             setShowTicketModal(false);
             setEditingTicket(null);

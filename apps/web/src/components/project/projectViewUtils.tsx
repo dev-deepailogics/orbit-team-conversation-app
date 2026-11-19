@@ -39,6 +39,49 @@ export function ticketAssignees(t: Ticket, members: WorkspaceMember[]): UserProf
   return out;
 }
 
+type ProjectRoster = Pick<Project, "assignedEmployees" | "selectedManagers" | "createdById">;
+
+/**
+ * Workspace members who belong to a project: its assigned employees and managers (matched by uid,
+ * or by display name for Firebase-imported entries), plus the creator and the current viewer.
+ * A project with no roster at all is open to everyone. `alwaysInclude` keeps specific users
+ * (e.g. a ticket's existing assignee) selectable even if they are no longer on the project.
+ */
+export function getProjectMembers(
+  project: ProjectRoster | null | undefined,
+  members: WorkspaceMember[],
+  options: { currentUserId?: string; alwaysInclude?: (string | null | undefined)[] } = {},
+): WorkspaceMember[] {
+  if (!project) return members;
+  const roster = [
+    ...(Array.isArray(project.assignedEmployees) ? (project.assignedEmployees as any[]) : []),
+    ...(Array.isArray(project.selectedManagers) ? (project.selectedManagers as any[]) : []),
+  ];
+  if (roster.length === 0) return members;
+
+  const byId = new Map<string, string>();
+  const byName = new Map<string, string>();
+  for (const m of members) {
+    if (!m.user) continue;
+    byId.set(m.user.id, m.user.id);
+    if (m.user.displayName) byName.set(m.user.displayName.toLowerCase(), m.user.id);
+  }
+
+  const allowed = new Set<string>();
+  for (const entry of roster) {
+    if (!entry) continue;
+    const uid = typeof entry === "string" ? undefined : entry.uid;
+    const name = (typeof entry === "string" ? entry : entry.name || "").toLowerCase();
+    const id = (uid && byId.get(uid)) || (name && byName.get(name));
+    if (id) allowed.add(id);
+  }
+  for (const id of [project.createdById, options.currentUserId, ...(options.alwaysInclude ?? [])]) {
+    if (id) allowed.add(id);
+  }
+
+  return members.filter((m) => m.user && allowed.has(m.user.id));
+}
+
 export const isOverdue = (t: Ticket, done: boolean, now = Date.now()) =>
   !done && !!t.dueDate && new Date(t.dueDate).getTime() < startOfDay(now);
 

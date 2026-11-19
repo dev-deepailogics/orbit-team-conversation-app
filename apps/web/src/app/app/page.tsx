@@ -41,7 +41,7 @@ import { ProjectDocsView } from "@/components/project/ProjectDocsView";
 import { ShareDocumentModal } from "@/components/project/ShareDocumentModal";
 import { useTeamPresence } from "@/components/availability/useTeamPresence";
 import { useLiveUserStatus } from "@/components/channel/useLiveUserStatus";
-import { Splash, WorkspaceSkeleton } from "@/components/brand/LoadingScreens";
+import { WorkspaceSkeleton } from "@/components/brand/LoadingScreens";
 import { EmptyState } from "@/components/brand/EmptyState";
 import { ProfileModal } from "@/components/profile/ProfileModal";
 import { OfflineOverlay } from "@/components/brand/OfflineScreen";
@@ -215,7 +215,9 @@ export default function AppDashboard() {
           (currentWorkspace &&
             res.data.find((w: Workspace) => w.id === currentWorkspace.id)) ||
           res.data[0];
-        handleSelectWorkspace(targetWs);
+        // Await so the loading screen stays up until the previous channel/view is restored;
+        // otherwise "Nothing open yet" flashes for a frame on every refresh.
+        await handleSelectWorkspace(targetWs);
       } else {
         // Clear active workspace and channels when user has 0 workspaces
         setCurrentWorkspace(null);
@@ -254,38 +256,34 @@ export default function AppDashboard() {
     }
     setCurrentProject(null);
     try {
-      const [res, unread] = await Promise.all([
+      // All independent: fetch in parallel. Only the workspace itself is required; the rest degrade gracefully.
+      const [res, unread, projRes, sidebarRes] = await Promise.all([
         api.get(`/api/workspaces/${workspace.id}`),
         // Server-side counts (since each member's lastReadAt); a failure just means no badges.
         api.get(`/api/channels/workspaces/${workspace.id}/unread`).catch(() => null),
+        api.get(`/api/projects/workspaces/${workspace.id}/projects`).catch((pErr) => {
+          console.error("Failed to load projects", pErr);
+          return null;
+        }),
+        Promise.all([
+          api.get("/api/canvases", { params: { workspaceId: workspace.id } }),
+          api.get("/api/documents", { params: { workspaceId: workspace.id } }),
+        ]).catch((cdErr) => {
+          console.error("Failed to load canvases or documents", cdErr);
+          return null;
+        }),
       ]);
       useChatStore.getState().setUnreadCounts(unread?.data ?? {});
       setChannels(res.data.channels || []);
       setMembers(res.data.members || []);
 
-      // Load Workspace Projects
-      let projectsData: Project[] = [];
-      try {
-        const projRes = await api.get(
-          `/api/projects/workspaces/${workspace.id}/projects`,
-        );
-        projectsData = projRes.data || [];
-        setProjects(projectsData);
-      } catch (pErr) {
-        console.error("Failed to load projects", pErr);
-        setProjects([]);
-      }
+      const projectsData: Project[] = projRes?.data || [];
+      setProjects(projectsData);
 
-      // Load Workspace Canvases & Documents for the sidebar
-      try {
-        const [canvasRes, docRes] = await Promise.all([
-          api.get("/api/canvases", { params: { workspaceId: workspace.id } }),
-          api.get("/api/documents", { params: { workspaceId: workspace.id } }),
-        ]);
+      if (sidebarRes) {
+        const [canvasRes, docRes] = sidebarRes;
         setCanvases(canvasRes.data || []);
         useProjectStore.getState().setDocuments(docRes.data || []);
-      } catch (cdErr) {
-        console.error("Failed to load canvases or documents", cdErr);
       }
 
       let targetChannel: Channel | null = null;
@@ -319,10 +317,10 @@ export default function AppDashboard() {
         handleOpenOrgControl();
       } else if (targetProject) {
         handleSelectProject(targetProject);
-      } else if (targetChannel) {
-        handleSelectChannel(targetChannel);
-      } else if (res.data.channels && res.data.channels.length > 0) {
-        handleSelectChannel(res.data.channels[0]);
+      } else {
+        // Awaited so the boot screen covers the first page of messages too (no empty-channel flash).
+        const channel = targetChannel ?? res.data.channels?.[0];
+        if (channel) await handleSelectChannel(channel);
       }
       // Docs open on top of the default channel so Home has somewhere to go back to
       if (targetDocs && !targetIsOrgControl) handleOpenDocs(targetDocs.docId);
@@ -968,8 +966,9 @@ export default function AppDashboard() {
     }
   };
 
-  if (isLoading) return <Splash />;
-  if (isDataLoading) return <WorkspaceSkeleton />;
+  // One continuous boot screen (session → workspace → restored view + its first messages),
+  // so a refresh goes straight from loading to the finished page with no intermediate flashes.
+  if (isLoading || isDataLoading) return <WorkspaceSkeleton />;
 
   // Workspace rail feature shortcuts (Home / Canvas / Docs / Projects)
   const docsActive = showDocsHub && !!currentWorkspace;
