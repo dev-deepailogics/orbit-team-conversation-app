@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { prisma } from '@orbit/db';
 import { SOCKET_EVENTS } from '@orbit/types';
 import { z } from 'zod';
-import { verifyMessageAccess, verifyWorkspaceMember } from '../utils/security.js';
+import { quotedMessageInclude, verifyMessageAccess, verifyQuotable, verifyWorkspaceMember } from '../utils/security.js';
 import { handleMessageMentions } from '../services/mentionService.js';
 import { getOrCreateAnonProfile, sanitizeMessageForViewer } from '../services/anonymousService.js';
 import { ACTIVITY_CHANNEL, postActivity } from '../services/systemBot.js';
@@ -201,11 +201,7 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         user: {
           select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
         },
-        quotedMessage: {
-          include: {
-            user: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
-          },
-        },
+        quotedMessage: quotedMessageInclude,
         attachments: true,
         reactions: {
           include: {
@@ -222,11 +218,7 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         user: {
           select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
         },
-        quotedMessage: {
-          include: {
-            user: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
-          },
-        },
+        quotedMessage: quotedMessageInclude,
         attachments: true,
         reactions: {
           include: {
@@ -262,6 +254,7 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     }
 
     const { content, attachments, quotedMessageId } = parseResult.data;
+    if (quotedMessageId && !(await verifyQuotable(userId, quotedMessageId, parent.channelId, reply))) return;
 
     let anonName: string | undefined;
     let anonEmoji: string | undefined;
@@ -319,11 +312,7 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         user: {
           select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
         },
-        quotedMessage: {
-          include: {
-            user: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
-          },
-        },
+        quotedMessage: quotedMessageInclude,
         attachments: true,
         reactions: true,
       },
@@ -467,6 +456,13 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return reply.status(403).send({ error: 'You can only edit your own messages' });
     }
 
+    if (access.message.quotedMessageId) {
+      const quoted = await prisma.message.findUnique({ where: { id: access.message.quotedMessageId }, select: { channelId: true } });
+      if (quoted && quoted.channelId !== access.message.channelId) {
+        return reply.status(400).send({ error: 'Forwarded messages cannot be edited' });
+      }
+    }
+
     const parseResult = editMessageSchema.safeParse(request.body);
     if (!parseResult.success) {
       return reply.status(400).send({ error: parseResult.error.errors[0].message });
@@ -482,11 +478,7 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         user: {
           select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
         },
-        quotedMessage: {
-          include: {
-            user: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
-          },
-        },
+        quotedMessage: quotedMessageInclude,
         attachments: {
           where: { isDeleted: false },
         },
@@ -557,11 +549,7 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         user: {
           select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
         },
-        quotedMessage: {
-          include: {
-            user: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
-          },
-        },
+        quotedMessage: quotedMessageInclude,
         attachments: true,
         reactions: {
           include: {
@@ -621,11 +609,7 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         bot: {
           select: { id: true, name: true, avatarUrl: true },
         },
-        quotedMessage: {
-          include: {
-            user: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
-          },
-        },
+        quotedMessage: quotedMessageInclude,
         attachments: {
           where: { isDeleted: false },
         },

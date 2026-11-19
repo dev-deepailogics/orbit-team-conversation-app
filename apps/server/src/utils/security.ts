@@ -1,4 +1,4 @@
-import { prisma } from '@orbit/db';
+import { prisma, Prisma } from '@orbit/db';
 import { FastifyReply } from 'fastify';
 
 /**
@@ -191,4 +191,40 @@ export async function verifyMessageAccess(
   if (!access) return null;
 
   return { message, channel: access.channel, isSuperAdmin: access.isSuperAdmin };
+}
+
+/**
+ * How a quoted or forwarded message is returned alongside the message that references it. One shape everywhere, since
+ * the client replaces whole messages on edit/pin/delete and a narrower include would strip the forwarded card.
+ */
+export const quotedMessageInclude = {
+  include: {
+    user: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+    channel: { select: { id: true, name: true, type: true } },
+    attachments: { where: { isDeleted: false } },
+  },
+} satisfies Prisma.MessageDefaultArgs;
+
+/**
+ * HTTP Guard: a message may quote (or forward) another only if the caller can read it. Quoting across channels is a
+ * forward, which is refused out of anonymous channels (it would expose the author) and for deleted messages. Returns
+ * the quoted message, or null once the reply has been sent.
+ */
+export async function verifyQuotable(
+  userId: string,
+  quotedMessageId: string,
+  targetChannelId: string,
+  reply: FastifyReply
+): Promise<{ id: string; channelId: string; content: string } | null> {
+  const access = await verifyMessageAccess(userId, quotedMessageId, reply);
+  if (!access) return null;
+  if (access.message.isDeleted) {
+    reply.status(400).send({ error: 'That message has been deleted' });
+    return null;
+  }
+  if (access.message.channelId !== targetChannelId && access.channel.isAnonymous) {
+    reply.status(400).send({ error: 'Messages from anonymous channels cannot be forwarded' });
+    return null;
+  }
+  return access.message;
 }
