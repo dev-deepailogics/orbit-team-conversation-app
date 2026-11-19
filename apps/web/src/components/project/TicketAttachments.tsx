@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Paperclip, Trash2, X, Download } from 'lucide-react';
+import { Paperclip, Trash2, X, Download, Loader2 } from '@/components/ui/icons';
 import { api } from '../../lib/api';
 
 export interface TicketAttachment {
@@ -250,6 +250,46 @@ export const TicketAttachmentList: React.FC<TicketAttachmentListProps> = ({
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+};
+
+/** Figma-styled attachments field for the ticket screens: upload button, paste target and file list. */
+export const TicketAttachmentsField: React.FC<{
+  upload: ReturnType<typeof useTicketAttachmentUpload>;
+  showEmpty?: boolean;
+}> = ({ upload, showEmpty }) => {
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  return (
+    <div
+      tabIndex={0}
+      onPaste={upload.handlePaste}
+      className="flex flex-col gap-2.5 rounded-[10px] outline-none focus-visible:shadow-[0_0_0_2px_var(--theme-primary)]"
+    >
+      <input ref={inputRef} type="file" multiple className="hidden" onChange={upload.handleFileInputChange} />
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={upload.isUploading}
+          className="h-9 px-3.5 rounded-[10px] border flex items-center gap-1.5 text-[13px] font-semibold transition hover:bg-[var(--theme-fill-hover)] disabled:opacity-50"
+          style={{ borderColor: 'var(--theme-border)', backgroundColor: 'var(--theme-bg-app)', color: 'var(--theme-text)' }}
+        >
+          {upload.isUploading ? <Loader2 size={14} className="animate-spin" /> : <Paperclip size={14} />}
+          {upload.isUploading ? 'Uploading…' : 'Add attachment'}
+        </button>
+        <span className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>
+          or click here and paste (Ctrl+V)
+        </span>
+      </div>
+      {upload.error && (
+        <p className="text-xs" style={{ color: '#DC2626' }}>
+          {upload.error}
+        </p>
+      )}
+      {(showEmpty || upload.attachments.length > 0) && (
+        <TicketAttachmentList attachments={upload.attachments} onRemove={upload.removeAttachment} />
       )}
     </div>
   );
