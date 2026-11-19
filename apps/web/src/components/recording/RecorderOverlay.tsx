@@ -1,19 +1,44 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import { X, Square, Circle, Mic, MicOff, Monitor, Send, Loader2, Video as CameraIcon, VideoOff, Pause, Play } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  X,
+  Square,
+  Circle,
+  Mic,
+  MicOff,
+  Monitor,
+  Send,
+  Loader2,
+  Video as CameraIcon,
+  VideoOff,
+  Pause,
+  Play,
+  UploadCloud,
+  ChevronDown,
+  Hash,
+  Lock,
+  Search,
+} from 'lucide-react';
 import { api } from '../../lib/api';
-import { Recording } from '@orbit/types';
-import { captureVideoFrame, formatDuration } from './recordingUtils';
+import { Channel, Recording, WorkspaceMember } from '@orbit/types';
+import { captureVideoFrame, clipShareUrl, formatDuration } from './recordingUtils';
 
 interface RecorderOverlayProps {
   workspaceId: string;
-  channelId?: string;
+  /** Conversations the clip can be shared into ("Share in Orbit"). */
+  channels?: Channel[];
+  members?: WorkspaceMember[];
+  currentUserId?: string;
   onClose: () => void;
+  /** Called once the clip is saved (to the library, or shared into a conversation). */
   onUploaded: (recording: Recording) => void;
 }
 
 type RecorderPhase = 'setup' | 'recording' | 'paused' | 'preview' | 'uploading';
+type SaveAction = 'library' | 'share';
+/** Where "Share in Orbit" posts the clip: an existing channel, or a DM opened with a member. */
+type ShareTarget = { kind: 'channel'; channel: Channel } | { kind: 'dm'; userId: string; name: string };
 type CaptureMode = 'screen' | 'camera' | 'screen+camera';
 
 const PREFERRED_MIME_TYPES = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
@@ -49,7 +74,16 @@ function waitForVideoDimensions(video: HTMLVideoElement, timeoutMs = 2000): Prom
   });
 }
 
-export const RecorderOverlay: React.FC<RecorderOverlayProps> = ({ workspaceId, channelId, onClose, onUploaded }) => {
+export const RecorderOverlay: React.FC<RecorderOverlayProps> = ({
+  workspaceId,
+  channels = [],
+  members = [],
+  currentUserId,
+  onClose,
+  onUploaded,
+}) => {
+  const [saveAction, setSaveAction] = useState<SaveAction | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
   const [phase, setPhase] = useState<RecorderPhase>('setup');
   const [mode, setMode] = useState<CaptureMode>('screen+camera');
   const [micEnabled, setMicEnabled] = useState(true);
@@ -101,9 +135,24 @@ export const RecorderOverlay: React.FC<RecorderOverlayProps> = ({ workspaceId, c
   // nothing is being screen-captured yet — swapped out for a position-only drag handle
   // the instant recording starts, so the camera is never baked into the output twice.
   useEffect(() => {
-    if (phase !== 'setup' || mode === 'screen' || !cameraEnabled) {
+    // Only manage the camera while setting up. Leaving setup means recording has taken over this
+    // very stream for the bubble; stopping it here is what made the recorded bubble solid black.
+    // stopAllTracks() releases it when recording stops or the overlay closes.
+    if (phase !== 'setup') return;
+
+    if (mode === 'screen' || !cameraEnabled) {
       camStreamRef.current?.getTracks().forEach((t) => t.stop());
       camStreamRef.current = null;
+      return;
+    }
+
+    // Already have a live camera (e.g. switching between "Screen + Cam" and "Camera"): reuse it.
+    const live = camStreamRef.current;
+    if (live && live.getVideoTracks().some((t) => t.readyState === 'live')) {
+      if (setupPreviewRef.current && setupPreviewRef.current.srcObject !== live) {
+        setupPreviewRef.current.srcObject = live;
+        setupPreviewRef.current.play().catch(() => {});
+      }
       return;
     }
 
@@ -199,7 +248,9 @@ export const RecorderOverlay: React.FC<RecorderOverlayProps> = ({ workspaceId, c
       // The setup-phase self-check preview may already hold the camera stream — reuse it
       // instead of asking for permission / re-acquiring the device a second time.
       let screenStream: MediaStream | null = null;
-      let camStream: MediaStream | null = camStreamRef.current;
+      // Reuse the setup preview's camera only if it's still live; an ended track draws black frames.
+      let camStream: MediaStream | null =
+        camStreamRef.current?.getVideoTracks().some((t) => t.readyState === 'live') ? camStreamRef.current : null;
 
       if (mode !== 'camera') {
         screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: true });
@@ -347,41 +398,69 @@ export const RecorderOverlay: React.FC<RecorderOverlayProps> = ({ workspaceId, c
     onClose();
   };
 
-  const upload = async () => {
-    const blob = blobRef.current;
-    if (!blob) return;
+  /** Uploads the clip. No channel = workspace library (visible to everyone in the workspace). */
+  const uploadClip = async (targetChannelId?: string): Promise<Recording> => {
+    const blob = blobRef.current!;
+    let thumbnailDataUrl: string | null = null;
+    try {
+      if (previewVideoRef.current) thumbnailDataUrl = captureVideoFrame(previewVideoRef.current);
+    } catch (thumbErr) {
+      console.warn('Thumbnail capture failed, uploading without one', thumbErr);
+    }
 
+    // @fastify/multipart only parses text fields as the stream advances, so any field
+    // placed AFTER the file part isn't available when the route reads request.file()
+    // — they must be appended before 'file', same convention as the file-upload route.
+    const formData = new FormData();
+    formData.append('workspaceId', workspaceId);
+    if (targetChannelId) formData.append('channelId', targetChannelId);
+    formData.append('title', title.trim() || 'Untitled recording');
+    formData.append('durationSec', String(elapsedSec));
+    if (thumbnailDataUrl) formData.append('thumbnailDataUrl', thumbnailDataUrl);
+    formData.append('file', blob, 'recording.webm');
+
+    const res = await api.post<Recording>('/api/recordings/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  };
+
+  const runSave = async (action: SaveAction, work: () => Promise<Recording>) => {
+    if (!blobRef.current) return;
+    setShareOpen(false);
+    setSaveAction(action);
     setPhase('uploading');
     setError(null);
     try {
-      let thumbnailDataUrl: string | null = null;
-      try {
-        if (previewVideoRef.current) thumbnailDataUrl = captureVideoFrame(previewVideoRef.current);
-      } catch (thumbErr) {
-        console.warn('Thumbnail capture failed, uploading without one', thumbErr);
-      }
-
-      // @fastify/multipart only parses text fields as the stream advances, so any field
-      // placed AFTER the file part isn't available when the route reads request.file()
-      // — they must be appended before 'file', same convention as the file-upload route.
-      const formData = new FormData();
-      formData.append('workspaceId', workspaceId);
-      if (channelId) formData.append('channelId', channelId);
-      formData.append('title', title.trim() || 'Untitled recording');
-      formData.append('durationSec', String(elapsedSec));
-      if (thumbnailDataUrl) formData.append('thumbnailDataUrl', thumbnailDataUrl);
-      formData.append('file', blob, 'recording.webm');
-
-      const res = await api.post<Recording>('/api/recordings/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      onUploaded(res.data);
+      onUploaded(await work());
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to upload recording');
+      setError(err.response?.data?.error || (action === 'share' ? 'Failed to share recording' : 'Failed to upload recording'));
       setPhase('preview');
+    } finally {
+      setSaveAction(null);
     }
   };
+
+  const uploadToLibrary = () => runSave('library', () => uploadClip());
+
+  // Save the clip to the chosen conversation and post it there as a message (rendered as a player).
+  const shareInOrbit = (target: ShareTarget) =>
+    runSave('share', async () => {
+      const targetChannelId =
+        target.kind === 'channel'
+          ? target.channel.id
+          : (await api.post<Channel>(`/api/channels/workspaces/${workspaceId}/dm`, { targetUserId: target.userId })).data.id;
+
+      const recording = await uploadClip(targetChannelId);
+      const message = await api.post(`/api/channels/${targetChannelId}/messages`, {
+        content: clipShareUrl(recording.shareSlug),
+      });
+      // Link the clip to its message; the clip is already posted, so a failure here isn't fatal.
+      if (message.data?.id) {
+        await api.post(`/api/recordings/${recording.id}/attach`, { messageId: message.data.id }).catch(() => {});
+      }
+      return recording;
+    });
 
   // Draggable position handle for the baked-in camera bubble. Deliberately NOT a live
   // video feed: if you share this very tab, anything rendered on it gets captured too,
@@ -416,7 +495,8 @@ export const RecorderOverlay: React.FC<RecorderOverlayProps> = ({ workspaceId, c
       {/* Setup / preview / upload card — hidden once live so it doesn't block the screen being recorded */}
       {!isLive && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pointer-events-auto">
-          <div className="w-full max-w-lg bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-2xl shadow-2xl overflow-hidden">
+          {/* No overflow-hidden: the "Share in Orbit" menu must be able to extend past the card. */}
+          <div className="w-full max-w-lg bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-2xl shadow-2xl">
             <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--theme-border)]">
               <div className="flex items-center gap-2">
                 <Monitor size={16} className="text-slack-green" />
@@ -516,16 +596,41 @@ export const RecorderOverlay: React.FC<RecorderOverlayProps> = ({ workspaceId, c
                     disabled={phase === 'uploading'}
                     className="text-sm bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-lg px-3 py-2 text-[var(--theme-text)] focus:outline-none focus:border-slack-green"
                   />
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <span className="text-xs text-[var(--theme-text-muted)] font-mono">{formatDuration(elapsedSec)}</span>
-                    <button
-                      onClick={upload}
-                      disabled={phase === 'uploading'}
-                      className="flex items-center gap-2 px-4 py-1.5 bg-slack-green hover:bg-slack-green/90 text-white rounded-lg text-xs font-semibold transition disabled:opacity-60"
-                    >
-                      {phase === 'uploading' ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                      {phase === 'uploading' ? 'Uploading...' : 'Share clip'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={uploadToLibrary}
+                        disabled={phase === 'uploading'}
+                        title="Save to this workspace's Video Library"
+                        className="flex items-center gap-2 px-3.5 py-1.5 border border-[var(--theme-border)] text-[var(--theme-text)] bg-[var(--theme-bg-app)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg text-xs font-semibold transition disabled:opacity-60"
+                      >
+                        {saveAction === 'library' ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
+                        {saveAction === 'library' ? 'Uploading...' : 'Upload to library'}
+                      </button>
+                      <div className="relative">
+                        <button
+                          onClick={() => setShareOpen((v) => !v)}
+                          disabled={phase === 'uploading'}
+                          aria-haspopup="listbox"
+                          aria-expanded={shareOpen}
+                          className="flex items-center gap-2 px-3.5 py-1.5 bg-slack-green hover:bg-slack-green/90 text-white rounded-lg text-xs font-semibold transition disabled:opacity-60"
+                        >
+                          {saveAction === 'share' ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                          {saveAction === 'share' ? 'Sharing...' : 'Share in Orbit'}
+                          {saveAction !== 'share' && <ChevronDown size={13} />}
+                        </button>
+                        {shareOpen && (
+                          <ShareTargetMenu
+                            channels={channels}
+                            members={members}
+                            currentUserId={currentUserId}
+                            onPick={shareInOrbit}
+                            onClose={() => setShareOpen(false)}
+                          />
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -580,6 +685,100 @@ export const RecorderOverlay: React.FC<RecorderOverlayProps> = ({ workspaceId, c
           </button>
         </div>
       )}
+    </div>
+  );
+};
+
+/**
+ * "Share in Orbit" picker: the user's channels plus a DM with any workspace member. Anonymous
+ * channels are left out — a recording carries its creator, which would unmask the poster.
+ */
+const ShareTargetMenu: React.FC<{
+  channels: Channel[];
+  members: WorkspaceMember[];
+  currentUserId?: string;
+  onPick: (target: ShareTarget) => void;
+  onClose: () => void;
+}> = ({ channels, members, currentUserId, onPick, onClose }) => {
+  const [query, setQuery] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      // The toggle button is the menu's previous sibling; let its own click handle toggling.
+      if (ref.current && !ref.current.parentElement?.contains(e.target as Node)) onClose();
+    };
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [onClose]);
+
+  const q = query.trim().toLowerCase();
+  const channelTargets = useMemo(
+    () =>
+      channels
+        .filter((c) => c.type !== 'DIRECT' && !c.isAnonymous && !c.isArchived)
+        .filter((c) => !q || c.name.toLowerCase().includes(q))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [channels, q],
+  );
+  const dmTargets = useMemo(
+    () =>
+      members
+        .filter((m) => m.user && m.user.id !== currentUserId)
+        .map((m) => ({ id: m.user!.id, name: m.user!.displayName || m.user!.username }))
+        .filter((u) => !q || u.name.toLowerCase().includes(q))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [members, currentUserId, q],
+  );
+
+  const row = 'w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-xs text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] transition';
+  const heading = 'px-2.5 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--theme-text-muted)]';
+
+  return (
+    <div
+      ref={ref}
+      role="listbox"
+      aria-label="Share in Orbit"
+      className="absolute right-0 bottom-full mb-2 w-64 max-h-80 flex flex-col bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-xl shadow-2xl z-10"
+    >
+      <div className="p-2 border-b border-[var(--theme-border)]">
+        <div className="relative">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--theme-text-muted)]" />
+          <input
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Find a channel or person"
+            className="w-full text-xs bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-lg pl-7 pr-2 py-1.5 text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-slack-green"
+          />
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto p-1">
+        {channelTargets.length > 0 && <div className={heading}>Channels</div>}
+        {channelTargets.map((c) => (
+          <button key={c.id} type="button" role="option" aria-selected={false} className={row} onClick={() => onPick({ kind: 'channel', channel: c })}>
+            {c.type === 'PRIVATE' ? <Lock size={13} className="shrink-0 opacity-70" /> : <Hash size={13} className="shrink-0 opacity-70" />}
+            <span className="truncate">{c.name}</span>
+          </button>
+        ))}
+        {dmTargets.length > 0 && <div className={heading}>Direct messages</div>}
+        {dmTargets.map((u) => (
+          <button key={u.id} type="button" role="option" aria-selected={false} className={row} onClick={() => onPick({ kind: 'dm', userId: u.id, name: u.name })}>
+            <span className="w-4 h-4 rounded-full bg-[var(--theme-bg-surface-hover)] flex items-center justify-center text-[9px] font-bold shrink-0">
+              {u.name.charAt(0).toUpperCase()}
+            </span>
+            <span className="truncate">{u.name}</span>
+          </button>
+        ))}
+        {channelTargets.length === 0 && dmTargets.length === 0 && (
+          <p className="px-2.5 py-3 text-xs text-[var(--theme-text-muted)]">No matches</p>
+        )}
+      </div>
     </div>
   );
 };

@@ -41,7 +41,6 @@ import { CanvasView } from "@/components/whiteboard/CanvasView";
 import { VideoLibraryView } from "@/components/video/VideoLibraryView";
 import { RecorderOverlay } from "@/components/recording/RecorderOverlay";
 import { useRecorderStore } from "@/stores/recorderStore";
-import { clipShareUrl } from "@/components/recording/recordingUtils";
 import { ProjectDocsView } from "@/components/project/ProjectDocsView";
 import { ShareDocumentModal } from "@/components/project/ShareDocumentModal";
 import { useTeamPresence } from "@/components/availability/useTeamPresence";
@@ -1962,12 +1961,12 @@ export default function AppDashboard() {
       {recorderState.isOpen && recorderState.workspaceId && (
         <RecorderOverlay
           workspaceId={recorderState.workspaceId}
-          channelId={recorderState.channelId || undefined}
+          channels={channels}
+          members={members}
+          currentUserId={user?.id}
           onClose={closeRecorder}
-          onUploaded={(recording) => {
-            recorderState.onInsertLink?.(clipShareUrl(recording.shareSlug));
-            closeRecorder();
-          }}
+          // Saved to the library, or already posted into the chosen conversation by the overlay.
+          onUploaded={closeRecorder}
         />
       )}
     </div>
