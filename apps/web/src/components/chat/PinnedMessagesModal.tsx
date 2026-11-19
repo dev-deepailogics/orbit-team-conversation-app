@@ -15,6 +15,7 @@ import { Channel, Message, UserProfile } from '@orbit/types';
 import { api } from '../../lib/api';
 import { useChatStore } from '../../stores/chatStore';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { useTimeFormat } from '../../lib/timeFormat';
 
 interface PinnedMessagesModalProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ export const PinnedMessagesModal: React.FC<PinnedMessagesModalProps> = ({
   currentUser,
   onJumpToMessage,
 }) => {
+  const timeFormat = useTimeFormat();
   const [pinnedMessages, setPinnedMessages] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [unpinningId, setUnpinningId] = useState<string | null>(null);
@@ -73,6 +75,7 @@ export const PinnedMessagesModal: React.FC<PinnedMessagesModalProps> = ({
     return new Date(dateStr).toLocaleString([], {
       dateStyle: 'medium',
       timeStyle: 'short',
+      hour12: timeFormat === '12',
     });
   };
 

@@ -40,6 +40,7 @@ import { CanvasView } from "@/components/whiteboard/CanvasView";
 import { ProjectDocsView } from "@/components/project/ProjectDocsView";
 import { ShareDocumentModal } from "@/components/project/ShareDocumentModal";
 import { useTeamPresence } from "@/components/availability/useTeamPresence";
+import { useLiveUserStatus } from "@/components/channel/useLiveUserStatus";
 import {
   Layers,
   ShieldCheck,
@@ -104,6 +105,8 @@ export default function AppDashboard() {
 
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [members, setMembers] = useState<any[]>([]);
+  // Whether each member is actually connected to Orbit right now (a live socket).
+  const liveStatus = useLiveUserStatus(members);
   const [showBotPortal, setShowBotPortal] = useState(false);
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
@@ -717,13 +720,21 @@ export default function AppDashboard() {
     };
 
     const onChannelUpdated = (updatedChan: Channel) => {
+      // Defensive: if some endpoint ever broadcasts a channel without its
+      // member list, don't let that wipe out per-member state (notification
+      // preference, read receipts) that was already known locally.
+      const merge = (prev: Channel) => ({
+        ...prev,
+        ...updatedChan,
+        members: updatedChan.members ?? prev.members,
+      });
       setChannels(
         useChatStore
           .getState()
-          .channels.map((c) => (c.id === updatedChan.id ? updatedChan : c)),
+          .channels.map((c) => (c.id === updatedChan.id ? merge(c) : c)),
       );
       if (currentChannelRef.current?.id === updatedChan.id) {
-        setCurrentChannel(updatedChan);
+        setCurrentChannel(merge(currentChannelRef.current));
       }
     };
 
@@ -1078,6 +1089,7 @@ export default function AppDashboard() {
                   handleStartHuddle(ch);
                 }}
                 presence={presence}
+                liveStatus={liveStatus}
                 onOpenSearch={() => {
                   setIsMobileSidebarOpen(false);
                   setShowSearchModal(true);
@@ -1166,6 +1178,7 @@ export default function AppDashboard() {
             onOpenBotPortal={() => setShowBotPortal(true)}
             onStartHuddle={handleStartHuddle}
             presence={presence}
+            liveStatus={liveStatus}
             onOpenSearch={() => setShowSearchModal(true)}
             onOpenOrganizationControl={() => {
               handleOpenOrgControl();

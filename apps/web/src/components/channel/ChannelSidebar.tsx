@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Workspace, Channel, UserProfile, Project } from "@orbit/types";
+import { Workspace, Channel, UserProfile, Project, UserStatus } from "@orbit/types";
 import { Presence, PRESENCE_STYLE } from "../availability/useTeamPresence";
+import { isLiveOnline } from "./useLiveUserStatus";
 import { useResizableSidebar } from "../layout/useResizableSidebar";
 import {
   Hash,
@@ -78,6 +79,7 @@ interface ChannelSidebarProps {
   onOpenBotPortal: () => void;
   onStartHuddle: (channel: Channel) => void;
   presence?: Record<string, Presence>;
+  liveStatus?: Record<string, UserStatus>;
   onOpenSearch?: () => void;
   onOpenOrganizationControl?: () => void;
   onCloseMobile?: () => void;
@@ -116,6 +118,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   onOpenBotPortal,
   onStartHuddle,
   presence = {},
+  liveStatus = {},
   onOpenSearch,
   onOpenOrganizationControl,
   onCloseMobile,
@@ -1234,6 +1237,15 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                           />
                         </div>
                         <span className="truncate">{user.displayName}</span>
+                        {isLiveOnline(liveStatus[user.id]) && (
+                          <span
+                            title="Online in Orbit right now"
+                            className="inline-flex items-center gap-1 shrink-0 px-1.5 py-[1px] rounded-full text-[9px] font-semibold uppercase tracking-wide bg-sky-400/15 text-sky-500"
+                          >
+                            <span className="w-[5px] h-[5px] rounded-full bg-sky-400 animate-pulse" />
+                            in orbit
+                          </span>
+                        )}
                         {isSelf && (
                           <span
                             className="text-[10px] shrink-0"

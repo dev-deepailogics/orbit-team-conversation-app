@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Channel, Message, UserProfile } from '@orbit/types';
+import React, { useState, useRef, useEffect } from "react";
+import { Channel, Message, UserProfile } from "@orbit/types";
 import {
   Hash,
   Lock,
@@ -30,27 +30,33 @@ import {
   CheckSquare,
   Pencil,
   Trash2,
+  Bell,
+  BellOff,
+  AtSign,
   ChevronDown,
-} from 'lucide-react';
-import { api } from '../../lib/api';
-import { getSocket } from '../../lib/socket';
-import { useChatStore } from '../../stores/chatStore';
-import { EmojiPickerPopover } from './EmojiPickerPopover';
-import { getTopEmojis, recordEmojiUsage } from '../../lib/emojiStore';
-import { CanvasView } from '../whiteboard/CanvasView';
-import { MarkdownRenderer } from './MarkdownRenderer';
-import { RichTextEditor, RichTextEditorRef } from './RichTextEditor';
-import { FileAttachmentList, formatFileSize, getFileCategory } from './FileAttachmentList';
-import { ChannelStorageModal } from './ChannelStorageModal';
-import { ChannelDetailsModal } from '../channel/ChannelDetailsModal';
-import { CompressFileConfirmModal } from './CompressFileConfirmModal';
-import { compressFile } from '../../lib/compression';
-import { PinnedMessagesModal } from './PinnedMessagesModal';
-import { AnonymousPersonaModal } from '../channel/AnonymousPersonaModal';
-import { UserHoverCard } from './UserHoverCard';
-import { Presence } from '../availability/useTeamPresence';
-import { useTimeFormat, formatMessageTime } from '../../lib/timeFormat';
-
+} from "lucide-react";
+import { api } from "../../lib/api";
+import { getSocket } from "../../lib/socket";
+import { useChatStore } from "../../stores/chatStore";
+import { EmojiPickerPopover } from "./EmojiPickerPopover";
+import { getTopEmojis, recordEmojiUsage } from "../../lib/emojiStore";
+import { CanvasView } from "../whiteboard/CanvasView";
+import { MarkdownRenderer } from "./MarkdownRenderer";
+import { RichTextEditor, RichTextEditorRef } from "./RichTextEditor";
+import {
+  FileAttachmentList,
+  formatFileSize,
+  getFileCategory,
+} from "./FileAttachmentList";
+import { ChannelStorageModal } from "./ChannelStorageModal";
+import { ChannelDetailsModal } from "../channel/ChannelDetailsModal";
+import { CompressFileConfirmModal } from "./CompressFileConfirmModal";
+import { compressFile } from "../../lib/compression";
+import { PinnedMessagesModal } from "./PinnedMessagesModal";
+import { AnonymousPersonaModal } from "../channel/AnonymousPersonaModal";
+import { UserHoverCard } from "./UserHoverCard";
+import { Presence } from "../availability/useTeamPresence";
+import { useTimeFormat, formatMessageTime } from "../../lib/timeFormat";
 
 interface ChatAreaProps {
   channel: Channel;
@@ -69,8 +75,8 @@ interface ChatAreaProps {
   members?: any[];
   onSelectUserDM?: (user: UserProfile) => void;
   onSelectChannel?: (channel: Channel) => void;
-  activeView: 'messages' | 'whiteboard';
-  onChangeView: (view: 'messages' | 'whiteboard') => void;
+  activeView: "messages" | "whiteboard";
+  onChangeView: (view: "messages" | "whiteboard") => void;
   presence?: Record<string, Presence>;
   onHuddleUser?: (user: UserProfile) => void;
 }
@@ -98,12 +104,22 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onHuddleUser,
 }) => {
   const timeFormat = useTimeFormat();
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState("");
   const sendingRef = useRef(false);
-  const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
+  const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(
+    null,
+  );
   const [showEmoji, setShowEmoji] = useState(false);
-  const [activeEmojiMessageId, setActiveEmojiMessageId] = useState<string | null>(null);
-  const [topEmojis, setTopEmojis] = useState<string[]>(['👍', '❤️', '🔥', '🎉', '🚀']);
+  const [activeEmojiMessageId, setActiveEmojiMessageId] = useState<
+    string | null
+  >(null);
+  const [topEmojis, setTopEmojis] = useState<string[]>([
+    "👍",
+    "❤️",
+    "🔥",
+    "🎉",
+    "🚀",
+  ]);
   const [attachments, setAttachments] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -112,14 +128,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showPinsModal, setShowPinsModal] = useState(false);
   const [showAnonPersonaModal, setShowAnonPersonaModal] = useState(false);
-  const [anonProfile, setAnonProfile] = useState<{ anonName: string; anonEmoji: string } | null>(
-    channel.myAnonProfile || null
-  );
+  const [anonProfile, setAnonProfile] = useState<{
+    anonName: string;
+    anonEmoji: string;
+  } | null>(channel.myAnonProfile || null);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-  const [editContent, setEditContent] = useState('');
+  const [editContent, setEditContent] = useState("");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
-  const [deleteConfirmMessage, setDeleteConfirmMessage] = useState<Message | null>(null);
+  const [deleteConfirmMessage, setDeleteConfirmMessage] =
+    useState<Message | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Compression Confirmation State
@@ -128,25 +146,58 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [isCompressing, setIsCompressing] = useState(false);
 
   const currentWorkspace = useChatStore((state) => state.currentWorkspace);
+  const notificationPreference =
+    channel.members?.find((m) => m.userId === currentUser?.id)
+      ?.notificationPreference || "ALL";
+  const isMuted = notificationPreference === "MUTED";
+  const [isSavingNotifPref, setIsSavingNotifPref] = useState(false);
+
+  const handleSetNotificationPreference = async (
+    preference: "ALL" | "MENTIONS" | "MUTED",
+  ) => {
+    if (preference === notificationPreference) return;
+    setIsSavingNotifPref(true);
+    try {
+      await api.post(`/api/channels/${channel.id}/notifications`, {
+        preference,
+      });
+      useChatStore.getState().updateChannel({
+        ...channel,
+        members: (channel.members || []).map((m) =>
+          m.userId === currentUser?.id
+            ? { ...m, notificationPreference: preference }
+            : m,
+        ),
+      });
+    } catch (err) {
+      console.error("Failed to update notification preference", err);
+    } finally {
+      setIsSavingNotifPref(false);
+    }
+  };
+
   const isWsAdmin =
     currentWorkspace?.ownerId === currentUser?.id ||
     members?.some(
       (m) =>
         m.userId === currentUser?.id &&
-        (m.role === 'ADMIN' || m.role === 'OWNER')
+        (m.role === "ADMIN" || m.role === "OWNER"),
     );
-  const isSuperAdmin = currentUser?.systemRole === 'SUPER_ADMIN';
+  const isSuperAdmin = currentUser?.systemRole === "SUPER_ADMIN";
 
   useEffect(() => {
     if (channel.isAnonymous) {
       if (channel.myAnonProfile) {
         setAnonProfile(channel.myAnonProfile);
       } else {
-        api.get(`/api/channels/${channel.id}`).then((res) => {
-          if (res.data?.myAnonProfile) {
-            setAnonProfile(res.data.myAnonProfile);
-          }
-        }).catch(() => {});
+        api
+          .get(`/api/channels/${channel.id}`)
+          .then((res) => {
+            if (res.data?.myAnonProfile) {
+              setAnonProfile(res.data.myAnonProfile);
+            }
+          })
+          .catch(() => {});
       }
     } else {
       setAnonProfile(null);
@@ -157,7 +208,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
-  const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<string | null>(null);
+  const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<
+    string | null
+  >(null);
   const previousScrollHeightRef = useRef<number>(0);
   const isInitialLoadRef = useRef(true);
   const previousMessagesCountRef = useRef(0);
@@ -183,7 +236,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const handleMentionClick = (username: string) => {
     if (channel.isAnonymous) return;
     const targetMember = members?.find(
-      (m) => m.user?.username?.toLowerCase() === username.toLowerCase()
+      (m) => m.user?.username?.toLowerCase() === username.toLowerCase(),
     );
     if (targetMember?.user && onSelectUserDM) {
       onSelectUserDM(targetMember.user);
@@ -200,15 +253,18 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   // Close more menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+      if (
+        moreMenuRef.current &&
+        !moreMenuRef.current.contains(e.target as Node)
+      ) {
         setShowMoreMenu(false);
       }
     };
     if (showMoreMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
     }
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [showMoreMenu]);
 
@@ -228,7 +284,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   // Auto-focus message input when switching to messages view
   useEffect(() => {
-    if (activeView === 'messages') {
+    if (activeView === "messages") {
       const timer = setTimeout(() => {
         editorRef.current?.focus();
       }, 100);
@@ -250,7 +306,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     // 1. Initial load of channel messages: jump straight to bottom
     if (isInitialLoadRef.current) {
       if (messages.length > 0) {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+        messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
         isInitialLoadRef.current = false;
       }
       previousMessagesCountRef.current = messages.length;
@@ -260,7 +316,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     // 2. Older messages prepended at top: maintain exact scroll position
     if (previousScrollHeightRef.current > 0 && scrollContainerRef.current) {
       const newScrollHeight = scrollContainerRef.current.scrollHeight;
-      const heightDifference = newScrollHeight - previousScrollHeightRef.current;
+      const heightDifference =
+        newScrollHeight - previousScrollHeightRef.current;
       scrollContainerRef.current.scrollTop += heightDifference;
       previousScrollHeightRef.current = 0;
       previousMessagesCountRef.current = messages.length;
@@ -272,14 +329,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     if (messages.length > previousMessagesCountRef.current) {
       const lastMessage = messages[messages.length - 1];
       const isSentByMe = Boolean(
-        lastMessage && (
-          lastMessage.isSelf ||
-          (currentUser && lastMessage.userId === currentUser.id)
-        )
+        lastMessage &&
+        (lastMessage.isSelf ||
+          (currentUser && lastMessage.userId === currentUser.id)),
       );
 
       if (isNearBottomRef.current || isSentByMe) {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
         // User is at bottom, so they have seen the message
         setFirstUnreadMessageId(null);
       } else {
@@ -295,7 +351,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
     // Track if user is near bottom (within 150px)
-    const distanceFromBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
+    const distanceFromBottom =
+      target.scrollHeight - target.scrollTop - target.clientHeight;
     const isNearBottom = distanceFromBottom < 150;
     isNearBottomRef.current = isNearBottom;
 
@@ -305,7 +362,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
 
     // When user scrolls close to top (within 40px), trigger loading older messages
-    if (target.scrollTop <= 40 && hasMoreMessages && !isLoadingOlder && onLoadOlderMessages) {
+    if (
+      target.scrollTop <= 40 &&
+      hasMoreMessages &&
+      !isLoadingOlder &&
+      onLoadOlderMessages
+    ) {
       previousScrollHeightRef.current = target.scrollHeight;
       onLoadOlderMessages();
     }
@@ -321,13 +383,18 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
     if (currentUser) {
       const typingName = channel.isAnonymous
-        ? (anonProfile ? `${anonProfile.anonEmoji} ${anonProfile.anonName}` : 'Someone')
+        ? anonProfile
+          ? `${anonProfile.anonEmoji} ${anonProfile.anonName}`
+          : "Someone"
         : currentUser.displayName;
-      socket.emit('typing:start', { channelId: channel.id, username: typingName });
+      socket.emit("typing:start", {
+        channelId: channel.id,
+        username: typingName,
+      });
 
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => {
-        socket.emit('typing:stop', { channelId: channel.id });
+        socket.emit("typing:stop", { channelId: channel.id });
       }, 2000);
     }
   };
@@ -335,25 +402,26 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const rawMarkdown = editorRef.current?.getMarkdown() || content.trim();
-    if ((!rawMarkdown.trim() && attachments.length === 0) || !currentUser) return;
+    if ((!rawMarkdown.trim() && attachments.length === 0) || !currentUser)
+      return;
 
     const trimmed = rawMarkdown.trim();
     const plainText = editorRef.current?.getText() || content.trim();
 
     // Check for Slash Command
-    if (plainText.startsWith('/')) {
-      const commandParts = plainText.split(' ');
+    if (plainText.startsWith("/")) {
+      const commandParts = plainText.split(" ");
       const cmd = commandParts[0].toLowerCase();
 
-      if (cmd === '/call' || cmd === '/meet' || cmd === '/huddle') {
+      if (cmd === "/call" || cmd === "/meet" || cmd === "/huddle") {
         editorRef.current?.clear();
-        setContent('');
+        setContent("");
         onStartHuddle(channel);
         return;
       }
 
       try {
-        const res = await api.post('/api/bot/commands/execute', {
+        const res = await api.post("/api/bot/commands/execute", {
           channelId: channel.id,
           workspaceId: channel.workspaceId,
           commandText: plainText,
@@ -362,11 +430,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           useChatStore.getState().addMessage(res.data.message);
         }
         editorRef.current?.clear();
-        setContent('');
+        setContent("");
         setReplyingToMessage(null);
         return;
       } catch (err: any) {
-        alert(err.response?.data?.error || 'Failed to execute command');
+        alert(err.response?.data?.error || "Failed to execute command");
         return;
       }
     }
@@ -377,7 +445,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     const sentReplyTo = replyingToMessage;
     // Clear input immediately so a second Enter can't resend
     editorRef.current?.clear();
-    setContent('');
+    setContent("");
     setAttachments([]);
     setReplyingToMessage(null);
 
@@ -393,9 +461,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
       setShowEmoji(false);
       const socket = getSocket();
-      socket.emit('typing:stop', { channelId: channel.id });
+      socket.emit("typing:stop", { channelId: channel.id });
     } catch (err) {
-      console.error('Failed to send message', err);
+      console.error("Failed to send message", err);
       setAttachments(sentAttachments);
       setReplyingToMessage(sentReplyTo);
     } finally {
@@ -404,7 +472,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   // Core file uploading logic with optional compression
-  const processUploadFiles = async (filesToUpload: File[], shouldCompress: boolean) => {
+  const processUploadFiles = async (
+    filesToUpload: File[],
+    shouldCompress: boolean,
+  ) => {
     setIsUploading(true);
     if (shouldCompress) {
       setIsCompressing(true);
@@ -418,30 +489,30 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           try {
             file = await compressFile(file);
           } catch (compErr) {
-            console.error('Compression failed for file', file.name, compErr);
+            console.error("Compression failed for file", file.name, compErr);
           }
         }
 
         const formData = new FormData();
-        formData.append('workspaceId', channel.workspaceId);
-        formData.append('channelId', channel.id);
-        formData.append('file', file);
+        formData.append("workspaceId", channel.workspaceId);
+        formData.append("channelId", channel.id);
+        formData.append("file", file);
 
         const url = `/api/files/upload?workspaceId=${encodeURIComponent(channel.workspaceId)}&channelId=${encodeURIComponent(channel.id)}`;
         const res = await api.post(url, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
+          headers: { "Content-Type": "multipart/form-data" },
         });
         setAttachments((prev) => [...prev, res.data]);
       }
     } catch (err: any) {
-      alert(err.response?.data?.error || 'File upload failed');
+      alert(err.response?.data?.error || "File upload failed");
     } finally {
       setIsUploading(false);
       setIsCompressing(false);
       setShowCompressModal(false);
       setPendingCompressFiles([]);
       if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        fileInputRef.current.value = "";
       }
       setTimeout(() => {
         editorRef.current?.focus();
@@ -480,9 +551,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       }
     };
 
-    socket.on('file:delete', onFileDelete);
+    socket.on("file:delete", onFileDelete);
     return () => {
-      socket.off('file:delete', onFileDelete);
+      socket.off("file:delete", onFileDelete);
     };
   }, []);
 
@@ -492,7 +563,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     try {
       await api.post(`/api/messages/${messageId}/reactions`, { emoji });
     } catch (err) {
-      console.error('Failed to react', err);
+      console.error("Failed to react", err);
     }
   };
 
@@ -503,7 +574,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       });
       useChatStore.getState().updateMessage(res.data.message);
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to toggle pin');
+      alert(err.response?.data?.error || "Failed to toggle pin");
     }
   };
 
@@ -516,9 +587,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       });
       useChatStore.getState().updateMessage(res.data);
       setEditingMessageId(null);
-      setEditContent('');
+      setEditContent("");
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to edit message');
+      alert(err.response?.data?.error || "Failed to edit message");
     } finally {
       setIsSavingEdit(false);
     }
@@ -526,7 +597,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   const handleCancelEdit = () => {
     setEditingMessageId(null);
-    setEditContent('');
+    setEditContent("");
   };
 
   const handleDeleteMessage = async () => {
@@ -539,45 +610,64 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       }
       setDeleteConfirmMessage(null);
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to delete message');
+      alert(err.response?.data?.error || "Failed to delete message");
     } finally {
       setIsDeleting(false);
     }
   };
 
   const getDirectChannelTitle = () => {
-    if (channel.type !== 'DIRECT') return channel.name;
+    if (channel.type !== "DIRECT") return channel.name;
     if (channel.members && channel.members.length > 0) {
-      const otherMember = channel.members.find((m) => m.userId !== currentUser?.id);
+      const otherMember = channel.members.find(
+        (m) => m.userId !== currentUser?.id,
+      );
       if (otherMember && otherMember.user) {
         return otherMember.user.displayName;
       }
-      return `${currentUser?.displayName || 'You'} (you)`;
+      return `${currentUser?.displayName || "You"} (you)`;
     }
     return channel.name;
   };
 
   // Slack-style intro shown at the top of a DM instead of the channel intro
-  const dmPeer = channel.members?.find((m) => m.userId !== currentUser?.id)?.user;
+  const dmPeer = channel.members?.find(
+    (m) => m.userId !== currentUser?.id,
+  )?.user;
   const dmName = getDirectChannelTitle();
-  const dmIntro = channel.type === 'DIRECT' && (
-    <div className="py-6 border-b mb-2" style={{ borderColor: 'var(--theme-border)' }}>
+  const dmIntro = channel.type === "DIRECT" && (
+    <div
+      className="py-6 border-b mb-2"
+      style={{ borderColor: "var(--theme-border)" }}
+    >
       <img
-        src={(dmPeer ?? currentUser)?.avatarUrl || `/api/avatar/bottts/svg?seed=${dmName}`}
+        src={
+          (dmPeer ?? currentUser)?.avatarUrl ||
+          `/api/avatar/bottts/svg?seed=${dmName}`
+        }
         alt={dmName}
         className="w-16 h-16 rounded-xl object-cover mb-3"
       />
-      <h3 className="font-bold text-lg" style={{ color: 'var(--theme-text-primary)' }}>
+      <h3
+        className="font-bold text-lg"
+        style={{ color: "var(--theme-text-primary)" }}
+      >
         {dmName}
       </h3>
-      <p className="text-sm mt-1 max-w-md" style={{ color: 'var(--theme-text-muted)' }}>
+      <p
+        className="text-sm mt-1 max-w-md"
+        style={{ color: "var(--theme-text-muted)" }}
+      >
         {dmPeer ? (
           <>
-            This conversation is just between{' '}
-            <span className="text-slack-green font-medium">@{dmPeer.displayName}</span> and you.
+            This conversation is just between{" "}
+            <span className="text-slack-green font-medium">
+              @{dmPeer.displayName}
+            </span>{" "}
+            and you.
           </>
         ) : (
-          'This is your space. Draft messages, list your to-dos, or keep links and files handy.'
+          "This is your space. Draft messages, list your to-dos, or keep links and files handy."
         )}
       </p>
     </div>
@@ -593,16 +683,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     <div
       className="flex-1 flex flex-col h-full relative min-w-0"
       style={{
-        backgroundColor: 'var(--theme-bg-app)',
-        color: 'var(--theme-text)',
+        backgroundColor: "var(--theme-bg-app)",
+        color: "var(--theme-text)",
       }}
     >
       {/* Channel Header */}
       <div
         className="h-14 border-b px-3 sm:px-6 flex items-center justify-between backdrop-blur z-10 gap-2"
         style={{
-          backgroundColor: 'var(--theme-bg-surface)',
-          borderColor: 'var(--theme-border)',
+          backgroundColor: "var(--theme-bg-surface)",
+          borderColor: "var(--theme-border)",
         }}
       >
         <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
@@ -624,20 +714,38 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             className="flex items-center gap-1.5 hover:bg-[var(--theme-bg-surface-hover)] px-2 py-1 rounded-lg transition group min-w-0"
           >
             {channel.isAnonymous ? (
-              <span className="text-lg leading-none shrink-0" title="Anonymous Channel">🎭</span>
-            ) : channel.type === 'DIRECT' ? (
-              <span className="font-bold text-slack-green text-base shrink-0">@</span>
-            ) : channel.type === 'PRIVATE' ? (
-              <Lock size={18} className="text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] shrink-0" />
+              <span
+                className="text-lg leading-none shrink-0"
+                title="Anonymous Channel"
+              >
+                🎭
+              </span>
+            ) : channel.type === "DIRECT" ? (
+              <span className="font-bold text-slack-green text-base shrink-0">
+                @
+              </span>
+            ) : channel.type === "PRIVATE" ? (
+              <Lock
+                size={18}
+                className="text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] shrink-0"
+              />
             ) : (
-              <Hash size={20} className="text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] shrink-0" />
+              <Hash
+                size={20}
+                className="text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] shrink-0"
+              />
             )}
             <span
               className="font-bold text-sm sm:text-base truncate group-hover:underline"
-              style={{ color: 'var(--theme-text-primary)' }}
+              style={{ color: "var(--theme-text-primary)" }}
             >
               {getDirectChannelTitle()}
             </span>
+            {isMuted && (
+              <span title="Muted" className="shrink-0 inline-flex">
+                <BellOff size={14} className="text-[var(--theme-text-muted)]" />
+              </span>
+            )}
             {channel.isAnonymous && (
               <span className="text-[10px] font-semibold uppercase bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded ml-1 shrink-0">
                 Anonymous
@@ -656,8 +764,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-100 hover:bg-purple-200 dark:bg-purple-950/70 dark:hover:bg-purple-900/80 border border-purple-500/50 text-purple-700 dark:text-purple-200 text-xs font-medium transition shrink-0 group shadow-sm"
             >
               <span className="text-sm">{anonProfile.anonEmoji}</span>
-              <span className="hidden sm:inline font-semibold">{anonProfile.anonName}</span>
-              <span className="text-[10px] text-purple-600 dark:text-purple-400 group-hover:text-purple-800 dark:group-hover:text-purple-200 ml-0.5">Edit</span>
+              <span className="hidden sm:inline font-semibold">
+                {anonProfile.anonName}
+              </span>
+              <span className="text-[10px] text-purple-600 dark:text-purple-400 group-hover:text-purple-800 dark:group-hover:text-purple-200 ml-0.5">
+                Edit
+              </span>
             </button>
           )}
 
@@ -667,20 +779,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               onClick={onOpenSearch}
               title="Search messages (Cmd+K / Ctrl+K)"
               style={{
-                backgroundColor: 'var(--theme-bg-surface)',
-                borderColor: 'var(--theme-border)',
-                color: 'var(--theme-text-primary)',
+                backgroundColor: "var(--theme-bg-surface)",
+                borderColor: "var(--theme-border)",
+                color: "var(--theme-text-primary)",
               }}
               className="flex items-center gap-1.5 p-1.5 sm:px-3 sm:py-1.5 rounded-lg border text-xs font-medium transition hover:opacity-85"
             >
-              <Search size={14} style={{ color: 'var(--theme-primary)' }} />
+              <Search size={14} style={{ color: "var(--theme-primary)" }} />
               <span className="hidden sm:inline">Search</span>
               <kbd
                 className="hidden lg:inline text-[10px] px-1 py-0.2 rounded font-mono border ml-0.5"
                 style={{
-                  backgroundColor: 'var(--theme-bg-app)',
-                  borderColor: 'var(--theme-border)',
-                  color: 'var(--theme-text-muted)',
+                  backgroundColor: "var(--theme-bg-app)",
+                  borderColor: "var(--theme-border)",
+                  color: "var(--theme-text-muted)",
                 }}
               >
                 ⌘K
@@ -693,13 +805,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             onClick={() => setShowPinsModal(true)}
             title="View Pinned Messages"
             style={{
-              backgroundColor: 'var(--theme-bg-surface)',
-              borderColor: 'var(--theme-border)',
-              color: 'var(--theme-text-primary)',
+              backgroundColor: "var(--theme-bg-surface)",
+              borderColor: "var(--theme-border)",
+              color: "var(--theme-text-primary)",
             }}
             className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border text-xs font-medium transition hover:opacity-85"
           >
-            <Pin size={14} className="text-amber-600 dark:text-amber-400 fill-amber-400/30" />
+            <Pin
+              size={14}
+              className="text-amber-600 dark:text-amber-400 fill-amber-400/30"
+            />
             <span className="hidden sm:inline">Pins</span>
           </button>
 
@@ -719,14 +834,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               onClick={() => setShowMoreMenu(!showMoreMenu)}
               title="More options"
               style={{
-                backgroundColor: 'var(--theme-bg-surface)',
-                borderColor: 'var(--theme-border)',
-                color: 'var(--theme-text-primary)',
+                backgroundColor: "var(--theme-bg-surface)",
+                borderColor: "var(--theme-border)",
+                color: "var(--theme-text-primary)",
               }}
               className={`p-1.5 sm:p-2 rounded-lg border transition hover:opacity-85 ${
-                showMoreMenu
-                  ? 'ring-2 ring-slack-green'
-                  : ''
+                showMoreMenu ? "ring-2 ring-slack-green" : ""
               }`}
             >
               <MoreVertical size={16} />
@@ -735,7 +848,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             {/* Dropdown Menu */}
             {showMoreMenu && (
               <div className="absolute right-0 mt-1.5 w-56 bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-xl shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
-                {channel.type !== 'DIRECT' && onOpenAddMembers && (
+                {channel.type === "PRIVATE" && onOpenAddMembers && (
                   <button
                     onClick={() => {
                       setShowMoreMenu(false);
@@ -748,6 +861,77 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   </button>
                 )}
 
+                {channel.type === "DIRECT" ? (
+                  // A 1:1 DM has no broader audience to be singled out from, and
+                  // nothing in between "notify" and "don't" — just a plain toggle.
+                  <button
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      handleSetNotificationPreference(
+                        isMuted ? "ALL" : "MUTED",
+                      );
+                    }}
+                    disabled={isSavingNotifPref}
+                    className="w-full px-3.5 py-2 text-left text-xs text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] flex items-center gap-2.5 transition disabled:opacity-50"
+                  >
+                    {isMuted ? (
+                      <Bell size={14} className="text-slack-green" />
+                    ) : (
+                      <BellOff
+                        size={14}
+                        className="text-[var(--theme-text-muted)]"
+                      />
+                    )}
+                    <span>
+                      {isMuted ? "Unmute Notifications" : "Mute Notifications"}
+                    </span>
+                  </button>
+                ) : (
+                  <>
+                    <div className="px-3.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--theme-text-muted)]">
+                      Notifications
+                    </div>
+                    {[
+                      {
+                        value: "ALL" as const,
+                        label: "All New Posts",
+                        icon: Bell,
+                      },
+                      {
+                        value: "MENTIONS" as const,
+                        label: "Mentions Only",
+                        icon: AtSign,
+                      },
+                      { value: "MUTED" as const, label: "Mute", icon: BellOff },
+                    ].map(({ value, label, icon: Icon }) => (
+                      <button
+                        key={value}
+                        onClick={() => {
+                          setShowMoreMenu(false);
+                          handleSetNotificationPreference(value);
+                        }}
+                        disabled={isSavingNotifPref}
+                        className="w-full px-3.5 py-2 text-left text-xs text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] flex items-center gap-2.5 transition disabled:opacity-50"
+                      >
+                        <Icon
+                          size={14}
+                          className={
+                            notificationPreference === value
+                              ? "text-slack-green"
+                              : "text-[var(--theme-text-muted)]"
+                          }
+                        />
+                        <span className="flex-1">{label}</span>
+                        {notificationPreference === value && (
+                          <Check size={13} className="text-slack-green" />
+                        )}
+                      </button>
+                    ))}
+                  </>
+                )}
+
+                <div className="my-1.5 border-t border-[var(--theme-border)]" />
+
                 <button
                   onClick={() => {
                     setShowMoreMenu(false);
@@ -755,7 +939,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   }}
                   className="w-full px-3.5 py-2 text-left text-xs text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] flex items-center gap-2.5 transition"
                 >
-                  <Pin size={14} className="text-amber-600 dark:text-amber-400 fill-amber-400" />
+                  <Pin
+                    size={14}
+                    className="text-amber-600 dark:text-amber-400 fill-amber-400"
+                  />
                   <span>Pinned Messages</span>
                 </button>
 
@@ -794,7 +981,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     <Copy size={14} />
                     <span>Copy Channel ID</span>
                   </span>
-                  {copiedChannelId && <Check size={12} className="text-slack-green" />}
+                  {copiedChannelId && (
+                    <Check size={12} className="text-slack-green" />
+                  )}
                 </button>
               </div>
             )}
@@ -808,7 +997,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-base shrink-0">🎭</span>
             <span className="truncate">
-              <strong>Anonymous Discussion Mode:</strong> Real identities, avatars, and user IDs are strictly hidden.
+              <strong>Anonymous Discussion Mode:</strong> Real identities,
+              avatars, and user IDs are strictly hidden.
             </span>
           </div>
           {anonProfile && (
@@ -823,737 +1013,936 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       )}
 
       {/* Main Content: Whiteboard View or Messages View */}
-      {activeView === 'whiteboard' ? (
+      {activeView === "whiteboard" ? (
         <div className="flex-1 w-full h-full relative flex min-h-0">
           <CanvasView
             workspaceId={channel.workspaceId}
             currentUser={currentUser}
-            scope={{ channelId: channel.id, label: channel.type === 'DIRECT' ? dmName : `#${channel.name}` }}
-            onClose={() => setActiveView('messages')}
+            scope={{
+              channelId: channel.id,
+              label: channel.type === "DIRECT" ? dmName : `#${channel.name}`,
+            }}
+            onClose={() => setActiveView("messages")}
           />
         </div>
       ) : (
         <>
           {/* Message List */}
-      <div
-        ref={scrollContainerRef}
-        onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-4"
-      >
-        {messages.length === 0 ? (
-          dmIntro || <div className="h-full flex flex-col items-center justify-center text-center">
-            <div
-              className="w-12 h-12 rounded-full flex items-center justify-center mb-3"
-              style={{ backgroundColor: 'var(--theme-bg-surface)', color: 'var(--theme-text-muted)' }}
-            >
-              <Hash size={24} />
-            </div>
-            <h3 className="font-bold text-lg" style={{ color: 'var(--theme-text-primary)' }}>
-              This is the start of #{channel.name}
-            </h3>
-            <p className="text-sm max-w-xs mt-1" style={{ color: 'var(--theme-text-muted)' }}>
-              This channel was created for your team. Send a message to get started!
-            </p>
+          <div
+            ref={scrollContainerRef}
+            onScroll={handleScroll}
+            className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-4"
+          >
+            {messages.length === 0 ? (
+              dmIntro || (
+                <div className="h-full flex flex-col items-center justify-center text-center">
+                  <div
+                    className="w-12 h-12 rounded-full flex items-center justify-center mb-3"
+                    style={{
+                      backgroundColor: "var(--theme-bg-surface)",
+                      color: "var(--theme-text-muted)",
+                    }}
+                  >
+                    <Hash size={24} />
+                  </div>
+                  <h3
+                    className="font-bold text-lg"
+                    style={{ color: "var(--theme-text-primary)" }}
+                  >
+                    This is the start of #{channel.name}
+                  </h3>
+                  <p
+                    className="text-sm max-w-xs mt-1"
+                    style={{ color: "var(--theme-text-muted)" }}
+                  >
+                    This channel was created for your team. Send a message to
+                    get started!
+                  </p>
+                </div>
+              )
+            ) : (
+              <>
+                {/* Load older messages button / indicator */}
+                {hasMoreMessages && (
+                  <div className="flex justify-center py-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (scrollContainerRef.current) {
+                          previousScrollHeightRef.current =
+                            scrollContainerRef.current.scrollHeight;
+                        }
+                        onLoadOlderMessages?.();
+                      }}
+                      disabled={isLoadingOlder}
+                      style={{
+                        backgroundColor: "var(--theme-bg-surface)",
+                        borderColor: "var(--theme-border)",
+                        color: "var(--theme-text-primary)",
+                      }}
+                      className="px-4 py-1.5 text-xs font-medium rounded-full transition flex items-center gap-2 border shadow-xs disabled:opacity-50 cursor-pointer hover:opacity-85"
+                    >
+                      {isLoadingOlder ? (
+                        <>
+                          <Loader2
+                            size={13}
+                            className="animate-spin text-slack-green"
+                          />
+                          <span>Loading older messages...</span>
+                        </>
+                      ) : (
+                        <span>Load older messages</span>
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {/* Start of channel header (only shown when user has scrolled all the way to the beginning) */}
+                {!hasMoreMessages &&
+                  (dmIntro || (
+                    <div
+                      className="py-6 border-b mb-2"
+                      style={{ borderColor: "var(--theme-border)" }}
+                    >
+                      <div
+                        className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3 shadow"
+                        style={{
+                          backgroundColor: "var(--theme-bg-surface)",
+                          color: "var(--theme-text-muted)",
+                        }}
+                      >
+                        <Hash size={24} />
+                      </div>
+                      <h3
+                        className="font-bold text-lg"
+                        style={{ color: "var(--theme-text-primary)" }}
+                      >
+                        This is the start of #{channel.name}
+                      </h3>
+                      <p
+                        className="text-xs mt-1 max-w-md"
+                        style={{ color: "var(--theme-text-muted)" }}
+                      >
+                        {channel.description ||
+                          channel.topic ||
+                          "This is the very beginning of the channel history."}
+                      </p>
+                    </div>
+                  ))}
+
+                {messages.map((msg, idx) => {
+                  const isBot = !!msg.bot;
+                  const isAnon = channel.isAnonymous || msg.isAnonymous;
+                  const isSelf =
+                    msg.isSelf || (!isAnon && msg.userId === currentUser.id);
+                  const canEdit = !msg.isDeleted && (isSelf || isSuperAdmin);
+                  const canDelete =
+                    !msg.isDeleted && (isSelf || isWsAdmin || isSuperAdmin);
+                  const authorName = isAnon
+                    ? msg.anonName || "Anonymous"
+                    : isBot
+                      ? msg.bot?.name
+                      : msg.user?.displayName || "Unknown";
+                  const anonEmoji = msg.anonEmoji || "🎭";
+                  const avatarUrl = isBot
+                    ? msg.bot?.avatarUrl ||
+                      `/api/avatar/bottts/svg?seed=${msg.bot?.name}`
+                    : msg.user?.avatarUrl ||
+                      `/api/avatar/bottts/svg?seed=${authorName}`;
+                  // Profile hover card: real people only (not bots / anonymous posts)
+                  const author = !isAnon && !isBot ? msg.user : undefined;
+                  const withCard = (
+                    node: React.ReactNode,
+                    className?: string,
+                  ) =>
+                    author ? (
+                      <UserHoverCard
+                        user={author}
+                        presence={presence[author.id] || "offline"}
+                        isSelf={author.id === currentUser.id}
+                        onMessage={() =>
+                          onSelectUserDM?.(author as UserProfile)
+                        }
+                        onHuddle={() => onHuddleUser?.(author as UserProfile)}
+                        className={className}
+                      >
+                        {node}
+                      </UserHoverCard>
+                    ) : (
+                      node
+                    );
+
+                  return (
+                    <React.Fragment key={msg.id}>
+                      {firstUnreadMessageId === msg.id && (
+                        <div className="flex items-center gap-3 my-4 select-none relative z-10 animate-in fade-in duration-200">
+                          <div className="flex-1 h-[1.5px] bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.4)]" />
+                          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider text-white bg-red-500 shadow-md">
+                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                            <span>New Messages</span>
+                          </div>
+                          <div className="flex-1 h-[1.5px] bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.4)]" />
+                        </div>
+                      )}
+                      <div
+                        id={`msg-${msg.id}`}
+                        className={`group flex gap-2.5 sm:gap-3 hover:bg-black/5 dark:hover:bg-[var(--theme-bg-surface-hover)] -mx-3 sm:-mx-6 px-3 sm:px-6 py-2 rounded-lg transition-all duration-300 relative ${
+                          msg.isPinned
+                            ? "bg-amber-500/5 border-l-2 border-amber-400/80 pl-2 sm:pl-5"
+                            : ""
+                        }`}
+                      >
+                        {isAnon ? (
+                          <div
+                            className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-900/70 to-indigo-900/70 border border-purple-500/40 flex items-center justify-center text-lg shrink-0 mt-0.5 shadow-sm select-none"
+                            title={authorName}
+                          >
+                            {anonEmoji}
+                          </div>
+                        ) : (
+                          withCard(
+                            <img
+                              src={avatarUrl}
+                              alt={authorName}
+                              className="w-9 h-9 rounded-lg object-cover shrink-0 mt-0.5 cursor-pointer"
+                            />,
+                            "shrink-0 self-start",
+                          )
+                        )}
+
+                        <div className="flex-1 min-w-0">
+                          {msg.isPinned && (
+                            <div className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-semibold mb-1">
+                              <Pin size={11} className="fill-amber-400" />
+                              <span>Pinned to channel</span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2">
+                            {withCard(
+                              <span
+                                className="font-bold text-sm hover:underline cursor-pointer flex items-center gap-1.5"
+                                style={{ color: "var(--theme-text-primary)" }}
+                              >
+                                {authorName}
+                                {isAnon ? (
+                                  <span
+                                    className={`text-[10px] font-semibold px-1.5 py-0.2 rounded uppercase ${
+                                      isSelf
+                                        ? "bg-purple-100 dark:bg-purple-900/70 text-purple-700 dark:text-purple-200 border border-purple-500/40"
+                                        : "bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] border border-[var(--theme-border)]"
+                                    }`}
+                                  >
+                                    {isSelf ? "You (Anon)" : "Anonymous"}
+                                  </span>
+                                ) : isBot ? (
+                                  <span
+                                    className="text-[10px] font-semibold px-1.5 py-0.2 rounded uppercase border"
+                                    style={{
+                                      backgroundColor:
+                                        "var(--theme-bg-surface-hover)",
+                                      borderColor: "var(--theme-border)",
+                                      color: "var(--theme-text-muted)",
+                                    }}
+                                  >
+                                    APP
+                                  </span>
+                                ) : null}
+                              </span>,
+                            )}
+                            <span
+                              className="text-[11px]"
+                              style={{ color: "var(--theme-text-muted)" }}
+                            >
+                              {formatMessageTime(msg.createdAt, timeFormat)}
+                            </span>
+                            {msg.isEdited && !msg.isDeleted && (
+                              <span
+                                className="text-[10px] italic select-none font-medium opacity-80"
+                                style={{ color: "var(--theme-text-muted)" }}
+                                title="Edited"
+                              >
+                                (edited)
+                              </span>
+                            )}
+                          </div>
+
+                          {msg.isDeleted ? (
+                            <div
+                              className="flex items-center gap-2 py-1.5 text-xs italic select-none"
+                              style={{ color: "var(--theme-text-muted)" }}
+                            >
+                              <Trash2
+                                size={13}
+                                className="opacity-60 shrink-0"
+                              />
+                              <span>This message was deleted</span>
+                            </div>
+                          ) : editingMessageId === msg.id ? (
+                            <div className="mt-2 space-y-2">
+                              <textarea
+                                value={editContent}
+                                onChange={(e) => setEditContent(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleSaveEdit(msg.id);
+                                  } else if (e.key === "Escape") {
+                                    e.preventDefault();
+                                    handleCancelEdit();
+                                  }
+                                }}
+                                rows={3}
+                                autoFocus
+                                className="w-full text-sm p-2.5 rounded-lg border focus:outline-none focus:ring-1 resize-y"
+                                style={{
+                                  backgroundColor: "var(--theme-bg-surface)",
+                                  borderColor: "var(--theme-border)",
+                                  color: "var(--theme-text-primary)",
+                                }}
+                                placeholder="Edit message..."
+                              />
+                              <div className="flex items-center justify-between text-xs">
+                                <span
+                                  style={{ color: "var(--theme-text-muted)" }}
+                                  className="text-[11px]"
+                                >
+                                  escape to{" "}
+                                  <button
+                                    type="button"
+                                    onClick={handleCancelEdit}
+                                    className="underline hover:opacity-80"
+                                  >
+                                    cancel
+                                  </button>{" "}
+                                  • enter to{" "}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSaveEdit(msg.id)}
+                                    className="underline hover:opacity-80"
+                                  >
+                                    save
+                                  </button>
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={handleCancelEdit}
+                                    disabled={isSavingEdit}
+                                    className="px-3 py-1 rounded text-xs font-medium border hover:bg-black/5 dark:hover:bg-[var(--theme-bg-surface-hover)] transition"
+                                    style={{
+                                      borderColor: "var(--theme-border)",
+                                      color: "var(--theme-text-primary)",
+                                    }}
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSaveEdit(msg.id)}
+                                    disabled={
+                                      isSavingEdit || !editContent.trim()
+                                    }
+                                    className="px-3 py-1 rounded text-xs font-semibold text-white transition flex items-center gap-1.5 shadow-sm"
+                                    style={{
+                                      backgroundColor: "var(--theme-primary)",
+                                    }}
+                                  >
+                                    {isSavingEdit ? (
+                                      <>
+                                        <Loader2
+                                          size={12}
+                                          className="animate-spin"
+                                        />
+                                        <span>Saving...</span>
+                                      </>
+                                    ) : (
+                                      "Save Changes"
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              {/* Quoted Message Preview Box */}
+                              {msg.quotedMessage && (
+                                <div
+                                  onClick={() => {
+                                    const el = document.getElementById(
+                                      `msg-${msg.quotedMessage?.id}`,
+                                    );
+                                    if (el) {
+                                      el.scrollIntoView({
+                                        behavior: "smooth",
+                                        block: "center",
+                                      });
+                                      el.classList.add(
+                                        "bg-slack-activeChannel/25",
+                                        "ring-2",
+                                        "ring-slack-activeChannel",
+                                      );
+                                      setTimeout(() => {
+                                        el.classList.remove(
+                                          "bg-slack-activeChannel/25",
+                                          "ring-2",
+                                          "ring-slack-activeChannel",
+                                        );
+                                      }, 2000);
+                                    }
+                                  }}
+                                  style={{
+                                    backgroundColor: "var(--theme-bg-surface)",
+                                    borderColor: "var(--theme-border)",
+                                  }}
+                                  className="mt-1 mb-1.5 flex items-center gap-2 border-l-4 border-slack-green rounded-r-lg px-3 py-1.5 cursor-pointer text-xs transition max-w-lg shadow-sm"
+                                >
+                                  <div className="min-w-0">
+                                    <span className="font-bold text-slack-green text-[11px] block">
+                                      {channel.isAnonymous ||
+                                      msg.quotedMessage.isAnonymous
+                                        ? msg.quotedMessage.anonName
+                                          ? `${msg.quotedMessage.anonEmoji || "🎭"} ${msg.quotedMessage.anonName}`
+                                          : "Anonymous"
+                                        : msg.quotedMessage.user?.displayName ||
+                                          "Teammate"}
+                                    </span>
+                                    <span
+                                      className="text-[11px] truncate block max-w-md"
+                                      style={{
+                                        color: "var(--theme-text-muted)",
+                                      }}
+                                    >
+                                      {msg.quotedMessage.content}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Message Content */}
+                              <div
+                                className="text-sm mt-1 max-w-none break-words"
+                                style={{ color: "var(--theme-text-primary)" }}
+                              >
+                                <MarkdownRenderer
+                                  content={msg.content}
+                                  currentUsername={currentUser?.username}
+                                  onMentionClick={handleMentionClick}
+                                  onChannelClick={handleChannelClick}
+                                />
+                              </div>
+
+                              {/* Attachments */}
+                              {msg.attachments &&
+                                msg.attachments.length > 0 && (
+                                  <FileAttachmentList
+                                    attachments={msg.attachments}
+                                    currentUser={currentUser}
+                                    onFileDeleted={(deletedFileId) => {
+                                      useChatStore
+                                        .getState()
+                                        .removeAttachment(deletedFileId);
+                                    }}
+                                  />
+                                )}
+
+                              {/* Reactions Bar - ONLY displayed when reactions exist */}
+                              {(() => {
+                                const reactionCounts = (
+                                  msg.reactions || []
+                                ).reduce(
+                                  (
+                                    acc: {
+                                      [emoji: string]: {
+                                        count: number;
+                                        users: string[];
+                                        hasReacted: boolean;
+                                      };
+                                    },
+                                    r,
+                                  ) => {
+                                    if (!acc[r.emoji]) {
+                                      acc[r.emoji] = {
+                                        count: 0,
+                                        users: [],
+                                        hasReacted: false,
+                                      };
+                                    }
+                                    acc[r.emoji].count += 1;
+                                    if (r.user?.displayName) {
+                                      acc[r.emoji].users.push(
+                                        channel.isAnonymous
+                                          ? "Anonymous"
+                                          : r.user.displayName,
+                                      );
+                                    }
+                                    if (r.userId === currentUser?.id)
+                                      acc[r.emoji].hasReacted = true;
+                                    return acc;
+                                  },
+                                  {},
+                                );
+
+                                const entries = Object.entries(reactionCounts);
+                                if (entries.length === 0) return null;
+
+                                return (
+                                  <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                                    {entries.map(([emoji, data]) => (
+                                      <button
+                                        key={emoji}
+                                        onClick={() =>
+                                          handleReaction(msg.id, emoji)
+                                        }
+                                        title={data.users.join(", ")}
+                                        className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition border ${
+                                          data.hasReacted
+                                            ? "bg-slack-activeChannel/20 border-slack-activeChannel text-slack-activeChannel font-bold"
+                                            : "bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] border-[var(--theme-border)] text-[var(--theme-text)]"
+                                        }`}
+                                      >
+                                        <span>{emoji}</span>
+                                        <span className="text-[11px]">
+                                          {data.count}
+                                        </span>
+                                      </button>
+                                    ))}
+
+                                    <button
+                                      onClick={() =>
+                                        setActiveEmojiMessageId(
+                                          activeEmojiMessageId === msg.id
+                                            ? null
+                                            : msg.id,
+                                        )
+                                      }
+                                      title="Add reaction"
+                                      className="flex items-center justify-center w-6 h-6 rounded-full bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition"
+                                    >
+                                      <SmilePlus size={12} />
+                                    </button>
+                                  </div>
+                                );
+                              })()}
+                            </>
+                          )}
+
+                          {/* Thread Replies Button */}
+                          {(msg.replyCount || 0) > 0 && (
+                            <button
+                              onClick={() => onOpenThread(msg)}
+                              className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-300 transition"
+                            >
+                              <MessageSquare size={13} />
+                              <span>
+                                {msg.replyCount}{" "}
+                                {msg.replyCount === 1 ? "reply" : "replies"}
+                              </span>
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Floating Hover Bubble Layer */}
+                        {!msg.isDeleted && (
+                          <div className="absolute right-2 sm:right-4 -top-3.5 hidden group-hover:flex items-center bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-xl shadow-2xl px-1.5 py-1 gap-1 z-20">
+                            {/* Top 4 Quick Reaction Emojis */}
+                            <div className="flex items-center gap-0.5 pr-1 border-r border-[var(--theme-border)] mr-0.5">
+                              {topEmojis.slice(0, 4).map((em) => (
+                                <button
+                                  key={em}
+                                  onClick={() => handleReaction(msg.id, em)}
+                                  className="hover:scale-125 transition text-xs p-1 rounded hover:bg-[var(--theme-bg-surface-hover)]"
+                                  title={`React with ${em}`}
+                                >
+                                  {em}
+                                </button>
+                              ))}
+                            </div>
+
+                            <button
+                              onClick={() =>
+                                setActiveEmojiMessageId(
+                                  activeEmojiMessageId === msg.id
+                                    ? null
+                                    : msg.id,
+                                )
+                              }
+                              title="More emojis..."
+                              className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded transition"
+                            >
+                              <SmilePlus size={14} />
+                            </button>
+                            <button
+                              onClick={() => setReplyingToMessage(msg)}
+                              title="Quote Reply"
+                              className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded transition"
+                            >
+                              <CornerUpLeft size={14} />
+                            </button>
+                            <button
+                              onClick={() => onOpenThread(msg)}
+                              title="Reply in thread"
+                              className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded transition"
+                            >
+                              <MessageSquare size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleTogglePin(msg)}
+                              title={
+                                msg.isPinned
+                                  ? "Unpin message"
+                                  : "Pin message to channel"
+                              }
+                              className={`p-1 rounded transition ${
+                                msg.isPinned
+                                  ? "text-amber-600 dark:text-amber-400 hover:text-amber-300"
+                                  : "text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]"
+                              }`}
+                            >
+                              <Pin
+                                size={14}
+                                className={msg.isPinned ? "fill-amber-400" : ""}
+                              />
+                            </button>
+                            {onCreateTicketFromMessage && (
+                              <button
+                                onClick={() => onCreateTicketFromMessage(msg)}
+                                title="Create Ticket from message"
+                                className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded transition"
+                              >
+                                <CheckSquare size={14} />
+                              </button>
+                            )}
+                            {canEdit && (
+                              <button
+                                onClick={() => {
+                                  setEditingMessageId(msg.id);
+                                  setEditContent(msg.content);
+                                }}
+                                title="Edit message"
+                                className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded transition"
+                              >
+                                <Pencil size={14} />
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button
+                                onClick={() => setDeleteConfirmMessage(msg)}
+                                title="Delete message"
+                                className="p-1 text-red-600 dark:text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded transition"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Anchored Mini Emoji Popover */}
+                        {!msg.isDeleted && activeEmojiMessageId === msg.id && (
+                          <EmojiPickerPopover
+                            isOpen={true}
+                            onClose={() => setActiveEmojiMessageId(null)}
+                            onSelectEmoji={(emoji) =>
+                              handleReaction(msg.id, emoji)
+                            }
+                            title="Add Reaction"
+                            positionClass={
+                              idx >= Math.max(0, messages.length - 4)
+                                ? "bottom-10 right-2 sm:right-4"
+                                : "top-8 right-2 sm:right-4"
+                            }
+                          />
+                        )}
+                      </div>
+                    </React.Fragment>
+                  );
+                })}
+              </>
+            )}
+            <div ref={messagesEndRef} />
           </div>
-        ) : (
-          <>
-            {/* Load older messages button / indicator */}
-            {hasMoreMessages && (
-              <div className="flex justify-center py-2">
+
+          {/* Typing Indicator */}
+          {typingUsers.length > 0 && (
+            <div className="px-3 sm:px-6 py-1 text-xs text-[var(--theme-text-muted)] italic flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" />
+              <span>
+                {typingUsers.join(", ")}{" "}
+                {typingUsers.length === 1 ? "is" : "are"} typing...
+              </span>
+            </div>
+          )}
+
+          {/* Chat Input Container */}
+          <div className="px-3 sm:px-6 pb-3 sm:pb-6 pt-1 relative">
+            {/* Floating "New Messages ↓" pill positioned above the input box */}
+            {firstUnreadMessageId && !isNearBottomRef.current && (
+              <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-30 animate-in fade-in slide-in-from-bottom-2 duration-150 pointer-events-auto">
                 <button
                   type="button"
                   onClick={() => {
-                    if (scrollContainerRef.current) {
-                      previousScrollHeightRef.current = scrollContainerRef.current.scrollHeight;
-                    }
-                    onLoadOlderMessages?.();
+                    messagesEndRef.current?.scrollIntoView({
+                      behavior: "smooth",
+                    });
+                    setFirstUnreadMessageId(null);
                   }}
-                  disabled={isLoadingOlder}
-                  style={{
-                    backgroundColor: 'var(--theme-bg-surface)',
-                    borderColor: 'var(--theme-border)',
-                    color: 'var(--theme-text-primary)',
-                  }}
-                  className="px-4 py-1.5 text-xs font-medium rounded-full transition flex items-center gap-2 border shadow-xs disabled:opacity-50 cursor-pointer hover:opacity-85"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slack-green hover:bg-slack-green/90 text-white text-xs font-semibold shadow-xl border border-black/10 dark:border-white/10 transition transform hover:scale-105 cursor-pointer"
                 >
-                  {isLoadingOlder ? (
-                    <>
-                      <Loader2 size={13} className="animate-spin text-slack-green" />
-                      <span>Loading older messages...</span>
-                    </>
-                  ) : (
-                    <span>Load older messages</span>
-                  )}
+                  <span>New messages</span>
+                  <ChevronDown size={14} />
                 </button>
               </div>
             )}
 
-            {/* Start of channel header (only shown when user has scrolled all the way to the beginning) */}
-            {!hasMoreMessages && (
-              dmIntro || <div className="py-6 border-b mb-2" style={{ borderColor: 'var(--theme-border)' }}>
-                <div
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3 shadow"
-                  style={{ backgroundColor: 'var(--theme-bg-surface)', color: 'var(--theme-text-muted)' }}
-                >
-                  <Hash size={24} />
+            {/* Quote Reply Banner */}
+            {replyingToMessage && (
+              <div className="mb-2 bg-[var(--theme-bg-surface)] border-l-4 border-slack-green rounded-r-xl px-3.5 py-2 flex items-center justify-between shadow-lg">
+                <div className="min-w-0 flex-1 mr-2">
+                  <span className="text-[11px] font-bold text-slack-green flex items-center gap-1.5">
+                    <CornerUpLeft size={12} />
+                    Replying to{" "}
+                    {channel.isAnonymous || replyingToMessage.isAnonymous
+                      ? replyingToMessage.anonName
+                        ? `${replyingToMessage.anonEmoji || "🎭"} ${replyingToMessage.anonName}`
+                        : "Anonymous"
+                      : replyingToMessage.user?.displayName || "Teammate"}
+                  </span>
+                  <p className="text-xs text-[var(--theme-text)] truncate mt-0.5 max-w-2xl">
+                    {replyingToMessage.content}
+                  </p>
                 </div>
-                <h3 className="font-bold text-lg" style={{ color: 'var(--theme-text-primary)' }}>
-                  This is the start of #{channel.name}
-                </h3>
-                <p className="text-xs mt-1 max-w-md" style={{ color: 'var(--theme-text-muted)' }}>
-                  {channel.description || channel.topic || 'This is the very beginning of the channel history.'}
-                </p>
+                <button
+                  type="button"
+                  onClick={() => setReplyingToMessage(null)}
+                  className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+            {/* Slash Command Suggestions */}
+            {content.startsWith("/") && !content.includes(" ") && (
+              <div className="mb-2 bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-xl p-2 shadow-2xl space-y-1">
+                <div className="text-[10px] font-bold uppercase text-[var(--theme-text-muted)] px-2 py-1 tracking-wider">
+                  Available Slash Commands
+                </div>
+                {[
+                  {
+                    cmd: '/poll "Question" "Opt 1" "Opt 2"',
+                    desc: "Create an interactive vote with reactions",
+                  },
+                  {
+                    cmd: "/topic <new topic>",
+                    desc: "Set or change channel topic",
+                  },
+                  {
+                    cmd: "/huddle",
+                    desc: "Start an instant voice/video huddle",
+                  },
+                  {
+                    cmd: "/shrug <message>",
+                    desc: "Append ¯\\_(ツ)_/¯ to message",
+                  },
+                ]
+                  .filter((c) =>
+                    c.cmd.toLowerCase().startsWith(content.toLowerCase()),
+                  )
+                  .map((c, i) => (
+                    <div
+                      key={i}
+                      onClick={() => setContent(c.cmd.split(" ")[0] + " ")}
+                      className="flex items-center justify-between px-3 py-1.5 hover:bg-[var(--theme-bg-surface-hover)] rounded-lg cursor-pointer text-xs transition"
+                    >
+                      <span className="font-mono text-slack-green font-semibold">
+                        {c.cmd}
+                      </span>
+                      <span className="text-[var(--theme-text-muted)]">
+                        {c.desc}
+                      </span>
+                    </div>
+                  ))}
               </div>
             )}
 
-            {messages.map((msg, idx) => {
-            const isBot = !!msg.bot;
-            const isAnon = channel.isAnonymous || msg.isAnonymous;
-            const isSelf = msg.isSelf || (!isAnon && msg.userId === currentUser.id);
-            const canEdit = !msg.isDeleted && (isSelf || isSuperAdmin);
-            const canDelete = !msg.isDeleted && (isSelf || isWsAdmin || isSuperAdmin);
-            const authorName = isAnon
-              ? (msg.anonName || 'Anonymous')
-              : isBot
-              ? msg.bot?.name
-              : (msg.user?.displayName || 'Unknown');
-            const anonEmoji = msg.anonEmoji || '🎭';
-            const avatarUrl = isBot
-              ? (msg.bot?.avatarUrl || `/api/avatar/bottts/svg?seed=${msg.bot?.name}`)
-              : (msg.user?.avatarUrl || `/api/avatar/bottts/svg?seed=${authorName}`);
-            // Profile hover card: real people only (not bots / anonymous posts)
-            const author = !isAnon && !isBot ? msg.user : undefined;
-            const withCard = (node: React.ReactNode, className?: string) =>
-              author ? (
-                <UserHoverCard
-                  user={author}
-                  presence={presence[author.id] || 'offline'}
-                  isSelf={author.id === currentUser.id}
-                  onMessage={() => onSelectUserDM?.(author as UserProfile)}
-                  onHuddle={() => onHuddleUser?.(author as UserProfile)}
-                  className={className}
-                >
-                  {node}
-                </UserHoverCard>
-              ) : (
-                node
-              );
-
-            return (
-              <React.Fragment key={msg.id}>
-                {firstUnreadMessageId === msg.id && (
-                  <div className="flex items-center gap-3 my-4 select-none relative z-10 animate-in fade-in duration-200">
-                    <div className="flex-1 h-[1.5px] bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.4)]" />
-                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider text-white bg-red-500 shadow-md">
-                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                      <span>New Messages</span>
-                    </div>
-                    <div className="flex-1 h-[1.5px] bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.4)]" />
-                  </div>
-                )}
-                <div
-                  id={`msg-${msg.id}`}
-                  className={`group flex gap-2.5 sm:gap-3 hover:bg-black/5 dark:hover:bg-[var(--theme-bg-surface-hover)] -mx-3 sm:-mx-6 px-3 sm:px-6 py-2 rounded-lg transition-all duration-300 relative ${
-                    msg.isPinned ? 'bg-amber-500/5 border-l-2 border-amber-400/80 pl-2 sm:pl-5' : ''
-                  }`}
-                >
-                {isAnon ? (
-                  <div
-                    className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-900/70 to-indigo-900/70 border border-purple-500/40 flex items-center justify-center text-lg shrink-0 mt-0.5 shadow-sm select-none"
-                    title={authorName}
-                  >
-                    {anonEmoji}
-                  </div>
-                ) : (
-                  withCard(
-                    <img src={avatarUrl} alt={authorName} className="w-9 h-9 rounded-lg object-cover shrink-0 mt-0.5 cursor-pointer" />,
-                    'shrink-0 self-start',
-                  )
-                )}
-
-                <div className="flex-1 min-w-0">
-                  {msg.isPinned && (
-                    <div className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-semibold mb-1">
-                      <Pin size={11} className="fill-amber-400" />
-                      <span>Pinned to channel</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2">
-                    {withCard(
-                    <span
-                      className="font-bold text-sm hover:underline cursor-pointer flex items-center gap-1.5"
-                      style={{ color: 'var(--theme-text-primary)' }}
-                    >
-                      {authorName}
-                      {isAnon ? (
-                        <span
-                          className={`text-[10px] font-semibold px-1.5 py-0.2 rounded uppercase ${
-                            isSelf
-                              ? 'bg-purple-100 dark:bg-purple-900/70 text-purple-700 dark:text-purple-200 border border-purple-500/40'
-                              : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] border border-[var(--theme-border)]'
-                          }`}
-                        >
-                          {isSelf ? 'You (Anon)' : 'Anonymous'}
-                        </span>
-                      ) : isBot ? (
-                        <span
-                          className="text-[10px] font-semibold px-1.5 py-0.2 rounded uppercase border"
-                          style={{
-                            backgroundColor: 'var(--theme-bg-surface-hover)',
-                            borderColor: 'var(--theme-border)',
-                            color: 'var(--theme-text-muted)',
-                          }}
-                        >
-                          APP
-                        </span>
-                      ) : null}
-                    </span>
-                    )}
-                    <span className="text-[11px]" style={{ color: 'var(--theme-text-muted)' }}>
-                      {formatMessageTime(msg.createdAt, timeFormat)}
-                    </span>
-                    {msg.isEdited && !msg.isDeleted && (
-                      <span
-                        className="text-[10px] italic select-none font-medium opacity-80"
-                        style={{ color: 'var(--theme-text-muted)' }}
-                        title="Edited"
-                      >
-                        (edited)
-                      </span>
-                    )}
-                  </div>
-
-                  {msg.isDeleted ? (
-                    <div
-                      className="flex items-center gap-2 py-1.5 text-xs italic select-none"
-                      style={{ color: 'var(--theme-text-muted)' }}
-                    >
-                      <Trash2 size={13} className="opacity-60 shrink-0" />
-                      <span>This message was deleted</span>
-                    </div>
-                  ) : editingMessageId === msg.id ? (
-                    <div className="mt-2 space-y-2">
-                      <textarea
-                        value={editContent}
-                        onChange={(e) => setEditContent(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleSaveEdit(msg.id);
-                          } else if (e.key === 'Escape') {
-                            e.preventDefault();
-                            handleCancelEdit();
-                          }
-                        }}
-                        rows={3}
-                        autoFocus
-                        className="w-full text-sm p-2.5 rounded-lg border focus:outline-none focus:ring-1 resize-y"
-                        style={{
-                          backgroundColor: 'var(--theme-bg-surface)',
-                          borderColor: 'var(--theme-border)',
-                          color: 'var(--theme-text-primary)',
-                        }}
-                        placeholder="Edit message..."
-                      />
-                      <div className="flex items-center justify-between text-xs">
-                        <span style={{ color: 'var(--theme-text-muted)' }} className="text-[11px]">
-                          escape to <button type="button" onClick={handleCancelEdit} className="underline hover:opacity-80">cancel</button> • enter to <button type="button" onClick={() => handleSaveEdit(msg.id)} className="underline hover:opacity-80">save</button>
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={handleCancelEdit}
-                            disabled={isSavingEdit}
-                            className="px-3 py-1 rounded text-xs font-medium border hover:bg-black/5 dark:hover:bg-[var(--theme-bg-surface-hover)] transition"
-                            style={{
-                              borderColor: 'var(--theme-border)',
-                              color: 'var(--theme-text-primary)',
-                            }}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleSaveEdit(msg.id)}
-                            disabled={isSavingEdit || !editContent.trim()}
-                            className="px-3 py-1 rounded text-xs font-semibold text-white transition flex items-center gap-1.5 shadow-sm"
-                            style={{
-                              backgroundColor: 'var(--theme-primary)',
-                            }}
-                          >
-                            {isSavingEdit ? (
-                              <>
-                                <Loader2 size={12} className="animate-spin" />
-                                <span>Saving...</span>
-                              </>
-                            ) : (
-                              'Save Changes'
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      {/* Quoted Message Preview Box */}
-                      {msg.quotedMessage && (
-                        <div
-                          onClick={() => {
-                            const el = document.getElementById(`msg-${msg.quotedMessage?.id}`);
-                            if (el) {
-                              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                              el.classList.add('bg-slack-activeChannel/25', 'ring-2', 'ring-slack-activeChannel');
-                              setTimeout(() => {
-                                el.classList.remove('bg-slack-activeChannel/25', 'ring-2', 'ring-slack-activeChannel');
-                              }, 2000);
-                            }
-                          }}
-                          style={{
-                            backgroundColor: 'var(--theme-bg-surface)',
-                            borderColor: 'var(--theme-border)',
-                          }}
-                          className="mt-1 mb-1.5 flex items-center gap-2 border-l-4 border-slack-green rounded-r-lg px-3 py-1.5 cursor-pointer text-xs transition max-w-lg shadow-sm"
-                        >
-                          <div className="min-w-0">
-                            <span className="font-bold text-slack-green text-[11px] block">
-                              {channel.isAnonymous || msg.quotedMessage.isAnonymous
-                                ? (msg.quotedMessage.anonName ? `${msg.quotedMessage.anonEmoji || '🎭'} ${msg.quotedMessage.anonName}` : 'Anonymous')
-                                : (msg.quotedMessage.user?.displayName || 'Teammate')}
-                            </span>
-                            <span className="text-[11px] truncate block max-w-md" style={{ color: 'var(--theme-text-muted)' }}>
-                              {msg.quotedMessage.content}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Message Content */}
-                      <div className="text-sm mt-1 max-w-none break-words" style={{ color: 'var(--theme-text-primary)' }}>
-                        <MarkdownRenderer
-                          content={msg.content}
-                          currentUsername={currentUser?.username}
-                          onMentionClick={handleMentionClick}
-                          onChannelClick={handleChannelClick}
-                        />
-                      </div>
-
-                      {/* Attachments */}
-                      {msg.attachments && msg.attachments.length > 0 && (
-                        <FileAttachmentList
-                          attachments={msg.attachments}
-                          currentUser={currentUser}
-                          onFileDeleted={(deletedFileId) => {
-                            useChatStore.getState().removeAttachment(deletedFileId);
-                          }}
-                        />
-                      )}
-
-                      {/* Reactions Bar - ONLY displayed when reactions exist */}
-                      {(() => {
-                        const reactionCounts = (msg.reactions || []).reduce(
-                          (acc: { [emoji: string]: { count: number; users: string[]; hasReacted: boolean } }, r) => {
-                            if (!acc[r.emoji]) {
-                              acc[r.emoji] = { count: 0, users: [], hasReacted: false };
-                            }
-                            acc[r.emoji].count += 1;
-                            if (r.user?.displayName) {
-                              acc[r.emoji].users.push(channel.isAnonymous ? 'Anonymous' : r.user.displayName);
-                            }
-                            if (r.userId === currentUser?.id) acc[r.emoji].hasReacted = true;
-                            return acc;
-                          },
-                          {}
-                        );
-
-                        const entries = Object.entries(reactionCounts);
-                        if (entries.length === 0) return null;
-
-                        return (
-                          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                            {entries.map(([emoji, data]) => (
-                              <button
-                                key={emoji}
-                                onClick={() => handleReaction(msg.id, emoji)}
-                                title={data.users.join(', ')}
-                                className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition border ${
-                                  data.hasReacted
-                                    ? 'bg-slack-activeChannel/20 border-slack-activeChannel text-slack-activeChannel font-bold'
-                                    : 'bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] border-[var(--theme-border)] text-[var(--theme-text)]'
-                                }`}
-                              >
-                                <span>{emoji}</span>
-                                <span className="text-[11px]">{data.count}</span>
-                              </button>
-                            ))}
-
-                            <button
-                              onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === msg.id ? null : msg.id)}
-                              title="Add reaction"
-                              className="flex items-center justify-center w-6 h-6 rounded-full bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition"
-                            >
-                              <SmilePlus size={12} />
-                            </button>
-                          </div>
-                        );
-                      })()}
-                    </>
-                  )}
-
-                  {/* Thread Replies Button */}
-                  {(msg.replyCount || 0) > 0 && (
-                    <button
-                      onClick={() => onOpenThread(msg)}
-                      className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-300 transition"
-                    >
-                      <MessageSquare size={13} />
-                      <span>{msg.replyCount} {msg.replyCount === 1 ? 'reply' : 'replies'}</span>
-                    </button>
-                  )}
-                </div>
-
-                {/* Floating Hover Bubble Layer */}
-                {!msg.isDeleted && (
-                  <div className="absolute right-2 sm:right-4 -top-3.5 hidden group-hover:flex items-center bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-xl shadow-2xl px-1.5 py-1 gap-1 z-20">
-                    {/* Top 4 Quick Reaction Emojis */}
-                    <div className="flex items-center gap-0.5 pr-1 border-r border-[var(--theme-border)] mr-0.5">
-                      {topEmojis.slice(0, 4).map((em) => (
-                        <button
-                          key={em}
-                          onClick={() => handleReaction(msg.id, em)}
-                          className="hover:scale-125 transition text-xs p-1 rounded hover:bg-[var(--theme-bg-surface-hover)]"
-                          title={`React with ${em}`}
-                        >
-                          {em}
-                        </button>
-                      ))}
-                    </div>
-
-                    <button
-                      onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === msg.id ? null : msg.id)}
-                      title="More emojis..."
-                      className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded transition"
-                    >
-                      <SmilePlus size={14} />
-                    </button>
-                    <button
-                      onClick={() => setReplyingToMessage(msg)}
-                      title="Quote Reply"
-                      className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded transition"
-                    >
-                      <CornerUpLeft size={14} />
-                    </button>
-                    <button
-                      onClick={() => onOpenThread(msg)}
-                      title="Reply in thread"
-                      className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded transition"
-                    >
-                      <MessageSquare size={14} />
-                    </button>
-                    <button
-                      onClick={() => handleTogglePin(msg)}
-                      title={msg.isPinned ? 'Unpin message' : 'Pin message to channel'}
-                      className={`p-1 rounded transition ${
-                        msg.isPinned
-                          ? 'text-amber-600 dark:text-amber-400 hover:text-amber-300'
-                          : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]'
-                      }`}
-                    >
-                      <Pin size={14} className={msg.isPinned ? 'fill-amber-400' : ''} />
-                    </button>
-                    {onCreateTicketFromMessage && (
-                      <button
-                        onClick={() => onCreateTicketFromMessage(msg)}
-                        title="Create Ticket from message"
-                        className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded transition"
-                      >
-                        <CheckSquare size={14} />
-                      </button>
-                    )}
-                    {canEdit && (
-                      <button
-                        onClick={() => {
-                          setEditingMessageId(msg.id);
-                          setEditContent(msg.content);
-                        }}
-                        title="Edit message"
-                        className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded transition"
-                      >
-                        <Pencil size={14} />
-                      </button>
-                    )}
-                    {canDelete && (
-                      <button
-                        onClick={() => setDeleteConfirmMessage(msg)}
-                        title="Delete message"
-                        className="p-1 text-red-600 dark:text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded transition"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* Anchored Mini Emoji Popover */}
-                {!msg.isDeleted && activeEmojiMessageId === msg.id && (
-                  <EmojiPickerPopover
-                    isOpen={true}
-                    onClose={() => setActiveEmojiMessageId(null)}
-                    onSelectEmoji={(emoji) => handleReaction(msg.id, emoji)}
-                    title="Add Reaction"
-                    positionClass={
-                      idx >= Math.max(0, messages.length - 4)
-                        ? 'bottom-10 right-2 sm:right-4'
-                        : 'top-8 right-2 sm:right-4'
-                    }
-                  />
-                )}
-              </div>
-            </React.Fragment>
-          );
-        })}
-      </>
-      )}
-      <div ref={messagesEndRef} />
-      </div>
-
-      {/* Typing Indicator */}
-      {typingUsers.length > 0 && (
-        <div className="px-3 sm:px-6 py-1 text-xs text-[var(--theme-text-muted)] italic flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" />
-          <span>{typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...</span>
-        </div>
-      )}
-
-      {/* Chat Input Container */}
-      <div className="px-3 sm:px-6 pb-3 sm:pb-6 pt-1 relative">
-        {/* Floating "New Messages ↓" pill positioned above the input box */}
-        {firstUnreadMessageId && !isNearBottomRef.current && (
-          <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-30 animate-in fade-in slide-in-from-bottom-2 duration-150 pointer-events-auto">
-            <button
-              type="button"
-              onClick={() => {
-                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-                setFirstUnreadMessageId(null);
+            <form
+              onSubmit={handleSendMessage}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragOver(true);
               }}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slack-green hover:bg-slack-green/90 text-white text-xs font-semibold shadow-xl border border-black/10 dark:border-white/10 transition transform hover:scale-105 cursor-pointer"
+              onDragLeave={() => setIsDragOver(false)}
+              onDrop={handleDrop}
+              style={{
+                backgroundColor: "var(--theme-bg-surface)",
+                borderColor: "var(--theme-border)",
+              }}
+              className={`border rounded-xl focus-within:border-gray-500 shadow-lg relative transition ${
+                isDragOver ? "ring-2 ring-slack-green/50" : ""
+              }`}
             >
-              <span>New messages</span>
-              <ChevronDown size={14} />
-            </button>
-          </div>
-        )}
-
-        {/* Quote Reply Banner */}
-        {replyingToMessage && (
-          <div className="mb-2 bg-[var(--theme-bg-surface)] border-l-4 border-slack-green rounded-r-xl px-3.5 py-2 flex items-center justify-between shadow-lg">
-            <div className="min-w-0 flex-1 mr-2">
-              <span className="text-[11px] font-bold text-slack-green flex items-center gap-1.5">
-                <CornerUpLeft size={12} />
-                Replying to{' '}
-                {channel.isAnonymous || replyingToMessage.isAnonymous
-                  ? replyingToMessage.anonName
-                    ? `${replyingToMessage.anonEmoji || '🎭'} ${replyingToMessage.anonName}`
-                    : 'Anonymous'
-                  : replyingToMessage.user?.displayName || 'Teammate'}
-              </span>
-              <p className="text-xs text-[var(--theme-text)] truncate mt-0.5 max-w-2xl">
-                {replyingToMessage.content}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setReplyingToMessage(null)}
-              className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        )}
-        {/* Slash Command Suggestions */}
-        {content.startsWith('/') && !content.includes(' ') && (
-          <div className="mb-2 bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-xl p-2 shadow-2xl space-y-1">
-            <div className="text-[10px] font-bold uppercase text-[var(--theme-text-muted)] px-2 py-1 tracking-wider">
-              Available Slash Commands
-            </div>
-            {[
-              { cmd: '/poll "Question" "Opt 1" "Opt 2"', desc: 'Create an interactive vote with reactions' },
-              { cmd: '/topic <new topic>', desc: 'Set or change channel topic' },
-              { cmd: '/huddle', desc: 'Start an instant voice/video huddle' },
-              { cmd: '/shrug <message>', desc: 'Append ¯\\_(ツ)_/¯ to message' },
-            ]
-              .filter((c) => c.cmd.toLowerCase().startsWith(content.toLowerCase()))
-              .map((c, i) => (
-                <div
-                  key={i}
-                  onClick={() => setContent(c.cmd.split(' ')[0] + ' ')}
-                  className="flex items-center justify-between px-3 py-1.5 hover:bg-[var(--theme-bg-surface-hover)] rounded-lg cursor-pointer text-xs transition"
-                >
-                  <span className="font-mono text-slack-green font-semibold">{c.cmd}</span>
-                  <span className="text-[var(--theme-text-muted)]">{c.desc}</span>
-                </div>
-              ))}
-          </div>
-        )}
-
-        <form
-          onSubmit={handleSendMessage}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setIsDragOver(true);
-          }}
-          onDragLeave={() => setIsDragOver(false)}
-          onDrop={handleDrop}
-          style={{
-            backgroundColor: 'var(--theme-bg-surface)',
-            borderColor: 'var(--theme-border)',
-          }}
-          className={`border rounded-xl focus-within:border-gray-500 shadow-lg relative transition ${
-            isDragOver
-              ? 'ring-2 ring-slack-green/50'
-              : ''
-          }`}
-        >
-          {/* File Attachments Preview & Upload Indicator */}
-          {(attachments.length > 0 || isUploading) && (
-            <div className="px-3 pt-2.5 flex flex-wrap gap-2 border-b border-[var(--theme-border)] pb-2.5 bg-[var(--theme-bg-surface)] rounded-t-xl">
-              {attachments.map((att, idx) => {
-                const isImage = getFileCategory(att.fileType, att.fileName) === 'image';
-                return (
-                  <div
-                    key={att.id || idx}
-                    className="flex items-center gap-2 bg-[var(--theme-bg-surface-hover)] border border-[var(--theme-border)] px-2.5 py-1 rounded-lg text-xs text-[var(--theme-text)] shadow-sm animate-in fade-in zoom-in-95 duration-100"
-                  >
-                    {isImage ? (
-                      <div className="w-4 h-4 rounded overflow-hidden bg-[var(--theme-bg-app)]">
-                        <img
-                          src={
-                            att.fileUrl?.startsWith('http')
-                              ? att.fileUrl
-                              : `${(process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:4000').replace(/\/$/, '')}${att.fileUrl?.startsWith('/') ? '' : '/'}${att.fileUrl}`
+              {/* File Attachments Preview & Upload Indicator */}
+              {(attachments.length > 0 || isUploading) && (
+                <div className="px-3 pt-2.5 flex flex-wrap gap-2 border-b border-[var(--theme-border)] pb-2.5 bg-[var(--theme-bg-surface)] rounded-t-xl">
+                  {attachments.map((att, idx) => {
+                    const isImage =
+                      getFileCategory(att.fileType, att.fileName) === "image";
+                    return (
+                      <div
+                        key={att.id || idx}
+                        className="flex items-center gap-2 bg-[var(--theme-bg-surface-hover)] border border-[var(--theme-border)] px-2.5 py-1 rounded-lg text-xs text-[var(--theme-text)] shadow-sm animate-in fade-in zoom-in-95 duration-100"
+                      >
+                        {isImage ? (
+                          <div className="w-4 h-4 rounded overflow-hidden bg-[var(--theme-bg-app)]">
+                            <img
+                              src={
+                                att.fileUrl?.startsWith("http")
+                                  ? att.fileUrl
+                                  : `${(process.env.NEXT_PUBLIC_SERVER_URL || "http://localhost:4000").replace(/\/$/, "")}${att.fileUrl?.startsWith("/") ? "" : "/"}${att.fileUrl}`
+                              }
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <FileText
+                            size={14}
+                            className="text-blue-600 dark:text-blue-400"
+                          />
+                        )}
+                        <span
+                          className="truncate max-w-[140px] font-medium"
+                          title={att.fileName}
+                        >
+                          {att.fileName}
+                        </span>
+                        <span className="text-[10px] text-[var(--theme-text-muted)] font-mono">
+                          ({formatFileSize(att.fileSize)})
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setAttachments(
+                              attachments.filter((_, i) => i !== idx),
+                            )
                           }
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
+                          title="Remove attachment"
+                          className="text-[var(--theme-text-muted)] hover:text-red-400 p-0.5 rounded transition"
+                        >
+                          <X size={13} />
+                        </button>
                       </div>
-                    ) : (
-                      <FileText size={14} className="text-blue-600 dark:text-blue-400" />
-                    )}
-                    <span className="truncate max-w-[140px] font-medium" title={att.fileName}>
-                      {att.fileName}
-                    </span>
-                    <span className="text-[10px] text-[var(--theme-text-muted)] font-mono">
-                      ({formatFileSize(att.fileSize)})
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setAttachments(attachments.filter((_, i) => i !== idx))}
-                      title="Remove attachment"
-                      className="text-[var(--theme-text-muted)] hover:text-red-400 p-0.5 rounded transition"
-                    >
-                      <X size={13} />
-                    </button>
-                  </div>
-                );
-              })}
+                    );
+                  })}
 
-              {isUploading && (
-                <div className="flex items-center gap-1.5 bg-[var(--theme-bg-surface-hover)] px-2.5 py-1 rounded-lg text-xs text-slack-green border border-slack-green/40 animate-pulse">
-                  <Loader2 size={13} className="animate-spin" />
-                  <span>Uploading file...</span>
+                  {isUploading && (
+                    <div className="flex items-center gap-1.5 bg-[var(--theme-bg-surface-hover)] px-2.5 py-1 rounded-lg text-xs text-slack-green border border-slack-green/40 animate-pulse">
+                      <Loader2 size={13} className="animate-spin" />
+                      <span>Uploading file...</span>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          )}
 
-          {/* Live WYSIWYG In-Place Rich Text Editor */}
-          <RichTextEditor
-            key={channel.id}
-            ref={editorRef}
-            autoFocus={true}
-            placeholder={
-              isDragOver
-                ? 'Drop file here to upload to channel...'
-                : channel.isAnonymous
-                ? `Message as ${anonProfile?.anonEmoji || '🎭'} ${anonProfile?.anonName || 'Anonymous'}...`
-                : channel.type === 'DIRECT'
-                ? `Message ${dmName}`
-                : `Message #${channel.name}`
-            }
-            showToolbar={showFormatting}
-            mentionUsers={mentionUsers}
-            onTyping={(text) => handleTyping(text)}
-            onPasteFiles={(files) => {
-              setPendingCompressFiles(files);
-              setShowCompressModal(true);
-            }}
-            onSubmit={() => handleSendMessage()}
-          />
-
-          {/* Action Bar */}
-          <div className="flex items-center justify-between px-3 py-2 bg-[var(--theme-bg-surface)] border-t border-[var(--theme-border)] rounded-b-xl">
-            <div className="flex items-center gap-1">
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileUpload}
-                multiple
-                className="hidden"
+              {/* Live WYSIWYG In-Place Rich Text Editor */}
+              <RichTextEditor
+                key={channel.id}
+                ref={editorRef}
+                autoFocus={true}
+                placeholder={
+                  isDragOver
+                    ? "Drop file here to upload to channel..."
+                    : channel.isAnonymous
+                      ? `Message as ${anonProfile?.anonEmoji || "🎭"} ${anonProfile?.anonName || "Anonymous"}...`
+                      : channel.type === "DIRECT"
+                        ? `Message ${dmName}`
+                        : `Message #${channel.name}`
+                }
+                showToolbar={showFormatting}
+                mentionUsers={mentionUsers}
+                onTyping={(text) => handleTyping(text)}
+                onPasteFiles={(files) => {
+                  setPendingCompressFiles(files);
+                  setShowCompressModal(true);
+                }}
+                onSubmit={() => handleSendMessage()}
               />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                title="Attach files (images, docs, code, zip...)"
-                className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition"
-              >
-                <Paperclip size={16} />
-              </button>
 
-              <button
-                type="button"
-                onClick={() => setShowFormatting(!showFormatting)}
-                title={showFormatting ? 'Hide formatting toolbar' : 'Show formatting toolbar'}
-                className={`p-1.5 rounded-lg transition ${
-                  showFormatting ? 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)]' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]'
-                }`}
-              >
-                <Type size={16} />
-              </button>
+              {/* Action Bar */}
+              <div className="flex items-center justify-between px-3 py-2 bg-[var(--theme-bg-surface)] border-t border-[var(--theme-border)] rounded-b-xl">
+                <div className="flex items-center gap-1">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                    multiple
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    title="Attach files (images, docs, code, zip...)"
+                    className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition"
+                  >
+                    <Paperclip size={16} />
+                  </button>
 
-              <button
-                type="button"
-                onClick={() => setShowEmoji(!showEmoji)}
-                title="Add emoji"
-                className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition relative"
-              >
-                <Smile size={16} />
-              </button>
-            </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowFormatting(!showFormatting)}
+                    title={
+                      showFormatting
+                        ? "Hide formatting toolbar"
+                        : "Show formatting toolbar"
+                    }
+                    className={`p-1.5 rounded-lg transition ${
+                      showFormatting
+                        ? "bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)]"
+                        : "text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]"
+                    }`}
+                  >
+                    <Type size={16} />
+                  </button>
 
-            <button
-              type="submit"
-              disabled={(!content.trim() && attachments.length === 0) || isUploading}
-              style={{
-                backgroundColor: 'var(--theme-primary)',
-              }}
-              className="p-1.5 hover:opacity-90 text-white rounded-lg transition disabled:opacity-30 flex items-center justify-center"
-            >
-              {isUploading ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-            </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowEmoji(!showEmoji)}
+                    title="Add emoji"
+                    className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition relative"
+                  >
+                    <Smile size={16} />
+                  </button>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={
+                    (!content.trim() && attachments.length === 0) || isUploading
+                  }
+                  style={{
+                    backgroundColor: "var(--theme-primary)",
+                  }}
+                  className="p-1.5 hover:opacity-90 text-white rounded-lg transition disabled:opacity-30 flex items-center justify-center"
+                >
+                  {isUploading ? (
+                    <Loader2 size={15} className="animate-spin" />
+                  ) : (
+                    <Send size={15} />
+                  )}
+                </button>
+              </div>
+
+              {/* Emoji Picker Popover - sits completely above composer input without clipping */}
+              <EmojiPickerPopover
+                isOpen={showEmoji}
+                onClose={() => setShowEmoji(false)}
+                onSelectEmoji={(emoji) => {
+                  editorRef.current?.insertEmoji(emoji);
+                }}
+                title="Add Emoji"
+                positionClass="bottom-full mb-2 left-2 sm:left-4 z-50"
+              />
+            </form>
           </div>
-
-          {/* Emoji Picker Popover - sits completely above composer input without clipping */}
-          <EmojiPickerPopover
-            isOpen={showEmoji}
-            onClose={() => setShowEmoji(false)}
-            onSelectEmoji={(emoji) => {
-              editorRef.current?.insertEmoji(emoji);
-            }}
-            title="Add Emoji"
-            positionClass="bottom-full mb-2 left-2 sm:left-4 z-50"
-          />
-        </form>
-      </div>
-      </>
+        </>
       )}
 
       {/* Channel Storage & Files Modal */}
@@ -1576,7 +1965,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           channel={channel}
           currentUser={currentUser}
           onOpenAddMembers={onOpenAddMembers}
-          onOpenWhiteboard={() => setActiveView('whiteboard')}
+          onOpenWhiteboard={() => setActiveView("whiteboard")}
           onOpenStorage={() => setShowStorageModal(true)}
           onChannelUpdated={(updated) => {
             // Update channel in store if needed
@@ -1595,10 +1984,18 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           onJumpToMessage={(msg) => {
             const el = document.getElementById(`msg-${msg.id}`);
             if (el) {
-              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              el.classList.add('bg-slack-activeChannel/25', 'ring-2', 'ring-slack-activeChannel');
+              el.scrollIntoView({ behavior: "smooth", block: "center" });
+              el.classList.add(
+                "bg-slack-activeChannel/25",
+                "ring-2",
+                "ring-slack-activeChannel",
+              );
               setTimeout(() => {
-                el.classList.remove('bg-slack-activeChannel/25', 'ring-2', 'ring-slack-activeChannel');
+                el.classList.remove(
+                  "bg-slack-activeChannel/25",
+                  "ring-2",
+                  "ring-slack-activeChannel",
+                );
               }, 3000);
             }
           }}
@@ -1616,7 +2013,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           currentEmoji={anonProfile?.anonEmoji}
           onPersonaUpdated={(newProfile) => {
             setAnonProfile(newProfile);
-            const currentCh = useChatStore.getState().channels.find((c) => c.id === channel.id);
+            const currentCh = useChatStore
+              .getState()
+              .channels.find((c) => c.id === channel.id);
             if (currentCh) {
               useChatStore.getState().updateChannel({
                 ...currentCh,
@@ -1633,9 +2032,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           <div
             className="w-full max-w-md rounded-2xl border shadow-2xl p-6 space-y-4"
             style={{
-              backgroundColor: 'var(--theme-bg-surface)',
-              borderColor: 'var(--theme-border)',
-              color: 'var(--theme-text-primary)',
+              backgroundColor: "var(--theme-bg-surface)",
+              borderColor: "var(--theme-border)",
+              color: "var(--theme-text-primary)",
             }}
           >
             <div className="flex items-start gap-3">
@@ -1644,8 +2043,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               </div>
               <div className="flex-1">
                 <h3 className="text-base font-bold">Delete message</h3>
-                <p className="text-xs mt-1" style={{ color: 'var(--theme-text-muted)' }}>
-                  Are you sure you want to delete this message? This message will be marked as deleted.
+                <p
+                  className="text-xs mt-1"
+                  style={{ color: "var(--theme-text-muted)" }}
+                >
+                  Are you sure you want to delete this message? This message
+                  will be marked as deleted.
                 </p>
               </div>
             </div>
@@ -1654,9 +2057,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               <div
                 className="p-3 rounded-lg border text-xs max-h-24 overflow-y-auto italic line-clamp-3"
                 style={{
-                  backgroundColor: 'var(--theme-bg-surface-hover)',
-                  borderColor: 'var(--theme-border)',
-                  color: 'var(--theme-text-muted)',
+                  backgroundColor: "var(--theme-bg-surface-hover)",
+                  borderColor: "var(--theme-border)",
+                  color: "var(--theme-text-muted)",
                 }}
               >
                 &ldquo;{deleteConfirmMessage.content}&rdquo;
@@ -1670,8 +2073,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 disabled={isDeleting}
                 className="px-4 py-2 rounded-xl text-xs font-medium border hover:bg-black/5 dark:hover:bg-[var(--theme-bg-surface-hover)] transition"
                 style={{
-                  borderColor: 'var(--theme-border)',
-                  color: 'var(--theme-text-primary)',
+                  borderColor: "var(--theme-border)",
+                  color: "var(--theme-text-primary)",
                 }}
               >
                 Cancel
@@ -1688,7 +2091,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     <span>Deleting...</span>
                   </>
                 ) : (
-                  'Delete'
+                  "Delete"
                 )}
               </button>
             </div>
@@ -1707,7 +2110,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           setShowCompressModal(false);
           setPendingCompressFiles([]);
           if (fileInputRef.current) {
-            fileInputRef.current.value = '';
+            fileInputRef.current.value = "";
           }
         }}
       />

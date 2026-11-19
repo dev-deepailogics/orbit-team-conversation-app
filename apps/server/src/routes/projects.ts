@@ -4,6 +4,40 @@ import { SOCKET_EVENTS } from "@orbit/types";
 import { z } from "zod";
 import { sendTicketBotNotification } from "../services/systemBot.js";
 
+// Freshly uploaded ticket attachments carry a `fileKey` (from /api/files/upload) and have
+// no Attachment DB row yet, so the download route can't resolve their real MIME type.
+// Attachments carried over from an existing message already have one and are skipped.
+async function createMissingTicketAttachments(
+  images: unknown,
+  workspaceId: string,
+  uploaderId: string
+) {
+  if (!Array.isArray(images)) return;
+
+  for (const image of images as Array<Record<string, any>>) {
+    const fileKey = image?.fileKey;
+    if (!fileKey || !image?.fileUrl) continue;
+
+    const existing = await prisma.attachment.findFirst({
+      where: { fileKey, isDeleted: false },
+    });
+    if (existing) continue;
+
+    await prisma.attachment.create({
+      data: {
+        workspaceId,
+        uploaderId,
+        fileName: image.fileName || "attachment",
+        fileKey,
+        fileUrl: image.fileUrl,
+        fileType: image.fileType || "application/octet-stream",
+        fileSize: image.fileSize || 0,
+        storageProvider: image.storageProvider || "LOCAL",
+      },
+    });
+  }
+}
+
 // User ids are UUIDs for new users but Firebase UIDs for migrated ones — accept both.
 const userIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
 
@@ -74,6 +108,7 @@ const createTicketSchema = z.object({
     .max(50)
     .optional()
     .nullable(),
+  images: z.any().optional().nullable(),
 });
 
 const updateTicketSchema = z.object({
@@ -93,6 +128,7 @@ const updateTicketSchema = z.object({
   gitbranch: z.string().optional().nullable(),
   checklist: z.any().optional().nullable(),
   labels: z.any().optional().nullable(),
+  images: z.any().optional().nullable(),
   storyPoints: z.number().optional().nullable(),
   notes: z.string().optional().nullable(),
   testPlan: z.string().optional().nullable(),
@@ -838,7 +874,7 @@ export const projectRoutes: FastifyPluginAsync = async (
           .send({ error: parseResult.error.errors[0].message });
       }
 
-      const { columnId, title, description, priority, dueDate, assignees } =
+      const { columnId, title, description, priority, dueDate, assignees, images } =
         parseResult.data;
       const assigneeId =
         parseResult.data.assigneeId ?? assignees?.[0]?.uid ?? null;
@@ -887,6 +923,7 @@ export const projectRoutes: FastifyPluginAsync = async (
           createdById: userId,
           assigneeId: assigneeId || null,
           assignees: assignees ?? undefined,
+          images: images ?? undefined,
           events: initialEvents,
         },
         include: {
@@ -909,6 +946,8 @@ export const projectRoutes: FastifyPluginAsync = async (
           column: true,
         },
       });
+
+      await createMissingTicketAttachments(images, project.workspaceId, userId);
 
       const targetUserIds = [
         ...new Set([
@@ -990,6 +1029,7 @@ export const projectRoutes: FastifyPluginAsync = async (
         gitbranch,
         checklist,
         labels,
+        images,
         storyPoints,
         notes,
         testPlan,
@@ -1049,6 +1089,7 @@ export const projectRoutes: FastifyPluginAsync = async (
       if (gitbranch !== undefined) dataToUpdate.gitbranch = gitbranch;
       if (checklist !== undefined) dataToUpdate.checklist = checklist;
       if (labels !== undefined) dataToUpdate.labels = labels;
+      if (images !== undefined) dataToUpdate.images = images;
       if (storyPoints !== undefined) dataToUpdate.storyPoints = storyPoints;
       if (notes !== undefined) dataToUpdate.notes = notes;
       if (testPlan !== undefined) dataToUpdate.testPlan = testPlan;
@@ -1084,6 +1125,10 @@ export const projectRoutes: FastifyPluginAsync = async (
           column: true,
         },
       });
+
+      if (images !== undefined) {
+        await createMissingTicketAttachments(images, project.workspaceId, userId);
+      }
 
       // Check if assignee changed
       if (newAssigneeIds.length > 0) {

@@ -337,7 +337,7 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
 
               {/* Quick Actions Bar */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-                {channel.type !== 'DIRECT' && onOpenAddMembers && (
+                {channel.type === 'PRIVATE' && onOpenAddMembers && (
                   <button
                     onClick={() => {
                       onClose();
@@ -417,7 +417,7 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
                   placeholder="Search members in channel..."
                   className="flex-1 bg-[var(--theme-bg-surface-hover)] border border-[var(--theme-border)] rounded-lg px-3 py-1.5 text-xs text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-slack-green"
                 />
-                {channel.type !== 'DIRECT' && onOpenAddMembers && (
+                {channel.type === 'PRIVATE' && onOpenAddMembers && (
                   <button
                     onClick={() => {
                       onClose();

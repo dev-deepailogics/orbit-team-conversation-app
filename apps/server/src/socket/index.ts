@@ -1,28 +1,49 @@
-import { Server as SocketIOServer, Socket } from 'socket.io';
-import { FastifyInstance } from 'fastify';
-import { prisma } from '@orbit/db';
-import { SOCKET_EVENTS } from '@orbit/types';
-import { canUserAccessWorkspace, canUserAccessChannel, canUserAccessCanvas } from '../utils/security.js';
+import { Server as SocketIOServer, Socket } from "socket.io";
+import { FastifyInstance } from "fastify";
+import { prisma } from "@orbit/db";
+import { SOCKET_EVENTS } from "@orbit/types";
+import {
+  canUserAccessWorkspace,
+  canUserAccessChannel,
+  canUserAccessCanvas,
+} from "../utils/security.js";
 
-export function setupSocketServer(fastify: FastifyInstance, io: SocketIOServer) {
+export function setupSocketServer(
+  fastify: FastifyInstance,
+  io: SocketIOServer,
+) {
   // Store connected user socket mapping
   const userSocketMap = new Map<string, Set<string>>();
+
+  prisma.user
+    .updateMany({
+      where: { status: { in: ["ONLINE", "IN_HUDDLE"] } },
+      data: { status: "OFFLINE" },
+    })
+    .catch(() => {});
 
   // Socket Authentication Middleware
   io.use(async (socket: Socket, next) => {
     const token =
       (socket.handshake.auth?.token as string) ||
-      (socket.handshake.headers?.authorization?.replace('Bearer ', '') as string);
+      (socket.handshake.headers?.authorization?.replace(
+        "Bearer ",
+        "",
+      ) as string);
 
     if (token) {
       try {
-        const decoded = fastify.jwt.verify(token) as { id: string; email: string; username: string };
+        const decoded = fastify.jwt.verify(token) as {
+          id: string;
+          email: string;
+          username: string;
+        };
         const user = await prisma.user.findUnique({
           where: { id: decoded.id },
           select: { id: true, disabled: true },
         });
         if (!user || user.disabled) {
-          return next(new Error('Account is deactivated'));
+          return next(new Error("Account is deactivated"));
         }
         socket.data.userId = decoded.id;
         socket.data.user = decoded;
@@ -31,21 +52,25 @@ export function setupSocketServer(fastify: FastifyInstance, io: SocketIOServer) 
         // Fallback check if valid user id was sent directly (e.g. testing)
         const fallbackUserId = socket.handshake.auth?.userId as string;
         if (fallbackUserId) {
-          const user = await prisma.user.findUnique({ where: { id: fallbackUserId } });
+          const user = await prisma.user.findUnique({
+            where: { id: fallbackUserId },
+          });
           if (user && !user.disabled) {
             socket.data.userId = user.id;
             socket.data.user = user;
             return next();
           }
         }
-        return next(new Error('Invalid socket authentication token'));
+        return next(new Error("Invalid socket authentication token"));
       }
     }
 
     // Direct fallback for userId if token is not available
     const fallbackUserId = socket.handshake.auth?.userId as string;
     if (fallbackUserId) {
-      const user = await prisma.user.findUnique({ where: { id: fallbackUserId } });
+      const user = await prisma.user.findUnique({
+        where: { id: fallbackUserId },
+      });
       if (user) {
         socket.data.userId = user.id;
         socket.data.user = user;
@@ -53,10 +78,10 @@ export function setupSocketServer(fastify: FastifyInstance, io: SocketIOServer) 
       }
     }
 
-    return next(new Error('Authentication required for WebSocket connection'));
+    return next(new Error("Authentication required for WebSocket connection"));
   });
 
-  io.on('connection', async (socket: Socket) => {
+  io.on("connection", async (socket: Socket) => {
     const userId = socket.data.userId as string;
     const requestedWorkspaceId = socket.handshake.auth?.workspaceId as string;
 
@@ -72,28 +97,36 @@ export function setupSocketServer(fastify: FastifyInstance, io: SocketIOServer) 
     userSocketMap.get(userId)?.add(socket.id);
 
     // Update user status to ONLINE in DB
-    await prisma.user.update({
-      where: { id: userId },
-      data: { status: 'ONLINE' },
-    }).catch(() => {});
+    await prisma.user
+      .update({
+        where: { id: userId },
+        data: { status: "ONLINE" },
+      })
+      .catch(() => {});
 
     // Join user's OWN private room only
     socket.join(`user:${userId}`);
 
     // Join initial workspace if authorized
     if (requestedWorkspaceId) {
-      const hasWsAccess = await canUserAccessWorkspace(userId, requestedWorkspaceId);
+      const hasWsAccess = await canUserAccessWorkspace(
+        userId,
+        requestedWorkspaceId,
+      );
       if (hasWsAccess) {
         socket.join(`workspace:${requestedWorkspaceId}`);
-        io.to(`workspace:${requestedWorkspaceId}`).emit(SOCKET_EVENTS.USER_STATUS_CHANGE, {
-          userId,
-          status: 'ONLINE',
-        });
+        io.to(`workspace:${requestedWorkspaceId}`).emit(
+          SOCKET_EVENTS.USER_STATUS_CHANGE,
+          {
+            userId,
+            status: "ONLINE",
+          },
+        );
       }
     }
 
     // Join User Private Room (strictly constrained to authenticated user)
-    socket.on('user:join', (uId: string) => {
+    socket.on("user:join", (uId: string) => {
       if (uId === userId) {
         socket.join(`user:${userId}`);
       }
@@ -134,14 +167,18 @@ export function setupSocketServer(fastify: FastifyInstance, io: SocketIOServer) 
             where: { channelId_userId: { channelId, userId } },
             select: { anonName: true, anonEmoji: true },
           });
-          const safeName = member?.anonName ? `${member.anonEmoji || '🎭'} ${member.anonName}` : 'Someone';
+          const safeName = member?.anonName
+            ? `${member.anonEmoji || "🎭"} ${member.anonName}`
+            : "Someone";
           socket.to(`channel:${channelId}`).emit(SOCKET_EVENTS.TYPING_START, {
             channelId,
             username: safeName,
             userId: `anon-${userId.slice(0, 8)}`,
           });
         } else {
-          socket.to(`channel:${channelId}`).emit(SOCKET_EVENTS.TYPING_START, { channelId, username, userId });
+          socket
+            .to(`channel:${channelId}`)
+            .emit(SOCKET_EVENTS.TYPING_START, { channelId, username, userId });
         }
       }
     });
@@ -153,52 +190,85 @@ export function setupSocketServer(fastify: FastifyInstance, io: SocketIOServer) 
           where: { id: channelId },
           select: { isAnonymous: true },
         });
-        const safeUserId = channel?.isAnonymous ? `anon-${userId.slice(0, 8)}` : userId;
-        socket.to(`channel:${channelId}`).emit(SOCKET_EVENTS.TYPING_STOP, { channelId, userId: safeUserId });
+        const safeUserId = channel?.isAnonymous
+          ? `anon-${userId.slice(0, 8)}`
+          : userId;
+        socket
+          .to(`channel:${channelId}`)
+          .emit(SOCKET_EVENTS.TYPING_STOP, { channelId, userId: safeUserId });
       }
     });
 
     // Real-Time Huddle Participant Sync
-    socket.on(SOCKET_EVENTS.HUDDLE_JOINED, async ({ channelId, workspaceId, user }: { channelId: string; workspaceId: string; user?: any }) => {
-      const hasAccess = await canUserAccessChannel(userId, channelId);
-      if (hasAccess) {
-        // Mark user status as IN_HUDDLE
-        await prisma.user.update({
-          where: { id: userId },
-          data: { status: 'IN_HUDDLE' },
-        }).catch(() => {});
+    socket.on(
+      SOCKET_EVENTS.HUDDLE_JOINED,
+      async ({
+        channelId,
+        workspaceId,
+        user,
+      }: {
+        channelId: string;
+        workspaceId: string;
+        user?: any;
+      }) => {
+        const hasAccess = await canUserAccessChannel(userId, channelId);
+        if (hasAccess) {
+          // Mark user status as IN_HUDDLE
+          await prisma.user
+            .update({
+              where: { id: userId },
+              data: { status: "IN_HUDDLE" },
+            })
+            .catch(() => {});
 
-        io.to(`workspace:${workspaceId}`).emit(SOCKET_EVENTS.USER_STATUS_CHANGE, {
-          userId,
-          status: 'IN_HUDDLE',
-        });
+          io.to(`workspace:${workspaceId}`).emit(
+            SOCKET_EVENTS.USER_STATUS_CHANGE,
+            {
+              userId,
+              status: "IN_HUDDLE",
+            },
+          );
 
-        io.to(`workspace:${workspaceId}`).emit(SOCKET_EVENTS.HUDDLE_JOINED, {
+          io.to(`workspace:${workspaceId}`).emit(SOCKET_EVENTS.HUDDLE_JOINED, {
+            channelId,
+            userId,
+            user: user || socket.data.user,
+          });
+        }
+      },
+    );
+
+    socket.on(
+      SOCKET_EVENTS.HUDDLE_LEFT,
+      async ({
+        channelId,
+        workspaceId,
+      }: {
+        channelId: string;
+        workspaceId: string;
+      }) => {
+        // Revert user status to ONLINE
+        await prisma.user
+          .update({
+            where: { id: userId },
+            data: { status: "ONLINE" },
+          })
+          .catch(() => {});
+
+        io.to(`workspace:${workspaceId}`).emit(
+          SOCKET_EVENTS.USER_STATUS_CHANGE,
+          {
+            userId,
+            status: "ONLINE",
+          },
+        );
+
+        io.to(`workspace:${workspaceId}`).emit(SOCKET_EVENTS.HUDDLE_LEFT, {
           channelId,
           userId,
-          user: user || socket.data.user,
         });
-      }
-    });
-
-    socket.on(SOCKET_EVENTS.HUDDLE_LEFT, async ({ channelId, workspaceId }: { channelId: string; workspaceId: string }) => {
-      // Revert user status to ONLINE
-      await prisma.user.update({
-        where: { id: userId },
-        data: { status: 'ONLINE' },
-      }).catch(() => {});
-
-      io.to(`workspace:${workspaceId}`).emit(SOCKET_EVENTS.USER_STATUS_CHANGE, {
-        userId,
-        status: 'ONLINE',
-      });
-
-      io.to(`workspace:${workspaceId}`).emit(SOCKET_EVENTS.HUDDLE_LEFT, {
-        channelId,
-        userId,
-      });
-    });
-
+      },
+    );
 
     // Canvas (whiteboard) live collaboration: access is checked once on join,
     // after which room membership is the authorization for relaying events.
@@ -222,28 +292,42 @@ export function setupSocketServer(fastify: FastifyInstance, io: SocketIOServer) 
         socket.to(room).emit(event, { ...payload, userId });
       }
     };
-    socket.on(SOCKET_EVENTS.WHITEBOARD_UPDATE, relayCanvas(SOCKET_EVENTS.WHITEBOARD_UPDATE));
-    socket.on(SOCKET_EVENTS.WHITEBOARD_CURSOR, relayCanvas(SOCKET_EVENTS.WHITEBOARD_CURSOR));
-    socket.on(SOCKET_EVENTS.WHITEBOARD_CLEAR, relayCanvas(SOCKET_EVENTS.WHITEBOARD_CLEAR));
+    socket.on(
+      SOCKET_EVENTS.WHITEBOARD_UPDATE,
+      relayCanvas(SOCKET_EVENTS.WHITEBOARD_UPDATE),
+    );
+    socket.on(
+      SOCKET_EVENTS.WHITEBOARD_CURSOR,
+      relayCanvas(SOCKET_EVENTS.WHITEBOARD_CURSOR),
+    );
+    socket.on(
+      SOCKET_EVENTS.WHITEBOARD_CLEAR,
+      relayCanvas(SOCKET_EVENTS.WHITEBOARD_CLEAR),
+    );
 
     // Disconnect
-    socket.on('disconnect', async () => {
+    socket.on("disconnect", async () => {
       if (userId && userSocketMap.has(userId)) {
         const sockets = userSocketMap.get(userId);
         sockets?.delete(socket.id);
 
         if (!sockets || sockets.size === 0) {
           userSocketMap.delete(userId);
-          await prisma.user.update({
-            where: { id: userId },
-            data: { status: 'OFFLINE' },
-          }).catch(() => {});
+          await prisma.user
+            .update({
+              where: { id: userId },
+              data: { status: "OFFLINE" },
+            })
+            .catch(() => {});
 
           if (requestedWorkspaceId) {
-            io.to(`workspace:${requestedWorkspaceId}`).emit(SOCKET_EVENTS.USER_STATUS_CHANGE, {
-              userId,
-              status: 'OFFLINE',
-            });
+            io.to(`workspace:${requestedWorkspaceId}`).emit(
+              SOCKET_EVENTS.USER_STATUS_CHANGE,
+              {
+                userId,
+                status: "OFFLINE",
+              },
+            );
           }
         }
       }
