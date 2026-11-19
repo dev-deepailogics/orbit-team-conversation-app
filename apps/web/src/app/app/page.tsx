@@ -268,6 +268,16 @@ export default function AppDashboard() {
         setProjects([]);
       }
 
+      // Unread counts from the server (not awaited); ignored if the user has switched workspace meanwhile
+      api
+        .get(`/api/channels/workspaces/${workspace.id}/unread`)
+        .then((r) => {
+          if (useChatStore.getState().currentWorkspace?.id === workspace.id) {
+            useChatStore.getState().setUnreadCounts(r.data || {});
+          }
+        })
+        .catch((uErr) => console.error("Failed to load unread counts", uErr));
+
       // Load Workspace Canvases & Documents for the sidebar
       try {
         const [canvasRes, docRes] = await Promise.all([
@@ -346,6 +356,20 @@ export default function AppDashboard() {
     }
   };
 
+  // Server-side read state, so unread counts survive a reload and sync across devices
+  const markChannelRead = (channelId: string) => {
+    api.post(`/api/channels/${channelId}/read`).catch(() => {});
+  };
+  // Messages arriving in the open channel are read; batch those into one call per couple of seconds
+  const readTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const markChannelReadSoon = (channelId: string) => {
+    if (readTimers.current[channelId]) return;
+    readTimers.current[channelId] = setTimeout(() => {
+      delete readTimers.current[channelId];
+      markChannelRead(channelId);
+    }, 2000);
+  };
+
   // 4. Handle Channel Selection (Chunked Initial Load)
   const handleSelectChannel = async (channel: Channel) => {
     setShowProfilePage(false);
@@ -354,6 +378,7 @@ export default function AppDashboard() {
     setShowDocsHub(false);
     setCurrentProject(null);
     setCurrentChannel(channel);
+    markChannelRead(channel.id);
     setHasMoreMessages(false);
     setNextCursor(null);
     if (typeof window !== "undefined") {
@@ -680,6 +705,7 @@ export default function AppDashboard() {
         addThreadReply(msg);
       } else if (activeChannel && msg.channelId === activeChannel.id) {
         addMessage(msg);
+        markChannelReadSoon(msg.channelId);
       } else {
         // Different channel or DM -> increment unread badge!
         incrementUnread(msg.id, msg.channelId);
@@ -1406,6 +1432,8 @@ export default function AppDashboard() {
           channels={channels}
           onBackToChat={() => setCurrentProject(null)}
           onDeleteProject={(id) => removeProject(id)}
+          onOpenSearch={() => setShowSearchModal(true)}
+          onOpenChannel={handleSelectChannel}
         />
       ) : currentChannel ? (
         <ChatArea

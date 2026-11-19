@@ -19,6 +19,7 @@ import { useProjectStore } from "../../stores/projectStore";
 import { TicketModal } from "./TicketModal";
 import { TicketDetailModal } from "./TicketDetailModal";
 import { ProjectViewSwitcher } from "./ProjectViewSwitcher";
+import { HeaderUtilities } from "../layout/HeaderUtilities";
 import { ProjectListView } from "./ProjectListView";
 import { ProjectSummaryView } from "./ProjectSummaryView";
 import { IssueChatModal } from "./IssueChatModal";
@@ -43,6 +44,9 @@ import {
   Board,
   More,
   Loader2,
+  Hash,
+  Lock,
+  Mask,
 } from "@/components/ui/icons";
 import {
   Avatar,
@@ -71,6 +75,8 @@ interface ProjectBoardViewProps {
   channels?: Channel[];
   onBackToChat: () => void;
   onDeleteProject?: (projectId: string) => void;
+  onOpenSearch?: () => void;
+  onOpenChannel?: (channel: Channel) => void;
 }
 
 const COLUMN_COLORS = [
@@ -91,6 +97,8 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
   channels = [],
   onBackToChat,
   onDeleteProject,
+  onOpenSearch,
+  onOpenChannel,
 }) => {
   const {
     currentProject,
@@ -268,6 +276,17 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
   };
 
   // Notification channel update helper
+  // Board activity goes to group channels only, never to DMs
+  const [notifyOpen, setNotifyOpen] = useState(false);
+  const notifyChannels = channels.filter(
+    (c) => c.type !== "DIRECT" && (c.type as string) !== "GROUP_DIRECT" && !c.isArchived,
+  );
+  const notifyChannel = channels.find((c) => c.id === project.notificationChannelId) || null;
+  const [notifyQuery, setNotifyQuery] = useState("");
+  const filteredNotifyChannels = notifyChannels.filter((c) =>
+    c.name.toLowerCase().includes(notifyQuery.trim().toLowerCase()),
+  );
+
   const handleUpdateNotificationChannel = async (channelId: string) => {
     try {
       const res = await api.put(`/api/projects/${project.id}`, {
@@ -749,6 +768,8 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
             )}
           </div>
 
+          <HeaderUtilities onOpenSearch={onOpenSearch} onOpenChannel={onOpenChannel} />
+
           {/* Project options */}
           <div className="relative shrink-0">
             <button
@@ -761,7 +782,14 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
             </button>
             {showProjectMenu && (
               <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowProjectMenu(false)} />
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => {
+                    setShowProjectMenu(false);
+                    setNotifyOpen(false);
+                    setNotifyQuery("");
+                  }}
+                />
                 <div
                   className="absolute right-0 top-full mt-1.5 w-64 rounded-[14px] border p-2 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100"
                   style={{
@@ -793,9 +821,13 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                       setShowAddColumn(true);
                     }}
                   />
-                  <label
-                    className="h-10 px-2.5 flex items-center gap-2.5 rounded-[10px] text-sm"
-                    title="Channel where Orbit Bot broadcasts board activities"
+                  <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setNotifyOpen((v) => !v)}
+                    title="Channel where Orbit Bot posts this board's activity"
+                    className="w-full h-10 px-2.5 flex items-center gap-2.5 rounded-[10px] text-sm text-left transition hover:bg-[var(--theme-fill-hover)]"
+                    style={{ color: "var(--theme-text)" }}
                   >
                     <span
                       className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
@@ -803,24 +835,82 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                     >
                       <Bell size={16} />
                     </span>
-                    <span className="font-medium shrink-0">Notify</span>
-                    <select
-                      value={project.notificationChannelId || ""}
-                      onChange={(e) => handleUpdateNotificationChannel(e.target.value)}
-                      className="flex-1 min-w-0 bg-transparent text-[13px] font-semibold focus:outline-none cursor-pointer truncate text-right"
+                    <span className={`shrink-0 ${notifyOpen ? "font-semibold" : "font-medium"}`}>Notify</span>
+                    <span
+                      className="flex-1 min-w-0 truncate text-right text-[13px] font-semibold"
                       style={{ color: "var(--theme-primary-hover)" }}
                     >
-                      {channels.length > 0 ? (
-                        channels.map((ch) => (
-                          <option key={ch.id} value={ch.id}>
-                            #{ch.name}
-                          </option>
-                        ))
-                      ) : (
-                        <option value="">#general</option>
-                      )}
-                    </select>
-                  </label>
+                      {notifyChannel ? `# ${notifyChannel.name}` : "Not set"}
+                    </span>
+                    <ChevronRight size={14} className="shrink-0" style={{ color: "var(--theme-text-muted)" }} />
+                  </button>
+                  {notifyOpen && (
+                    <div
+                      className="absolute right-full top-0 mr-2 w-64 rounded-[14px] border p-2 z-50 flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-100"
+                      style={{
+                        backgroundColor: "var(--theme-bg-app)",
+                        borderColor: "var(--theme-border)",
+                        boxShadow: "0 12px 16px rgba(20, 26, 46, 0.2)",
+                      }}
+                    >
+                      <p
+                        className="px-2.5 pt-1 pb-0.5 text-[11px] font-bold tracking-[0.6px]"
+                        style={{ color: "var(--theme-text-muted)" }}
+                      >
+                        NOTIFY CHANNEL
+                      </p>
+                      <div
+                        className="h-8 mx-0.5 px-2.5 rounded-lg flex items-center gap-2"
+                        style={{ backgroundColor: "var(--theme-fill)" }}
+                      >
+                        <Search size={14} style={{ color: "var(--theme-text-muted)" }} />
+                        <input
+                          autoFocus
+                          value={notifyQuery}
+                          onChange={(e) => setNotifyQuery(e.target.value)}
+                          placeholder="Find a channel"
+                          className="flex-1 min-w-0 bg-transparent outline-none text-[13px]"
+                          style={{ color: "var(--theme-text)" }}
+                        />
+                      </div>
+                      <div className="max-h-72 overflow-y-auto flex flex-col gap-0.5">
+                        {filteredNotifyChannels.length === 0 ? (
+                          <p className="px-2.5 py-3 text-[13px]" style={{ color: "var(--theme-text-muted)" }}>
+                            {notifyChannels.length === 0 ? "No channels yet" : "No channels match"}
+                          </p>
+                        ) : (
+                          filteredNotifyChannels.map((ch) => {
+                            const selected = ch.id === project.notificationChannelId;
+                            return (
+                              <button
+                                key={ch.id}
+                                type="button"
+                                onClick={() => {
+                                  setNotifyOpen(false);
+                                  setNotifyQuery("");
+                                  if (!selected) handleUpdateNotificationChannel(ch.id);
+                                }}
+                                className={`w-full h-9 px-2.5 flex items-center gap-2 rounded-[10px] text-left text-sm transition ${
+                                  selected ? "" : "hover:bg-[var(--theme-fill-hover)]"
+                                }`}
+                                style={{
+                                  backgroundColor: selected ? "var(--theme-selected)" : undefined,
+                                  color: selected ? "var(--theme-primary-hover)" : "var(--theme-text)",
+                                }}
+                              >
+                                <span className="w-4 flex justify-center shrink-0" style={{ color: "var(--theme-text-muted)" }}>
+                                  {ch.isAnonymous ? <Mask size={14} /> : ch.type === "PRIVATE" ? <Lock size={14} /> : <Hash size={14} />}
+                                </span>
+                                <span className={`flex-1 truncate ${selected ? "font-semibold" : "font-medium"}`}>{ch.name}</span>
+                                {selected && <Check size={14} style={{ color: "var(--theme-primary-hover)" }} />}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  </div>
                   <div className="py-1">
                     <div className="h-px" style={{ backgroundColor: "var(--theme-border)" }} />
                   </div>
@@ -844,7 +934,8 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
             activeSection={activeSection}
             onSectionChange={(sec) => setActiveSection(sec as any)}
           />
-          <div className="flex items-center gap-2 min-w-0 overflow-x-auto">
+          {/* No overflow clipping here: the filter dropdowns open below this 48px row */}
+          <div className="flex items-center gap-2 min-w-0">
             {loadingAll && (
               <span
                 className="flex items-center gap-1.5 text-xs whitespace-nowrap shrink-0"
