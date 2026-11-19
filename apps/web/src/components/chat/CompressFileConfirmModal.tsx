@@ -14,7 +14,7 @@ import {
   Loader2,
   TrendingDown,
   Video as VideoIcon
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { formatBytes, isImageFile, isVideoFile, getCompressedSize } from '../../lib/compression';
 
 interface CompressFileConfirmModalProps {

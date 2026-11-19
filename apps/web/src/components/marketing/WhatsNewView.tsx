@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, Rss, Github, ArrowRight, Layers } from 'lucide-react';
+import { Sparkles, Rss, Github, ArrowRight, Layers } from '@/components/ui/icons';
 
 import { Navbar } from '@/components/marketing/Navbar';
 import { Footer } from '@/components/marketing/Footer';

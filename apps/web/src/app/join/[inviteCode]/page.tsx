@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Layers, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Layers, ArrowRight, CheckCircle2, AlertCircle } from '@/components/ui/icons';
 import { api } from '../../../lib/api';
 import { useAuthStore, PENDING_INVITE_KEY } from '../../../stores/authStore';
 

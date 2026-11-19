@@ -16,7 +16,7 @@ import {
   Video,
   CheckCircle2,
   Users,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 
 import { Navbar } from '@/components/marketing/Navbar';
 import { Footer } from '@/components/marketing/Footer';

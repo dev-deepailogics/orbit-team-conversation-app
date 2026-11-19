@@ -17,7 +17,7 @@ import {
   Users,
   UserMinus,
   Loader2,
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { useTimeFormat, formatMessageTime } from "../../lib/timeFormat";
 
 interface UserAvailabilityViewProps {

@@ -14,7 +14,7 @@ import {
   RefreshCw,
   LogOut,
   SlidersHorizontal,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 
 interface EmployeeStatusViewProps {
   workspace: Workspace;

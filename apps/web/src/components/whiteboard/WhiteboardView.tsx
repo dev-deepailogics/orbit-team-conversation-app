@@ -29,7 +29,18 @@ import {
   List,
   AlertTriangle,
   Loader2,
-} from 'lucide-react';
+  Plus,
+  Pen,
+  Connector,
+} from '@/components/ui/icons';
+import {
+  AvatarStack,
+  BackPill,
+  MenuItem,
+  MoreButton,
+  Popover,
+  SaveMeta,
+} from '../project/docsCanvasUi';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
 import { useThemeStore } from '../../stores/themeStore';
@@ -216,8 +227,15 @@ interface WhiteboardViewProps {
   canvas: Pick<Canvas, 'id' | 'title' | 'workspaceId'>;
   currentUser: UserProfile | null;
   onClose?: () => void;
-  // Replaces the title in the floating header (e.g. rename + link controls)
+  // Replaces the title in the header (e.g. an inline rename input)
   headerSlot?: React.ReactNode;
+  onBack?: () => void;
+  backLabel?: string;
+  // Shown after the save state, e.g. "· Linked to # Social"
+  headerMeta?: React.ReactNode;
+  // Buttons between the collaborators and the More menu (link, share)
+  headerActions?: React.ReactNode;
+  moreItems?: (close: () => void) => React.ReactNode;
 }
 
 const COLOR_PALETTE = [
@@ -252,6 +270,11 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
   currentUser,
   onClose,
   headerSlot,
+  onBack,
+  backLabel = 'Canvas',
+  headerMeta,
+  headerActions,
+  moreItems,
 }) => {
   // Canvas colors follow the active theme. '#FFFFFF' is stored as the "ink" color
   // and drawn in the theme's text color so it stays visible on light backgrounds.
@@ -1277,7 +1300,7 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
     }
 
     // Background Canvas
-    ctx.fillStyle = theme.backgroundColor;
+    ctx.fillStyle = theme.surfaceHoverColor || theme.surfaceColor;
     ctx.fillRect(0, 0, width, height);
 
     // Dynamic Infinite Grid Dots
@@ -1635,123 +1658,97 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
   // Locate the currently editing element in screen space
   const editingElement = elements.find((el) => el.id === editingId);
 
+  const collaborators = [
+    ...(currentUser ? [{ id: currentUser.id, name: currentUser.displayName, avatarUrl: currentUser.avatarUrl }] : []),
+    ...Object.values(peerCursors)
+      .filter((p) => p.userId !== currentUser?.id)
+      .map((p) => ({ id: p.userId, name: p.displayName, avatarUrl: p.avatarUrl })),
+  ];
+
+  const tools: { tool: ToolType; Icon: React.ElementType; label: string }[] = [
+    { tool: 'select', Icon: MousePointer, label: 'Select & Move (V)' },
+    { tool: 'rect', Icon: Square, label: 'Rectangle (R)' },
+    { tool: 'text', Icon: Type, label: 'Text Box (T)' },
+    { tool: 'sticky', Icon: StickyNote, label: 'Sticky Note (S)' },
+    { tool: 'arrow', Icon: Connector, label: 'Arrow' },
+    { tool: 'pen', Icon: Pen, label: 'Draw Pen (P)' },
+  ];
+  const extraTools: { tool: ToolType; Icon: React.ElementType; label: string }[] = [
+    { tool: 'circle', Icon: Circle, label: 'Circle (C)' },
+    { tool: 'line', Icon: Minus, label: 'Line' },
+    { tool: 'hand', Icon: Hand, label: 'Pan Hand (H / Space)' },
+    { tool: 'eraser', Icon: Eraser, label: 'Eraser (E)' },
+  ];
+  const chromeCard: React.CSSProperties = {
+    backgroundColor: 'var(--theme-bg-app)',
+    borderColor: 'var(--theme-border)',
+    boxShadow: '0 4px 4px rgba(20, 26, 46, 0.08)',
+  };
+  const showStyleOptions = !['select', 'hand', 'eraser'].includes(activeTool);
+
   return (
+    <div className="w-full h-full flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--theme-bg-surface)' }}>
+      {/* Editor header */}
+      <div
+        className="h-16 shrink-0 border-b px-3 sm:px-5 flex items-center gap-3 z-30"
+        style={{ backgroundColor: 'var(--theme-bg-app)', borderColor: 'var(--theme-border)' }}
+      >
+        {onBack && <BackPill label={backLabel} onClick={onBack} />}
+        <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+          <div className="text-[17px] font-bold leading-[22px] truncate min-w-0" style={{ color: 'var(--theme-text)' }}>
+            {headerSlot ?? canvas.title}
+          </div>
+          <SaveMeta saving={isSaving}>{headerMeta}</SaveMeta>
+        </div>
+        <AvatarStack people={collaborators} />
+        {headerActions}
+        <Popover width={220} trigger={(_, toggle) => <MoreButton size={36} onClick={toggle} />}>
+          {(close) => (
+            <>
+              <MenuItem
+                icon={<Download size={14} />}
+                onClick={() => {
+                  close();
+                  handleExportImage();
+                }}
+              >
+                Export as PNG
+              </MenuItem>
+              {moreItems?.(close)}
+              <MenuItem
+                danger
+                icon={<Trash2 size={14} />}
+                onClick={() => {
+                  close();
+                  handleClearBoard();
+                }}
+              >
+                Clear board
+              </MenuItem>
+              {onClose && (
+                <MenuItem
+                  icon={<X size={14} />}
+                  onClick={() => {
+                    close();
+                    onClose();
+                  }}
+                >
+                  Close canvas
+                </MenuItem>
+              )}
+            </>
+          )}
+        </Popover>
+      </div>
+
     <div
       ref={containerRef}
       onWheel={handleWheel}
-      className={`relative w-full h-full flex flex-col bg-[var(--theme-bg-app)] overflow-hidden select-none ${
+      className={`relative flex-1 min-h-0 w-full flex flex-col overflow-hidden select-none ${
         isSpacePressed || activeTool === 'hand' ? 'cursor-grab active:cursor-grabbing' : ''
       }`}
+      style={{ backgroundColor: 'var(--theme-bg-surface-hover)' }}
     >
-      {/* Top Header Bar */}
-      <div className="absolute top-2 sm:top-4 left-2 sm:left-4 right-2 sm:right-4 z-30 flex items-center justify-between pointer-events-none gap-2">
-        {/* Left: Channel Canvas Info */}
-        <div className="flex items-center gap-2 sm:gap-3 bg-[var(--theme-bg-surface)] backdrop-blur border border-[var(--theme-border)] px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl shadow-2xl pointer-events-auto min-w-0">
-          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-            <Sparkles size={15} className="text-slack-green animate-pulse shrink-0" />
-            <span className="font-bold text-xs sm:text-sm text-[var(--theme-text)] truncate max-w-[100px] sm:max-w-none">
-              {headerSlot ?? canvas.title}
-            </span>
-          </div>
-
-          <span className="text-gray-600 hidden xs:inline">|</span>
-
-          <div className="hidden xs:flex items-center gap-1 text-[11px] sm:text-xs text-[var(--theme-text)] shrink-0">
-            <Users size={13} className="text-slack-green" />
-            <span>{activeUsersCount} Live</span>
-          </div>
-
-          {isSaving && (
-            <span className="text-[10px] sm:text-[11px] text-[var(--theme-text-muted)] italic hidden sm:inline ml-1">
-              Saving...
-            </span>
-          )}
-        </div>
-
-        {/* Right: Actions */}
-        <div className="flex items-center gap-1 sm:gap-1.5 bg-[var(--theme-bg-surface)] backdrop-blur border border-[var(--theme-border)] p-1 sm:p-1.5 rounded-xl sm:rounded-2xl shadow-2xl pointer-events-auto shrink-0">
-          <button
-            onClick={handleUndo}
-            disabled={historyIndex <= 0}
-            title="Undo (Ctrl+Z)"
-            className="p-1.5 sm:p-2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg sm:rounded-xl transition disabled:opacity-30"
-          >
-            <Undo2 size={15} />
-          </button>
-          <button
-            onClick={handleRedo}
-            disabled={historyIndex >= history.length - 1}
-            title="Redo (Ctrl+Y)"
-            className="p-1.5 sm:p-2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg sm:rounded-xl transition disabled:opacity-30"
-          >
-            <Redo2 size={15} />
-          </button>
-
-          <span className="w-px h-4 sm:h-5 bg-[var(--theme-bg-surface-hover)] mx-0.5" />
-
-          {/* Zoom Controls */}
-          <button
-            onClick={() => setZoom((z) => Math.min(3, z + 0.15))}
-            title="Zoom In"
-            className="p-1.5 sm:p-2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg sm:rounded-xl transition"
-          >
-            <ZoomIn size={15} />
-          </button>
-          <span className="text-[11px] sm:text-xs text-[var(--theme-text-muted)] px-0.5 font-mono hidden sm:inline">
-            {Math.round(zoom * 100)}%
-          </span>
-          <button
-            onClick={() => setZoom((z) => Math.max(0.2, z - 0.15))}
-            title="Zoom Out"
-            className="p-1.5 sm:p-2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg sm:rounded-xl transition"
-          >
-            <ZoomOut size={15} />
-          </button>
-          <button
-            onClick={() => {
-              setZoom(1);
-              setPan({ x: 0, y: 0 });
-            }}
-            title="Reset View (100%)"
-            className="hidden sm:flex p-2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-xl transition"
-          >
-            <Maximize2 size={15} />
-          </button>
-
-          <span className="w-px h-4 sm:h-5 bg-[var(--theme-bg-surface-hover)] mx-0.5" />
-
-          {/* Export PNG */}
-          <button
-            onClick={handleExportImage}
-            title="Export as PNG"
-            className="p-1.5 sm:p-2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg sm:rounded-xl transition"
-          >
-            <Download size={15} />
-          </button>
-
-          {/* Clear Board */}
-          <button
-            onClick={handleClearBoard}
-            title="Clear Board"
-            className="p-1.5 sm:p-2 text-red-600 dark:text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg sm:rounded-xl transition"
-          >
-            <Trash2 size={15} />
-          </button>
-
-          {onClose && (
-            <>
-              <span className="w-px h-4 sm:h-5 bg-[var(--theme-bg-surface-hover)] mx-0.5" />
-              <button
-                onClick={onClose}
-                title="Back to Chat"
-                className="p-1.5 sm:p-2 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg sm:rounded-xl transition"
-              >
-                <X size={15} />
-              </button>
-            </>
-          )}
-        </div>
-      </div>
 
       {/* Floating Formatting Toolbar (When Text / Sticky Note is Selected) */}
       {selectedElement && (selectedElement.type === 'text' || selectedElement.type === 'sticky') && (
@@ -1875,95 +1872,116 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         </div>
       )}
 
-      {/* Floating Center Bottom Toolbar (Tools & Palettes) */}
-      <div className="absolute bottom-3 sm:bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 sm:gap-2 bg-[var(--theme-bg-surface)] backdrop-blur border border-[var(--theme-border)] p-1.5 sm:p-2 rounded-xl sm:rounded-2xl shadow-2xl max-w-[96vw] overflow-x-auto scrollbar-none">
-        {/* Tool Selector */}
-        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
-          {[
-            { tool: 'select', icon: MousePointer, label: 'Select & Move (V)' },
-            { tool: 'hand', icon: Hand, label: 'Pan Hand (H / Space)' },
-            { tool: 'pen', icon: Pencil, label: 'Draw Pen (P)' },
-            { tool: 'sticky', icon: StickyNote, label: 'Sticky Note (S)' },
-            { tool: 'text', icon: Type, label: 'Text Box (T)' },
-            { tool: 'rect', icon: Square, label: 'Rectangle (R)' },
-            { tool: 'circle', icon: Circle, label: 'Circle (C)' },
-            { tool: 'arrow', icon: ArrowRight, label: 'Arrow' },
-            { tool: 'line', icon: Minus, label: 'Line' },
-            { tool: 'eraser', icon: Eraser, label: 'Eraser (E)' },
-          ].map(({ tool, icon: Icon, label }) => (
+      {/* Tool palette */}
+      <div
+        className="absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center gap-0.5 p-1.5 rounded-[14px] border max-h-[calc(100%-120px)] overflow-y-auto scrollbar-none"
+        style={chromeCard}
+      >
+        {[...tools, null, ...extraTools].map((t, i) =>
+          t ? (
             <button
-              key={tool}
-              onClick={() => setActiveTool(tool as ToolType)}
-              title={label}
-              className={`p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl transition flex items-center justify-center shrink-0 ${
-                activeTool === tool
-                  ? 'bg-slack-green text-white shadow-lg scale-105 font-bold'
-                  : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]'
-              }`}
+              key={t.tool}
+              onClick={() => setActiveTool(t.tool)}
+              title={t.label}
+              className="w-10 h-10 rounded-[10px] flex items-center justify-center shrink-0 transition hover:bg-[var(--theme-fill-hover)]"
+              style={
+                activeTool === t.tool
+                  ? { backgroundColor: 'var(--theme-selected)', color: 'var(--theme-accent)' }
+                  : { color: 'var(--theme-text-muted)' }
+              }
             >
-              <Icon size={16} />
+              <t.Icon size={19} />
             </button>
-          ))}
-        </div>
+          ) : (
+            <span key={`sep-${i}`} className="w-6 h-px my-1 shrink-0" style={{ backgroundColor: 'var(--theme-border)' }} />
+          ),
+        )}
+      </div>
 
-        <span className="w-px h-5 sm:h-6 bg-[var(--theme-bg-surface-hover)] mx-0.5 sm:mx-1 shrink-0" />
-
-        {/* Color Palette / Note Color Picker */}
-        {activeTool === 'sticky' ? (
-          <div className="flex items-center gap-1 sm:gap-1.5 px-0.5 sm:px-1 shrink-0">
-            {STICKY_COLORS.map((sc, idx) => (
+      {/* Style options for the active drawing tool */}
+      {showStyleOptions && (
+        <div
+          className="absolute bottom-3 sm:bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 sm:gap-2 p-1.5 rounded-[14px] border max-w-[calc(100vw-2rem)] overflow-x-auto scrollbar-none"
+          style={chromeCard}
+        >
+          {activeTool === 'sticky' ? (
+            STICKY_COLORS.map((sc, idx) => (
               <button
                 key={sc.label}
                 onClick={() => setStickyColorIdx(idx)}
-                style={{ backgroundColor: sc.bg }}
-                title={`${sc.label} Pinned Note`}
-                className={`w-5 h-5 sm:w-6 sm:h-6 rounded-md transition transform hover:scale-125 border shrink-0 relative ${
-                  stickyColorIdx === idx
-                    ? 'ring-2 ring-slack-green ring-offset-2 ring-offset-[var(--theme-bg-surface)] scale-110'
-                    : 'border-gray-500/50'
-                }`}
-              >
-                <span className="absolute top-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-red-500 shadow-sm" />
-              </button>
-            ))}
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center gap-1 sm:gap-1.5 px-0.5 sm:px-1 shrink-0">
+                style={{
+                  backgroundColor: sc.bg,
+                  boxShadow: stickyColorIdx === idx ? '0 0 0 2px var(--theme-bg-app), 0 0 0 4px var(--theme-primary)' : undefined,
+                }}
+                title={`${sc.label} note`}
+                className="w-6 h-6 rounded-md shrink-0 transition hover:scale-110"
+              />
+            ))
+          ) : (
+            <>
               {COLOR_PALETTE.map((c) => (
                 <button
                   key={c}
                   onClick={() => setActiveColor(c)}
-                  style={{ backgroundColor: ink(c) }}
-                  className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full transition transform hover:scale-125 border shrink-0 ${
-                    activeColor === c
-                      ? 'ring-2 ring-slack-green ring-offset-2 ring-offset-[var(--theme-bg-surface)]'
-                      : 'border-[var(--theme-border)]'
-                  }`}
+                  style={{
+                    backgroundColor: ink(c),
+                    boxShadow:
+                      activeColor === c
+                        ? '0 0 0 2px var(--theme-bg-app), 0 0 0 4px var(--theme-primary)'
+                        : 'inset 0 0 0 1px var(--theme-border)',
+                  }}
+                  className="w-6 h-6 rounded-full shrink-0 transition hover:scale-110"
                 />
               ))}
-            </div>
-
-            <span className="w-px h-5 sm:h-6 bg-[var(--theme-bg-surface-hover)] mx-0.5 sm:mx-1 shrink-0" />
-
-            {/* Stroke Width Selector */}
-            <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+              <span className="w-px h-5 mx-0.5 shrink-0" style={{ backgroundColor: 'var(--theme-border)' }} />
               {[2, 4, 8].map((w) => (
                 <button
                   key={w}
                   onClick={() => setStrokeWidth(w)}
-                  className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-mono font-bold transition shrink-0 ${
+                  className="h-8 px-2 rounded-lg text-xs font-semibold shrink-0 transition hover:bg-[var(--theme-fill-hover)]"
+                  style={
                     strokeWidth === w
-                      ? 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] border border-slack-green'
-                      : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
-                  }`}
+                      ? { backgroundColor: 'var(--theme-selected)', color: 'var(--theme-accent)' }
+                      : { color: 'var(--theme-text-muted)' }
+                  }
                 >
                   {w}px
                 </button>
               ))}
-            </div>
-          </>
-        )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Zoom + history */}
+      <div className="absolute left-3 sm:left-5 bottom-3 sm:bottom-5 z-30 flex items-center gap-4">
+        <div className="flex items-center gap-0.5 p-1 rounded-[14px] border" style={chromeCard}>
+          <ChromeButton title="Zoom out" onClick={() => setZoom((z) => Math.max(0.2, z - 0.15))}>
+            <Minus size={16} />
+          </ChromeButton>
+          <button
+            onClick={() => {
+              setZoom(1);
+              setPan({ x: 0, y: 0 });
+            }}
+            title="Reset view"
+            className="h-8 px-2.5 rounded-lg text-[13px] font-semibold tabular-nums transition hover:bg-[var(--theme-fill-hover)]"
+            style={{ color: 'var(--theme-text)' }}
+          >
+            {Math.round(zoom * 100)}%
+          </button>
+          <ChromeButton title="Zoom in" onClick={() => setZoom((z) => Math.min(3, z + 0.15))}>
+            <Plus size={16} />
+          </ChromeButton>
+        </div>
+        <div className="flex items-center gap-0.5 p-1 rounded-[14px] border" style={chromeCard}>
+          <ChromeButton title="Undo (Ctrl+Z)" onClick={handleUndo} disabled={historyIndex <= 0}>
+            <Undo2 size={16} />
+          </ChromeButton>
+          <ChromeButton title="Redo (Ctrl+Y)" onClick={handleRedo} disabled={historyIndex >= history.length - 1}>
+            <Redo2 size={16} />
+          </ChromeButton>
+        </div>
       </div>
 
       {/* Main Interactive Canvas */}
@@ -2228,5 +2246,23 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         </div>
       )}
     </div>
+    </div>
   );
 };
+
+const ChromeButton: React.FC<{
+  title: string;
+  onClick: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+}> = ({ title, onClick, disabled, children }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    title={title}
+    className="w-8 h-8 rounded-lg flex items-center justify-center transition hover:bg-[var(--theme-fill-hover)] disabled:opacity-30 disabled:hover:bg-transparent"
+    style={{ color: 'var(--theme-text)' }}
+  >
+    {children}
+  </button>
+);

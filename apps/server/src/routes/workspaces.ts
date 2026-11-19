@@ -588,6 +588,9 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       secondaryColor: z.string().min(3).max(30),
       borderColor: z.string().min(3).max(30),
       fontFamily: z.string().max(120).regex(/^[\w\s'",-]+$/).optional(),
+      selectedColor: z.string().min(3).max(30).optional(),
+      accentColor: z.string().min(3).max(30).optional(),
+      sectionColor: z.string().min(3).max(30).optional(),
     });
 
     const bodySchema = z.object({

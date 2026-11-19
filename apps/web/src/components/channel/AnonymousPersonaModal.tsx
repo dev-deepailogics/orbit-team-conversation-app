@@ -1,8 +1,17 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Sparkles, Check, Smile, ShieldAlert } from 'lucide-react';
+import { Mask, Sparkles } from '@/components/ui/icons';
 import { api } from '../../lib/api';
+import {
+  ModalShell,
+  Field,
+  SecondaryButton,
+  PrimaryButton,
+  ErrorNote,
+  inputClass,
+  WARNING,
+} from './modalKit';
 
 const ADJECTIVES = [
   'Thoughtful', 'Curious', 'Brave', 'Philosophical', 'Silent',
@@ -35,6 +44,10 @@ function getRandomPersona() {
   const emoji = POPULAR_EMOJIS[Math.floor(Math.random() * POPULAR_EMOJIS.length)];
   return { name: `${adj} ${noun}`, emoji };
 }
+
+// Figma amber surfaces (#FFFBEB fill, #92400E text) expressed against the warning token.
+const AMBER_FILL = `color-mix(in srgb, ${WARNING} 9%, var(--theme-bg-app))`;
+const AMBER_TEXT = `color-mix(in srgb, ${WARNING} 70%, var(--theme-text))`;
 
 interface AnonymousPersonaModalProps {
   isOpen?: boolean;
@@ -96,132 +109,106 @@ export const AnonymousPersonaModal: React.FC<AnonymousPersonaModalProps> = ({
     }
   };
 
+  const feedName = channelName.startsWith('#') ? channelName : `#${channelName}`;
+
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
-      <div className="bg-[var(--theme-bg-app)] border border-[var(--theme-border)] rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-150">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--theme-border)] bg-[var(--theme-bg-app)]">
+    <ModalShell
+      width={480}
+      title="Set your character name"
+      subtitle={`You will post in ${feedName} under this name. Your real name stays hidden.`}
+      icon={
+        <span
+          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+          style={{ backgroundColor: AMBER_FILL, color: WARNING }}
+        >
+          <Mask size={20} />
+        </span>
+      }
+      onClose={onClose}
+      onSubmit={handleSave}
+      footer={
+        <>
+          <SecondaryButton onClick={onClose} disabled={isSaving}>
+            Cancel
+          </SecondaryButton>
+          <PrimaryButton disabled={isSaving || !anonName.trim()}>
+            {isSaving ? 'Saving…' : 'Confirm name'}
+          </PrimaryButton>
+        </>
+      }
+    >
+      {/* Preview */}
+      <div className="rounded-xl p-3 flex items-center gap-3" style={{ backgroundColor: AMBER_FILL }}>
+        <span
+          className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-xl select-none"
+          style={{ backgroundColor: 'var(--theme-bg-app)' }}
+        >
+          {anonEmoji}
+        </span>
+        <span className="flex flex-col min-w-0">
+          <span className="text-sm font-bold leading-5 truncate" style={{ color: 'var(--theme-text)' }}>
+            {anonName.trim() || 'Anonymous member'}
+          </span>
+          <span className="text-xs leading-4 truncate" style={{ color: AMBER_TEXT }}>
+            How you will appear in {feedName}
+          </span>
+        </span>
+      </div>
+
+      <Field label="Character name" help="Pick a name others will recognize you by in this feed.">
+        <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
-            <span className="text-xl">🎭</span>
-            <div>
-              <h2 className="text-sm font-bold text-[var(--theme-text)]">Your Anonymous Persona</h2>
-              <p className="text-[11px] text-[var(--theme-text-muted)]">in #{channelName}</p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] rounded-lg hover:bg-[var(--theme-bg-surface)] transition"
-          >
-            <X size={16} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSave} className="p-5 space-y-4">
-          {/* Privacy Notice Banner */}
-          <div className="flex items-start gap-2.5 bg-purple-50 dark:bg-purple-950/30 border border-purple-800/40 rounded-xl p-3 text-xs text-purple-700 dark:text-purple-200">
-            <ShieldAlert size={16} className="text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
-            <div className="leading-relaxed text-[11px]">
-              <strong className="text-purple-700 dark:text-purple-300 font-semibold block">Total Anonymity Protected</strong>
-              Your real name, profile photo, and user ID are strictly hidden from all members in this channel.
-            </div>
-          </div>
-
-          {/* Current Persona Preview Card */}
-          <div className="flex items-center justify-between bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-xl p-3.5">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-900/60 to-indigo-900/60 border border-purple-500/40 flex items-center justify-center text-2xl shadow-inner select-none">
-                {anonEmoji}
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-purple-600 dark:text-purple-400 block">
-                  Current Identity
-                </span>
-                <span className="text-sm font-bold text-[var(--theme-text)] truncate max-w-[180px] block">
-                  {anonName || 'Anonymous Member'}
-                </span>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleRollRandom}
-              title="Generate another meaningful name & emoji"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] text-xs font-semibold text-[var(--theme-text)] rounded-lg border border-[var(--theme-border)] transition active:scale-95"
-            >
-              <Sparkles size={13} className="text-yellow-600 dark:text-yellow-400" />
-              <span>Random</span>
-            </button>
-          </div>
-
-          {/* Name Input */}
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--theme-text)] mb-1.5">
-              Persona Name
-            </label>
             <input
               type="text"
               required
+              autoFocus
               maxLength={40}
               placeholder="e.g. Philosophical Fox"
               value={anonName}
               onChange={(e) => setAnonName(e.target.value)}
-              className="w-full bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-lg px-3.5 py-2.5 text-sm text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 transition"
+              className={inputClass}
             />
-            <span className="text-[10px] text-[var(--theme-text-muted)] mt-1 block">
-              You can choose any name or title you like for this discussion.
-            </span>
-          </div>
-
-          {/* Emoji Selector Grid */}
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--theme-text)] mb-1.5 flex items-center gap-1">
-              <Smile size={12} className="text-[var(--theme-text-muted)]" />
-              <span>Icon / Emoji</span>
-            </label>
-            <div className="grid grid-cols-10 gap-1.5 bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-xl p-2.5 max-h-36 overflow-y-auto">
-              {POPULAR_EMOJIS.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => setAnonEmoji(emoji)}
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg transition ${
-                    anonEmoji === emoji
-                      ? 'bg-purple-600/40 border border-purple-400 shadow-sm scale-110'
-                      : 'hover:bg-[var(--theme-bg-surface-hover)]'
-                  }`}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {error && (
-            <div className="text-xs text-red-600 dark:text-red-400 bg-red-950/30 border border-red-800/40 rounded-lg p-2.5">
-              {error}
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[var(--theme-border)]">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg text-xs font-medium text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface)] transition"
+            <SecondaryButton
+              onClick={handleRollRandom}
+              title="Generate a random name and icon"
+              className="h-10 px-3 shrink-0"
             >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="flex items-center gap-1.5 px-5 py-2 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white transition disabled:opacity-50 shadow-md shadow-purple-900/30"
-            >
-              <Check size={14} />
-              <span>{isSaving ? 'Saving...' : 'Apply Persona'}</span>
-            </button>
+              <Sparkles size={14} />
+              Random
+            </SecondaryButton>
           </div>
-        </form>
-      </div>
-    </div>
+        </div>
+      </Field>
+
+      <Field label="Icon">
+        <div
+          className="grid grid-cols-10 gap-1 rounded-[10px] border p-1.5 max-h-[104px] overflow-y-auto"
+          style={{ borderColor: 'var(--theme-border)' }}
+        >
+          {POPULAR_EMOJIS.map((emoji) => {
+            const selected = anonEmoji === emoji;
+            return (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => setAnonEmoji(emoji)}
+                aria-label={`Use ${emoji}`}
+                aria-pressed={selected}
+                className="h-8 rounded-lg flex items-center justify-center text-lg transition hover:bg-[var(--theme-fill-hover)]"
+                style={
+                  selected
+                    ? { backgroundColor: 'var(--theme-selected)', boxShadow: 'inset 0 0 0 1.5px var(--theme-primary)' }
+                    : undefined
+                }
+              >
+                {emoji}
+              </button>
+            );
+          })}
+        </div>
+      </Field>
+
+      {error && <ErrorNote>{error}</ErrorNote>}
+    </ModalShell>
   );
 };

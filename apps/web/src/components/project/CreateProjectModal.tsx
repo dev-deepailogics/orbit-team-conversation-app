@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Project, Channel } from '@orbit/types';
 import { api } from '../../lib/api';
-import { X, FolderKanban, Sparkles, Bell } from 'lucide-react';
+import { X, FolderKanban, Sparkles, Bell } from '@/components/ui/icons';
 
 interface CreateProjectModalProps {
   workspaceId: string;

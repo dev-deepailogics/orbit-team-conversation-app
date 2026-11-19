@@ -1,92 +1,64 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { Compass, Home, Layers, ArrowLeft, Radio } from 'lucide-react';
-import { Navbar } from '@/components/marketing/Navbar';
-import { Footer } from '@/components/marketing/Footer';
+import { BrandPinwheel } from '@/components/brand/BrandMark';
 
+/** Figma 1:10609 · Error · Page not found. */
 export default function NotFoundPage() {
+  // Signed-in users go back to the app; visitors to the marketing home.
+  const [homeHref, setHomeHref] = useState('/');
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('orbit_token')) setHomeHref('/app');
+    } catch {}
+  }, []);
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#090D16] text-slate-900 dark:text-zinc-100 flex flex-col justify-between selection:bg-indigo-500 selection:text-white transition-colors duration-200">
-      <Navbar />
-
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-32 text-center relative overflow-hidden">
-        {/* Ambient cosmic aura */}
-        <div className="absolute w-[600px] h-[350px] bg-indigo-600/15 blur-[120px] rounded-full pointer-events-none -z-10" />
-
-        {/* Playful Floating Deep-Space Satellite Illustration */}
-        <motion.div
-          animate={{
-            y: [-12, 12, -12],
-            rotate: [-4, 4, -4],
-          }}
-          transition={{
-            duration: 6,
-            repeat: Infinity,
-            ease: 'easeInOut',
-          }}
-          className="relative w-44 h-44 mb-8"
+    <main
+      className="min-h-screen w-full flex items-center justify-center overflow-hidden p-4"
+      style={{ backgroundColor: 'var(--theme-bg-surface)', fontFamily: "var(--theme-font, 'Inter'), sans-serif" }}
+    >
+      <div className="relative w-[600px] max-w-full h-[486px] shrink-0 -translate-y-[37px]">
+        <p
+          aria-hidden="true"
+          className="absolute inset-x-0 top-0 text-center text-[150px] font-bold leading-[normal] select-none"
+          style={{ color: 'oklch(from var(--theme-primary) 0.91 calc(c * 0.8) h)' }}
         >
-          {/* Orbital Ring */}
-          <div className="absolute inset-0 rounded-full border border-dashed border-indigo-500/40 animate-spin" style={{ animationDuration: '30s' }} />
-
-          {/* Central Satellite Body */}
-          <div className="absolute inset-6 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 p-[2px] shadow-2xl shadow-indigo-600/40">
-            <div className="w-full h-full bg-white dark:bg-zinc-950 rounded-[14px] flex flex-col items-center justify-center p-3 shadow">
-              <Radio className="w-8 h-8 text-indigo-600 dark:text-cyan-300 animate-pulse" />
-              <span className="font-mono text-[10px] text-slate-500 dark:text-zinc-400 mt-2 font-bold">BEACON: 404</span>
-            </div>
-          </div>
-
-          {/* Satellite Solar Panels */}
-          <div className="absolute top-1/2 -left-6 -translate-y-1/2 w-7 h-10 rounded bg-cyan-100 dark:bg-cyan-950 border border-cyan-400 dark:border-cyan-500/40 flex flex-col justify-around p-1">
-            <div className="w-full h-[1px] bg-cyan-500/40" />
-            <div className="w-full h-[1px] bg-cyan-500/40" />
-          </div>
-          <div className="absolute top-1/2 -right-6 -translate-y-1/2 w-7 h-10 rounded bg-cyan-100 dark:bg-cyan-950 border border-cyan-400 dark:border-cyan-500/40 flex flex-col justify-around p-1">
-            <div className="w-full h-[1px] bg-cyan-500/40" />
-            <div className="w-full h-[1px] bg-cyan-500/40" />
-          </div>
-        </motion.div>
-
-        {/* Eyebrow */}
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-mono mb-4">
-          <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-          <span>SIGNAL LOST IN ORBIT</span>
-        </div>
-
-        <h1 className="font-display font-black text-4xl sm:text-6xl text-slate-900 dark:text-white tracking-tight mb-4">
-          404: Out of Range
-        </h1>
-
-        <p className="text-slate-600 dark:text-zinc-400 max-w-md mx-auto text-sm sm:text-base leading-relaxed mb-8">
-          The requested coordinate or channel does not exist in this workspace cluster. Our deep-space probes could not locate any active socket listener.
+          404
         </p>
-
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center justify-center gap-4">
+        <BrandPinwheel size={120} className="absolute left-1/2 -translate-x-1/2 top-[100px]" />
+        <h1
+          className="absolute inset-x-0 top-[330px] text-center text-[28px] font-bold"
+          style={{ color: 'var(--theme-text)' }}
+        >
+          This page drifted out of orbit
+        </h1>
+        <p
+          className="absolute left-1/2 -translate-x-1/2 top-[376px] w-[500px] max-w-full text-center text-base"
+          style={{ color: 'var(--theme-text-muted)' }}
+        >
+          The link may be broken or the page was moved.
+        </p>
+        <div className="absolute inset-x-0 top-[440px] flex justify-center gap-5">
           <Link
-            href="/"
-            className="px-6 py-3 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm transition-colors flex items-center gap-2 shadow-lg shadow-indigo-600/30"
+            href={homeHref}
+            className="w-[200px] h-[46px] rounded-[10px] flex items-center justify-center text-[15px] font-semibold transition hover:bg-[var(--theme-primary-hover)]"
+            style={{ backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-text)' }}
           >
-            <Home className="w-4 h-4" />
-            <span>Return to Mission Control</span>
+            Back to Home
           </Link>
-
-          <Link
-            href="/app"
-            className="px-6 py-3 rounded-full bg-slate-200 hover:bg-slate-300 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-slate-900 dark:text-white font-medium text-sm border border-slate-300 dark:border-white/10 transition-colors flex items-center gap-2"
-          >
-            <Layers className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-            <span>Launch Web App</span>
-          </Link>
+          {homeHref === '/app' && (
+            <Link
+              href="/app?search=1"
+              className="w-[120px] h-[46px] rounded-[10px] border flex items-center justify-center text-[15px] font-semibold transition hover:bg-[var(--theme-fill-hover)]"
+              style={{ backgroundColor: 'var(--theme-bg-app)', borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}
+            >
+              Search
+            </Link>
+          )}
         </div>
-      </main>
-
-      <Footer />
-    </div>
+      </div>
+    </main>
   );
 }
-
