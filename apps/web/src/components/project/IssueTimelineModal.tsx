@@ -1,8 +1,9 @@
 'use client';
 
 import React from 'react';
-import { X, Clock } from 'lucide-react';
+import { X, Clock } from '@/components/ui/icons';
 import { WorkspaceMember, ProjectColumn } from '@orbit/types';
+import { useTimeFormat } from '../../lib/timeFormat';
 
 interface IssueTimelineModalProps {
   ticket: any;
@@ -17,6 +18,7 @@ export const IssueTimelineModal: React.FC<IssueTimelineModalProps> = ({
   columns = [],
   onClose,
 }) => {
+  const timeFormat = useTimeFormat();
   // Helper to resolve user name by ID
   const getUserName = (userIdOrName?: string) => {
     if (!userIdOrName) return 'Team Member';
@@ -156,7 +158,7 @@ export const IssueTimelineModal: React.FC<IssueTimelineModalProps> = ({
                 hour: 'numeric',
                 minute: '2-digit',
                 second: '2-digit',
-                hour12: true,
+                hour12: timeFormat === '12',
               }
             );
 

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { FileText, Shield, Scale } from 'lucide-react';
+import { FileText, Shield, Scale } from '@/components/ui/icons';
 
 import { Navbar } from '@/components/marketing/Navbar';
 import { Footer } from '@/components/marketing/Footer';

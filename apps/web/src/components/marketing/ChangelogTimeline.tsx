@@ -13,7 +13,7 @@ import {
   ArrowRight,
   ShieldCheck,
   Video,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 
 type Category = 'All' | 'New' | 'Improved' | 'Fixed';
 

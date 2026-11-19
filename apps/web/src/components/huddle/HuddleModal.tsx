@@ -23,7 +23,7 @@ import {
   Users,
   Monitor,
   MessageSquare,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 
 import { useHuddleStore } from '../../stores/huddleStore';
 import { ModernMeetingChat } from './ModernMeetingChat';

@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Avatar } from '@/components/project/projectViewUtils';
 import { Message, UserProfile, Channel } from '@orbit/types';
-import { X, Send, CornerUpLeft, Smile, SmilePlus, Type, Paperclip, FileText, Loader2, Pencil, Trash2, ChevronDown } from 'lucide-react';
+import { X, Send, CornerUpLeft, Smile, SmilePlus, Type, Paperclip, FileText, Loader2, Pencil, Trash2, ChevronDown } from '@/components/ui/icons';
 import { api } from '../../lib/api';
 import { loadDraft, saveDraft, clearDraft } from '../../lib/drafts';
 import { useChatStore } from '../../stores/chatStore';
@@ -418,7 +419,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
               {parentAnonEmoji}
             </div>
           ) : (
-            <img src={avatarUrl} alt={authorName} className="w-8 h-8 rounded-lg shrink-0 mt-0.5" />
+            <Avatar name={authorName} src={avatarUrl} size={32} className="mt-0.5" />
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
@@ -696,7 +697,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                   {replyEmoji}
                 </div>
               ) : (
-                <img src={replyAvatar} alt={replyAuthor} className="w-7 h-7 rounded-lg shrink-0 mt-0.5" />
+                <Avatar name={replyAuthor} src={replyAvatar} size={28} className="mt-0.5" />
               )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">

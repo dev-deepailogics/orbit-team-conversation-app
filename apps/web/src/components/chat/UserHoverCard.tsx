@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { Avatar } from '@/components/project/projectViewUtils';
 import { createPortal } from 'react-dom';
-import { Clock, MessageSquare, Headphones } from 'lucide-react';
+import { Clock, MessageSquare, Headphones } from '@/components/ui/icons';
 import { Presence, PRESENCE_STYLE } from '../availability/useTeamPresence';
 
 interface HoverUser {
@@ -86,7 +87,7 @@ export const UserHoverCard: React.FC<UserHoverCardProps> = ({ user, presence, is
             style={{ ...pos, width: CARD_WIDTH, backgroundColor: 'var(--theme-bg-surface)' }}
           >
             <div className="flex items-center gap-4 p-4">
-              <img src={avatar} alt="" className="w-20 h-20 rounded-xl object-cover shrink-0" />
+              <Avatar name={user.displayName || user.username} src={avatar} size={80} />
               <div className="min-w-0">
                 <p className="font-bold text-[15px] text-[var(--theme-text)] flex items-center gap-2">
                   <span className="truncate">{user.displayName}</span>

@@ -41,6 +41,8 @@ interface ChatState {
   setTypingUser: (channelId: string, user: TypingUser, isTyping: boolean) => void;
   incrementUnread: (messageId: string, channelId: string) => void;
   clearUnread: (channelId: string) => void;
+  /** Replace all counts with the server's (the open channel stays at 0). */
+  setUnreadCounts: (counts: { [channelId: string]: number }) => void;
   removeAttachment: (fileId: string) => void;
   reset: () => void;
 }
@@ -88,6 +90,10 @@ export const useChatStore = create<ChatState>((set) => ({
       unreadCounts: channel
         ? { ...state.unreadCounts, [channel.id]: 0 }
         : state.unreadCounts,
+    })),
+  setUnreadCounts: (counts) =>
+    set((state) => ({
+      unreadCounts: state.currentChannel ? { ...counts, [state.currentChannel.id]: 0 } : counts,
     })),
   setMessages: (messages) => set({ messages }),
   

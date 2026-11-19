@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { PhoneCall, PhoneOff, Video } from 'lucide-react';
+import { Avatar } from '@/components/project/projectViewUtils';
+import { PhoneCall, PhoneOff, Video } from '@/components/ui/icons';
 import { useHuddleStore } from '../../stores/huddleStore';
 import { sounds } from '../../lib/sound';
 
@@ -35,10 +36,11 @@ export const IncomingCallDialog: React.FC<IncomingCallDialogProps> = ({ onAccept
       <div className="bg-[#1F2326] border-2 border-slack-green shadow-2xl rounded-2xl p-3.5 sm:p-5 flex items-center gap-3 sm:gap-4 max-w-sm backdrop-blur">
         {/* Caller Avatar with pulsing ring */}
         <div className="relative">
-          <img
-            src={incomingCall.callerAvatar || `/api/avatar/bottts/svg?seed=${incomingCall.callerName}`}
-            alt={incomingCall.callerName}
-            className="w-12 h-12 rounded-xl object-cover ring-2 ring-slack-green"
+          <Avatar
+            name={incomingCall.callerName}
+            src={incomingCall.callerAvatar}
+            size={48}
+            ring="var(--theme-primary)"
           />
           <div className="absolute -top-1 -right-1 w-4 h-4 bg-slack-green rounded-full flex items-center justify-center text-white animate-pulse">
             <Video size={10} />

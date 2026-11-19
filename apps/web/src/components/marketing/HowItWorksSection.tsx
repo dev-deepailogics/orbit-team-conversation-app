@@ -2,7 +2,7 @@
 
 import React, { useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
-import { PenTool, FolderKanban, Users, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { PenTool, FolderKanban, Users, ArrowRight, CheckCircle2 } from '@/components/ui/icons';
 
 const STEPS = [
   {

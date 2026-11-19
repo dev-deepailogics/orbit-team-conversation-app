@@ -17,7 +17,7 @@ import {
   Music,
   File,
   RefreshCw,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { api } from '../../lib/api';
 import { formatFileSize, getFileCategory } from './FileAttachmentList';
 

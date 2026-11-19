@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { Avatar } from '@/components/project/projectViewUtils';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -26,7 +27,9 @@ import {
   Loader2,
   Sparkles,
   Copy,
-} from 'lucide-react';
+  Eye,
+  EyeOff,
+} from '@/components/ui/icons';
 import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 
@@ -107,6 +110,7 @@ export default function AdminDashboardPage() {
 
   const [selectedUserForPassword, setSelectedUserForPassword] = useState<AdminUser | null>(null);
   const [newPassword, setNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
 
   const [userToDelete, setUserToDelete] = useState<AdminUser | null>(null);
@@ -553,11 +557,7 @@ export default function AdminDashboardPage() {
                       return (
                         <tr key={u.id} className="hover:bg-white/[0.02] transition">
                           <td className="py-3 px-4 flex items-center gap-2.5">
-                            <img
-                              src={u.avatarUrl || `/api/avatar/bottts/svg?seed=${u.username}`}
-                              alt={u.displayName}
-                              className="w-8 h-8 rounded-xl object-cover border border-gray-700"
-                            />
+                            <Avatar name={u.displayName || u.username} src={u.avatarUrl} size={32} />
                             <div>
                               <span className="font-bold text-white block">{u.displayName}</span>
                               <span className="text-[11px] text-gray-400 font-mono">@{u.username}</span>
@@ -960,14 +960,23 @@ export default function AdminDashboardPage() {
                 <div className="relative">
                   <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
-                    type="password"
+                    type={showNewPassword ? 'text' : 'password'}
                     required
                     minLength={6}
                     placeholder="Enter at least 6 characters"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full bg-[#222529] border border-gray-700 rounded-xl pl-9 pr-3.5 py-2 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                    className="w-full bg-[#222529] border border-gray-700 rounded-xl pl-9 pr-9 py-2 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-amber-400"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword((v) => !v)}
+                    aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                    tabIndex={-1}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 transition"
+                  >
+                    {showNewPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
                 </div>
               </div>
 

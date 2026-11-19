@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Pause, Play } from 'lucide-react';
+import { Pause, Play } from '@/components/ui/icons';
 
 const BRANDS = [
   { name: 'Fastify', label: 'Fastify Core', tag: 'Fast Backend' },

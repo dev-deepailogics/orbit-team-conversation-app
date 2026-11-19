@@ -17,8 +17,14 @@ import {
   ZoomOut,
   Maximize2,
   File,
-} from 'lucide-react';
+  PriorityUp,
+} from '@/components/ui/icons';
 import { api } from '../../lib/api';
+
+const fileTypeLabel = (fileName: string, category: string) => {
+  const ext = fileName.includes('.') ? fileName.split('.').pop()!.toUpperCase() : '';
+  return ext && ext.length <= 5 ? ext : category === 'other' ? 'File' : category.toUpperCase();
+};
 
 interface FileAttachmentListProps {
   attachments?: Attachment[];
@@ -347,58 +353,67 @@ export const FileAttachmentList: React.FC<FileAttachmentListProps> = ({
           return (
             <div
               key={file.id}
-              className="flex items-center justify-between gap-3 max-w-sm sm:max-w-md bg-[var(--theme-bg-surface)] hover:bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] hover:border-[var(--theme-border)] px-3.5 py-2.5 rounded-xl transition shadow-sm group"
+              className="flex items-center gap-[10px] w-[300px] max-w-full p-[10px] rounded-[10px] border transition group"
+              style={{ backgroundColor: 'var(--theme-bg-app)', borderColor: 'var(--theme-border)' }}
             >
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                {renderFileIcon(category)}
-                <div className="flex flex-col min-w-0 flex-1">
-                  <span
-                    className="text-xs font-semibold text-[var(--theme-text)] group-hover:text-[var(--theme-text)] truncate"
-                    title={file.fileName}
-                  >
-                    {file.fileName}
-                  </span>
-                  <div className="flex items-center gap-2 text-[11px] text-[var(--theme-text-muted)] font-mono">
-                    <span>{formatFileSize(file.fileSize)}</span>
-                    <span>•</span>
-                    <span className="uppercase text-[9px] px-1 py-0.2 bg-[var(--theme-bg-surface)] rounded font-bold text-[var(--theme-text)]">
-                      {category}
-                    </span>
-                  </div>
-                </div>
+              <span
+                className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                style={{ backgroundColor: 'var(--theme-bg-surface)', color: 'var(--theme-text-muted)' }}
+              >
+                {category === 'sheet' ? (
+                  <FileSpreadsheet size={18} />
+                ) : category === 'archive' ? (
+                  <FileArchive size={18} />
+                ) : category === 'code' ? (
+                  <FileCode size={18} />
+                ) : (
+                  <FileText size={18} />
+                )}
+              </span>
+              <div className="flex flex-col min-w-0 flex-1">
+                <span
+                  className="text-[13px] font-semibold truncate"
+                  style={{ color: 'var(--theme-text)' }}
+                  title={file.fileName}
+                >
+                  {file.fileName}
+                </span>
+                <span className="text-xs truncate" style={{ color: 'var(--theme-text-muted)' }}>
+                  {fileTypeLabel(file.fileName, category)} · {formatFileSize(file.fileSize)}
+                </span>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-0.5 shrink-0">
+                <a
+                  href={getDownloadUrl(file)}
+                  download={file.fileName}
+                  title="Download file"
+                  className="p-1 rounded-md transition opacity-0 group-hover:opacity-100 hover:bg-[var(--theme-fill-hover)]"
+                  style={{ color: 'var(--theme-text-muted)' }}
+                >
+                  <Download size={14} />
+                </a>
+                {(currentUser?.id === file.uploaderId || !file.uploaderId) && (
+                  <button
+                    onClick={(e) => handleDeleteFile(e, file)}
+                    disabled={deletingId === file.id}
+                    title="Delete file from server"
+                    className="p-1 rounded-md transition opacity-0 group-hover:opacity-100 hover:bg-[var(--theme-fill-hover)] hover:text-[#DC2626]"
+                    style={{ color: 'var(--theme-text-muted)' }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
                 <a
                   href={getFullFileUrl(file.fileUrl)}
                   target="_blank"
                   rel="noreferrer"
                   title="Open in new tab"
-                  className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition"
+                  className="p-0.5 rounded-md transition hover:bg-[var(--theme-fill-hover)]"
+                  style={{ color: 'var(--theme-text-muted)' }}
                 >
-                  <ExternalLink size={14} />
+                  <PriorityUp size={16} />
                 </a>
-
-                <a
-                  href={getDownloadUrl(file)}
-                  download={file.fileName}
-                  title="Download File"
-                  className="p-1.5 text-slack-green hover:text-[var(--theme-text)] hover:bg-slack-green/20 rounded-lg transition"
-                >
-                  <Download size={14} />
-                </a>
-
-                {(currentUser?.id === file.uploaderId || !file.uploaderId) && (
-                  <button
-                    onClick={(e) => handleDeleteFile(e, file)}
-                    disabled={deletingId === file.id}
-                    title="Delete File from Server"
-                    className="p-1.5 text-[var(--theme-text-muted)] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                )}
               </div>
             </div>
           );

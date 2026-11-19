@@ -32,7 +32,7 @@ import {
   FolderOpen,
   Home,
   Check,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 
 interface MediaManagerProps {
   workspace: any;

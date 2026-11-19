@@ -31,8 +31,18 @@ import {
   Pencil,
   Trash2,
   ChevronDown,
-  PenTool,
-} from 'lucide-react';
+  Mask,
+  Canvas,
+  More,
+  Users,
+  User as UserIcon,
+  AtSign,
+  Plus,
+  Bell,
+  BellOff,
+} from '@/components/ui/icons';
+import { Avatar, tint, relativeTime } from '../project/projectViewUtils';
+import { ChannelSidePanel, PresenceAvatar, PRESENCE_COLOR } from './ChannelSidePanel';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
 import { loadDraft, saveDraft, clearDraft } from '../../lib/drafts';
@@ -50,9 +60,101 @@ import { compressFile } from '../../lib/compression';
 import { PinnedMessagesModal } from './PinnedMessagesModal';
 import { AnonymousPersonaModal } from '../channel/AnonymousPersonaModal';
 import { UserHoverCard } from './UserHoverCard';
-import { Presence } from '../availability/useTeamPresence';
+import { Presence, PRESENCE_STYLE } from '../availability/useTeamPresence';
 import { useTimeFormat, formatMessageTime } from '../../lib/timeFormat';
 import { MessageChangeNote } from './MessageChangeNote';
+
+// Anonymous-feed warm accent (Figma amber/600); text uses a darker mix so it stays readable on any theme.
+const ANON_WARM = '#D97706';
+const ANON_WARM_TEXT = 'color-mix(in srgb, #D97706 70%, var(--theme-text))';
+// Saturated character colours for anonymous avatars (Figma: amber, cyan, pink + extras).
+const ANON_AVATAR_COLORS = ['#D97706', '#0EA5C6', '#E0568D', '#7C4DDB', '#1F9D63', '#2563EB'];
+const anonColor = (seed: string) =>
+  ANON_AVATAR_COLORS[seed.split('').reduce((h, c) => h + c.charCodeAt(0), 0) % ANON_AVATAR_COLORS.length];
+
+const dayKey = (iso: string) => {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+};
+const dayLabel = (iso: string) => {
+  const d = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (dayKey(iso) === dayKey(today.toISOString())) return 'Today';
+  if (dayKey(iso) === dayKey(yesterday.toISOString())) return 'Yesterday';
+  return d.toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+    ...(d.getFullYear() !== today.getFullYear() && { year: 'numeric' }),
+  });
+};
+
+const HeaderIconButton: React.FC<{
+  title: string;
+  onClick: () => void;
+  children: React.ReactNode;
+  className?: string;
+  active?: boolean;
+}> = ({ title, onClick, children, className = '', active }) => (
+  <button
+    onClick={onClick}
+    title={title}
+    className={`w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0 transition hover:bg-[var(--theme-fill-hover)] ${className}`}
+    style={{
+      color: active ? 'var(--theme-text)' : 'var(--theme-text-muted)',
+      backgroundColor: active ? 'var(--theme-fill)' : undefined,
+    }}
+  >
+    {children}
+  </button>
+);
+
+const HeaderTab: React.FC<{ label: string; active?: boolean; count?: number; onClick: () => void }> = ({
+  label,
+  active,
+  count,
+  onClick,
+}) => (
+  <button onClick={onClick} className="h-12 flex flex-col items-center shrink-0">
+    <span
+      className={`h-[46px] px-1 flex items-center gap-2 text-sm ${active ? 'font-semibold' : 'font-medium'}`}
+      style={{ color: active ? 'var(--theme-primary-hover)' : 'var(--theme-text-muted)' }}
+    >
+      {label}
+      {typeof count === 'number' && count > 0 && (
+        <span
+          className="h-5 min-w-5 px-[7px] rounded-[10px] flex items-center justify-center text-xs font-semibold"
+          style={{ backgroundColor: 'var(--theme-bg-surface-hover)', color: 'var(--theme-text-muted)' }}
+        >
+          {count}
+        </span>
+      )}
+    </span>
+    <span className="h-0.5 w-full" style={{ backgroundColor: active ? 'var(--theme-primary)' : 'transparent' }} />
+  </button>
+);
+
+const MenuItem: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  muted?: boolean;
+  selected?: boolean;
+  disabled?: boolean;
+}> = ({ icon, label, onClick, muted, selected, disabled }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className="w-full px-3.5 py-2 text-left text-[13px] flex items-center gap-2.5 transition hover:bg-[var(--theme-fill-hover)] disabled:opacity-50"
+    style={{ color: muted ? 'var(--theme-text-muted)' : 'var(--theme-text)' }}
+  >
+    <span style={{ color: selected ? 'var(--theme-primary)' : 'var(--theme-text-muted)' }}>{icon}</span>
+    <span className={`flex-1 ${selected ? 'font-semibold' : ''}`}>{label}</span>
+    {selected && <Check size={13} style={{ color: 'var(--theme-primary)' }} />}
+  </button>
+);
 
 
 interface ChatAreaProps {
@@ -120,7 +222,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [attachments, setAttachments] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [showFormatting, setShowFormatting] = useState(true);
+  const [showFormatting, setShowFormatting] = useState(false);
   const [showStorageModal, setShowStorageModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showPinsModal, setShowPinsModal] = useState(false);
@@ -129,6 +231,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     channel.myAnonProfile || null
   );
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showSidePanel, setShowSidePanel] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -141,6 +244,30 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [isCompressing, setIsCompressing] = useState(false);
 
   const currentWorkspace = useChatStore((state) => state.currentWorkspace);
+  const notificationPreference =
+    channel.members?.find((m) => m.userId === currentUser?.id)?.notificationPreference || 'ALL';
+  const isMuted = notificationPreference === 'MUTED';
+  const [isSavingNotifPref, setIsSavingNotifPref] = useState(false);
+  // Only private channels take explicit invites; public ones are open for anyone in the workspace to join
+  const canAddMembers = channel.type === 'PRIVATE' && !!onOpenAddMembers;
+
+  const handleSetNotificationPreference = async (preference: 'ALL' | 'MENTIONS' | 'MUTED') => {
+    if (preference === notificationPreference) return;
+    setIsSavingNotifPref(true);
+    try {
+      await api.post(`/api/channels/${channel.id}/notifications`, { preference });
+      useChatStore.getState().updateChannel({
+        ...channel,
+        members: (channel.members || []).map((m) =>
+          m.userId === currentUser?.id ? { ...m, notificationPreference: preference } : m,
+        ),
+      });
+    } catch (err) {
+      console.error('Failed to update notification preference', err);
+    } finally {
+      setIsSavingNotifPref(false);
+    }
+  };
   const isWsAdmin =
     currentWorkspace?.ownerId === currentUser?.id ||
     members?.some(
@@ -593,20 +720,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const dmPeer = channel.members?.find((m) => m.userId !== currentUser?.id)?.user;
   const dmName = getDirectChannelTitle();
   const dmIntro = channel.type === 'DIRECT' && (
-    <div className="py-6 border-b mb-2" style={{ borderColor: 'var(--theme-border)' }}>
-      <img
-        src={(dmPeer ?? currentUser)?.avatarUrl || `/api/avatar/bottts/svg?seed=${dmName}`}
-        alt={dmName}
-        className="w-16 h-16 rounded-xl object-cover mb-3"
-      />
-      <h3 className="font-bold text-lg" style={{ color: 'var(--theme-text-primary)' }}>
+    <div className="pb-5 mb-1 border-b flex flex-col gap-2" style={{ borderColor: 'var(--theme-border)' }}>
+      <Avatar name={dmName} src={(dmPeer ?? currentUser)?.avatarUrl} size={64} />
+      <h3 className="text-[17px] font-bold" style={{ color: 'var(--theme-text)' }}>
         {dmName}
       </h3>
-      <p className="text-sm mt-1 max-w-md" style={{ color: 'var(--theme-text-muted)' }}>
+      <p className="text-sm leading-[21px] max-w-md" style={{ color: 'var(--theme-text-muted)' }}>
         {dmPeer ? (
           <>
             This conversation is just between{' '}
-            <span className="text-slack-green font-medium">@{dmPeer.displayName}</span> and you.
+            <span className="font-semibold" style={{ color: 'var(--theme-primary-hover)' }}>@{dmPeer.displayName}</span> and you.
           </>
         ) : (
           'This is your space. Draft messages, list your to-dos, or keep links and files handy.'
@@ -614,6 +737,22 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       </p>
     </div>
   );
+
+  const isDirect = channel.type === 'DIRECT';
+  const channelPeople: UserProfile[] = (
+    channel.members?.length ? channel.members.map((m) => m.user) : (members || []).map((m: any) => m.user)
+  ).filter(Boolean) as UserProfile[];
+  const pinnedCount = messages.filter((m) => m.isPinned && !m.isDeleted).length;
+  const fileCount = messages.reduce((n, m) => n + (m.isDeleted ? 0 : m.attachments?.length || 0), 0);
+
+  const jumpToMessage = (msg: Message) => {
+    const el = document.getElementById(`msg-${msg.id}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('ring-2', 'ring-[var(--theme-primary)]');
+      setTimeout(() => el.classList.remove('ring-2', 'ring-[var(--theme-primary)]'), 2500);
+    }
+  };
 
   const handleCopyChannelId = () => {
     navigator.clipboard.writeText(channel.id);
@@ -629,246 +768,357 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         color: 'var(--theme-text)',
       }}
     >
-      {/* Channel Header */}
+      {/* Channel Header (Redesign v3) */}
       <div
-        className="h-14 border-b px-3 sm:px-6 flex items-center justify-between backdrop-blur z-10 gap-2"
-        style={{
-          backgroundColor: 'var(--theme-bg-surface)',
-          borderColor: 'var(--theme-border)',
-        }}
+        className="shrink-0 border-b z-10"
+        style={{ backgroundColor: 'var(--theme-bg-app)', borderColor: 'var(--theme-border)' }}
       >
-        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-          {/* Mobile hamburger menu toggle */}
+        <div className="h-[72px] px-3 sm:px-7 flex items-center gap-3 sm:gap-5">
           {onToggleMobileSidebar && (
             <button
               onClick={onToggleMobileSidebar}
               title="Open Navigation"
-              className="md:hidden p-1.5 -ml-1 text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition shrink-0"
+              className="md:hidden p-1.5 -ml-1 rounded-lg transition shrink-0 hover:bg-[var(--theme-fill-hover)]"
+              style={{ color: 'var(--theme-text)' }}
             >
               <Menu size={20} />
             </button>
           )}
 
-          {/* Channel Name Button (Click to open details) */}
-          <button
-            onClick={() => setShowDetailsModal(true)}
-            title="Click to view channel details"
-            className="flex items-center gap-1.5 hover:bg-[var(--theme-bg-surface-hover)] px-2 py-1 rounded-lg transition group min-w-0"
-          >
-            {channel.isAnonymous ? (
-              <span className="text-lg leading-none shrink-0" title="Anonymous Channel">🎭</span>
-            ) : channel.type === 'DIRECT' ? (
-              <span className="font-bold text-slack-green text-base shrink-0">@</span>
-            ) : channel.type === 'PRIVATE' ? (
-              <Lock size={18} className="text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] shrink-0" />
+          {/* Page info */}
+          <div className="flex-1 min-w-0 flex items-center gap-3.5">
+            {isDirect ? (
+              <button onClick={() => setShowSidePanel((v) => !v)} title="View profile" className="shrink-0">
+                <PresenceAvatar
+                  name={dmName}
+                  src={(dmPeer ?? currentUser)?.avatarUrl}
+                  size={44}
+                  presence={presence[(dmPeer ?? currentUser)?.id || ''] || 'offline'}
+                  dot={14}
+                />
+              </button>
             ) : (
-              <Hash size={20} className="text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] shrink-0" />
-            )}
-            <span
-              className="font-bold text-sm sm:text-base truncate group-hover:underline"
-              style={{ color: 'var(--theme-text-primary)' }}
-            >
-              {getDirectChannelTitle()}
-            </span>
-            {channel.isAnonymous && (
-              <span className="text-[10px] font-semibold uppercase bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded ml-1 shrink-0">
-                Anonymous
-              </span>
-            )}
-          </button>
-        </div>
-
-        {/* Actions in Header */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Anonymous Persona Badge / Edit Button */}
-          {channel.isAnonymous && anonProfile && (
-            <button
-              onClick={() => setShowAnonPersonaModal(true)}
-              title="Change your Anonymous Persona"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-100 hover:bg-purple-200 dark:bg-purple-950/70 dark:hover:bg-purple-900/80 border border-purple-500/50 text-purple-700 dark:text-purple-200 text-xs font-medium transition shrink-0 group shadow-sm"
-            >
-              <span className="text-sm">{anonProfile.anonEmoji}</span>
-              <span className="hidden sm:inline font-semibold">{anonProfile.anonName}</span>
-              <span className="text-[10px] text-purple-600 dark:text-purple-400 group-hover:text-purple-800 dark:group-hover:text-purple-200 ml-0.5">Edit</span>
-            </button>
-          )}
-
-          {/* Search Messages Button */}
-          {onOpenSearch && (
-            <button
-              onClick={onOpenSearch}
-              title="Search messages (Cmd+K / Ctrl+K)"
-              style={{
-                backgroundColor: 'var(--theme-bg-surface)',
-                borderColor: 'var(--theme-border)',
-                color: 'var(--theme-text-primary)',
-              }}
-              className="flex items-center gap-1.5 p-1.5 sm:px-3 sm:py-1.5 rounded-lg border text-xs font-medium transition hover:opacity-85"
-            >
-              <Search size={14} style={{ color: 'var(--theme-primary)' }} />
-              <span className="hidden sm:inline">Search</span>
-              <kbd
-                className="hidden lg:inline text-[10px] px-1 py-0.2 rounded font-mono border ml-0.5"
+              <span
+                className="w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0"
                 style={{
-                  backgroundColor: 'var(--theme-bg-app)',
-                  borderColor: 'var(--theme-border)',
-                  color: 'var(--theme-text-muted)',
+                  backgroundColor: channel.isAnonymous ? tint(ANON_WARM, 12) : 'var(--theme-selected)',
+                  color: channel.isAnonymous ? ANON_WARM : 'var(--theme-accent)',
                 }}
               >
-                ⌘K
-              </kbd>
-            </button>
-          )}
-
-          {/* Pinned Messages Button */}
-          <button
-            onClick={() => setShowPinsModal(true)}
-            title="View Pinned Messages"
-            style={{
-              backgroundColor: 'var(--theme-bg-surface)',
-              borderColor: 'var(--theme-border)',
-              color: 'var(--theme-text-primary)',
-            }}
-            className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border text-xs font-medium transition hover:opacity-85"
-          >
-            <Pin size={14} className="text-amber-600 dark:text-amber-400 fill-amber-400/30" />
-            <span className="hidden sm:inline">Pins</span>
-          </button>
-
-          {/* Call / Meet Button */}
-          <button
-            onClick={() => onStartHuddle(channel)}
-            title="Start Audio/Video Call"
-            className="flex items-center gap-1.5 sm:gap-2 p-1.5 sm:px-3.5 sm:py-1.5 rounded-lg bg-slack-green/15 hover:bg-slack-green/25 text-slack-green border border-slack-green/40 text-xs font-semibold transition"
-          >
-            <PhoneCall size={14} />
-            <span className="hidden sm:inline">Call</span>
-          </button>
-
-          {/* Vertical Three Dots Menu (Most Right Corner) */}
-          <div className="relative" ref={moreMenuRef}>
-            <button
-              onClick={() => setShowMoreMenu(!showMoreMenu)}
-              title="More options"
-              style={{
-                backgroundColor: 'var(--theme-bg-surface)',
-                borderColor: 'var(--theme-border)',
-                color: 'var(--theme-text-primary)',
-              }}
-              className={`p-1.5 sm:p-2 rounded-lg border transition hover:opacity-85 ${
-                showMoreMenu
-                  ? 'ring-2 ring-slack-green'
-                  : ''
-              }`}
-            >
-              <MoreVertical size={16} />
-            </button>
-
-            {/* Dropdown Menu */}
-            {showMoreMenu && (
-              <div className="absolute right-0 mt-1.5 w-56 bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-xl shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
-                {channel.type !== 'DIRECT' && onOpenAddMembers && (
-                  <button
-                    onClick={() => {
-                      setShowMoreMenu(false);
-                      onOpenAddMembers();
-                    }}
-                    className="w-full px-3.5 py-2 text-left text-xs text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] flex items-center gap-2.5 transition"
+                {channel.isAnonymous ? <Mask size={22} /> : channel.type === 'PRIVATE' ? <Lock size={22} /> : <Hash size={22} />}
+              </span>
+            )}
+            <div className="min-w-0 flex flex-col gap-0.5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <button
+                  onClick={() => (isDirect ? setShowSidePanel((v) => !v) : setShowDetailsModal(true))}
+                  title={isDirect ? 'View profile' : 'Channel settings'}
+                  className="text-[20px] leading-[26px] font-bold tracking-[-0.4px] truncate hover:underline text-left"
+                  style={{ color: 'var(--theme-text)' }}
+                >
+                  {getDirectChannelTitle()}
+                </button>
+                {channel.isAnonymous && (
+                  <span
+                    className="h-[22px] px-[9px] rounded-[11px] flex items-center gap-[5px] text-[11px] font-semibold shrink-0"
+                    style={{ backgroundColor: tint(ANON_WARM, 12), color: ANON_WARM_TEXT }}
                   >
-                    <UserPlus size={14} className="text-slack-green" />
-                    <span>Add People</span>
-                  </button>
-                )}
-
-                <button
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    if (onOpenQuickCanvas) {
-                      onOpenQuickCanvas();
-                    } else {
-                      setActiveView('whiteboard');
-                    }
-                  }}
-                  className="w-full px-3.5 py-2 text-left text-xs text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] flex items-center gap-2.5 transition"
-                >
-                  <PenTool size={14} className="text-slack-green" />
-                  <span>Canvas</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    setShowPinsModal(true);
-                  }}
-                  className="w-full px-3.5 py-2 text-left text-xs text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] flex items-center gap-2.5 transition"
-                >
-                  <Pin size={14} className="text-amber-600 dark:text-amber-400 fill-amber-400" />
-                  <span>Pinned Messages</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    setShowDetailsModal(true);
-                  }}
-                  className="w-full px-3.5 py-2 text-left text-xs text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] flex items-center gap-2.5 transition"
-                >
-                  <Info size={14} className="text-slack-green" />
-                  <span>Channel Details & Info</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    setShowStorageModal(true);
-                  }}
-                  className="w-full px-3.5 py-2 text-left text-xs text-[var(--theme-text)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] flex items-center gap-2.5 transition"
-                >
-                  <HardDrive size={14} className="text-slack-green" />
-                  <span>Channel Files & Storage</span>
-                </button>
-
-                <div className="h-px bg-[var(--theme-bg-surface-hover)] my-1" />
-
-                <button
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    handleCopyChannelId();
-                  }}
-                  className="w-full px-3.5 py-2 text-left text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] flex items-center justify-between transition"
-                >
-                  <span className="flex items-center gap-2.5">
-                    <Copy size={14} />
-                    <span>Copy Channel ID</span>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ANON_WARM }} />
+                    Anonymous
                   </span>
-                  {copiedChannelId && <Check size={12} className="text-slack-green" />}
-                </button>
+                )}
+                {!channel.isAnonymous && channel.type === 'PRIVATE' && (
+                  <span
+                    className="h-6 px-[9px] rounded-xl flex items-center gap-[5px] text-[11px] font-semibold shrink-0"
+                    style={{ backgroundColor: tint(ANON_WARM, 14), color: ANON_WARM_TEXT }}
+                  >
+                    <Lock size={12} />
+                    Private
+                  </span>
+                )}
+                {isMuted && (
+                  <span title="Notifications muted" className="shrink-0 inline-flex" style={{ color: 'var(--theme-text-muted)' }}>
+                    <BellOff size={15} />
+                  </span>
+                )}
               </div>
+              <p className="text-[13px] leading-[18px] truncate flex items-center gap-1.5" style={{ color: 'var(--theme-text-muted)' }}>
+                {isDirect ? (
+                  (() => {
+                    const p = presence[(dmPeer ?? currentUser)?.id || ''] || 'offline';
+                    return (
+                      <>
+                        <span
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{
+                            backgroundColor: p === 'offline' ? 'transparent' : PRESENCE_COLOR[p],
+                            border: p === 'offline' ? `1.5px solid ${PRESENCE_COLOR.offline}` : undefined,
+                          }}
+                        />
+                        {PRESENCE_STYLE[p].label}
+                        {dmPeer?.customStatusText ? ` · ${dmPeer.customStatusText}` : ''}
+                      </>
+                    );
+                  })()
+                ) : channel.isAnonymous ? (
+                  channel.description || channel.topic || 'Post without revealing your identity'
+                ) : messages.length === 0 && !hasMoreMessages ? (
+                  `New channel · ${channelPeople.length} ${channelPeople.length === 1 ? 'member' : 'members'}`
+                ) : (
+                  channel.description || channel.topic || (channel.type === 'PRIVATE' ? 'Private channel' : 'Public channel')
+                )}
+              </p>
+            </div>
+
+            {/* Member stack */}
+            {!isDirect && !channel.isAnonymous && channelPeople.length > 0 && (
+              <button
+                onClick={() => setShowSidePanel((v) => !v)}
+                title="Channel members"
+                className="hidden md:flex items-center px-1.5 py-1 shrink-0 rounded-[18px] transition hover:bg-[var(--theme-fill-hover)]"
+              >
+                {channelPeople.slice(0, 3).map((u, i) => (
+                  <Avatar
+                    key={u.id}
+                    name={u.displayName}
+                    src={u.avatarUrl}
+                    size={28}
+                    ring="var(--theme-bg-app)"
+                    className={i ? '-ml-[5px]' : ''}
+                  />
+                ))}
+                {channelPeople.length > 3 && (
+                  <span
+                    className="-ml-[5px] w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold"
+                    style={{
+                      backgroundColor: 'var(--theme-bg-surface-hover)',
+                      color: 'var(--theme-text)',
+                      boxShadow: '0 0 0 2px var(--theme-bg-app)',
+                    }}
+                  >
+                    +{channelPeople.length - 3}
+                  </span>
+                )}
+              </button>
             )}
           </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-2 shrink-0">
+            {channel.isAnonymous && anonProfile && (
+              <button
+                onClick={() => setShowAnonPersonaModal(true)}
+                title="Change your character name"
+                className="h-9 pl-1.5 pr-3 rounded-[18px] flex items-center gap-2 transition hover:brightness-95"
+                style={{ backgroundColor: tint(ANON_WARM, 12) }}
+              >
+                <span
+                  className="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: ANON_WARM, color: '#FFFFFF' }}
+                >
+                  <Mask size={14} />
+                </span>
+                <span className="hidden sm:inline text-[13px] font-semibold whitespace-nowrap" style={{ color: ANON_WARM_TEXT }}>
+                  You are {anonProfile.anonName}
+                </span>
+                <Pencil size={14} style={{ color: ANON_WARM_TEXT }} />
+              </button>
+            )}
+
+            {isDirect && (
+              <button
+                onClick={() => setShowSidePanel((v) => !v)}
+                className="hidden sm:flex h-9 px-3.5 rounded-[18px] border items-center gap-1.5 text-[13px] font-medium transition hover:bg-[var(--theme-fill-hover)]"
+                style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}
+              >
+                <UserIcon size={15} />
+                View profile
+              </button>
+            )}
+
+            {onOpenSearch && (
+              <button
+                onClick={onOpenSearch}
+                title="Search messages (Cmd+K / Ctrl+K)"
+                className="hidden xl:flex w-[340px] h-11 pl-4 pr-2.5 rounded-[22px] border items-center gap-2.5 transition hover:brightness-[0.98]"
+                style={{ backgroundColor: 'var(--theme-bg-surface-hover)', borderColor: 'var(--theme-border)' }}
+              >
+                <Search size={16} style={{ color: 'var(--theme-text-muted)' }} />
+                <span className="flex-1 text-left text-sm" style={{ color: 'var(--theme-text-muted)' }}>
+                  Search Orbit
+                </span>
+                <kbd
+                  className="font-sans text-[11px] font-medium px-1.5 py-0.5 rounded-md border"
+                  style={{
+                    backgroundColor: 'var(--theme-bg-app)',
+                    borderColor: 'color-mix(in srgb, var(--theme-text) 20%, transparent)',
+                    color: 'var(--theme-text-muted)',
+                  }}
+                >
+                  Ctrl K
+                </kbd>
+              </button>
+            )}
+            {onOpenSearch && (
+              <HeaderIconButton title="Search messages" onClick={onOpenSearch} className="xl:hidden">
+                <Search size={18} />
+              </HeaderIconButton>
+            )}
+
+            {isDirect && (
+              <HeaderIconButton title="Open canvas" onClick={() => setActiveView('whiteboard')}>
+                <Canvas size={18} />
+              </HeaderIconButton>
+            )}
+            <HeaderIconButton title="Pinned messages" onClick={() => setShowPinsModal(true)}>
+              <Pin size={18} />
+            </HeaderIconButton>
+            <HeaderIconButton title="Start audio/video call" onClick={() => onStartHuddle(channel)}>
+              <PhoneCall size={18} />
+            </HeaderIconButton>
+
+            {/* More menu */}
+            <div className="relative" ref={moreMenuRef}>
+              <HeaderIconButton title="More options" onClick={() => setShowMoreMenu(!showMoreMenu)} active={showMoreMenu}>
+                <More size={18} />
+              </HeaderIconButton>
+              {showMoreMenu && (
+                <div
+                  className="absolute right-0 mt-1.5 w-56 rounded-xl border shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150"
+                  style={{ backgroundColor: 'var(--theme-bg-app)', borderColor: 'var(--theme-border)' }}
+                >
+                  {isDirect ? (
+                    // A 1:1 DM has no wider audience to filter, so it's a plain mute toggle
+                    <MenuItem
+                      icon={isMuted ? <Bell size={14} /> : <BellOff size={14} />}
+                      label={isMuted ? 'Unmute notifications' : 'Mute notifications'}
+                      disabled={isSavingNotifPref}
+                      onClick={() => {
+                        setShowMoreMenu(false);
+                        handleSetNotificationPreference(isMuted ? 'ALL' : 'MUTED');
+                      }}
+                    />
+                  ) : (
+                    <>
+                      <p
+                        className="px-3.5 pt-1.5 pb-1 text-[11px] font-bold tracking-[0.6px]"
+                        style={{ color: 'var(--theme-text-muted)' }}
+                      >
+                        NOTIFICATIONS
+                      </p>
+                      {(
+                        [
+                          { value: 'ALL', label: 'All new posts', Icon: Bell },
+                          { value: 'MENTIONS', label: 'Mentions only', Icon: AtSign },
+                          { value: 'MUTED', label: 'Mute', Icon: BellOff },
+                        ] as const
+                      ).map(({ value, label, Icon }) => (
+                        <MenuItem
+                          key={value}
+                          icon={<Icon size={14} />}
+                          label={label}
+                          selected={notificationPreference === value}
+                          disabled={isSavingNotifPref}
+                          onClick={() => {
+                            setShowMoreMenu(false);
+                            handleSetNotificationPreference(value);
+                          }}
+                        />
+                      ))}
+                    </>
+                  )}
+                  <div className="h-px my-1" style={{ backgroundColor: 'var(--theme-border)' }} />
+                  {canAddMembers && (
+                    <MenuItem
+                      icon={<UserPlus size={14} />}
+                      label="Add people"
+                      onClick={() => {
+                        setShowMoreMenu(false);
+                        onOpenAddMembers?.();
+                      }}
+                    />
+                  )}
+                  <MenuItem
+                    icon={<Info size={14} />}
+                    label={isDirect ? 'Conversation details' : 'Channel settings'}
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      setShowDetailsModal(true);
+                    }}
+                  />
+                  <MenuItem
+                    icon={<HardDrive size={14} />}
+                    label="Files & storage"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      setShowStorageModal(true);
+                    }}
+                  />
+                  <div className="h-px my-1" style={{ backgroundColor: 'var(--theme-border)' }} />
+                  <MenuItem
+                    icon={copiedChannelId ? <Check size={14} /> : <Copy size={14} />}
+                    label={copiedChannelId ? 'Channel ID copied' : 'Copy channel ID'}
+                    muted
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      handleCopyChannelId();
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs row */}
+        <div className="h-12 px-3 sm:px-7 flex items-center justify-between gap-3">
+          <div className="flex items-start gap-5 h-12 overflow-x-auto">
+            <HeaderTab label="Messages" active={activeView === 'messages'} onClick={() => setActiveView('messages')} />
+            <HeaderTab label="Canvas" active={activeView === 'whiteboard'} onClick={() => setActiveView('whiteboard')} />
+            <HeaderTab label="Pinned" count={pinnedCount} onClick={() => setShowPinsModal(true)} />
+            <HeaderTab label="Files" count={fileCount} onClick={() => setShowStorageModal(true)} />
+          </div>
+          {!isDirect && (
+            <button
+              onClick={() => setShowSidePanel((v) => !v)}
+              className="hidden lg:flex h-9 px-3.5 rounded-[18px] border items-center gap-1.5 text-[13px] font-medium shrink-0 transition hover:bg-[var(--theme-fill-hover)]"
+              style={{
+                borderColor: 'var(--theme-border)',
+                color: 'var(--theme-text)',
+                backgroundColor: showSidePanel ? 'var(--theme-selected)' : 'var(--theme-bg-app)',
+              }}
+            >
+              <Users size={15} />
+              Details
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Anonymous Discussion Info Banner */}
+      {/* Anonymity banner */}
       {channel.isAnonymous && (
-        <div className="bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 dark:from-purple-950/80 dark:via-indigo-950/60 dark:to-purple-950/80 border-b border-purple-500/30 px-3 sm:px-6 py-2 flex items-center justify-between text-xs text-purple-700 dark:text-purple-200 shrink-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-base shrink-0">🎭</span>
-            <span className="truncate">
-              <strong>Anonymous Discussion Mode:</strong> Real identities, avatars, and user IDs are strictly hidden.
-            </span>
-          </div>
+        <div
+          className="shrink-0 px-3 sm:px-6 py-3 flex items-center gap-2.5 text-[13px]"
+          style={{ backgroundColor: tint(ANON_WARM, 8) }}
+        >
+          <Info size={18} style={{ color: ANON_WARM }} />
+          <span className="flex-1 min-w-0" style={{ color: 'var(--theme-text)' }}>
+            Everything here is posted under a character name, not your profile. Keep it kind and follow the community rules.
+          </span>
           {anonProfile && (
             <button
               onClick={() => setShowAnonPersonaModal(true)}
-              className="ml-3 text-xs font-semibold underline text-purple-700 dark:text-purple-300 hover:text-[var(--theme-text)] shrink-0"
+              className="font-semibold whitespace-nowrap hover:underline shrink-0"
+              style={{ color: ANON_WARM_TEXT }}
             >
-              Change Persona ({anonProfile.anonEmoji} {anonProfile.anonName})
+              Change name
             </button>
           )}
         </div>
       )}
 
+      <div className="flex-1 flex min-h-0 relative">
+      <div className="flex-1 flex flex-col min-w-0 relative">
       {/* Main Content: Whiteboard View or Messages View */}
       {activeView === 'whiteboard' ? (
         <div className="flex-1 w-full h-full relative flex min-h-0">
@@ -885,23 +1135,82 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-4"
+        className="flex-1 overflow-y-auto px-3 sm:px-6 py-6 space-y-2.5"
       >
         {messages.length === 0 ? (
-          dmIntro || <div className="h-full flex flex-col items-center justify-center text-center">
-            <div
-              className="w-12 h-12 rounded-full flex items-center justify-center mb-3"
-              style={{ backgroundColor: 'var(--theme-bg-surface)', color: 'var(--theme-text-muted)' }}
-            >
-              <Hash size={24} />
+          dmIntro || (
+            <div className="min-h-full flex flex-col">
+              <div className="flex-1 flex flex-col items-center justify-center gap-3 p-8 text-center">
+                <span
+                  className="w-[72px] h-[72px] rounded-full flex items-center justify-center"
+                  style={{
+                    backgroundColor: channel.isAnonymous ? tint(ANON_WARM, 12) : 'var(--theme-bg-surface)',
+                    color: channel.isAnonymous ? ANON_WARM : 'var(--theme-accent)',
+                  }}
+                >
+                  {channel.isAnonymous ? <Mask size={32} /> : channel.type === 'PRIVATE' ? <Lock size={32} /> : <Hash size={32} />}
+                </span>
+                <h3 className="text-[17px] font-bold" style={{ color: 'var(--theme-text)' }}>
+                  Welcome to #{channel.name}
+                </h3>
+                <p className="text-sm leading-[21px] max-w-[360px]" style={{ color: 'var(--theme-text-muted)' }}>
+                  {channel.isAnonymous
+                    ? 'Nothing posted yet. Everything here is shared under a character name, so start the conversation.'
+                    : 'This is the very beginning of the channel. Add teammates or post the first message to get things moving.'}
+                </p>
+                <div className="flex items-center gap-2 pt-1">
+                  {canAddMembers && !channel.isAnonymous && (
+                    <button
+                      onClick={onOpenAddMembers}
+                      className="h-9 px-4 rounded-[18px] flex items-center gap-1.5 text-[13px] font-semibold transition hover:brightness-95"
+                      style={{ backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-text)' }}
+                    >
+                      <Plus size={15} />
+                      Add people
+                    </button>
+                  )}
+                  <button
+                    onClick={() => editorRef.current?.focus()}
+                    className="h-9 px-3.5 rounded-[18px] border flex items-center gap-1.5 text-[13px] font-medium transition hover:bg-[var(--theme-fill-hover)]"
+                    style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)', backgroundColor: 'var(--theme-bg-app)' }}
+                  >
+                    <MessageSquare size={15} />
+                    Post a message
+                  </button>
+                </div>
+              </div>
+              {!channel.isAnonymous && (
+                <div className="flex flex-wrap items-stretch justify-center gap-3 pb-0">
+                  {[
+                    { Icon: Users, title: 'Invite your team', body: 'Add members by name or email', onClick: canAddMembers ? onOpenAddMembers : undefined },
+                    { Icon: Canvas, title: 'Start a canvas', body: 'Plan together on a whiteboard', onClick: () => setActiveView('whiteboard') },
+                    { Icon: FileText, title: 'Share a doc', body: 'Link a doc everyone can read', onClick: () => fileInputRef.current?.click() },
+                  ].map(({ Icon, title, body, onClick }) => (
+                    <button
+                      key={title}
+                      onClick={onClick}
+                      disabled={!onClick}
+                      className="w-[230px] p-3.5 rounded-xl border flex flex-col items-start gap-1 text-left transition hover:bg-[var(--theme-fill-hover)] disabled:cursor-default"
+                      style={{ borderColor: 'var(--theme-border)', backgroundColor: 'var(--theme-bg-app)' }}
+                    >
+                      <span
+                        className="w-8 h-8 rounded-lg flex items-center justify-center"
+                        style={{ backgroundColor: 'var(--theme-bg-surface)', color: 'var(--theme-accent)' }}
+                      >
+                        <Icon size={16} />
+                      </span>
+                      <span className="text-[13px] font-bold" style={{ color: 'var(--theme-text)' }}>
+                        {title}
+                      </span>
+                      <span className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>
+                        {body}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            <h3 className="font-bold text-lg" style={{ color: 'var(--theme-text-primary)' }}>
-              This is the start of #{channel.name}
-            </h3>
-            <p className="text-sm max-w-xs mt-1" style={{ color: 'var(--theme-text-muted)' }}>
-              This channel was created for your team. Send a message to get started!
-            </p>
-          </div>
+          )
         ) : (
           <>
             {/* Load older messages button / indicator */}
@@ -925,7 +1234,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 >
                   {isLoadingOlder ? (
                     <>
-                      <Loader2 size={13} className="animate-spin text-slack-green" />
+                      <Loader2 size={13} className="animate-spin" style={{ color: 'var(--theme-primary)' }} />
                       <span>Loading older messages...</span>
                     </>
                   ) : (
@@ -937,17 +1246,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
             {/* Start of channel header (only shown when user has scrolled all the way to the beginning) */}
             {!hasMoreMessages && (
-              dmIntro || <div className="py-6 border-b mb-2" style={{ borderColor: 'var(--theme-border)' }}>
-                <div
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3 shadow"
-                  style={{ backgroundColor: 'var(--theme-bg-surface)', color: 'var(--theme-text-muted)' }}
+              dmIntro || <div className="pb-5 mb-1 border-b flex flex-col gap-2" style={{ borderColor: 'var(--theme-border)' }}>
+                <span
+                  className="w-14 h-14 rounded-full flex items-center justify-center"
+                  style={{
+                    backgroundColor: channel.isAnonymous ? tint(ANON_WARM, 12) : 'var(--theme-bg-surface)',
+                    color: channel.isAnonymous ? ANON_WARM : 'var(--theme-accent)',
+                  }}
                 >
-                  <Hash size={24} />
-                </div>
-                <h3 className="font-bold text-lg" style={{ color: 'var(--theme-text-primary)' }}>
-                  This is the start of #{channel.name}
+                  {channel.isAnonymous ? <Mask size={26} /> : channel.type === 'PRIVATE' ? <Lock size={26} /> : <Hash size={26} />}
+                </span>
+                <h3 className="text-[17px] font-bold" style={{ color: 'var(--theme-text)' }}>
+                  Welcome to #{channel.name}
                 </h3>
-                <p className="text-xs mt-1 max-w-md" style={{ color: 'var(--theme-text-muted)' }}>
+                <p className="text-sm leading-[21px] max-w-md" style={{ color: 'var(--theme-text-muted)' }}>
                   {channel.description || channel.topic || 'This is the very beginning of the channel history.'}
                 </p>
               </div>
@@ -965,9 +1277,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               ? msg.bot?.name
               : (msg.user?.displayName || 'Unknown');
             const anonEmoji = msg.anonEmoji || '🎭';
-            const avatarUrl = isBot
-              ? (msg.bot?.avatarUrl || `/api/avatar/bottts/svg?seed=${msg.bot?.name}`)
-              : (msg.user?.avatarUrl || `/api/avatar/bottts/svg?seed=${authorName}`);
+            const avatarUrl = isBot ? msg.bot?.avatarUrl : msg.user?.avatarUrl;
             // Profile hover card: real people only (not bots / anonymous posts)
             const author = !isAnon && !isBot ? msg.user : undefined;
             const withCard = (node: React.ReactNode, className?: string) =>
@@ -988,75 +1298,79 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
             return (
               <React.Fragment key={msg.id}>
+                {(idx === 0 || dayKey(messages[idx - 1].createdAt) !== dayKey(msg.createdAt)) && (
+                  <div className="flex items-center gap-2.5 py-1 select-none" role="separator">
+                    <span className="flex-1 h-px" style={{ backgroundColor: 'var(--theme-border)' }} />
+                    <span
+                      className="h-6 px-3 rounded-xl border flex items-center text-xs font-semibold"
+                      style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text-muted)', backgroundColor: 'var(--theme-bg-app)' }}
+                    >
+                      {dayLabel(msg.createdAt)}
+                    </span>
+                    <span className="flex-1 h-px" style={{ backgroundColor: 'var(--theme-border)' }} />
+                  </div>
+                )}
                 {firstUnreadMessageId === msg.id && (
-                  <div className="flex items-center gap-3 my-4 select-none relative z-10 animate-in fade-in duration-200">
-                    <div className="flex-1 h-[1.5px] bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.4)]" />
-                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider text-white bg-red-500 shadow-md">
-                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                      <span>New Messages</span>
-                    </div>
-                    <div className="flex-1 h-[1.5px] bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.4)]" />
+                  <div className="flex items-center gap-2.5 select-none animate-in fade-in duration-200" role="separator">
+                    <span
+                      className="flex-1 h-px"
+                      style={{ backgroundColor: 'color-mix(in srgb, var(--theme-primary) 55%, transparent)' }}
+                    />
+                    <span className="text-xs font-bold" style={{ color: 'var(--theme-primary)' }}>
+                      New messages
+                    </span>
                   </div>
                 )}
                 <div
                   id={`msg-${msg.id}`}
-                  className={`group flex gap-2.5 sm:gap-3 hover:bg-black/5 dark:hover:bg-[var(--theme-bg-surface-hover)] -mx-3 sm:-mx-6 px-3 sm:px-6 py-2 rounded-lg transition-all duration-300 relative ${
-                    msg.isPinned ? 'bg-amber-500/5 border-l-2 border-amber-400/80 pl-2 sm:pl-5' : ''
-                  }`}
+                  className="group flex gap-3 hover:bg-[var(--theme-fill-hover)] -mx-3 sm:-mx-6 px-3 sm:px-6 py-1 transition-colors duration-200 relative"
+                  style={
+                    msg.isPinned
+                      ? { backgroundColor: tint(ANON_WARM, 6), boxShadow: `inset 2px 0 0 ${ANON_WARM}` }
+                      : undefined
+                  }
                 >
                 {isAnon ? (
                   <div
-                    className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-900/70 to-indigo-900/70 border border-purple-500/40 flex items-center justify-center text-lg shrink-0 mt-0.5 shadow-sm select-none"
-                    title={authorName}
+                    className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0 select-none"
+                    style={{ backgroundColor: anonColor(authorName || 'Anonymous'), color: '#FFFFFF' }}
+                    title={`${anonEmoji} ${authorName}`}
                   >
-                    {anonEmoji}
+                    <Mask size={18} />
                   </div>
                 ) : (
                   withCard(
-                    <img src={avatarUrl} alt={authorName} className="w-9 h-9 rounded-lg object-cover shrink-0 mt-0.5 cursor-pointer" />,
+                    <Avatar name={authorName} src={avatarUrl} size={36} className="cursor-pointer" />,
                     'shrink-0 self-start',
                   )
                 )}
 
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 flex flex-col gap-[3px]">
                   {msg.isPinned && (
-                    <div className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-semibold mb-1">
-                      <Pin size={11} className="fill-amber-400" />
+                    <div className="flex items-center gap-1 text-[11px] font-semibold" style={{ color: ANON_WARM_TEXT }}>
+                      <Pin size={11} />
                       <span>Pinned to channel</span>
                     </div>
                   )}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 leading-none">
                     {withCard(
                     <span
-                      className="font-bold text-sm hover:underline cursor-pointer flex items-center gap-1.5"
-                      style={{ color: 'var(--theme-text-primary)' }}
+                      className={`font-bold text-sm flex items-center gap-1.5 ${author ? 'hover:underline cursor-pointer' : ''}`}
+                      style={{ color: 'var(--theme-text)' }}
                     >
-                      {authorName}
-                      {isAnon ? (
+                      {!isAnon && author && author.id === currentUser.id ? 'You' : authorName}
+                      {isBot && (
                         <span
-                          className={`text-[10px] font-semibold px-1.5 py-0.2 rounded uppercase ${
-                            isSelf
-                              ? 'bg-purple-100 dark:bg-purple-900/70 text-purple-700 dark:text-purple-200 border border-purple-500/40'
-                              : 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)] border border-[var(--theme-border)]'
-                          }`}
-                        >
-                          {isSelf ? 'You (Anon)' : 'Anonymous'}
-                        </span>
-                      ) : isBot ? (
-                        <span
-                          className="text-[10px] font-semibold px-1.5 py-0.2 rounded uppercase border"
-                          style={{
-                            backgroundColor: 'var(--theme-bg-surface-hover)',
-                            borderColor: 'var(--theme-border)',
-                            color: 'var(--theme-text-muted)',
-                          }}
+                          className="h-4 px-1.5 rounded flex items-center text-[10px] font-semibold leading-3"
+                          style={{ backgroundColor: 'var(--theme-bg-surface-hover)', color: 'var(--theme-text-muted)' }}
                         >
                           APP
                         </span>
-                      ) : null}
+                      )}
                     </span>
                     )}
-                    <span className="text-[11px]" style={{ color: 'var(--theme-text-muted)' }}>
+                    <span className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>
+                      {isAnon && isSelf ? 'You · ' : ''}
                       {formatMessageTime(msg.createdAt, timeFormat)}
                     </span>
                     <MessageChangeNote message={msg} timeFormat={timeFormat} className="text-[10px] opacity-80" />
@@ -1115,7 +1429,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                             type="button"
                             onClick={() => handleSaveEdit(msg.id)}
                             disabled={isSavingEdit || !editContent.trim()}
-                            className="px-3 py-1 rounded text-xs font-semibold text-white transition flex items-center gap-1.5 shadow-sm"
+                            className="px-3 py-1 rounded text-xs font-semibold text-[var(--theme-primary-text)] transition flex items-center gap-1.5 shadow-sm"
                             style={{
                               backgroundColor: 'var(--theme-primary)',
                             }}
@@ -1141,9 +1455,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                             const el = document.getElementById(`msg-${msg.quotedMessage?.id}`);
                             if (el) {
                               el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                              el.classList.add('bg-slack-activeChannel/25', 'ring-2', 'ring-slack-activeChannel');
+                              el.classList.add('ring-2', 'ring-[var(--theme-primary)]');
                               setTimeout(() => {
-                                el.classList.remove('bg-slack-activeChannel/25', 'ring-2', 'ring-slack-activeChannel');
+                                el.classList.remove('ring-2', 'ring-[var(--theme-primary)]');
                               }, 2000);
                             }
                           }}
@@ -1151,10 +1465,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                             backgroundColor: 'var(--theme-bg-surface)',
                             borderColor: 'var(--theme-border)',
                           }}
-                          className="mt-1 mb-1.5 flex items-center gap-2 border-l-4 border-slack-green rounded-r-lg px-3 py-1.5 cursor-pointer text-xs transition max-w-lg shadow-sm"
+                          className="mt-1 mb-1.5 flex items-center gap-2 border-l-4 border-l-[var(--theme-primary)] rounded-r-lg px-3 py-1.5 cursor-pointer text-xs transition max-w-lg"
                         >
                           <div className="min-w-0">
-                            <span className="font-bold text-slack-green text-[11px] block">
+                            <span className="font-bold text-[11px] block" style={{ color: 'var(--theme-primary-hover)' }}>
                               {channel.isAnonymous || msg.quotedMessage.isAnonymous
                                 ? (msg.quotedMessage.anonName ? `${msg.quotedMessage.anonEmoji || '🎭'} ${msg.quotedMessage.anonName}` : 'Anonymous')
                                 : (msg.quotedMessage.user?.displayName || 'Teammate')}
@@ -1167,7 +1481,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       )}
 
                       {/* Message Content */}
-                      <div className="text-sm mt-1 max-w-none break-words" style={{ color: 'var(--theme-text-primary)' }}>
+                      <div className="text-sm leading-[21px] max-w-none break-words" style={{ color: 'var(--theme-text)' }}>
                         <MarkdownRenderer
                           content={msg.content}
                           currentUsername={currentUser?.username}
@@ -1208,27 +1522,37 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         if (entries.length === 0) return null;
 
                         return (
-                          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                          <div className="flex items-center gap-1.5 pt-1 flex-wrap">
                             {entries.map(([emoji, data]) => (
                               <button
                                 key={emoji}
                                 onClick={() => handleReaction(msg.id, emoji)}
                                 title={data.users.join(', ')}
-                                className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition border ${
+                                className="h-6 px-2 rounded-xl border flex items-center gap-1 text-xs font-semibold transition hover:brightness-95"
+                                style={
                                   data.hasReacted
-                                    ? 'bg-slack-activeChannel/20 border-slack-activeChannel text-slack-activeChannel font-bold'
-                                    : 'bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] border-[var(--theme-border)] text-[var(--theme-text)]'
-                                }`}
+                                    ? {
+                                        backgroundColor: 'var(--theme-selected)',
+                                        borderColor: 'color-mix(in srgb, var(--theme-primary) 40%, transparent)',
+                                        color: 'var(--theme-primary-hover)',
+                                      }
+                                    : {
+                                        backgroundColor: 'var(--theme-bg-app)',
+                                        borderColor: 'var(--theme-border)',
+                                        color: 'var(--theme-text-muted)',
+                                      }
+                                }
                               >
-                                <span>{emoji}</span>
-                                <span className="text-[11px]">{data.count}</span>
+                                <span className="text-xs leading-none">{emoji}</span>
+                                <span>{data.count}</span>
                               </button>
                             ))}
 
                             <button
                               onClick={() => setActiveEmojiMessageId(activeEmojiMessageId === msg.id ? null : msg.id)}
                               title="Add reaction"
-                              className="flex items-center justify-center w-6 h-6 rounded-full bg-[var(--theme-bg-surface-hover)] hover:bg-[var(--theme-bg-surface-hover)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition"
+                              className="h-6 w-7 rounded-xl border flex items-center justify-center transition opacity-0 group-hover:opacity-100 hover:bg-[var(--theme-fill-hover)]"
+                              style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text-muted)' }}
                             >
                               <SmilePlus size={12} />
                             </button>
@@ -1242,10 +1566,26 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   {(msg.replyCount || 0) > 0 && (
                     <button
                       onClick={() => onOpenThread(msg)}
-                      className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-300 transition"
+                      className="self-start flex items-center gap-2 pt-1 group/thread"
                     >
-                      <MessageSquare size={13} />
-                      <span>{msg.replyCount} {msg.replyCount === 1 ? 'reply' : 'replies'}</span>
+                      <span
+                        className="w-5 h-5 rounded-full flex items-center justify-center"
+                        style={{ backgroundColor: 'var(--theme-selected)', color: 'var(--theme-accent)' }}
+                      >
+                        <MessageSquare size={11} />
+                      </span>
+                      <span className="text-[13px] font-semibold group-hover/thread:underline" style={{ color: 'var(--theme-primary-hover)' }}>
+                        {msg.replyCount} {msg.replyCount === 1 ? 'reply' : 'replies'}
+                      </span>
+                      {msg.latestReplyAt && (
+                        <span className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>
+                          Last reply{' '}
+                          {(() => {
+                            const r = relativeTime(msg.latestReplyAt);
+                            return r === 'Just now' || r === 'Yesterday' ? r.toLowerCase() : r;
+                          })()}
+                        </span>
+                      )}
                     </button>
                   )}
                 </div>
@@ -1293,11 +1633,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       title={msg.isPinned ? 'Unpin message' : 'Pin message to channel'}
                       className={`p-1 rounded transition ${
                         msg.isPinned
-                          ? 'text-amber-600 dark:text-amber-400 hover:text-amber-300'
+                          ? 'text-[#D97706]'
                           : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]'
                       }`}
                     >
-                      <Pin size={14} className={msg.isPinned ? 'fill-amber-400' : ''} />
+                      <Pin size={14} />
                     </button>
                     {onCreateTicketFromMessage && (
                       <button
@@ -1324,7 +1664,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       <button
                         onClick={() => setDeleteConfirmMessage(msg)}
                         title="Delete message"
-                        className="p-1 text-red-600 dark:text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded transition"
+                        className="p-1 text-[#DC2626] hover:bg-[color-mix(in_srgb,#DC2626_12%,transparent)] rounded transition"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -1357,14 +1697,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
       {/* Typing Indicator */}
       {typingUsers.length > 0 && (
-        <div className="px-3 sm:px-6 py-1 text-xs text-[var(--theme-text-muted)] italic flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" />
+        <div className="px-3 sm:px-6 py-1 text-xs italic flex items-center gap-1.5" style={{ color: 'var(--theme-text-muted)' }}>
+          <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ backgroundColor: 'var(--theme-text-muted)' }} />
           <span>{typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...</span>
         </div>
       )}
 
       {/* Chat Input Container */}
-      <div className="px-3 sm:px-6 pb-3 sm:pb-6 pt-1 relative">
+      <div className="px-3 sm:px-6 pb-5 pt-1 relative">
         {/* Floating "New Messages ↓" pill positioned above the input box */}
         {firstUnreadMessageId && !isNearBottomRef.current && (
           <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-30 animate-in fade-in slide-in-from-bottom-2 duration-150 pointer-events-auto">
@@ -1374,7 +1714,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
                 setFirstUnreadMessageId(null);
               }}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slack-green hover:bg-slack-green/90 text-white text-xs font-semibold shadow-xl border border-black/10 dark:border-white/10 transition transform hover:scale-105 cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-xl transition hover:brightness-95 cursor-pointer bg-[var(--theme-primary)] text-[var(--theme-primary-text)]"
             >
               <span>New messages</span>
               <ChevronDown size={14} />
@@ -1384,9 +1724,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
         {/* Quote Reply Banner */}
         {replyingToMessage && (
-          <div className="mb-2 bg-[var(--theme-bg-surface)] border-l-4 border-slack-green rounded-r-xl px-3.5 py-2 flex items-center justify-between shadow-lg">
+          <div
+            className="mb-2 rounded-r-xl px-3.5 py-2 flex items-center justify-between border-l-4"
+            style={{ backgroundColor: 'var(--theme-bg-surface)', borderLeftColor: 'var(--theme-primary)' }}
+          >
             <div className="min-w-0 flex-1 mr-2">
-              <span className="text-[11px] font-bold text-slack-green flex items-center gap-1.5">
+              <span className="text-[11px] font-bold flex items-center gap-1.5" style={{ color: 'var(--theme-primary-hover)' }}>
                 <CornerUpLeft size={12} />
                 Replying to{' '}
                 {channel.isAnonymous || replyingToMessage.isAnonymous
@@ -1427,7 +1770,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   onClick={() => setContent(c.cmd.split(' ')[0] + ' ')}
                   className="flex items-center justify-between px-3 py-1.5 hover:bg-[var(--theme-bg-surface-hover)] rounded-lg cursor-pointer text-xs transition"
                 >
-                  <span className="font-mono text-slack-green font-semibold">{c.cmd}</span>
+                  <span className="font-mono font-semibold" style={{ color: 'var(--theme-primary-hover)' }}>{c.cmd}</span>
                   <span className="text-[var(--theme-text-muted)]">{c.desc}</span>
                 </div>
               ))}
@@ -1443,18 +1786,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           onDragLeave={() => setIsDragOver(false)}
           onDrop={handleDrop}
           style={{
-            backgroundColor: 'var(--theme-bg-surface)',
+            backgroundColor: 'var(--theme-bg-app)',
             borderColor: 'var(--theme-border)',
+            boxShadow: '0 1px 1px rgba(20, 26, 46, 0.06)',
           }}
-          className={`border rounded-xl focus-within:border-gray-500 shadow-lg relative transition ${
-            isDragOver
-              ? 'ring-2 ring-slack-green/50'
-              : ''
+          className={`border rounded-xl relative transition focus-within:border-[color-mix(in_srgb,var(--theme-text)_20%,transparent)] ${
+            isDragOver ? 'ring-2 ring-[var(--theme-primary)]' : ''
           }`}
         >
           {/* File Attachments Preview & Upload Indicator */}
           {(attachments.length > 0 || isUploading) && (
-            <div className="px-3 pt-2.5 flex flex-wrap gap-2 border-b border-[var(--theme-border)] pb-2.5 bg-[var(--theme-bg-surface)] rounded-t-xl">
+            <div className="px-3 pt-2.5 flex flex-wrap gap-2 border-b border-[var(--theme-border)] pb-2.5 rounded-t-xl">
               {attachments.map((att, idx) => {
                 const isImage = getFileCategory(att.fileType, att.fileName) === 'image';
                 return (
@@ -1475,7 +1817,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         />
                       </div>
                     ) : (
-                      <FileText size={14} className="text-blue-600 dark:text-blue-400" />
+                      <FileText size={14} style={{ color: 'var(--theme-text-muted)' }} />
                     )}
                     <span className="truncate max-w-[140px] font-medium" title={att.fileName}>
                       {att.fileName}
@@ -1496,7 +1838,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               })}
 
               {isUploading && (
-                <div className="flex items-center gap-1.5 bg-[var(--theme-bg-surface-hover)] px-2.5 py-1 rounded-lg text-xs text-slack-green border border-slack-green/40 animate-pulse">
+                <div className="flex items-center gap-1.5 bg-[var(--theme-bg-surface-hover)] px-2.5 py-1 rounded-lg text-xs text-[var(--theme-primary)] border border-[var(--theme-border)] animate-pulse">
                   <Loader2 size={13} className="animate-spin" />
                   <span>Uploading file...</span>
                 </div>
@@ -1514,7 +1856,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               isDragOver
                 ? 'Drop file here to upload to channel...'
                 : channel.isAnonymous
-                ? `Message as ${anonProfile?.anonEmoji || '🎭'} ${anonProfile?.anonName || 'Anonymous'}...`
+                ? `Post as ${anonProfile?.anonName || 'Anonymous'}`
                 : channel.type === 'DIRECT'
                 ? `Message ${dmName}`
                 : `Message #${channel.name}`
@@ -1527,52 +1869,57 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           />
 
           {/* Action Bar */}
-          <div className="flex items-center justify-between px-3 py-2 bg-[var(--theme-bg-surface)] border-t border-[var(--theme-border)] rounded-b-xl">
-            <div className="flex items-center gap-1">
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileUpload}
-                multiple
-                className="hidden"
-              />
+          <div className="flex items-center gap-0.5 px-2.5 pb-2.5 rounded-b-xl">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              multiple
+              className="hidden"
+            />
+            {[
+              {
+                title: showFormatting ? 'Hide formatting' : 'Show formatting',
+                Icon: Pencil,
+                onClick: () => setShowFormatting(!showFormatting),
+                active: showFormatting,
+              },
+              { title: 'Add emoji', Icon: Smile, onClick: () => setShowEmoji(!showEmoji), active: showEmoji },
+              ...(channel.isAnonymous
+                ? []
+                : [{ title: 'Mention someone', Icon: AtSign, onClick: () => editorRef.current?.insertEmoji('@'), active: false }]),
+              {
+                title: 'Attach files (images, docs, code, zip...)',
+                Icon: Paperclip,
+                onClick: () => fileInputRef.current?.click(),
+                active: false,
+              },
+            ].map(({ title, Icon, onClick, active }) => (
               <button
+                key={title}
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
-                title="Attach files (images, docs, code, zip...)"
-                className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition"
+                onClick={onClick}
+                title={title}
+                className="w-[30px] h-[30px] rounded-lg flex items-center justify-center transition hover:bg-[var(--theme-fill-hover)]"
+                style={{
+                  color: active ? 'var(--theme-text)' : 'var(--theme-text-muted)',
+                  backgroundColor: active ? 'var(--theme-fill)' : undefined,
+                }}
               >
-                <Paperclip size={16} />
+                <Icon size={17} />
               </button>
-
-              <button
-                type="button"
-                onClick={() => setShowFormatting(!showFormatting)}
-                title={showFormatting ? 'Hide formatting toolbar' : 'Show formatting toolbar'}
-                className={`p-1.5 rounded-lg transition ${
-                  showFormatting ? 'bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)]' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]'
-                }`}
-              >
-                <Type size={16} />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowEmoji(!showEmoji)}
-                title="Add emoji"
-                className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition relative"
-              >
-                <Smile size={16} />
-              </button>
-            </div>
+            ))}
+            <span className="flex-1" />
 
             <button
               type="submit"
               disabled={(!content.trim() && attachments.length === 0) || isUploading}
+              title="Send"
+              className="w-8 h-8 rounded-[10px] transition disabled:opacity-40 flex items-center justify-center hover:brightness-95"
               style={{
-                backgroundColor: 'var(--theme-primary)',
+                backgroundColor: channel.isAnonymous ? ANON_WARM : 'var(--theme-primary)',
+                color: channel.isAnonymous ? '#FFFFFF' : 'var(--theme-primary-text)',
               }}
-              className="p-1.5 hover:opacity-90 text-white rounded-lg transition disabled:opacity-30 flex items-center justify-center"
             >
               {isUploading ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
             </button>
@@ -1592,6 +1939,23 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       </div>
       </>
       )}
+      </div>
+      {showSidePanel && (
+        <ChannelSidePanel
+          channel={channel}
+          messages={messages}
+          currentUser={currentUser}
+          members={members}
+          presence={presence}
+          dmPeer={dmPeer}
+          onClose={() => setShowSidePanel(false)}
+          onOpenSettings={() => setShowDetailsModal(true)}
+          onOpenWhiteboard={() => setActiveView('whiteboard')}
+          onJumpToMessage={jumpToMessage}
+          onHuddleUser={onHuddleUser}
+        />
+      )}
+      </div>
 
       {/* Channel Storage & Files Modal */}
       {showStorageModal && (
@@ -1612,6 +1976,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           onClose={() => setShowDetailsModal(false)}
           channel={channel}
           currentUser={currentUser}
+          presence={presence}
           onOpenAddMembers={onOpenAddMembers}
           onOpenWhiteboard={() => setActiveView('whiteboard')}
           onOpenStorage={() => setShowStorageModal(true)}
@@ -1633,9 +1998,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             const el = document.getElementById(`msg-${msg.id}`);
             if (el) {
               el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              el.classList.add('bg-slack-activeChannel/25', 'ring-2', 'ring-slack-activeChannel');
+              el.classList.add('ring-2', 'ring-[var(--theme-primary)]');
               setTimeout(() => {
-                el.classList.remove('bg-slack-activeChannel/25', 'ring-2', 'ring-slack-activeChannel');
+                el.classList.remove('ring-2', 'ring-[var(--theme-primary)]');
               }, 3000);
             }
           }}

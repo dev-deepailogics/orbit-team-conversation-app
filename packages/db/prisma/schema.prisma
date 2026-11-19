@@ -29,6 +29,12 @@ enum ChannelType {
   GROUP_DIRECT
 }
 
+enum NotificationPreference {
+  ALL      // Notify on every new post (default)
+  MENTIONS // Notify only when the user is @mentioned
+  MUTED    // Never notify
+}
+
 enum NotificationType {
   MENTION
   DIRECT_MESSAGE
@@ -207,13 +213,14 @@ model Channel {
 }
 
 model ChannelMember {
-  id         String    @id @default(uuid())
-  channelId  String
-  userId     String
-  anonName   String?
-  anonEmoji  String?
-  joinedAt   DateTime  @default(now())
-  lastReadAt DateTime  @default(now())
+  id                     String                 @id @default(uuid())
+  channelId              String
+  userId                 String
+  anonName               String?
+  anonEmoji              String?
+  joinedAt               DateTime               @default(now())
+  lastReadAt             DateTime               @default(now())
+  notificationPreference NotificationPreference @default(ALL)
 
   channel    Channel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -2,12 +2,38 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useResizableSidebar } from '../layout/useResizableSidebar';
-import { Canvas, Channel, UserProfile } from '@orbit/types';
-import { Plus, Search, PenTool, Trash2, Link2, PanelLeft, X } from 'lucide-react';
+import { Canvas, Channel, UserProfile, WorkspaceMember } from '@orbit/types';
+import {
+  Plus,
+  Search,
+  Canvas as CanvasIcon,
+  Trash2,
+  Link2,
+  X,
+  Share2,
+  Board,
+  SortDown,
+  Pencil,
+} from '@/components/ui/icons';
 import { api } from '../../lib/api';
 import { useChatStore } from '../../stores/chatStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { WhiteboardView } from './WhiteboardView';
+import { NewCanvasModal } from './NewCanvasModal';
+import { ShareCanvasModal } from './ShareCanvasModal';
+import { LinkConversationModal } from '../channel/LinkConversationModal';
+import { Avatar, relativeTime } from '../project/projectViewUtils';
+import {
+  MenuItem,
+  MoreButton,
+  OutlinePill,
+  PageHeader,
+  Popover,
+  SearchField,
+  SearchOrbitButton,
+  SolidPill,
+  TabsRow,
+} from '../project/docsCanvasUi';
 
 interface CanvasViewProps {
   workspaceId: string;
@@ -17,9 +43,30 @@ interface CanvasViewProps {
   initialCanvasId?: string | null;
   onClose?: () => void;
   onOpenCanvasSidebar?: () => void;
+  // Optional: owner names on cards; without it others' canvases show "Teammate"
+  members?: WorkspaceMember[];
+  // Optional controlled selection (e.g. driven by the app sidebar)
+  selectedCanvasId?: string | null;
+  onSelectCanvas?: (canvasId: string | null) => void;
+  onOpenSearch?: () => void;
+  getCanvasLink?: (canvasId: string) => string;
+  // Bump to open the New canvas dialog from outside (e.g. the sidebar's "+")
+  newCanvasSignal?: number;
+  // Keep an outside canvas list (the app sidebar) in sync with changes made here
+  onCanvasCreated?: (canvas: Canvas) => void;
+  onCanvasDeleted?: (canvasId: string) => void;
 }
 
+type CanvasTab = 'all' | 'linked' | 'others';
+type SortKey = 'edited' | 'title' | 'created';
+const SORT_LABEL: Record<SortKey, string> = { edited: 'Last edited', title: 'Title', created: 'Date created' };
+
 const isDirect = (c: Channel) => c.type === 'DIRECT' || c.type === 'GROUP_DIRECT';
+
+const editedLabel = (iso: string) => {
+  const rel = relativeTime(iso);
+  return rel === 'Just now' ? 'Edited just now' : `Edited ${rel === 'Yesterday' ? 'yesterday' : rel}`;
+};
 
 export const CanvasView: React.FC<CanvasViewProps> = ({
   workspaceId,
@@ -28,25 +75,49 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
   initialCanvasId,
   onClose,
   onOpenCanvasSidebar,
+  members = [],
+  selectedCanvasId,
+  onSelectCanvas,
+  onOpenSearch,
+  getCanvasLink,
+  newCanvasSignal,
+  onCanvasCreated,
+  onCanvasDeleted,
 }) => {
+  const [showLink, setShowLink] = useState(false);
   const channels = useChatStore((s) => s.channels);
   const projects = useProjectStore((s) => s.projects);
   const [canvases, setCanvases] = useState<Canvas[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedId, setSelectedId] = useState<string | null>(initialCanvasId || null);
+  const [localSelectedId, setLocalSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [tab, setTab] = useState<CanvasTab>('all');
+  const [sortKey, setSortKey] = useState<SortKey>('edited');
+  const [showNew, setShowNew] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const sidebar = useResizableSidebar('orbit_canvas_sidebar_width');
   const [isSidebarOpen, setIsSidebarOpen] = useState(
     () => typeof window === 'undefined' || window.innerWidth >= 768
   );
   const [titleDraft, setTitleDraft] = useState('');
 
+  const controlled = selectedCanvasId !== undefined;
+  const selectedId = controlled ? selectedCanvasId : localSelectedId;
+  const setSelectedId = (id: string | null) => {
+    if (!controlled) setLocalSelectedId(id);
+    onSelectCanvas?.(id);
+  };
+
   const selected = canvases.find((c) => c.id === selectedId) || null;
+
+  useEffect(() => {
+    if (newCanvasSignal) setShowNew(true);
+  }, [newCanvasSignal]);
 
   useEffect(() => {
     let alive = true;
     setIsLoading(true);
-    setSelectedId(initialCanvasId || null);
+    if (!controlled) setLocalSelectedId(null);
     api
       .get('/api/canvases', { params: { workspaceId, channelId: scope?.channelId, projectId: scope?.projectId } })
       .then((res) => {
@@ -66,36 +137,64 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     return () => {
       alive = false;
     };
-  }, [workspaceId, scope?.channelId, scope?.projectId, initialCanvasId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceId, scope?.channelId, scope?.projectId]);
 
   useEffect(() => setTitleDraft(selected?.title || ''), [selected?.id, selected?.title]);
 
   const channelLabel = (c: Channel) => {
-    if (!isDirect(c)) return `#${c.name}`;
+    if (!isDirect(c)) return `# ${c.name}`;
     const others = (c.members || []).filter((m) => m.userId !== currentUser?.id).map((m) => m.user?.displayName);
     return others.filter(Boolean).join(', ') || c.name;
   };
 
+  const linkedChannel = (canvas: Canvas) => (canvas.channelId ? channels.find((c) => c.id === canvas.channelId) || null : null);
+  const linkedProject = (canvas: Canvas) => (canvas.projectId ? projects.find((p) => p.id === canvas.projectId) || null : null);
+
   const linkLabel = (canvas: Canvas) => {
     if (canvas.channelId) {
-      const ch = channels.find((c) => c.id === canvas.channelId);
+      const ch = linkedChannel(canvas);
       return ch ? channelLabel(ch) : 'Linked chat';
     }
     if (canvas.projectId) {
-      const pr = projects.find((p) => p.id === canvas.projectId);
-      return pr ? `${pr.icon || '📋'} ${pr.name}` : 'Linked project';
+      const pr = linkedProject(canvas);
+      return pr ? `${pr.name} board` : 'Linked project';
     }
     return null;
   };
 
+  const owner = (canvas: Canvas) => {
+    if (canvas.createdById === currentUser?.id) {
+      return { name: currentUser.displayName, label: `You (${currentUser.displayName})`, avatarUrl: currentUser.avatarUrl, isMe: true };
+    }
+    const u = members.find((m) => m.userId === canvas.createdById)?.user;
+    return { name: u?.displayName || 'Teammate', label: u?.displayName || 'Teammate', avatarUrl: u?.avatarUrl, isMe: false };
+  };
+
+  const tabCanvases: Record<CanvasTab, Canvas[]> = useMemo(
+    () => ({
+      all: canvases,
+      linked: canvases.filter((c) => c.channelId || c.projectId),
+      others: canvases.filter((c) => c.createdById !== currentUser?.id),
+    }),
+    [canvases, currentUser?.id]
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return q ? canvases.filter((c) => c.title.toLowerCase().includes(q)) : canvases;
-  }, [canvases, search]);
+    const list = tabCanvases[tab].filter((c) => !q || c.title.toLowerCase().includes(q));
+    return [...list].sort((a, b) =>
+      sortKey === 'title'
+        ? a.title.localeCompare(b.title)
+        : sortKey === 'created'
+          ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          : new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    );
+  }, [tabCanvases, tab, search, sortKey]);
 
   const openCanvas = (id: string) => {
     setSelectedId(id);
-    if (typeof window !== 'undefined' && window.innerWidth < 768) setIsSidebarOpen(false);
+    if (scope && typeof window !== 'undefined' && window.innerWidth < 768) setIsSidebarOpen(false);
   };
 
   const patchCanvas = async (id: string, body: Partial<Pick<Canvas, 'title' | 'channelId' | 'projectId'>>) => {
@@ -107,26 +206,12 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     }
   };
 
-  const handleCreate = async () => {
-    try {
-      const res = await api.post('/api/canvases', {
-        workspaceId,
-        title: 'Untitled canvas',
-        channelId: scope?.channelId,
-        projectId: scope?.projectId,
-      });
-      setCanvases((prev) => [res.data, ...prev]);
-      openCanvas(res.data.id);
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to create canvas');
-    }
-  };
-
   const handleDelete = async (canvas: Canvas) => {
     if (!window.confirm(`Delete "${canvas.title}" for everyone? This cannot be undone.`)) return;
     try {
       await api.delete(`/api/canvases/${canvas.id}`);
       setCanvases((prev) => prev.filter((c) => c.id !== canvas.id));
+      onCanvasDeleted?.(canvas.id);
       if (selectedId === canvas.id) setSelectedId(null);
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to delete canvas');
@@ -141,269 +226,447 @@ export const CanvasView: React.FC<CanvasViewProps> = ({
     }
   };
 
-  const linkValue = selected?.channelId
-    ? `channel:${selected.channelId}`
-    : selected?.projectId
-      ? `project:${selected.projectId}`
-      : '';
-
-  const handleLinkChange = (value: string) => {
-    if (!selected) return;
-    const [kind, id] = value.split(':');
-    patchCanvas(selected.id, {
-      channelId: kind === 'channel' ? id : null,
-      projectId: kind === 'project' ? id : null,
-    });
-  };
-
-  const linkableChannels = channels.filter((c) => !c.isArchived && !isDirect(c));
-  const linkableChats = channels.filter((c) => !c.isArchived && isDirect(c));
 
   const canDelete = (c: Canvas) => c.createdById === currentUser?.id || currentUser?.systemRole === 'SUPER_ADMIN';
 
-  const headerSlot = selected && (
-    <div className="flex items-center gap-1.5 min-w-0">
-      <button
-        onClick={onOpenCanvasSidebar || (() => setIsSidebarOpen((v) => !v))}
-        title="Show canvas list"
-        aria-label="Toggle canvas list"
-        className="p-1 rounded-md shrink-0 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]"
-      >
-        <PanelLeft size={14} />
-      </button>
-      <input
-        value={titleDraft}
-        onChange={(e) => setTitleDraft(e.target.value)}
-        onBlur={commitTitle}
-        onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-        aria-label="Canvas title"
-        className="bg-transparent font-bold text-xs sm:text-sm text-[var(--theme-text)] focus:outline-none min-w-0 w-24 sm:w-44 rounded px-1 hover:bg-[var(--theme-bg-surface-hover)] focus:bg-[var(--theme-bg-surface-hover)]"
+  const newCanvasModal = showNew && (
+    <NewCanvasModal
+      workspaceId={workspaceId}
+      currentUser={currentUser}
+      channels={channels}
+      projects={projects}
+      defaultLink={
+        scope ? { channelId: scope.channelId || null, projectId: scope.projectId || null } : undefined
+      }
+      onClose={() => setShowNew(false)}
+      onCreated={(canvas) => {
+        setShowNew(false);
+        setCanvases((prev) => [canvas, ...prev]);
+        onCanvasCreated?.(canvas);
+        openCanvas(canvas.id);
+      }}
+    />
+  );
+
+  // ---------------- Workspace (a canvas is open) ----------------
+  const workspace = selected && (
+    <>
+      <WhiteboardView
+        key={selected.id}
+        canvas={selected}
+        currentUser={currentUser}
+        onClose={onClose}
+        onBack={() => setSelectedId(null)}
+        backLabel="Canvas"
+        headerSlot={
+          <input
+            value={titleDraft}
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onBlur={commitTitle}
+            onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+            aria-label="Canvas title"
+            className="w-full max-w-[420px] bg-transparent font-bold outline-none rounded-md -ml-1 px-1 hover:bg-[var(--theme-fill-hover)] focus:bg-[var(--theme-fill-hover)]"
+            style={{ color: 'var(--theme-text)' }}
+          />
+        }
+        headerMeta={
+          linkLabel(selected) && (
+            <>
+              <span>·</span>
+              <span className="font-medium truncate" style={{ color: 'var(--theme-primary-hover)' }}>
+                Linked to {linkLabel(selected)}
+              </span>
+            </>
+          )
+        }
+        headerActions={
+          <>
+            <span className="hidden md:block">
+              <OutlinePill onClick={() => setShowLink(true)} icon={<Link2 size={14} />} title="Link to a channel or chat">
+                {linkLabel(selected) ? `Linked: ${linkLabel(selected)}` : 'Link to channel'}
+              </OutlinePill>
+            </span>
+            <SolidPill onClick={() => setShowShare(true)} icon={<Share2 size={14} />}>
+              Share
+            </SolidPill>
+          </>
+        }
+        moreItems={(close) => (
+          <>
+            {projects.length > 0 && <GroupLabel>Link to project board</GroupLabel>}
+            {projects.map((p) => (
+              <MenuItem
+                key={p.id}
+                icon={<Board size={14} />}
+                selected={p.id === selected.projectId}
+                onClick={() => {
+                  close();
+                  patchCanvas(selected.id, { channelId: null, projectId: p.id === selected.projectId ? null : p.id });
+                }}
+              >
+                {p.name}
+              </MenuItem>
+            ))}
+            {canDelete(selected) && (
+              <MenuItem
+                danger
+                icon={<Trash2 size={14} />}
+                onClick={() => {
+                  close();
+                  handleDelete(selected);
+                }}
+              >
+                Delete canvas
+              </MenuItem>
+            )}
+          </>
+        )}
       />
-      <label className="flex items-center gap-1 text-[11px] text-[var(--theme-text-muted)] shrink-0" title="Link to a channel, chat or project">
-        <Link2 size={13} />
-        <select
-          value={linkValue}
-          onChange={(e) => handleLinkChange(e.target.value)}
-          aria-label="Link canvas to"
-          className="bg-[var(--theme-bg-surface)] text-[var(--theme-text)] border border-[var(--theme-border)] rounded-md px-1 py-0.5 text-[11px] max-w-[110px] sm:max-w-[180px] focus:outline-none"
-        >
-          <option value="">Not linked</option>
-          {linkableChannels.length > 0 && (
-            <optgroup label="Channels">
-              {linkableChannels.map((c) => (
-                <option key={c.id} value={`channel:${c.id}`}>{channelLabel(c)}</option>
-              ))}
-            </optgroup>
-          )}
-          {linkableChats.length > 0 && (
-            <optgroup label="Direct messages">
-              {linkableChats.map((c) => (
-                <option key={c.id} value={`channel:${c.id}`}>{channelLabel(c)}</option>
-              ))}
-            </optgroup>
-          )}
-          {projects.length > 0 && (
-            <optgroup label="Projects">
-              {projects.map((p) => (
-                <option key={p.id} value={`project:${p.id}`}>{`${p.icon || '📋'} ${p.name}`}</option>
-              ))}
-            </optgroup>
-          )}
-        </select>
-      </label>
+      {showLink && (
+        <LinkConversationModal
+          item={{ title: selected.title, kind: 'canvas' }}
+          channels={channels.filter((c) => !c.isArchived)}
+          currentUserId={currentUser?.id}
+          linkedChannelId={selected.channelId}
+          onLink={(channelId) => {
+            setShowLink(false);
+            patchCanvas(selected.id, { channelId, projectId: null });
+          }}
+          onClose={() => setShowLink(false)}
+        />
+      )}
+      {showShare && (
+        <ShareCanvasModal
+          canvas={selected}
+          owner={owner(selected)}
+          channel={linkedChannel(selected)}
+          project={linkedProject(selected)}
+          channelLabel={channelLabel}
+          getCanvasLink={getCanvasLink}
+          onClose={() => setShowShare(false)}
+        />
+      )}
+    </>
+  );
+
+  // ---------------- Canvas list ----------------
+  const list = (
+    <div className="flex-1 h-full flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--theme-bg-app)' }}>
+      <div className="shrink-0 border-b" style={{ borderColor: 'var(--theme-border)' }}>
+        <PageHeader
+          icon={<CanvasIcon size={20} />}
+          title={scope ? `Canvas · ${scope.label}` : 'Canvas'}
+          subtitle="Whiteboards for planning and brainstorming. Link them to any conversation."
+          right={
+            <>
+              {onOpenSearch && <SearchOrbitButton onClick={onOpenSearch} />}
+              {!scope && onOpenCanvasSidebar && (
+                <button
+                  type="button"
+                  onClick={onOpenCanvasSidebar}
+                  className="md:hidden h-8 px-2.5 rounded-lg text-[13px] font-medium transition hover:bg-[var(--theme-fill-hover)]"
+                  style={{ color: 'var(--theme-text-muted)' }}
+                >
+                  Menu
+                </button>
+              )}
+              {scope && onClose && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  title="Back to messages"
+                  className="w-9 h-9 rounded-[10px] flex items-center justify-center transition hover:bg-[var(--theme-fill-hover)]"
+                  style={{ color: 'var(--theme-text-muted)' }}
+                >
+                  <X size={18} />
+                </button>
+              )}
+            </>
+          }
+        />
+        <TabsRow<CanvasTab>
+          tabs={[
+            { id: 'all', label: 'All canvases', count: tabCanvases.all.length },
+            { id: 'linked', label: 'Linked', count: tabCanvases.linked.length },
+            { id: 'others', label: 'Shared with me', count: tabCanvases.others.length },
+          ]}
+          active={tab}
+          onChange={setTab}
+          action={
+            <SolidPill onClick={() => setShowNew(true)} icon={<Plus size={14} />}>
+              New canvas
+            </SolidPill>
+          }
+        />
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-6 py-4 flex flex-col gap-3.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <SearchField value={search} onChange={setSearch} placeholder="Search canvases" />
+          <span className="flex-1" />
+          <Popover
+            width={180}
+            trigger={(_, toggle) => (
+              <OutlinePill onClick={toggle} icon={<SortDown size={14} />}>
+                {SORT_LABEL[sortKey]}
+              </OutlinePill>
+            )}
+          >
+            {(close) =>
+              (Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+                <MenuItem
+                  key={k}
+                  selected={k === sortKey}
+                  onClick={() => {
+                    setSortKey(k);
+                    close();
+                  }}
+                >
+                  {SORT_LABEL[k]}
+                </MenuItem>
+              ))
+            }
+          </Popover>
+        </div>
+
+        {isLoading ? (
+          <p className="text-[13px] py-6" style={{ color: 'var(--theme-text-muted)' }}>
+            Loading canvases…
+          </p>
+        ) : filtered.length === 0 ? (
+          <div className="py-12 flex flex-col items-center gap-3 text-center">
+            <p className="text-[13px]" style={{ color: 'var(--theme-text-muted)' }}>
+              {search ? 'No canvases match your search.' : tab === 'all' ? 'No canvases yet.' : 'Nothing here yet.'}
+            </p>
+            {!search && (
+              <SolidPill onClick={() => setShowNew(true)} icon={<Plus size={14} />}>
+                New canvas
+              </SolidPill>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {filtered.map((c) => {
+              const who = owner(c);
+              const link = linkLabel(c);
+              return (
+                <div
+                  key={c.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openCanvas(c.id)}
+                  onKeyDown={(e) => e.key === 'Enter' && openCanvas(c.id)}
+                  className="group relative rounded-[14px] border overflow-hidden text-left cursor-pointer transition hover:-translate-y-px"
+                  style={{
+                    borderColor: 'var(--theme-border)',
+                    backgroundColor: 'var(--theme-bg-app)',
+                    boxShadow: '0 1px 2px rgba(20, 26, 46, 0.06)',
+                  }}
+                >
+                  <div
+                    className="h-[150px] flex items-center justify-center"
+                    style={{
+                      backgroundColor: 'var(--theme-bg-surface)',
+                      backgroundImage: 'radial-gradient(var(--theme-border) 1.2px, transparent 1.2px)',
+                      backgroundSize: '18px 18px',
+                      color: 'var(--theme-text-muted)',
+                    }}
+                  >
+                    <span
+                      className="w-12 h-12 rounded-xl flex items-center justify-center"
+                      style={{ backgroundColor: 'var(--theme-bg-app)', color: 'var(--theme-accent)', boxShadow: '0 1px 2px rgba(20, 26, 46, 0.06)' }}
+                    >
+                      <CanvasIcon size={22} />
+                    </span>
+                  </div>
+                  <span
+                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition rounded-lg"
+                    style={{ backgroundColor: 'var(--theme-bg-app)' }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Popover width={180} trigger={(_, toggle) => <MoreButton onClick={toggle} />}>
+                      {(close) => (
+                        <>
+                          <MenuItem
+                            icon={<Pencil size={14} />}
+                            onClick={() => {
+                              close();
+                              openCanvas(c.id);
+                            }}
+                          >
+                            Open
+                          </MenuItem>
+                          {canDelete(c) && (
+                            <MenuItem
+                              danger
+                              icon={<Trash2 size={14} />}
+                              onClick={() => {
+                                close();
+                                handleDelete(c);
+                              }}
+                            >
+                              Delete
+                            </MenuItem>
+                          )}
+                        </>
+                      )}
+                    </Popover>
+                  </span>
+                  <div className="p-3.5 flex flex-col gap-2">
+                    <p className="text-sm font-bold truncate" style={{ color: 'var(--theme-text)' }}>
+                      {c.title}
+                    </p>
+                    <div className="flex items-center gap-2 min-w-0 text-xs">
+                      <Avatar name={who.name} src={who.avatarUrl} size={20} />
+                      <span className="truncate" style={{ color: 'var(--theme-text)' }}>
+                        {who.label}
+                      </span>
+                      <span style={{ color: 'var(--theme-text-muted)' }}>·</span>
+                      <span className="truncate" style={{ color: 'var(--theme-text-muted)' }}>
+                        {editedLabel(c.updatedAt)}
+                      </span>
+                    </div>
+                    <span
+                      className="self-start inline-flex items-center gap-[5px] h-[22px] px-2 rounded-[11px] text-xs font-semibold max-w-full"
+                      style={
+                        link
+                          ? { backgroundColor: 'var(--theme-bg-surface)', color: 'var(--theme-primary-hover)' }
+                          : { backgroundColor: 'var(--theme-bg-surface-hover)', color: 'var(--theme-text-muted)' }
+                      }
+                    >
+                      <Link2 size={12} />
+                      <span className="truncate">{link || 'Not linked'}</span>
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 
   return (
     <div className="flex-1 flex h-full overflow-hidden relative" style={{ color: 'var(--theme-text-primary)' }}>
-      {/* Canvas list sidebar (only rendered when scope is provided, e.g. embedded modal) */}
+      {/* Scoped canvas list (embedded in a channel's canvas tab) */}
       {scope && (
         <div
           className={`${
-            isSidebarOpen
-              ? 'w-64 md:w-[var(--sidebar-w)]'
-              : 'w-0'
+            isSidebarOpen ? 'w-64 md:w-[var(--sidebar-w)]' : 'w-0'
           } shrink-0 border-r flex flex-col h-full select-none ${sidebar.dragging ? '' : 'transition-all duration-200'} overflow-hidden relative`}
           style={{ backgroundColor: 'var(--theme-bg-sidebar)', borderColor: 'var(--theme-border)', ...sidebar.style }}
         >
           {sidebar.handle}
           <div
-            className="h-14 border-b px-3 sm:px-4 flex items-center justify-between gap-2 shrink-0"
-            style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)' }}
+            className="h-14 border-b pl-4 pr-3 flex items-center justify-between gap-2 shrink-0"
+            style={{ borderColor: 'var(--theme-fill)', color: 'var(--theme-text)' }}
           >
-            <span className="truncate font-bold text-sm sm:text-base">{scope ? `Canvases · ${scope.label}` : 'Canvases'}</span>
+            <span className="truncate font-bold text-[15px]">Canvases · {scope.label}</span>
             <div className="flex items-center gap-1 shrink-0">
               <button
-                onClick={handleCreate}
+                onClick={() => setShowNew(true)}
                 title="Create new canvas"
                 aria-label="Create new canvas"
-                className="p-1.5 rounded-lg transition hover:bg-black/5 dark:hover:bg-white/10"
+                className="w-8 h-8 rounded-lg flex items-center justify-center transition hover:brightness-95"
+                style={{ backgroundColor: 'var(--theme-fill)', color: 'var(--theme-text-muted)' }}
               >
                 <Plus size={18} />
               </button>
               <button
                 onClick={() => setIsSidebarOpen(false)}
-                className="p-1.5 rounded-lg opacity-60 hover:opacity-100 md:hidden"
+                className="w-8 h-8 rounded-lg flex items-center justify-center md:hidden"
                 aria-label="Close canvas list"
+                style={{ color: 'var(--theme-text-muted)' }}
               >
                 <X size={15} />
               </button>
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-2 py-3 space-y-4">
-            <div className="px-1">
-              <div
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs"
-                style={{ backgroundColor: 'var(--theme-bg-surface)', borderColor: 'var(--theme-border)', color: 'var(--theme-text-muted)' }}
-              >
-                <Search size={14} className="shrink-0" style={{ color: 'var(--theme-primary)' }} />
-                <input
-                  type="search"
-                  placeholder="Search canvases..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full bg-transparent focus:outline-none"
-                  style={{ color: 'var(--theme-text-primary)' }}
-                />
-              </div>
-            </div>
+          <div className="flex-1 overflow-y-auto px-2 py-3 space-y-3">
+            <label
+              className="mx-1 h-8 flex items-center gap-[9px] pl-[9px] pr-3 rounded-lg"
+              style={{ backgroundColor: 'var(--theme-fill)', color: 'var(--theme-text-muted)' }}
+            >
+              <Search size={16} />
+              <input
+                type="search"
+                placeholder="Search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full bg-transparent outline-none text-[13px]"
+                style={{ color: 'var(--theme-text)' }}
+              />
+            </label>
 
-            <div>
-              <div
-                className="flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-wider mb-1"
-                style={{ color: 'var(--theme-text-muted)' }}
-              >
-                <span>All canvases</span>
-                <span className="text-[10px] font-semibold">{canvases.length}</span>
-              </div>
-
+            <div className="space-y-0.5">
               {isLoading ? (
-                <div className="px-2.5 py-1.5 text-xs" style={{ color: 'var(--theme-text-muted)' }}>Loading canvases...</div>
+                <p className="px-2.5 py-1.5 text-xs" style={{ color: 'var(--theme-text-muted)' }}>
+                  Loading canvases…
+                </p>
               ) : filtered.length === 0 ? (
-                <div className="px-2.5 py-1.5 text-xs" style={{ color: 'var(--theme-text-muted)' }}>
+                <p className="px-2.5 py-1.5 text-xs" style={{ color: 'var(--theme-text-muted)' }}>
                   {search ? 'No canvases found' : 'No canvases yet'}
-                </div>
+                </p>
               ) : (
-                <div className="space-y-0.5">
-                  {filtered.map((c) => {
-                    const isActive = c.id === selectedId;
-                    return (
-                      <div
-                        key={c.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => openCanvas(c.id)}
-                        onKeyDown={(e) => e.key === 'Enter' && openCanvas(c.id)}
-                        title={linkLabel(c) ? `${c.title} · ${linkLabel(c)}` : `${c.title} · Not linked`}
-                        className={`group flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
-                          isActive ? 'shadow font-semibold' : 'hover:bg-black/5 dark:hover:bg-white/10'
-                        }`}
-                        style={
-                          isActive
-                            ? { backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-text)' }
-                            : { color: 'var(--theme-text-primary)' }
-                        }
+                filtered.map((c) => {
+                  const isActive = c.id === selectedId;
+                  return (
+                    <div
+                      key={c.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => openCanvas(c.id)}
+                      onKeyDown={(e) => e.key === 'Enter' && openCanvas(c.id)}
+                      className={`group relative flex items-center h-8 pr-2 rounded-lg cursor-pointer transition-colors ${
+                        isActive ? '' : 'hover:bg-[var(--theme-fill-hover)]'
+                      }`}
+                      style={isActive ? { backgroundColor: 'var(--theme-selected)' } : undefined}
+                    >
+                      {isActive && (
+                        <span className="absolute left-0 top-[6px] w-[3px] h-5 rounded-[2px]" style={{ backgroundColor: 'var(--theme-accent)' }} />
+                      )}
+                      <span className="ml-[10px] mr-2 flex" style={{ color: 'var(--theme-text-muted)' }}>
+                        <CanvasIcon size={18} />
+                      </span>
+                      <span
+                        className={`flex-1 truncate text-sm ${isActive ? 'font-semibold' : ''}`}
+                        style={{ color: 'var(--theme-text)' }}
                       >
-                        <div className="flex items-center gap-2 truncate">
-                          <PenTool size={15} className="shrink-0 opacity-70" />
-                          <span className="truncate">{c.title}</span>
-                        </div>
-                        {canDelete(c) && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(c);
-                            }}
-                            title="Delete canvas"
-                            aria-label={`Delete ${c.title}`}
-                            className="p-0.5 rounded shrink-0 opacity-0 group-hover:opacity-70 hover:!opacity-100 focus:opacity-100 hover:bg-black/10 dark:hover:bg-white/10"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                        {c.title}
+                      </span>
+                      {canDelete(c) && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(c);
+                          }}
+                          title="Delete canvas"
+                          aria-label={`Delete ${c.title}`}
+                          className="p-1 rounded shrink-0 opacity-0 group-hover:opacity-70 hover:!opacity-100 focus:opacity-100"
+                          style={{ color: 'var(--theme-text-muted)' }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Main area: the selected canvas, or a "new or existing" chooser */}
-      <div className="flex-1 h-full relative overflow-hidden" style={{ backgroundColor: 'var(--theme-bg-app)' }}>
-        {selected ? (
-          <WhiteboardView
-            key={selected.id}
-            canvas={selected}
-            currentUser={currentUser}
-            onClose={onClose}
-            headerSlot={headerSlot}
-          />
-        ) : (
-          <div className="h-full overflow-y-auto p-6 flex flex-col items-center">
-            <div className="w-full max-w-2xl mt-6 sm:mt-16">
-              <button
-                onClick={onOpenCanvasSidebar || (() => setIsSidebarOpen(true))}
-                className="mb-4 flex items-center gap-1.5 text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]"
-              >
-                <PanelLeft size={14} /> Show canvas list
-              </button>
-              <h2 className="text-lg font-bold">{scope ? `Canvases in ${scope.label}` : 'Canvases'}</h2>
-              <p className="text-xs mt-1 mb-5" style={{ color: 'var(--theme-text-muted)' }}>
-                Start a new canvas or pick up where you left off.
-              </p>
-
-              <button
-                onClick={handleCreate}
-                className="w-full flex items-center gap-3 p-4 rounded-2xl border-2 border-dashed text-left transition hover:bg-[var(--theme-bg-surface-hover)]"
-                style={{ borderColor: 'var(--theme-border)' }}
-              >
-                <span
-                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-text)' }}
-                >
-                  <Plus size={20} />
-                </span>
-                <span>
-                  <span className="block text-sm font-semibold">New canvas</span>
-                  <span className="block text-xs" style={{ color: 'var(--theme-text-muted)' }}>
-                    {scope ? `Linked to ${scope.label}` : 'Link it to a channel, chat or project anytime'}
-                  </span>
-                </span>
-              </button>
-
-              {canvases.length > 0 && (
-                <>
-                  <h3 className="text-[11px] font-bold uppercase tracking-wider mt-8 mb-2" style={{ color: 'var(--theme-text-muted)' }}>
-                    Open existing
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {canvases.slice(0, 12).map((c) => (
-                      <button
-                        key={c.id}
-                        onClick={() => openCanvas(c.id)}
-                        className="flex items-center gap-3 p-3 rounded-xl border text-left transition hover:bg-[var(--theme-bg-surface-hover)] min-w-0"
-                        style={{ borderColor: 'var(--theme-border)', backgroundColor: 'var(--theme-bg-surface)' }}
-                      >
-                        <PenTool size={16} className="shrink-0" style={{ color: 'var(--theme-primary)' }} />
-                        <span className="min-w-0">
-                          <span className="block text-sm font-medium truncate">{c.title}</span>
-                          <span className="block text-[11px] truncate" style={{ color: 'var(--theme-text-muted)' }}>
-                            {linkLabel(c) || 'Not linked'} · {new Date(c.updatedAt).toLocaleDateString()}
-                          </span>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+      <div className="flex-1 h-full relative overflow-hidden flex">{workspace || list}</div>
+      {newCanvasModal}
     </div>
   );
 };
+
+const GroupLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <p className="px-2.5 pt-2 pb-1 text-[11px] font-semibold" style={{ color: 'var(--theme-text-muted)' }}>
+    {children}
+  </p>
+);

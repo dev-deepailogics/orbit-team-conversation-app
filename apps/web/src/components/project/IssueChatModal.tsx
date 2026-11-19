@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, Mic, User } from 'lucide-react';
+import { X, Send, Mic, User } from '@/components/ui/icons';
 import { api } from '../../lib/api';
+import { Avatar } from './projectViewUtils';
 import { UserProfile } from '@orbit/types';
+import { useTimeFormat } from '../../lib/timeFormat';
 
 interface IssueChatModalProps {
   projectId: string;
@@ -18,6 +20,7 @@ export const IssueChatModal: React.FC<IssueChatModalProps> = ({
   currentUser,
   onClose,
 }) => {
+  const timeFormat = useTimeFormat();
   const [comments, setComments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [newText, setNewText] = useState('');
@@ -126,16 +129,12 @@ export const IssueChatModal: React.FC<IssueChatModalProps> = ({
                 year: 'numeric',
                 hour: 'numeric',
                 minute: '2-digit',
-                hour12: true,
+                hour12: timeFormat === '12',
               });
 
               return (
                 <div key={comment.id} className="flex items-start gap-3 text-xs">
-                  <img
-                    src={avatar}
-                    alt={authorName}
-                    className="w-7 h-7 rounded-full object-cover ring-1 ring-white/10 shrink-0 mt-0.5"
-                  />
+                  <Avatar name={authorName} src={avatar} size={28} className="mt-0.5" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-semibold text-blue-600 dark:text-blue-400">{authorName}</span>

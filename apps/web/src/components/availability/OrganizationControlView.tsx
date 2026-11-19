@@ -40,7 +40,7 @@ import {
   FolderKanban,
   HardDrive,
   UploadCloud,
-} from "lucide-react";
+} from "@/components/ui/icons";
 
 const BREAK_REASONS = [
   "Lunch",

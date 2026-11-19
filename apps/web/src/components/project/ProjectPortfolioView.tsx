@@ -19,7 +19,7 @@ import {
   Users,
   ChevronDown,
   Check,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 
 interface ProjectPortfolioViewProps {
   workspace: Workspace;

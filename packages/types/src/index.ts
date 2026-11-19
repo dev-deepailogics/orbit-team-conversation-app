@@ -62,6 +62,10 @@ export interface ThemeConfig {
   secondaryColor: string;
   borderColor: string;
   fontFamily?: string; // CSS font-family stack; falls back to Inter
+  // Optional fine-tuning; when absent each is derived from the colors above in globals.css
+  selectedColor?: string; // selected nav tile / sidebar row
+  accentColor?: string; // active indicator bars, unread badges
+  sectionColor?: string; // sidebar section headers
 }
 
 export interface WorkspaceSettings {
@@ -99,6 +103,9 @@ export interface WorkspaceMember {
   settings?: WorkspaceMemberSettings | null;
   joinedAt: string;
   user?: UserProfile;
+  // Only present when this object is actually a ChannelMember (Channel.members
+  // reuses this type) — this user's notification preference for that channel.
+  notificationPreference?: "ALL" | "MENTIONS" | "MUTED";
 }
 
 // ==========================================

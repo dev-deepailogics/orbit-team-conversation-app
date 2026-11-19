@@ -3,6 +3,7 @@ import webpush from 'web-push';
 import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getMessaging, type MulticastMessage } from 'firebase-admin/messaging';
 import { prisma } from '@orbit/db';
+import { matchMentionedUserIds } from './mentionParser.js';
 
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
@@ -183,16 +184,34 @@ async function notifyMessage(io: any, messageId: string) {
   const members = await prisma.channelMember.findMany({
     where: {
       channelId: msg.channelId,
+      notificationPreference: { not: 'MUTED' },
       ...(msg.userId ? { userId: { not: msg.userId } } : {}),
       ...(participants ? { userId: { in: participants.filter((id) => id !== msg.userId) } } : {}),
     },
-    select: { userId: true },
+    select: {
+      notificationPreference: true,
+      user: { select: { id: true, username: true, displayName: true } },
+    },
   });
   if (members.length === 0) {
     console.log('Push fan-out: no recipients');
     return;
   }
-  const memberIds = members.map((m) => m.userId);
+
+  // 'MENTIONS' members only get a push when this specific message @mentions them.
+  const mentionedIds = new Set(
+    matchMentionedUserIds(
+      msg.content || '',
+      members.filter((m) => m.notificationPreference === 'MENTIONS').map((m) => m.user)
+    )
+  );
+  const memberIds = members
+    .filter((m) => m.notificationPreference === 'ALL' || mentionedIds.has(m.user.id))
+    .map((m) => m.user.id);
+  if (memberIds.length === 0) {
+    console.log('Push fan-out: no recipients want this notification');
+    return;
+  }
 
   const isDM = msg.channel.type === 'DIRECT' || msg.channel.type === 'GROUP_DIRECT';
   const sender = msg.channel.isAnonymous

@@ -17,7 +17,7 @@ import {
   Reply,
   ShieldCheck,
   CornerDownRight,
-} from "lucide-react";
+} from "@/components/ui/icons";
 import EmojiPicker, {
   Theme,
   EmojiClickData,

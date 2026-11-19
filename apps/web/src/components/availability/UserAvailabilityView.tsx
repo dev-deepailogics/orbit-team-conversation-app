@@ -17,7 +17,7 @@ import {
   Users,
   UserMinus,
   Loader2,
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { useTimeFormat, formatMessageTime } from "../../lib/timeFormat";
 
 interface UserAvailabilityViewProps {
@@ -1103,7 +1103,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                         <strong className="text-sm font-bold text-[#0F172A] mt-0.5 block">
                           {selectedRecordForModal?.availableTime
                             ? fmtTime(selectedRecordForModal.availableTime)
-                            : "09:58 AM"}
+                            : "—"}
                         </strong>
                       </div>
 
@@ -1114,7 +1114,7 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
                         <strong className="text-sm font-bold text-[#0F172A] mt-0.5 block">
                           {selectedRecordForModal?.offTime
                             ? fmtTime(selectedRecordForModal.offTime)
-                            : "07:41 PM"}
+                            : "—"}
                         </strong>
                       </div>
                     </div>

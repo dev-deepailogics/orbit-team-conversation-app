@@ -32,19 +32,34 @@
     --radius: 0.5rem;
 
     /* Orbit Theme Dynamic Variables */
-    --theme-bg-sidebar: #F8F4F8;
-    --theme-bg-workspace: #EDE6EE;
+    --theme-bg-sidebar: #F2F6F5;
+    --theme-bg-workspace: #E6EDEB;
     --theme-bg-app: #FFFFFF;
-    --theme-bg-surface: #F8F8F8;
-    --theme-bg-surface-hover: #EFEFEF;
-    --theme-text-primary: #1D1C1D;
-    --theme-text: #1D1C1D;
-    --theme-text-muted: #616061;
-    --theme-primary: #611F69;
-    --theme-primary-hover: #4A154B;
+    --theme-bg-surface: #F6FAF9;
+    --theme-bg-surface-hover: #EDF4F2;
+    --theme-text-primary: #10201D;
+    --theme-text: #10201D;
+    --theme-text-muted: #466059;
+    --theme-primary: #0D9488;
+    --theme-primary-hover: #0F766E;
     --theme-primary-text: #FFFFFF;
-    --theme-secondary: #1264A3;
-    --theme-border: #DDDDDD;
+    --theme-secondary: #2D5855;
+    --theme-border: #DBE7E4;
+
+    /* Optional theme fields; applyTheme overrides these when a theme defines them */
+    --theme-selected: color-mix(in srgb, var(--theme-primary) 16%, var(--theme-bg-sidebar));
+    --theme-accent: var(--theme-primary);
+    --theme-section: var(--theme-text-muted);
+    /* Translucent fills that follow the text color, so they work on any theme */
+    --theme-fill: color-mix(in srgb, var(--theme-text) 7%, transparent);
+    --theme-fill-hover: color-mix(in srgb, var(--theme-text) 5%, transparent);
+  }
+
+  .orbit-icon {
+    display: inline-block;
+    flex-shrink: 0;
+    width: var(--icon-size, 24px);
+    height: var(--icon-size, 24px);
   }
 
   .dark {
