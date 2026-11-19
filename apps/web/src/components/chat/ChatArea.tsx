@@ -32,6 +32,7 @@ import {
   Trash2,
   ChevronDown,
   Mask,
+  Eye,
   Canvas,
   More,
   Users,
@@ -41,6 +42,8 @@ import {
   Bell,
   BellOff,
 } from '@/components/ui/icons';
+import { useAnonStore } from '../../stores/anonStore';
+import { EyeOff } from 'lucide-react';
 import { Avatar, tint, relativeTime } from '../project/projectViewUtils';
 import { ChannelSidePanel, PresenceAvatar, PRESENCE_COLOR } from './ChannelSidePanel';
 import { api } from '../../lib/api';
@@ -227,6 +230,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showPinsModal, setShowPinsModal] = useState(false);
   const [showAnonPersonaModal, setShowAnonPersonaModal] = useState(false);
+  const revealAnon = useAnonStore((s) => s.reveal);
+  const toggleRevealAnon = useAnonStore((s) => s.toggleReveal);
   const [anonProfile, setAnonProfile] = useState<{ anonName: string; anonEmoji: string } | null>(
     channel.myAnonProfile || null
   );
@@ -905,7 +910,29 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
           {/* Actions */}
           <div className="flex items-center gap-2 shrink-0">
-            {channel.isAnonymous && anonProfile && (
+            {channel.isAnonymous && anonProfile && !revealAnon && (
+              <button
+                onClick={toggleRevealAnon}
+                title="Show your persona"
+                aria-label="Show your persona"
+                className="h-9 w-9 rounded-full flex items-center justify-center transition hover:brightness-95"
+                style={{ backgroundColor: tint(ANON_WARM, 12), color: ANON_WARM_TEXT }}
+              >
+                <Eye size={16} />
+              </button>
+            )}
+            {channel.isAnonymous && anonProfile && revealAnon && (
+              <button
+                onClick={toggleRevealAnon}
+                title="Hide your persona"
+                aria-label="Hide your persona"
+                className="h-9 w-9 rounded-full flex items-center justify-center transition hover:brightness-95"
+                style={{ backgroundColor: tint(ANON_WARM, 12), color: ANON_WARM_TEXT }}
+              >
+                <EyeOff size={16} />
+              </button>
+            )}
+            {channel.isAnonymous && anonProfile && revealAnon && (
               <button
                 onClick={() => setShowAnonPersonaModal(true)}
                 title="Change your character name"
@@ -1271,8 +1298,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             const isSelf = msg.isSelf || (!isAnon && msg.userId === currentUser.id);
             const canEdit = !msg.isDeleted && isSelf; // admins can delete a message, not edit it
             const canDelete = !msg.isDeleted && (isSelf || isWsAdmin || isSuperAdmin);
+            const hideSelfAnon = isAnon && isSelf && !revealAnon;
             const authorName = isAnon
-              ? (msg.anonName || 'Anonymous')
+              ? (hideSelfAnon ? 'Anonymous' : (msg.anonName || 'Anonymous'))
               : isBot
               ? msg.bot?.name
               : (msg.user?.displayName || 'Unknown');
@@ -1370,7 +1398,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     </span>
                     )}
                     <span className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>
-                      {isAnon && isSelf ? 'You · ' : ''}
+                      {isAnon && isSelf && revealAnon ? 'You · ' : ''}
                       {formatMessageTime(msg.createdAt, timeFormat)}
                     </span>
                     <MessageChangeNote message={msg} timeFormat={timeFormat} className="text-[10px] opacity-80" />

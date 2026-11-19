@@ -5,6 +5,7 @@ import { Avatar } from '@/components/project/projectViewUtils';
 import { Message, UserProfile, Channel } from '@orbit/types';
 import { X, Send, CornerUpLeft, Smile, SmilePlus, Type, Paperclip, FileText, Loader2, Pencil, Trash2, ChevronDown } from '@/components/ui/icons';
 import { api } from '../../lib/api';
+import { useAnonStore } from '../../stores/anonStore';
 import { loadDraft, saveDraft, clearDraft } from '../../lib/drafts';
 import { useChatStore } from '../../stores/chatStore';
 import { EmojiPickerPopover } from './EmojiPickerPopover';
@@ -377,8 +378,9 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   const isParentSelf = parentMessage.isSelf || (!isParentAnon && parentMessage.userId === currentUser?.id);
   const canEditParent = !parentMessage.isDeleted && isParentSelf; // admins can delete a message, not edit it
   const canDeleteParent = !parentMessage.isDeleted && (isParentSelf || isWsAdmin || isSuperAdmin);
+  const revealAnon = useAnonStore((s) => s.reveal);
   const authorName = isParentAnon
-    ? (parentMessage.anonName || 'Anonymous')
+    ? (isParentSelf && !revealAnon ? 'Anonymous' : (parentMessage.anonName || 'Anonymous'))
     : (parentMessage.user?.displayName || parentMessage.bot?.name || 'Unknown');
   const parentAnonEmoji = parentMessage.anonEmoji || '🎭';
   const avatarUrl = parentMessage.user?.avatarUrl || parentMessage.bot?.avatarUrl || `/api/avatar/bottts/svg?seed=${authorName}`;
@@ -432,7 +434,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                       : 'bg-[var(--theme-bg-surface)] text-[var(--theme-text)] border border-[var(--theme-border)]'
                   }`}
                 >
-                  {isParentSelf ? 'You (Anon)' : 'Anonymous'}
+                  {isParentSelf && revealAnon ? 'You (Anon)' : 'Anonymous'}
                 </span>
               )}
               <span className="text-[10px] text-[var(--theme-text-muted)]">
@@ -668,7 +670,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
           const canEditReply = !reply.isDeleted && isReplySelf;
           const canDeleteReply = !reply.isDeleted && (isReplySelf || isWsAdmin || isSuperAdmin);
           const replyAuthor = isReplyAnon
-            ? (reply.anonName || 'Anonymous')
+            ? (isReplySelf && !revealAnon ? 'Anonymous' : (reply.anonName || 'Anonymous'))
             : (reply.user?.displayName || 'Unknown');
           const replyEmoji = reply.anonEmoji || '🎭';
           const replyAvatar = reply.user?.avatarUrl || `/api/avatar/bottts/svg?seed=${replyAuthor}`;
@@ -710,7 +712,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                           : 'bg-[var(--theme-bg-surface)] text-[var(--theme-text)] border border-[var(--theme-border)]'
                       }`}
                     >
-                      {isReplySelf ? 'You (Anon)' : 'Anonymous'}
+                      {isReplySelf && revealAnon ? 'You (Anon)' : 'Anonymous'}
                     </span>
                   )}
                   <span className="text-[10px] text-[var(--theme-text-muted)]">
