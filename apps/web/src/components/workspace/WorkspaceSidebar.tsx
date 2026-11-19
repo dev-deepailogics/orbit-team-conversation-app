@@ -27,7 +27,6 @@ import {
 import { api } from '../../lib/api';
 import { EmployeeAvailabilityHeader } from '../availability/EmployeeAvailabilityHeader';
 import { Presence, PRESENCE_STYLE } from '../availability/useTeamPresence';
-import { ProfileModal } from '../profile/ProfileModal';
 import { ThemeModal } from '../theme/ThemeModal';
 import { WorkspaceStorageModal } from './WorkspaceStorageModal';
 import { useChatStore } from '../../stores/chatStore';
@@ -45,8 +44,8 @@ interface WorkspaceSidebarProps {
   onOpenDocs?: () => void;
   onOpenProjects?: () => void;
   onOpenBotPortal?: () => void;
-  // Opens the profile as a page in the main area; falls back to the profile modal
-  onOpenProfile?: () => void;
+  // Opens the profile page in the main area
+  onOpenProfile: () => void;
   members?: any[];
   presence?: Record<string, Presence>;
   onLogout: () => void;
@@ -72,24 +71,28 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   onLogout,
 }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showProfile, setShowProfile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [themeExpanded, setThemeExpanded] = useState(false);
   const [themeModalTab, setThemeModalTab] = useState<'presets' | 'custom' | null>(null);
   const [showStorage, setShowStorage] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
-  const openProfile = () => (onOpenProfile ? onOpenProfile() : setShowProfile(true));
+  const openProfile = () => onOpenProfile();
   const accountRef = useRef<HTMLDivElement>(null);
 
+  // Account and Settings menus share the avatar anchor; a click outside it closes both
+  const menuOpen = showAccount || showSettings;
   useEffect(() => {
-    if (!showAccount) return;
+    if (!menuOpen) return;
     const close = (e: MouseEvent) => {
-      if (accountRef.current && !accountRef.current.contains(e.target as Node)) setShowAccount(false);
+      if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
+        setShowAccount(false);
+        setShowSettings(false);
+      }
     };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
-  }, [showAccount]);
+  }, [menuOpen]);
   const myPresence = (currentUser && presence[currentUser.id]) || 'offline';
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -101,15 +104,6 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
     myMembership?.role === 'OWNER' ||
     myMembership?.role === 'ADMIN' ||
     (!!currentWorkspace && currentWorkspace.ownerId === currentUser?.id);
-
-  useEffect(() => {
-    if (!showSettings) return;
-    const close = (e: MouseEvent) => {
-      if (accountRef.current && !accountRef.current.contains(e.target as Node)) setShowSettings(false);
-    };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [showSettings]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -275,7 +269,10 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
         {currentUser && (
           <div ref={accountRef} className="relative">
             <button
-              onClick={() => setShowAccount((v) => !v)}
+              onClick={() => {
+                if (showSettings) return setShowSettings(false);
+                setShowAccount((v) => !v);
+              }}
               title={`${currentUser.displayName} · ${PRESENCE_STYLE[myPresence].label}`}
               className="relative w-6 h-6 shrink-0 rounded-full transition hover:opacity-85 block"
             >
@@ -370,16 +367,6 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           </div>
         )}
       </div>
-
-      {showProfile && currentUser && (
-        <ProfileModal
-          user={currentUser}
-          workspaceId={currentWorkspace?.id}
-          presence={myPresence}
-          onClose={() => setShowProfile(false)}
-          onLogout={onLogout}
-        />
-      )}
 
       {themeModalTab && (
         <ThemeModal

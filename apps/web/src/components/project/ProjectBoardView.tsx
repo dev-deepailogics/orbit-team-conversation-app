@@ -62,7 +62,6 @@ import {
   ticketLabels,
 } from "./projectViewUtils";
 
-const DONE_GREEN = "#1F9D63";
 const DANGER = "#DC2626";
 
 interface ProjectBoardViewProps {
@@ -1149,15 +1148,6 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                         >
                           <div className="flex items-center justify-between gap-2">
                             <span className="flex items-center gap-1.5 min-w-0">
-                              <span
-                                className="w-4 h-4 rounded flex items-center justify-center shrink-0"
-                                style={{
-                                  backgroundColor: done ? DONE_GREEN : "var(--theme-selected)",
-                                  color: done ? "#FFFFFF" : "var(--theme-text-muted)",
-                                }}
-                              >
-                                <Check size={10} />
-                              </span>
                               <span className="text-xs font-medium truncate" style={{ color: "var(--theme-text-muted)" }}>
                                 {ticketKey(ticket)}
                               </span>

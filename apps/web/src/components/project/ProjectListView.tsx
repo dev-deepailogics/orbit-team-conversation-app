@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import { Project, Ticket, WorkspaceMember } from "@orbit/types";
-import { ChevronDown, Check, Calendar, SortDown, Loader2 } from "@/components/ui/icons";
+import { ChevronDown, Calendar, SortDown, Loader2 } from "@/components/ui/icons";
 import {
   Avatar,
   LabelChip,
@@ -25,7 +25,6 @@ interface ProjectListViewProps {
 }
 
 const GRID = "grid grid-cols-[104px_minmax(220px,1fr)_128px_104px_160px_152px_104px] items-center px-4";
-const DONE_GREEN = "#1F9D63";
 const DANGER = "#DC2626";
 
 export const ProjectListView: React.FC<ProjectListViewProps> = ({
@@ -128,15 +127,6 @@ export const ProjectListView: React.FC<ProjectListViewProps> = ({
                       style={{ borderColor: "var(--theme-border)" }}
                     >
                       <span className="flex items-center gap-2 min-w-0">
-                        <span
-                          className="w-4 h-4 rounded flex items-center justify-center shrink-0"
-                          style={{
-                            backgroundColor: done ? DONE_GREEN : "var(--theme-selected)",
-                            color: done ? "#FFFFFF" : "var(--theme-text-muted)",
-                          }}
-                        >
-                          <Check size={10} />
-                        </span>
                         <span className="text-[13px] font-medium truncate" style={{ color: "var(--theme-text-muted)" }}>
                           {ticketKey(t)}
                         </span>

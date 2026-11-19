@@ -117,6 +117,18 @@ export default function AppDashboard() {
   const [canvases, setCanvases] = useState<any[]>([]);
   const [newCanvasSignal, setNewCanvasSignal] = useState(0);
   const [showProfilePage, setShowProfilePage] = useState(false);
+  const wasProfileOpen = useRef(false);
+  useEffect(() => {
+    if (wasProfileOpen.current && !showProfilePage && typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("view") === "profile") {
+        params.delete("view");
+        const qs = params.toString();
+        window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+      }
+    }
+    wasProfileOpen.current = showProfilePage;
+  }, [showProfilePage]);
   // The canvas hub is toggled from several places; any of them leaves the profile page.
   useEffect(() => {
     if (showCanvasHub) setShowProfilePage(false);
@@ -216,10 +228,13 @@ export default function AppDashboard() {
     }
   };
 
+  // Keyed on the user id: saving the profile replaces the user object and token but must not reload the workspace
+  const hasToken = !!token;
   useEffect(() => {
-    if (!user || !token) return;
+    if (!user || !hasToken) return;
     loadWorkspaces();
-  }, [user, token]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, hasToken]);
 
   // Synchronize workspace theme (cached in localStorage, synced with DB)
   useEffect(() => {
@@ -475,13 +490,33 @@ export default function AppDashboard() {
   };
 
   // Profile: a full page in the main area (?view=profile)
+  // Rewrites the URL to just the channel/project it already names, plus or minus view=profile.
+  // Reads the live URL (not state) so it is correct inside stale closures such as the initial load.
+  const setProfileInUrl = (on: boolean) => {
+    if (typeof window === "undefined") return;
+    const current = new URLSearchParams(window.location.search);
+    const next = new URLSearchParams();
+    const projectId = current.get("projectId");
+    const channelId = current.get("channelId");
+    if (projectId) next.set("projectId", projectId);
+    else if (channelId) next.set("channelId", channelId);
+    if (on) next.set("view", "profile");
+    const qs = next.toString();
+    window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+  };
   const openProfilePage = () => {
     setShowCanvasHub(false);
     setShowDocsHub(false);
     setShowOrgControl(false);
     setIsMobileSidebarOpen(false);
     setShowProfilePage(true);
-    if (typeof window !== "undefined") window.history.replaceState(null, "", "?view=profile");
+    setProfileInUrl(true);
+  };
+  // Switching or creating a workspace leaves the profile page (the URL would otherwise reopen it)
+  const switchWorkspace = (ws: Workspace) => {
+    setShowProfilePage(false);
+    setProfileInUrl(false);
+    handleSelectWorkspace(ws);
   };
   const closeProfilePage = () => {
     setShowProfilePage(false);
@@ -548,6 +583,7 @@ export default function AppDashboard() {
 
   // 4c. Handle selection of searched message
   const handleSelectSearchedMessage = async (searchedMsg: any) => {
+    setShowProfilePage(false);
     try {
       // 1. If message belongs to a channel that is not currently selected, switch to that channel
       if (!currentChannel || currentChannel.id !== searchedMsg.channelId) {
@@ -968,6 +1004,7 @@ export default function AppDashboard() {
             syncUrlToCurrent();
           }
           if (showOrgControl) setShowOrgControl(false);
+          setShowProfilePage(false);
           setShowProjectsPanel((v) => !v);
         }
       : undefined,
@@ -993,12 +1030,10 @@ export default function AppDashboard() {
               workspaces={workspaces}
               currentWorkspace={currentWorkspace}
               currentUser={user}
-              onSelectWorkspace={(ws) => {
-                handleSelectWorkspace(ws);
-              }}
+              onSelectWorkspace={switchWorkspace}
               onWorkspaceCreated={(ws) => {
                 setWorkspaces([...workspaces, ws]);
-                handleSelectWorkspace(ws);
+                switchWorkspace(ws);
               }}
             />
             {/* Show Channels & DMs / Projects / Canvas / Docs sidebar */}
@@ -1109,10 +1144,10 @@ export default function AppDashboard() {
           workspaces={workspaces}
           currentWorkspace={currentWorkspace}
           currentUser={user}
-          onSelectWorkspace={handleSelectWorkspace}
+          onSelectWorkspace={switchWorkspace}
           onWorkspaceCreated={(ws) => {
             setWorkspaces([...workspaces, ws]);
-            handleSelectWorkspace(ws);
+            switchWorkspace(ws);
           }}
         />
       </div>
@@ -1184,7 +1219,15 @@ export default function AppDashboard() {
       )}
 
       {/* 3. Main Chat View or Empty Workspace State */}
-      {workspaces.length === 0 ? (
+      {showProfilePage && user ? (
+        <ProfileModal
+          user={user}
+          workspaceId={currentWorkspace?.id}
+          presence={presence[user.id] || "offline"}
+          onClose={closeProfilePage}
+          onLogout={logout}
+        />
+      ) : workspaces.length === 0 ? (
         <div
           className="flex-1 flex flex-col items-center justify-center p-6 text-center relative overflow-y-auto"
           style={{ backgroundColor: "var(--theme-bg-app)" }}
@@ -1312,15 +1355,6 @@ export default function AppDashboard() {
             </div>
           </div>
         </div>
-      ) : showProfilePage && user ? (
-        <ProfileModal
-          variant="page"
-          user={user}
-          workspaceId={currentWorkspace?.id}
-          presence={presence[user.id] || "offline"}
-          onClose={closeProfilePage}
-          onLogout={logout}
-        />
       ) : docsActive && currentWorkspace ? (
         <ProjectDocsView
           workspaceId={currentWorkspace.id}
@@ -1599,6 +1633,7 @@ export default function AppDashboard() {
           channels={channels}
           onClose={() => setShowCreateProjectModal(false)}
           onProjectCreated={(newProj) => {
+            setShowProfilePage(false);
             addProject(newProj);
             setCurrentProject(newProj);
           }}
