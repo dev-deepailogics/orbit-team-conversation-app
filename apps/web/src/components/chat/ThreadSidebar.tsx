@@ -7,6 +7,7 @@ import { X, Send, CornerUpLeft, Smile, SmilePlus, Type, Paperclip, FileText, Loa
 import { api } from '../../lib/api';
 import { useChatStore } from '../../stores/chatStore';
 import { EmojiPickerPopover } from './EmojiPickerPopover';
+import { AnonAvatar } from './AnonAvatar';
 import { getTopEmojis, recordEmojiUsage } from '../../lib/emojiStore';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { RichTextEditor, RichTextEditorRef } from './RichTextEditor';
@@ -367,10 +368,9 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
         >
           {isParentAnon ? (
             <div
-              className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-900/70 to-indigo-900/70 border border-purple-500/40 flex items-center justify-center text-base shrink-0 mt-0.5 select-none"
-              title={authorName}
+              className="mt-0.5 shrink-0"
             >
-              {parentAnonEmoji}
+              <AnonAvatar name={authorName} emoji={parentAnonEmoji} size={32} />
             </div>
           ) : (
             <Avatar name={authorName} src={avatarUrl} size={32} className="mt-0.5" />
@@ -624,10 +624,9 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
               >
               {isReplyAnon ? (
                 <div
-                  className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-900/70 to-indigo-900/70 border border-purple-500/40 flex items-center justify-center text-sm shrink-0 mt-0.5 select-none"
-                  title={replyAuthor}
+                  className="mt-0.5 shrink-0"
                 >
-                  {replyEmoji}
+                  <AnonAvatar name={replyAuthor} emoji={replyEmoji} size={28} />
                 </div>
               ) : (
                 <Avatar name={replyAuthor} src={replyAvatar} size={28} className="mt-0.5" />
