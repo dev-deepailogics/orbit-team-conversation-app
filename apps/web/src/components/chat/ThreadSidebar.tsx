@@ -10,6 +10,7 @@ import { loadDraft, saveDraft, clearDraft } from '../../lib/drafts';
 import { useChatStore } from '../../stores/chatStore';
 import { EmojiPickerPopover } from './EmojiPickerPopover';
 import { AnonAvatar } from './AnonAvatar';
+import { BotAvatar } from '../bot/BotAvatar';
 import { getTopEmojis, recordEmojiUsage } from '../../lib/emojiStore';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { RichTextEditor, RichTextEditorRef } from './RichTextEditor';
@@ -420,6 +421,8 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
             >
               <AnonAvatar name={authorName} emoji={parentAnonEmoji} size={32} />
             </div>
+          ) : parentMessage.bot && !parentMessage.user ? (
+            <BotAvatar name={authorName} src={parentMessage.bot.avatarUrl} size={32} className="mt-0.5" />
           ) : (
             <Avatar name={authorName} src={avatarUrl} size={32} className="mt-0.5" />
           )}

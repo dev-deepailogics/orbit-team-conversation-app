@@ -41,6 +41,7 @@ import { EyeOff } from "lucide-react";
 import { useAnonStore } from "../../stores/anonStore";
 import { Avatar, tint, relativeTime } from "../project/projectViewUtils";
 import { AnonAvatar } from "./AnonAvatar";
+import { BotAvatar } from "../bot/BotAvatar";
 import {
   ChannelSidePanel,
   PresenceAvatar,
@@ -1727,6 +1728,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                                 name={authorName}
                                 emoji={anonEmoji}
                                 size={36}
+                              />
+                            ) : isBot ? (
+                              <BotAvatar
+                                name={authorName}
+                                src={avatarUrl}
+                                size={36}
+                                className="self-start"
                               />
                             ) : (
                               withCard(

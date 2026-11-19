@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { BotApp, Workspace } from '@orbit/types';
-import { Bot, Check, Copy, Eye, EyeOff, KeyRound, Plus, Shield, AlertTriangle, X } from '@/components/ui/icons';
+import { Bot, Check, Copy, Eye, EyeOff, KeyRound, Pencil, Plus, Shield, AlertTriangle, Upload, X } from '@/components/ui/icons';
 import { api } from '../../lib/api';
+import { BotAvatar } from '../bot/BotAvatar';
+import { isUploadedAvatar } from '../project/projectViewUtils';
 import {
   Card,
   CardTitle,
@@ -27,6 +29,7 @@ export const BotSettings: React.FC<{ workspace: Workspace }> = ({ workspace }) =
   const [copied, setCopied] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [created, setCreated] = useState<BotApp | null>(null);
+  const [editing, setEditing] = useState<BotApp | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -80,16 +83,7 @@ export const BotSettings: React.FC<{ workspace: Workspace }> = ({ workspace }) =
               className="w-full rounded-xl border p-3.5 flex flex-wrap items-center gap-3.5"
               style={{ backgroundColor: 'var(--theme-bg-surface)', borderColor: 'var(--theme-border)' }}
             >
-              {bot.avatarUrl ? (
-                <img src={bot.avatarUrl} alt={bot.name} className="w-11 h-11 rounded-xl object-cover shrink-0" />
-              ) : (
-                <span
-                  className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-text)' }}
-                >
-                  <Bot size={22} />
-                </span>
-              )}
+              <BotAvatar name={bot.name} src={bot.avatarUrl} size={44} />
               <div className="flex-1 min-w-[180px] flex flex-col gap-[3px]">
                 <span className="flex items-center gap-2">
                   <span className="text-[15px] font-bold truncate" style={{ color: 'var(--theme-text)' }}>
@@ -138,6 +132,9 @@ export const BotSettings: React.FC<{ workspace: Workspace }> = ({ workspace }) =
                   {copied === bot.id ? <Check size={15} /> : <Copy size={15} />}
                 </button>
               </div>
+              <OutlineButton icon={<Pencil size={14} />} onClick={() => setEditing(bot)}>
+                Edit
+              </OutlineButton>
             </div>
           ))}
         </Card>
@@ -194,13 +191,24 @@ export const BotSettings: React.FC<{ workspace: Workspace }> = ({ workspace }) =
       </div>
 
       {showCreate && (
-        <CreateBotDialog
+        <BotFormDialog
           workspace={workspace}
           onClose={() => setShowCreate(false)}
-          onCreated={(bot) => {
+          onSaved={(bot) => {
             setBots((prev) => [bot, ...prev]);
             setShowCreate(false);
             setCreated(bot);
+          }}
+        />
+      )}
+      {editing && (
+        <BotFormDialog
+          workspace={workspace}
+          bot={editing}
+          onClose={() => setEditing(null)}
+          onSaved={(bot) => {
+            setBots((prev) => prev.map((b) => (b.id === bot.id ? bot : b)));
+            setEditing(null);
           }}
         />
       )}
@@ -209,55 +217,114 @@ export const BotSettings: React.FC<{ workspace: Workspace }> = ({ workspace }) =
   );
 };
 
-const CreateBotDialog: React.FC<{ workspace: Workspace; onClose: () => void; onCreated: (bot: BotApp) => void }> = ({
-  workspace,
-  onClose,
-  onCreated,
-}) => {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
+const MAX_BOT_IMAGE_BYTES = 5 * 1024 * 1024;
+
+/** Create a bot, or edit an existing one's image, name and description. */
+const BotFormDialog: React.FC<{
+  workspace: Workspace;
+  bot?: BotApp; // present = edit mode
+  onClose: () => void;
+  onSaved: (bot: BotApp) => void;
+}> = ({ workspace, bot, onClose, onSaved }) => {
+  const isEdit = !!bot;
+  const [name, setName] = useState(bot?.name ?? '');
+  const [description, setDescription] = useState(bot?.description ?? '');
+  // Old generated robot placeholders count as "no image" (the Orbit logo).
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(isUploadedAvatar(bot?.avatarUrl) ? bot!.avatarUrl! : null);
+  const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return setError('Please choose an image file.');
+    if (file.size > MAX_BOT_IMAGE_BYTES) return setError('Image must be 5 MB or smaller.');
+    setError(null);
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await api.post(`/api/files/upload?workspaceId=${encodeURIComponent(workspace.id)}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setAvatarUrl(res.data.fileUrl);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to upload image');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!name.trim() || saving) return;
+    if (name.trim().length < 2 || saving || uploading) return;
     setSaving(true);
     setError(null);
     try {
-      const res = await api.post(`/api/bot/workspaces/${workspace.id}/bots`, {
-        name: name.trim(),
-        description: description.trim() || undefined,
-      });
-      onCreated(res.data);
+      const res = isEdit
+        ? await api.patch(`/api/bot/workspaces/${workspace.id}/bots/${bot!.id}`, {
+            name: name.trim(),
+            description: description.trim() || null,
+            avatarUrl, // null resets to the Orbit logo
+          })
+        : await api.post(`/api/bot/workspaces/${workspace.id}/bots`, {
+            name: name.trim(),
+            description: description.trim() || undefined,
+            ...(avatarUrl && { avatarUrl }),
+          });
+      onSaved(res.data);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to create bot');
+      setError(err.response?.data?.error || (isEdit ? 'Failed to update bot' : 'Failed to create bot'));
     } finally {
       setSaving(false);
     }
   };
 
+  const canSubmit = name.trim().length >= 2 && !saving && !uploading;
   const inputBase = 'w-full rounded-[10px] px-3 text-sm outline-none placeholder:text-[var(--theme-text-muted)]';
   return (
     <DialogFrame
       width={560}
       onClose={onClose}
       icon={<Bot size={20} />}
-      title="Create a new bot app"
-      subtitle="Bots post messages and respond to slash commands."
+      title={isEdit ? `Edit ${bot!.name}` : 'Create a new bot app'}
+      subtitle={isEdit ? 'Change how this bot appears in channels.' : 'Bots post messages and respond to slash commands.'}
       closeIcon={<X size={18} />}
       footer={
         <>
           <DialogButton type="button" onClick={onClose}>
             Cancel
           </DialogButton>
-          <DialogButton primary type="button" disabled={!name.trim() || saving} onClick={() => submit()}>
-            {saving ? 'Creating…' : 'Create bot'}
+          <DialogButton primary type="button" disabled={!canSubmit} onClick={() => submit()}>
+            {saving ? (isEdit ? 'Saving…' : 'Creating…') : isEdit ? 'Save changes' : 'Create bot'}
           </DialogButton>
         </>
       }
     >
       <form onSubmit={submit} className="flex flex-col gap-4">
+        <div className="flex items-center gap-3.5">
+          <BotAvatar name={name || 'Bot'} src={avatarUrl} size={56} />
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-semibold" style={{ color: 'var(--theme-text)' }}>
+              Bot image
+            </span>
+            <div className="flex items-center gap-2">
+              <OutlineButton icon={<Upload size={14} />} onClick={() => fileRef.current?.click()}>
+                {uploading ? 'Uploading…' : avatarUrl ? 'Change image' : 'Upload image'}
+              </OutlineButton>
+              {avatarUrl && !uploading && (
+                <OutlineButton onClick={() => setAvatarUrl(null)}>Use Orbit logo</OutlineButton>
+              )}
+            </div>
+            <span className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>
+              PNG, JPG or GIF up to 5 MB. Without an image, the Orbit logo is used.
+            </span>
+          </div>
+          <input ref={fileRef} type="file" accept="image/*" hidden onChange={handleImage} />
+        </div>
         <label className="flex flex-col gap-1.5">
           <span className="text-[13px] font-semibold" style={{ color: 'var(--theme-text)' }}>
             Bot name
@@ -288,12 +355,14 @@ const CreateBotDialog: React.FC<{ workspace: Workspace; onClose: () => void; onC
             style={{ backgroundColor: 'var(--theme-bg-app)', borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}
           />
         </label>
-        <div className="rounded-xl p-3 flex items-start gap-2.5" style={{ backgroundColor: 'var(--theme-bg-surface)' }}>
-          <Shield size={18} style={{ color: 'var(--theme-primary-hover)' }} />
-          <p className="flex-1 text-[13px] leading-[19px]" style={{ color: 'var(--theme-text)' }}>
-            Each bot gets a unique Bearer token that starts with xoxb-. You will see it once after the bot is created.
-          </p>
-        </div>
+        {!isEdit && (
+          <div className="rounded-xl p-3 flex items-start gap-2.5" style={{ backgroundColor: 'var(--theme-bg-surface)' }}>
+            <Shield size={18} style={{ color: 'var(--theme-primary-hover)' }} />
+            <p className="flex-1 text-[13px] leading-[19px]" style={{ color: 'var(--theme-text)' }}>
+              Each bot gets a unique Bearer token that starts with xoxb-. You will see it once after the bot is created.
+            </p>
+          </div>
+        )}
         {error && (
           <p className="text-[13px]" style={{ color: '#DC2626' }}>
             {error}

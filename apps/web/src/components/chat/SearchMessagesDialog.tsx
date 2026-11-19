@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Avatar } from '@/components/project/projectViewUtils';
+import { BotAvatar } from '@/components/bot/BotAvatar';
 import {
   Search,
   X,
@@ -979,11 +980,15 @@ const FullMessageView: React.FC<{
 
       <div className="rounded-[14px] border p-5 flex flex-col gap-3" style={{ backgroundColor: 'var(--theme-bg-app)', borderColor: 'var(--theme-border)' }}>
         <div className="flex items-center gap-3">
-          <Avatar
-            name={message.bot?.name || message.user?.displayName || message.user?.username || 'Teammate'}
-            src={message.bot?.avatarUrl || message.user?.avatarUrl}
-            size={36}
-          />
+          {message.bot ? (
+            <BotAvatar name={message.bot.name} src={message.bot.avatarUrl} size={36} />
+          ) : (
+            <Avatar
+              name={message.user?.displayName || message.user?.username || 'Teammate'}
+              src={message.user?.avatarUrl}
+              size={36}
+            />
+          )}
           <div className="flex flex-col">
             <span className="flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--theme-text)' }}>
               {message.bot?.name || message.user?.displayName || message.user?.username || 'Teammate'}

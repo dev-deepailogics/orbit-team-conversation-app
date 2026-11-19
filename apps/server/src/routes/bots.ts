@@ -5,12 +5,27 @@ import crypto from 'crypto';
 import { z } from 'zod';
 import { verifyWorkspaceMember } from '../utils/security.js';
 
+// Our own uploads only (same rule as profile pictures). No avatar = the client shows the Orbit logo.
+const botAvatarUrlSchema = z
+  .string()
+  .max(500)
+  .refine((u) => u.startsWith('/api/files/download/'), 'Invalid bot image URL');
+
 const createBotSchema = z.object({
-  name: z.string().min(2).max(50),
+  name: z.string().trim().min(2).max(50),
   description: z.string().optional(),
-  avatarUrl: z.string().optional(),
+  avatarUrl: botAvatarUrlSchema.optional(),
   scopes: z.array(z.string()).default(['chat:write']),
 });
+
+const updateBotSchema = z
+  .object({
+    name: z.string().trim().min(2).max(50).optional(),
+    description: z.string().trim().max(500).nullable().optional(),
+    // null resets the bot back to the default Orbit logo
+    avatarUrl: botAvatarUrlSchema.nullable().optional(),
+  })
+  .refine((d) => Object.keys(d).length > 0, 'Nothing to update');
 
 const postBotMessageSchema = z.object({
   channelId: z.string().min(1),
@@ -62,7 +77,7 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
         workspaceId,
         name,
         description,
-        avatarUrl: avatarUrl || `/api/avatar/bottts/svg?seed=${name}`,
+        avatarUrl: avatarUrl ?? null,
         botToken,
         scopes,
         createdById: userId,
@@ -70,6 +85,45 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
     });
 
     return reply.status(201).send(bot);
+  });
+
+  // Edit a bot's name, description or image (Workspace Admin/Owner or Super Admin)
+  fastify.patch('/workspaces/:workspaceId/bots/:botId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { workspaceId, botId } = request.params as { workspaceId: string; botId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const access = await verifyWorkspaceMember(userId, workspaceId, reply);
+    if (!access) return;
+
+    const isWsAdmin =
+      access.isSuperAdmin ||
+      access.workspaceMember?.role === 'OWNER' ||
+      access.workspaceMember?.role === 'ADMIN';
+    if (!isWsAdmin) {
+      return reply.status(403).send({ error: 'Only workspace administrators can edit bot applications' });
+    }
+
+    const parseResult = updateBotSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.errors[0].message });
+    }
+
+    // Scope by workspace so an admin of one workspace can't edit another workspace's bot.
+    const existing = await prisma.botApp.findFirst({ where: { id: botId, workspaceId }, select: { id: true } });
+    if (!existing) {
+      return reply.status(404).send({ error: 'Bot not found' });
+    }
+
+    const { name, description, avatarUrl } = parseResult.data;
+    const bot = await prisma.botApp.update({
+      where: { id: botId },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(description !== undefined && { description: description || null }),
+        ...(avatarUrl !== undefined && { avatarUrl }),
+      },
+    });
+    return reply.send(bot);
   });
 
   // List bots for workspace

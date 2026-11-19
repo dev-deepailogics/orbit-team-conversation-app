@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Avatar } from '@/components/project/projectViewUtils';
+import { BotAvatar } from '@/components/bot/BotAvatar';
 import {
   X,
   Pin,
@@ -149,7 +150,11 @@ export const PinnedMessagesModal: React.FC<PinnedMessagesModalProps> = ({
                   {/* Top Bar: Author, Time */}
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2 min-w-0">
-                      <Avatar name={authorName} src={avatarUrl} size={28} />
+                      {msg.bot ? (
+                        <BotAvatar name={authorName} src={msg.bot.avatarUrl} size={28} />
+                      ) : (
+                        <Avatar name={authorName} src={avatarUrl} size={28} />
+                      )}
                       <div className="min-w-0">
                         <span className="font-bold text-[var(--theme-text)] text-xs truncate block">
                           {authorName}
