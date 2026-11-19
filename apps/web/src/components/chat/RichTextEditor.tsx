@@ -954,7 +954,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
 
         if (files.length > 0 && onPasteFiles) {
           e.preventDefault();
-          onPasteFiles(files);
+          onPasteFiles(namePastedFiles(files));
           return;
         }
       }
@@ -964,7 +964,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         const fileList = Array.from(e.clipboardData.files);
         if (fileList.length > 0) {
           e.preventDefault();
-          onPasteFiles(fileList);
+          onPasteFiles(namePastedFiles(fileList));
           return;
         }
       }

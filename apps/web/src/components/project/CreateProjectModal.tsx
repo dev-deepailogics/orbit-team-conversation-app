@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Project, Channel } from '@orbit/types';
 import { api } from '../../lib/api';
+import { useProjectStore } from '../../stores/projectStore';
 import { X, FolderKanban, Sparkles, Bell } from '@/components/ui/icons';
 
 interface CreateProjectModalProps {
@@ -42,6 +43,15 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
+
+    const trimmedName = name.trim();
+    const isDuplicate = useProjectStore.getState().projects.some(
+      (p) => p.workspaceId === workspaceId && p.name.trim().toLowerCase() === trimmedName.toLowerCase()
+    );
+    if (isDuplicate) {
+      setError(`A project named "${trimmedName}" already exists in this workspace`);
+      return;
+    }
 
     setIsSubmitting(true);
     setError('');
