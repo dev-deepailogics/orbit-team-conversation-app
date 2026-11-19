@@ -910,28 +910,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
           {/* Actions */}
           <div className="flex items-center gap-2 shrink-0">
-            {channel.isAnonymous && anonProfile && !revealAnon && (
-              <button
-                onClick={toggleRevealAnon}
-                title="Show your persona"
-                aria-label="Show your persona"
-                className="h-9 w-9 rounded-full flex items-center justify-center transition hover:brightness-95"
-                style={{ backgroundColor: tint(ANON_WARM, 12), color: ANON_WARM_TEXT }}
-              >
-                <Eye size={16} />
-              </button>
-            )}
-            {channel.isAnonymous && anonProfile && revealAnon && (
-              <button
-                onClick={toggleRevealAnon}
-                title="Hide your persona"
-                aria-label="Hide your persona"
-                className="h-9 w-9 rounded-full flex items-center justify-center transition hover:brightness-95"
-                style={{ backgroundColor: tint(ANON_WARM, 12), color: ANON_WARM_TEXT }}
-              >
-                <EyeOff size={16} />
-              </button>
-            )}
             {channel.isAnonymous && anonProfile && revealAnon && (
               <button
                 onClick={() => setShowAnonPersonaModal(true)}
@@ -1132,6 +1110,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           <span className="flex-1 min-w-0" style={{ color: 'var(--theme-text)' }}>
             Everything here is posted under a character name, not your profile. Keep it kind and follow the community rules.
           </span>
+          {anonProfile && (
+            <button
+              onClick={toggleRevealAnon}
+              title={revealAnon ? 'Hide your persona' : 'Show your persona'}
+              aria-label={revealAnon ? 'Hide your persona' : 'Show your persona'}
+              className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition hover:brightness-95"
+              style={{ backgroundColor: tint(ANON_WARM, 14), color: ANON_WARM_TEXT }}
+            >
+              {revealAnon ? <EyeOff size={15} /> : <Eye size={15} />}
+            </button>
+          )}
           {anonProfile && (
             <button
               onClick={() => setShowAnonPersonaModal(true)}

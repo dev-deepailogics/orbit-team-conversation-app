@@ -27,6 +27,7 @@ import { WorkspaceSidebar } from "@/components/workspace/WorkspaceSidebar";
 import { ChannelSidebar } from "@/components/channel/ChannelSidebar";
 import { ChatArea } from "@/components/chat/ChatArea";
 import { ThreadSidebar } from "@/components/chat/ThreadSidebar";
+import { QuickTodos } from "@/components/layout/QuickTodos";
 import { HuddleModal } from "@/components/huddle/HuddleModal";
 import { IncomingCallDialog } from "@/components/huddle/IncomingCallDialog";
 import { AddMembersDialog } from "@/components/channel/AddMembersDialog";
@@ -1836,6 +1837,9 @@ export default function AppDashboard() {
           }}
         />
       )}
+
+      {/* 13. Quick to-dos (Alt+T) */}
+      <QuickTodos />
     </div>
   );
 }
