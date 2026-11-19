@@ -104,7 +104,9 @@ export default function AppDashboard() {
     currentDocument,
     setCurrentDocument,
   } = useProjectStore();
-  const [chatView, setChatView] = useState<"messages" | "whiteboard">("messages");
+  const [chatView, setChatView] = useState<"messages" | "whiteboard">(
+    "messages",
+  );
 
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [members, setMembers] = useState<any[]>([]);
@@ -122,12 +124,20 @@ export default function AppDashboard() {
   const [showProfilePage, setShowProfilePage] = useState(false);
   const wasProfileOpen = useRef(false);
   useEffect(() => {
-    if (wasProfileOpen.current && !showProfilePage && typeof window !== "undefined") {
+    if (
+      wasProfileOpen.current &&
+      !showProfilePage &&
+      typeof window !== "undefined"
+    ) {
       const params = new URLSearchParams(window.location.search);
       if (params.get("view") === "profile") {
         params.delete("view");
         const qs = params.toString();
-        window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+        window.history.replaceState(
+          null,
+          "",
+          qs ? `?${qs}` : window.location.pathname,
+        );
       }
     }
     wasProfileOpen.current = showProfilePage;
@@ -260,11 +270,15 @@ export default function AppDashboard() {
       const [res, unread, projRes, sidebarRes] = await Promise.all([
         api.get(`/api/workspaces/${workspace.id}`),
         // Server-side counts (since each member's lastReadAt); a failure just means no badges.
-        api.get(`/api/channels/workspaces/${workspace.id}/unread`).catch(() => null),
-        api.get(`/api/projects/workspaces/${workspace.id}/projects`).catch((pErr) => {
-          console.error("Failed to load projects", pErr);
-          return null;
-        }),
+        api
+          .get(`/api/channels/workspaces/${workspace.id}/unread`)
+          .catch(() => null),
+        api
+          .get(`/api/projects/workspaces/${workspace.id}/projects`)
+          .catch((pErr) => {
+            console.error("Failed to load projects", pErr);
+            return null;
+          }),
         Promise.all([
           api.get("/api/canvases", { params: { workspaceId: workspace.id } }),
           api.get("/api/documents", { params: { workspaceId: workspace.id } }),
@@ -372,6 +386,7 @@ export default function AppDashboard() {
     setShowOrgControl(false);
     setShowCanvasHub(false);
     setShowDocsHub(false);
+    setShowProjectsPanel(false);
     setCurrentProject(null);
     setCurrentChannel(channel);
     markChannelRead(channel.id);
@@ -401,11 +416,18 @@ export default function AppDashboard() {
   };
 
   // 4b. Handle Project Selection
+  // Last board the user opened, so the Projects rail icon can reopen it.
+  const lastProjectIdRef = useRef<string | null>(null);
+
   const handleSelectProject = (project: Project) => {
     setShowProfilePage(false);
     setShowOrgControl(false);
     setShowCanvasHub(false);
     setShowDocsHub(false);
+    // A board is always shown with the Projects list beside it, however it was opened
+    // (sidebar, search, URL, Organization Control).
+    setShowProjectsPanel(true);
+    lastProjectIdRef.current = project.id;
     setCurrentProject(project);
     if (typeof window !== "undefined") {
       window.history.replaceState(null, "", `?projectId=${project.id}`);
@@ -418,6 +440,7 @@ export default function AppDashboard() {
     setShowOrgControl(true);
     setShowCanvasHub(false);
     setShowDocsHub(false);
+    setShowProjectsPanel(false);
     setCurrentProject(null);
     setOrgControlResetKey((prev) => prev + 1);
     if (typeof window !== "undefined") {
@@ -441,7 +464,12 @@ export default function AppDashboard() {
 
   const handleDeleteCanvas = async (canvasId: string) => {
     const target = canvases.find((c) => c.id === canvasId);
-    if (!window.confirm(`Delete "${target?.title || "canvas"}"? This cannot be undone.`)) return;
+    if (
+      !window.confirm(
+        `Delete "${target?.title || "canvas"}"? This cannot be undone.`,
+      )
+    )
+      return;
     try {
       await api.delete(`/api/canvases/${canvasId}`);
       setCanvases((prev) => prev.filter((c) => c.id !== canvasId));
@@ -462,8 +490,15 @@ export default function AppDashboard() {
   };
 
   const handleDeleteDoc = async (docId: string) => {
-    const target = useProjectStore.getState().documents.find((d) => d.id === docId);
-    if (!window.confirm(`Delete "${target?.title || "document"}"? This cannot be undone.`)) return;
+    const target = useProjectStore
+      .getState()
+      .documents.find((d) => d.id === docId);
+    if (
+      !window.confirm(
+        `Delete "${target?.title || "document"}"? This cannot be undone.`,
+      )
+    )
+      return;
     try {
       await api.delete(`/api/documents/${docId}`);
       useProjectStore.getState().removeDocument(docId);
@@ -478,7 +513,11 @@ export default function AppDashboard() {
   // 4d. Docs: workspace-level, own URL (?view=docs&docId=...)
   const setDocsUrl = (docId: string | null) => {
     if (typeof window !== "undefined") {
-      window.history.replaceState(null, "", docId ? `?view=docs&docId=${docId}` : "?view=docs");
+      window.history.replaceState(
+        null,
+        "",
+        docId ? `?view=docs&docId=${docId}` : "?view=docs",
+      );
     }
   };
 
@@ -486,6 +525,8 @@ export default function AppDashboard() {
     setShowProfilePage(false);
     setShowCanvasHub(false);
     setShowOrgControl(false);
+    setShowProjectsPanel(false);
+    setCurrentProject(null);
     setDocsInitialId(docId);
     setShowDocsHub(true);
     setDocsUrl(docId);
@@ -496,14 +537,61 @@ export default function AppDashboard() {
     syncUrlToCurrent();
   };
 
+  // Home: close every feature view (incl. an open board) and show the channel. Every "close" or
+  // "back" path uses this, so the rail, the sidebar and the main area always agree.
+  const goHome = () => {
+    setShowProfilePage(false);
+    setShowCanvasHub(false);
+    setShowDocsHub(false);
+    setShowOrgControl(false);
+    setShowProjectsPanel(false);
+    setCurrentProject(null);
+    // The channel stays loaded underneath other views; only fetch one if none was ever opened
+    // (e.g. the app was loaded straight onto a project or docs URL).
+    const channel = currentChannel ?? channels[0];
+    if (channel && channel.id !== currentChannel?.id) {
+      handleSelectChannel(channel);
+    } else if (typeof window !== "undefined") {
+      window.history.replaceState(
+        null,
+        "",
+        currentChannel ? `?channelId=${currentChannel.id}` : window.location.pathname,
+      );
+    }
+  };
+
+  // Projects: show the list and reopen the last board (or the first one) in the main area.
+  const openProjects = () => {
+    const target =
+      projects.find((p) => p.id === lastProjectIdRef.current) ?? projects[0];
+    if (target) {
+      handleSelectProject(target);
+      return;
+    }
+    // No boards yet: show the (empty) list with its "create" action over the current channel.
+    setShowProfilePage(false);
+    setShowCanvasHub(false);
+    setShowDocsHub(false);
+    setShowOrgControl(false);
+    setShowProjectsPanel(true);
+  };
+
   // Point the URL back at the current channel / project
   const syncUrlToCurrent = () => {
     if (typeof window !== "undefined") {
       // Project first: selecting a project keeps currentChannel set underneath it
       if (currentProject) {
-        window.history.replaceState(null, "", `?projectId=${currentProject.id}`);
+        window.history.replaceState(
+          null,
+          "",
+          `?projectId=${currentProject.id}`,
+        );
       } else if (currentChannel) {
-        window.history.replaceState(null, "", `?channelId=${currentChannel.id}`);
+        window.history.replaceState(
+          null,
+          "",
+          `?channelId=${currentChannel.id}`,
+        );
       } else {
         window.history.replaceState(null, "", window.location.pathname);
       }
@@ -523,7 +611,11 @@ export default function AppDashboard() {
     else if (channelId) next.set("channelId", channelId);
     if (on) next.set("view", "profile");
     const qs = next.toString();
-    window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+    window.history.replaceState(
+      null,
+      "",
+      qs ? `?${qs}` : window.location.pathname,
+    );
   };
   const openProfilePage = () => {
     setShowCanvasHub(false);
@@ -985,60 +1077,37 @@ export default function AppDashboard() {
     activeFeature: showProfilePage
       ? null
       : canvasActive
-      ? ("canvas" as const)
-      : docsActive
-      ? ("docs" as const)
-      : showProjectsPanel
-      ? ("projects" as const)
-      : ("home" as const),
-    // Home: back to the channel / project view
-    onGoHome: currentWorkspace
+        ? ("canvas" as const)
+        : docsActive
+          ? ("docs" as const)
+          : showProjectsPanel
+            ? ("projects" as const)
+            : ("home" as const),
+    // Every rail item switches sidebar AND main area together; clicking the active one goes Home.
+    onGoHome: currentWorkspace ? goHome : undefined,
+    onOpenCanvas: currentWorkspace
       ? () => {
-          setShowProfilePage(false);
-          setShowCanvasHub(false);
+          if (canvasActive) return goHome();
           setShowDocsHub(false);
           setShowOrgControl(false);
           setShowProjectsPanel(false);
-          syncUrlToCurrent();
-        }
-      : undefined,
-    // Canvas hub: opens Canvases list in the secondary sidebar
-    onOpenCanvas: currentWorkspace
-      ? () => {
-          if (showDocsHub) {
-            setShowDocsHub(false);
-            syncUrlToCurrent();
-          }
-          if (showOrgControl) setShowOrgControl(false);
-          setShowProjectsPanel(false);
-          setShowCanvasHub((v) => !v);
-        }
-      : undefined,
-    // Docs: opens Docs list in the secondary sidebar
-    onOpenDocs: currentWorkspace
-      ? () => {
-          if (showOrgControl) setShowOrgControl(false);
-          if (showCanvasHub) setShowCanvasHub(false);
-          if (!showDocsHub) {
-            setShowProjectsPanel(false);
-            return handleOpenDocs();
-          }
-          setShowDocsHub(false);
-          syncUrlToCurrent();
-        }
-      : undefined,
-    // Projects & Boards: toggles the list back open in the channel sidebar
-    onOpenProjects: currentWorkspace
-      ? () => {
-          if (showCanvasHub) setShowCanvasHub(false);
-          if (showDocsHub) {
-            setShowDocsHub(false);
-            syncUrlToCurrent();
-          }
-          if (showOrgControl) setShowOrgControl(false);
           setShowProfilePage(false);
-          setShowProjectsPanel((v) => !v);
+          setCurrentProject(null);
+          setShowCanvasHub(true);
+          if (typeof window !== "undefined") {
+            window.history.replaceState(
+              null,
+              "",
+              currentChannel ? `?channelId=${currentChannel.id}` : window.location.pathname,
+            );
+          }
         }
+      : undefined,
+    onOpenDocs: currentWorkspace
+      ? () => (docsActive ? goHome() : handleOpenDocs())
+      : undefined,
+    onOpenProjects: currentWorkspace
+      ? () => (showProjectsPanel && !showProfilePage ? goHome() : openProjects())
       : undefined,
   };
 
@@ -1081,12 +1150,7 @@ export default function AppDashboard() {
                 showProjects={showProjectsPanel}
                 showCanvas={showCanvasHub}
                 showDocs={docsActive}
-                onClosePanel={() => {
-                  setShowProjectsPanel(false);
-                  setShowCanvasHub(false);
-                  setShowDocsHub(false);
-                  syncUrlToCurrent();
-                }}
+                onClosePanel={goHome}
                 canvases={canvases}
                 currentCanvasId={selectedCanvasId}
                 onSelectCanvas={(canvasId) => {
@@ -1200,12 +1264,7 @@ export default function AppDashboard() {
             showProjects={showProjectsPanel}
             showCanvas={showCanvasHub}
             showDocs={docsActive}
-            onClosePanel={() => {
-              setShowProjectsPanel(false);
-              setShowCanvasHub(false);
-              setShowDocsHub(false);
-              syncUrlToCurrent();
-            }}
+            onClosePanel={goHome}
             canvases={canvases}
             currentCanvasId={selectedCanvasId}
             onSelectCanvas={(canvasId) => {
@@ -1354,7 +1413,10 @@ export default function AppDashboard() {
                       className="px-2.5 py-1 text-xs font-medium rounded bg-[var(--theme-bg-surface-hover)] hover:bg-gray-600 text-[var(--theme-text)] flex items-center gap-1.5 transition shrink-0"
                     >
                       {copiedEmail ? (
-                        <Check size={13} className="text-green-600 dark:text-green-400" />
+                        <Check
+                          size={13}
+                          className="text-green-600 dark:text-green-400"
+                        />
                       ) : (
                         <Copy size={13} />
                       )}
@@ -1411,9 +1473,13 @@ export default function AppDashboard() {
           onSelectCanvas={setSelectedCanvasId}
           onOpenSearch={() => setShowSearchModal(true)}
           newCanvasSignal={newCanvasSignal}
-          onCanvasCreated={(c) => setCanvases((prev) => [c, ...prev.filter((x) => x.id !== c.id)])}
-          onCanvasDeleted={(id) => setCanvases((prev) => prev.filter((x) => x.id !== id))}
-          onClose={() => setShowCanvasHub(false)}
+          onCanvasCreated={(c) =>
+            setCanvases((prev) => [c, ...prev.filter((x) => x.id !== c.id)])
+          }
+          onCanvasDeleted={(id) =>
+            setCanvases((prev) => prev.filter((x) => x.id !== id))
+          }
+          onClose={goHome}
           onOpenCanvasSidebar={() => setIsMobileSidebarOpen(true)}
         />
       ) : showOrgControl && currentWorkspace ? (
@@ -1440,8 +1506,11 @@ export default function AppDashboard() {
           currentUser={user}
           members={members}
           channels={channels}
-          onBackToChat={() => setCurrentProject(null)}
-          onDeleteProject={(id) => removeProject(id)}
+          onBackToChat={goHome}
+          onDeleteProject={(id) => {
+            removeProject(id);
+            goHome();
+          }}
           onOpenSearch={() => setShowSearchModal(true)}
           onOpenChannel={handleSelectChannel}
         />
@@ -1671,9 +1740,8 @@ export default function AppDashboard() {
           channels={channels}
           onClose={() => setShowCreateProjectModal(false)}
           onProjectCreated={(newProj) => {
-            setShowProfilePage(false);
             addProject(newProj);
-            setCurrentProject(newProj);
+            handleSelectProject(newProj);
           }}
         />
       )}
