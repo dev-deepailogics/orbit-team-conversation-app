@@ -3,7 +3,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Avatar } from "@/components/project/projectViewUtils";
 import { Workspace, Channel, UserProfile, Project, UserStatus } from "@orbit/types";
-import { Presence, PRESENCE_STYLE } from "../availability/useTeamPresence";
+import { Presence } from "../availability/useTeamPresence";
+import { StatusEmoji } from "../availability/StatusEmoji";
 import { isLiveOnline } from "./useLiveUserStatus";
 import { useResizableSidebar } from "../layout/useResizableSidebar";
 import {
@@ -155,6 +156,8 @@ interface ChannelSidebarProps {
   onOpenBotPortal: () => void;
   onStartHuddle: (channel: Channel) => void;
   presence?: Record<string, Presence>;
+  /** userId -> reason of their open break (only for members currently on break). */
+  breakReasons?: Record<string, string>;
   liveStatus?: Record<string, UserStatus>;
   onOpenSearch?: () => void;
   onOpenOrganizationControl?: () => void;
@@ -194,6 +197,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   onOpenBotPortal,
   onStartHuddle,
   presence = {},
+  breakReasons = {},
   liveStatus = {},
   onOpenSearch,
   onOpenOrganizationControl,
@@ -1132,6 +1136,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                   const user = member.user;
                   if (!user) return null;
                   const userPresence = presence[user.id] || "offline";
+                  const inOrbit = isLiveOnline(liveStatus[user.id]);
                   const isSelf = user.id === currentUser?.id;
 
                   // Find matching DM channel to check selection and unread counts
@@ -1175,32 +1180,18 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                       {isSelectedDM && <ActiveBar />}
                       <span className="relative ml-2 mr-1 w-6 h-6 shrink-0">
                         <Avatar name={user.displayName || user.username} src={user.avatarUrl} size={24} />
+                        {/* Dot = connected to Orbit (web/app) right now; check-in status lives in the pill */}
                         <span
-                          title={PRESENCE_STYLE[userPresence].label}
-                          className={`absolute left-4 top-4 w-2.5 h-2.5 rounded-full ${PRESENCE_STYLE[userPresence].dot}`}
+                          title={inOrbit ? "In Orbit right now" : "Not in Orbit"}
+                          className={`absolute bottom-0 right-0 w-[7px] h-[7px] rounded-full ${inOrbit ? "bg-emerald-500" : "bg-black"}`}
                           style={{
-                            boxShadow: `0 0 0 2px ${isSelectedDM ? "var(--theme-selected)" : "var(--theme-bg-sidebar)"}`,
+                            boxShadow: `0 0 0 1.5px ${isSelectedDM ? "var(--theme-selected)" : "var(--theme-bg-sidebar)"}`,
                           }}
                         />
                       </span>
                       <span {...rowLabel(!!isSelectedDM, unread > 0)}>
                         {user.displayName}
-                        {isLiveOnline(liveStatus[user.id]) && (
-                          <span
-                            title="Online in Orbit right now"
-                            className="ml-1.5 inline-flex items-center gap-1 align-middle px-1.5 py-[1px] rounded-full text-[9px] font-semibold uppercase tracking-wide"
-                            style={{
-                              backgroundColor: "color-mix(in srgb, var(--theme-primary) 14%, transparent)",
-                              color: "var(--theme-primary-hover)",
-                            }}
-                          >
-                            <span
-                              className="w-[5px] h-[5px] rounded-full animate-pulse"
-                              style={{ backgroundColor: "var(--theme-primary)" }}
-                            />
-                            in orbit
-                          </span>
-                        )}
+                        <StatusEmoji presence={userPresence} breakReason={breakReasons[user.id]} />
                         {isSelf && (
                           <span className="ml-1.5 text-[11px] font-normal" style={{ color: "var(--theme-text-muted)" }}>
                             you

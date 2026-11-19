@@ -5,20 +5,21 @@ import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
 import { SOCKET_EVENTS, UserAvailabilityRecord } from '@orbit/types';
 import { Clock, Coffee, AlertTriangle, Check, ChevronRight } from '@/components/ui/icons';
+import { EmojiPickerPopover } from '../chat/EmojiPickerPopover';
+import { useEmojiSuggestions } from './useEmojiSuggestions';
+import {
+  BREAK_PRESETS,
+  DEFAULT_CUSTOM_EMOJI,
+  OTHER_REASON,
+  formatBreakReason,
+  parseBreakReason,
+} from './breakStatus';
 
 // Semantic presence colours from the Figma guideline (fixed across themes)
 const WORKING = '#1F9D63';
 const BREAK = '#D97706';
 const tint = (c: string, pct = 14) => `color-mix(in srgb, ${c} ${pct}%, transparent)`;
 
-const BREAK_REASONS = [
-  'Lunch',
-  'Namaz',
-  'Tea Break',
-  'Personal',
-  'Meeting / Discussion',
-  'Other',
-];
 
 // 45s → 12m → 1h 23m
 export const formatElapsed = (secs: number) => {
@@ -37,8 +38,14 @@ export const EmployeeAvailabilityHeader: React.FC<{
 
   // Modals
   const [showBreakModal, setShowBreakModal] = useState<boolean>(false);
-  const [selectedBreakReason, setSelectedBreakReason] = useState<string>(BREAK_REASONS[0]);
+  const [selectedBreakReason, setSelectedBreakReason] = useState<string>(BREAK_PRESETS[0].label);
   const [customBreakReason, setCustomBreakReason] = useState<string>('');
+  // null = follow the top keyword suggestion; set once the user picks an emoji themselves.
+  const [pickedEmoji, setPickedEmoji] = useState<string | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const isOtherReason = selectedBreakReason === OTHER_REASON;
+  const emojiSuggestions = useEmojiSuggestions(customBreakReason, isOtherReason && showBreakModal);
+  const customEmoji = pickedEmoji ?? emojiSuggestions[0] ?? DEFAULT_CUSTOM_EMOJI;
   const [showCheckoutConfirm, setShowCheckoutConfirm] = useState<boolean>(false);
   const [checkoutWarningHours, setCheckoutWarningHours] = useState<string>('0');
 
@@ -142,13 +149,16 @@ export const EmployeeAvailabilityHeader: React.FC<{
     if (isActionLocked) return;
     lockActions();
     const note = customBreakReason.trim();
-    const reason =
-      selectedBreakReason === 'Other' ? note || 'Other' : note ? `${selectedBreakReason} · ${note}` : selectedBreakReason;
+    const preset = BREAK_PRESETS.find((p) => p.label === selectedBreakReason) ?? BREAK_PRESETS[0];
+    const reason = isOtherReason
+      ? formatBreakReason(customEmoji, note || OTHER_REASON)
+      : formatBreakReason(preset.emoji, note ? `${preset.label} · ${note}` : preset.label);
     try {
       const res = await api.post('/api/availability/break/start', { reason });
       setAvailability(res.data.availability);
       setShowBreakModal(false);
       setCustomBreakReason('');
+      setPickedEmoji(null);
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to start break');
     }
@@ -196,7 +206,8 @@ export const EmployeeAvailabilityHeader: React.FC<{
     setShowBreakModal(false);
   };
 
-  const lastBreakReason = (availability?.breaks || []).slice(-1)[0]?.breakReason;
+  const lastBreak = (availability?.breaks || []).slice(-1)[0];
+  const lastBreakStatus = lastBreak ? parseBreakReason(lastBreak.breakReason) : null;
 
   return (
     <>
@@ -256,7 +267,7 @@ export const EmployeeAvailabilityHeader: React.FC<{
               <StatusOption
                 icon="/icons/status-away.svg"
                 title="Break"
-                subtitle={isOnBreak ? `On break${lastBreakReason ? ` · ${lastBreakReason}` : ''}` : 'Pause notifications for a while'}
+                subtitle={isOnBreak ? `On break${lastBreakStatus ? ` · ${lastBreakStatus.emoji} ${lastBreakStatus.text}` : ''}` : 'Pause notifications for a while'}
                 selected={isOnBreak}
                 expanded={!isOnBreak && showBreakModal}
                 trailing={isOnBreak ? undefined : 'chevron'}
@@ -297,13 +308,13 @@ export const EmployeeAvailabilityHeader: React.FC<{
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  {BREAK_REASONS.map((reason) => {
-                    const on = selectedBreakReason === reason;
+                  {BREAK_PRESETS.map(({ label, emoji }) => {
+                    const on = selectedBreakReason === label;
                     return (
                       <button
-                        key={reason}
+                        key={label}
                         type="button"
-                        onClick={() => setSelectedBreakReason(reason)}
+                        onClick={() => setSelectedBreakReason(label)}
                         className={`w-full h-[38px] px-3 rounded-[10px] border flex items-center gap-2.5 text-left text-sm transition ${
                           on ? 'font-semibold' : 'font-medium hover:bg-[var(--theme-fill-hover)]'
                         }`}
@@ -319,25 +330,79 @@ export const EmployeeAvailabilityHeader: React.FC<{
                         >
                           {on && <span className="w-2 h-2 rounded-full" style={{ backgroundColor: BREAK }} />}
                         </span>
-                        {reason}
+                        <span className="text-base leading-none" aria-hidden>
+                          {label === OTHER_REASON ? customEmoji : emoji}
+                        </span>
+                        {label}
                       </button>
                     );
                   })}
                 </div>
 
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-semibold" style={{ color: 'var(--theme-text-muted)' }}>
-                    {selectedBreakReason === 'Other' ? 'Break reason' : 'Custom message (optional)'}
-                  </span>
-                  <input
-                    type="text"
-                    value={customBreakReason}
-                    onChange={(e) => setCustomBreakReason(e.target.value)}
-                    placeholder={selectedBreakReason === 'Other' ? 'Specify break reason' : 'Back in 30 minutes'}
-                    className="h-10 px-3 rounded-[10px] border text-sm outline-none focus:border-[var(--theme-primary)] placeholder:text-[var(--theme-text-muted)]"
-                    style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)', backgroundColor: 'var(--theme-bg-app)' }}
-                  />
-                </label>
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="break-reason-input" className="text-xs font-semibold" style={{ color: 'var(--theme-text-muted)' }}>
+                    {selectedBreakReason === OTHER_REASON ? 'Break reason' : 'Custom message (optional)'}
+                  </label>
+                  <div className="relative flex items-center gap-1.5">
+                    {isOtherReason && (
+                      <>
+                        <button
+                          type="button"
+                          title="Choose an emoji"
+                          aria-label="Choose an emoji"
+                          onClick={() => setShowEmojiPicker((v) => !v)}
+                          className="w-10 h-10 shrink-0 rounded-[10px] border text-lg flex items-center justify-center transition hover:bg-[var(--theme-fill-hover)]"
+                          style={{ borderColor: 'var(--theme-border)', backgroundColor: 'var(--theme-bg-app)' }}
+                        >
+                          {customEmoji}
+                        </button>
+                        <EmojiPickerPopover
+                          isOpen={showEmojiPicker}
+                          onClose={() => setShowEmojiPicker(false)}
+                          onSelectEmoji={setPickedEmoji}
+                          title="Status emoji"
+                          positionClass="bottom-full left-0 mb-2"
+                        />
+                      </>
+                    )}
+                    <input
+                      id="break-reason-input"
+                      type="text"
+                      value={customBreakReason}
+                      onChange={(e) => setCustomBreakReason(e.target.value)}
+                      placeholder={selectedBreakReason === OTHER_REASON ? 'Specify break reason' : 'Back in 30 minutes'}
+                      className="flex-1 min-w-0 h-10 px-3 rounded-[10px] border text-sm outline-none focus:border-[var(--theme-primary)] placeholder:text-[var(--theme-text-muted)]"
+                      style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)', backgroundColor: 'var(--theme-bg-app)' }}
+                    />
+                  </div>
+
+                  {isOtherReason && emojiSuggestions.length > 0 && (
+                    <div className="flex items-center gap-1" role="listbox" aria-label="Suggested emojis">
+                      <span className="text-[11px] font-semibold mr-1" style={{ color: 'var(--theme-text-muted)' }}>
+                        Suggested
+                      </span>
+                      {emojiSuggestions.map((emoji) => {
+                        const on = emoji === customEmoji;
+                        return (
+                          <button
+                            key={emoji}
+                            type="button"
+                            role="option"
+                            aria-selected={on}
+                            onClick={() => setPickedEmoji(emoji)}
+                            className="w-8 h-8 rounded-lg border text-base flex items-center justify-center transition hover:bg-[var(--theme-fill-hover)]"
+                            style={{
+                              borderColor: on ? BREAK : 'transparent',
+                              backgroundColor: on ? tint(BREAK, 16) : 'transparent',
+                            }}
+                          >
+                            {emoji}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
 
                 <div className="pt-1 flex items-center gap-2">
                   <button

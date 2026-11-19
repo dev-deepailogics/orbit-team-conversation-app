@@ -43,56 +43,19 @@ export async function performAutoCheckoutBackfill(fastify?: FastifyInstance) {
         include: { breaks: true },
       });
 
-      await prisma.user.update({
-        where: { id: rec.userId },
-        data: { status: 'OFFLINE' },
-      }).catch(() => {});
-
-      if (fastify?.io) {
-        fastify.io.emit(SOCKET_EVENTS.AVAILABILITY_UPDATE, {
-          userId: rec.userId,
-          availability: updated,
-        });
-        fastify.io.emit(SOCKET_EVENTS.USER_STATUS_CHANGE, {
-          userId: rec.userId,
-          status: 'OFFLINE',
-        });
-      }
+      fastify?.io?.emit(SOCKET_EVENTS.AVAILABILITY_UPDATE, {
+        userId: rec.userId,
+        availability: updated,
+      });
     }
   } catch (err) {
     console.error('Error running performAutoCheckoutBackfill:', err);
   }
 }
 
-// Helper: Broadcast chat notification message to channel
-async function broadcastStatusMessage(fastify: FastifyInstance, userId: string, text: string) {
-  try {
-    // Find user details
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, displayName: true, username: true },
-    });
-    if (!user) return;
-
-    // Find any common public channel or broadcast to user's workspaces
-    const memberships = await prisma.workspaceMember.findMany({
-      where: { userId },
-      select: { workspaceId: true },
-    });
-
-    for (const m of memberships) {
-      if (fastify.io) {
-        fastify.io.to(`workspace:${m.workspaceId}`).emit(SOCKET_EVENTS.USER_STATUS_CHANGE, {
-          userId,
-          statusText: text,
-        });
-      }
-    }
-  } catch (err) {
-    console.error('Failed to broadcast status alert:', err);
-  }
-}
-
+// NOTE: check-in state lives in UserAvailability and is broadcast via AVAILABILITY_UPDATE.
+// User.status / USER_STATUS_CHANGE is owned by the socket layer and means "connected to Orbit",
+// so these routes must never write it.
 export const availabilityRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   // 1. Get Current Availability Status for authenticated user
   fastify.get('/current', { preHandler: [fastify.authenticate] }, async (request, reply) => {
@@ -175,21 +138,10 @@ export const availabilityRoutes: FastifyPluginAsync = async (fastify: FastifyIns
       });
     }
 
-    // Update user status
-    await prisma.user.update({
-      where: { id: userPayload.id },
-      data: { status: 'ONLINE' },
-    }).catch(() => {});
-
-    // Broadcast Real-time sync event
-    if (fastify.io) {
-      fastify.io.emit(SOCKET_EVENTS.AVAILABILITY_UPDATE, {
-        userId: userPayload.id,
-        availability: record,
-      });
-    }
-
-    await broadcastStatusMessage(fastify, userPayload.id, 'is now available and ready to work!');
+    fastify.io?.emit(SOCKET_EVENTS.AVAILABILITY_UPDATE, {
+      userId: userPayload.id,
+      availability: record,
+    });
 
     return reply.send({ success: true, availability: record, serverTime: now.toISOString() });
   });
@@ -234,20 +186,10 @@ export const availabilityRoutes: FastifyPluginAsync = async (fastify: FastifyIns
       include: { breaks: true },
     });
 
-    // Update user status to AWAY
-    await prisma.user.update({
-      where: { id: userPayload.id },
-      data: { status: 'AWAY' },
-    }).catch(() => {});
-
-    if (fastify.io) {
-      fastify.io.emit(SOCKET_EVENTS.AVAILABILITY_UPDATE, {
-        userId: userPayload.id,
-        availability: updated,
-      });
-    }
-
-    await broadcastStatusMessage(fastify, userPayload.id, `is now on break (${breakReason})`);
+    fastify.io?.emit(SOCKET_EVENTS.AVAILABILITY_UPDATE, {
+      userId: userPayload.id,
+      availability: updated,
+    });
 
     return reply.send({ success: true, availability: updated, serverTime: now.toISOString() });
   });
@@ -300,20 +242,10 @@ export const availabilityRoutes: FastifyPluginAsync = async (fastify: FastifyIns
       include: { breaks: true },
     });
 
-    // Revert user status to ONLINE
-    await prisma.user.update({
-      where: { id: userPayload.id },
-      data: { status: 'ONLINE' },
-    }).catch(() => {});
-
-    if (fastify.io) {
-      fastify.io.emit(SOCKET_EVENTS.AVAILABILITY_UPDATE, {
-        userId: userPayload.id,
-        availability: updated,
-      });
-    }
-
-    await broadcastStatusMessage(fastify, userPayload.id, 'is back from break and available to work!');
+    fastify.io?.emit(SOCKET_EVENTS.AVAILABILITY_UPDATE, {
+      userId: userPayload.id,
+      availability: updated,
+    });
 
     return reply.send({ success: true, availability: updated, serverTime: now.toISOString() });
   });
@@ -373,24 +305,10 @@ export const availabilityRoutes: FastifyPluginAsync = async (fastify: FastifyIns
       include: { breaks: true },
     });
 
-    // Set user offline
-    await prisma.user.update({
-      where: { id: userPayload.id },
-      data: { status: 'OFFLINE' },
-    }).catch(() => {});
-
-    if (fastify.io) {
-      fastify.io.emit(SOCKET_EVENTS.AVAILABILITY_UPDATE, {
-        userId: userPayload.id,
-        availability: updated,
-      });
-      fastify.io.emit(SOCKET_EVENTS.USER_STATUS_CHANGE, {
-        userId: userPayload.id,
-        status: 'OFFLINE',
-      });
-    }
-
-    await broadcastStatusMessage(fastify, userPayload.id, 'has checked out and is now offline.');
+    fastify.io?.emit(SOCKET_EVENTS.AVAILABILITY_UPDATE, {
+      userId: userPayload.id,
+      availability: updated,
+    });
 
     return reply.send({ success: true, availability: updated, serverTime: now.toISOString() });
   });

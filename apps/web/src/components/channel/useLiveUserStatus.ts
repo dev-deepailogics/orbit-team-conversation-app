@@ -32,7 +32,10 @@ export function useLiveUserStatus(members: WorkspaceMember[]) {
     }: {
       userId: string;
       status: UserStatus;
-    }) => setStatus((prev) => ({ ...prev, [userId]: next }));
+    }) => {
+      if (!userId || !next) return; // ignore partial payloads
+      setStatus((prev) => (prev[userId] === next ? prev : { ...prev, [userId]: next }));
+    };
     socket.on(SOCKET_EVENTS.USER_STATUS_CHANGE, onChange);
     return () => {
       socket.off(SOCKET_EVENTS.USER_STATUS_CHANGE, onChange);

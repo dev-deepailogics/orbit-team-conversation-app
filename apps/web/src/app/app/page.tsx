@@ -79,7 +79,7 @@ export default function AppDashboard() {
     incrementUnread,
   } = useChatStore();
   // Check-in driven presence (working / break / offline) for everyone in the workspace
-  const presence = useTeamPresence(currentWorkspace?.id);
+  const { presence, breakReasons } = useTeamPresence(currentWorkspace?.id);
 
   const {
     startHuddle,
@@ -1146,6 +1146,7 @@ export default function AppDashboard() {
                   handleStartHuddle(ch);
                 }}
                 presence={presence}
+                breakReasons={breakReasons}
                 liveStatus={liveStatus}
                 onOpenSearch={() => {
                   setIsMobileSidebarOpen(false);
@@ -1235,6 +1236,7 @@ export default function AppDashboard() {
             onOpenBotPortal={() => setShowBotPortal(true)}
             onStartHuddle={handleStartHuddle}
             presence={presence}
+            breakReasons={breakReasons}
             liveStatus={liveStatus}
             onOpenSearch={() => setShowSearchModal(true)}
             onOpenOrganizationControl={() => {

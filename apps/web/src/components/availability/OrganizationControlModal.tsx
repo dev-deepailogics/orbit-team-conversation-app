@@ -23,6 +23,7 @@ import {
   Activity,
 } from '@/components/ui/icons';
 import { useTimeFormat, formatMessageTime } from '../../lib/timeFormat';
+import { withBreakEmoji } from './breakStatus';
 
 const BREAK_REASONS = [
   'Lunch',
@@ -223,7 +224,7 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
         : selectedBreakReason;
 
     try {
-      const res = await api.post('/api/availability/break/start', { reason });
+      const res = await api.post('/api/availability/break/start', { reason: withBreakEmoji(reason) });
       setAvailability(res.data.availability);
       setShowBreakModal(false);
       setCustomBreakReason('');
