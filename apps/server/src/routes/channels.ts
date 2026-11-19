@@ -13,7 +13,11 @@ import {
   getOrCreateAnonProfile,
   sanitizeMessageForViewer,
 } from "../services/anonymousService.js";
-import { verifyChannelAccess } from "../utils/security.js";
+import {
+  quotedMessageInclude,
+  verifyChannelAccess,
+  verifyQuotable,
+} from "../utils/security.js";
 
 const createChannelSchema = z.object({
   name: z
@@ -50,9 +54,11 @@ const postMessageSchema = z
   .refine(
     (data) =>
       (data.content && data.content.trim().length > 0) ||
-      (data.attachments && data.attachments.length > 0),
+      (data.attachments && data.attachments.length > 0) ||
+      !!data.quotedMessageId,
     {
-      message: "Message must contain text content or at least one attachment",
+      message:
+        "Message must contain text content, an attachment, or a forwarded message",
     },
   );
 
@@ -388,10 +394,15 @@ export const channelRoutes: FastifyPluginAsync = async (
 
       // A 1:1 DM has no broader audience to be singled out from, so
       // "mentions only" doesn't apply there — only to channels and group DMs.
-      if (parseResult.data.preference === "MENTIONS" && access.channel.type === "DIRECT") {
+      if (
+        parseResult.data.preference === "MENTIONS" &&
+        access.channel.type === "DIRECT"
+      ) {
         return reply
           .status(400)
-          .send({ error: "'MENTIONS' preference is not available for direct messages" });
+          .send({
+            error: "'MENTIONS' preference is not available for direct messages",
+          });
       }
 
       const { count } = await prisma.channelMember.updateMany({
@@ -598,18 +609,7 @@ export const channelRoutes: FastifyPluginAsync = async (
           bot: {
             select: { id: true, name: true, avatarUrl: true },
           },
-          quotedMessage: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  username: true,
-                  displayName: true,
-                  avatarUrl: true,
-                },
-              },
-            },
-          },
+          quotedMessage: quotedMessageInclude,
           attachments: {
             where: { isDeleted: false },
           },
@@ -663,18 +663,7 @@ export const channelRoutes: FastifyPluginAsync = async (
               status: true,
             },
           },
-          quotedMessage: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  username: true,
-                  displayName: true,
-                  avatarUrl: true,
-                },
-              },
-            },
-          },
+          quotedMessage: quotedMessageInclude,
           bot: true,
           attachments: true,
           reactions: {
@@ -879,6 +868,14 @@ export const channelRoutes: FastifyPluginAsync = async (
       const access = await verifyChannelAccess(userId, channelId, reply);
       if (!access) return;
       const channel = access.channel;
+      // Quoting a message from another channel is how forwarding works
+      const quoted = quotedMessageId
+        ? await verifyQuotable(userId, quotedMessageId, channelId, reply)
+        : null;
+      if (quotedMessageId && !quoted) return;
+      // A forward is a copy, so it outlives the original being edited or deleted. The quote link only says who wrote it
+      // and where; the note, if any, is sent by the client as its own message.
+      const isForward = !!quoted && quoted.channelId !== channelId;
 
       let anonName: string | undefined;
       let anonEmoji: string | undefined;
@@ -892,7 +889,7 @@ export const channelRoutes: FastifyPluginAsync = async (
         data: {
           channelId,
           userId,
-          content: content || "",
+          content: isForward ? quoted!.content : content || "",
           quotedMessageId: quotedMessageId || undefined,
           anonName,
           anonEmoji,
@@ -900,7 +897,20 @@ export const channelRoutes: FastifyPluginAsync = async (
       });
 
       // Link or create attachments
-      if (attachments && attachments.length > 0) {
+      if (isForward) {
+        // Same stored files, new rows: deleting the original only soft-deletes its own rows. uploaderId stays the
+        // original uploader's so the forwarder gains no right to delete the underlying file.
+        const originals = await prisma.attachment.findMany({
+          where: { messageId: quoted!.id, isDeleted: false },
+        });
+        await prisma.attachment.createMany({
+          data: originals.map(({ id, createdAt, updatedAt, ...a }) => ({
+            ...a,
+            channelId,
+            messageId: message.id,
+          })),
+        });
+      } else if (attachments && attachments.length > 0) {
         for (const att of attachments) {
           if (att.id) {
             await prisma.attachment.update({
@@ -941,18 +951,7 @@ export const channelRoutes: FastifyPluginAsync = async (
               status: true,
             },
           },
-          quotedMessage: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  username: true,
-                  displayName: true,
-                  avatarUrl: true,
-                },
-              },
-            },
-          },
+          quotedMessage: quotedMessageInclude,
           bot: true,
           attachments: true,
           reactions: true,
@@ -1102,11 +1101,9 @@ export const channelRoutes: FastifyPluginAsync = async (
       const channel = access.channel;
 
       if (channel.name === "general" || channel.name === ACTIVITY_CHANNEL) {
-        return reply
-          .status(400)
-          .send({
-            error: `The default #${channel.name} channel cannot be deleted`,
-          });
+        return reply.status(400).send({
+          error: `The default #${channel.name} channel cannot be deleted`,
+        });
       }
 
       const wsMember = await prisma.workspaceMember.findUnique({

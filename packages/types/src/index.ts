@@ -193,6 +193,7 @@ export interface Message {
   parentMessageId: string | null; // For threads
   quotedMessageId?: string | null; // For quote replies
   quotedMessage?: Message | null;
+  channel?: Pick<Channel, 'id' | 'name' | 'type'>; // Present on a quoted message; differs from the quoting one's when forwarded
   anonName?: string | null;
   anonEmoji?: string | null;
   isAnonymous?: boolean;
