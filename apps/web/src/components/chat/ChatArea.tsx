@@ -37,6 +37,7 @@ import {
   Forward,
 } from "@/components/ui/icons";
 import { Avatar, tint, relativeTime } from "../project/projectViewUtils";
+import { AnonAvatar } from "./AnonAvatar";
 import {
   ChannelSidePanel,
   PresenceAvatar,
@@ -69,20 +70,6 @@ import { ForwardMessageDialog } from "./ForwardMessageDialog";
 // Anonymous-feed warm accent (Figma amber/600); text uses a darker mix so it stays readable on any theme.
 const ANON_WARM = "#D97706";
 const ANON_WARM_TEXT = "color-mix(in srgb, #D97706 70%, var(--theme-text))";
-// Saturated character colours for anonymous avatars (Figma: amber, cyan, pink + extras).
-const ANON_AVATAR_COLORS = [
-  "#D97706",
-  "#0EA5C6",
-  "#E0568D",
-  "#7C4DDB",
-  "#1F9D63",
-  "#2563EB",
-];
-const anonColor = (seed: string) =>
-  ANON_AVATAR_COLORS[
-    seed.split("").reduce((h, c) => h + c.charCodeAt(0), 0) %
-      ANON_AVATAR_COLORS.length
-  ];
 
 const dayKey = (iso: string) => {
   const d = new Date(iso);
@@ -1044,12 +1031,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 className="h-9 pl-1.5 pr-3 rounded-[18px] flex items-center gap-2 transition hover:brightness-95"
                 style={{ backgroundColor: tint(ANON_WARM, 12) }}
               >
-                <span
-                  className="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: ANON_WARM, color: "#FFFFFF" }}
-                >
-                  <Mask size={14} />
-                </span>
+                <AnonAvatar
+                  name={anonProfile.anonName}
+                  emoji={anonProfile.anonEmoji}
+                  size={24}
+                  rounded="full"
+                />
                 <span
                   className="hidden sm:inline text-[13px] font-semibold whitespace-nowrap"
                   style={{ color: ANON_WARM_TEXT }}
@@ -1675,18 +1662,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                             }
                           >
                             {isAnon ? (
-                              <div
-                                className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0 select-none"
-                                style={{
-                                  backgroundColor: anonColor(
-                                    authorName || "Anonymous",
-                                  ),
-                                  color: "#FFFFFF",
-                                }}
-                                title={`${anonEmoji} ${authorName}`}
-                              >
-                                <Mask size={18} />
-                              </div>
+                              <AnonAvatar
+                                name={authorName}
+                                emoji={anonEmoji}
+                                size={36}
+                              />
                             ) : (
                               withCard(
                                 <Avatar
