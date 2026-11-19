@@ -63,6 +63,43 @@ function getInlineFormattingParent(node: Node | null, rootEl: HTMLElement): HTML
   return null;
 }
 
+const CODE_BLOCK_PLACEHOLDER = '// type code here';
+
+/** Nearest ancestor (or self) with the given tag, stopping at the editor root. */
+function closestInEditor(node: Node | null, tag: string, rootEl: HTMLElement): HTMLElement | null {
+  let curr: Node | null = node;
+  while (curr && curr !== rootEl) {
+    if (curr.nodeType === Node.ELEMENT_NODE && (curr as HTMLElement).tagName.toLowerCase() === tag) {
+      return curr as HTMLElement;
+    }
+    curr = curr.parentNode;
+  }
+  return null;
+}
+
+/** Turn a code block back into plain lines (one div per line) and put the caret at its end. */
+function unwrapCodeBlock(pre: HTMLElement, sel: Selection) {
+  const text = (pre.textContent || '').replace(/​/g, '');
+  const lines = text === CODE_BLOCK_PLACEHOLDER ? [''] : text.split('\n');
+  const frag = document.createDocumentFragment();
+  let last: HTMLElement | null = null;
+  for (const line of lines) {
+    const div = document.createElement('div');
+    if (line) div.textContent = line;
+    else div.appendChild(document.createElement('br'));
+    frag.appendChild(div);
+    last = div;
+  }
+  pre.replaceWith(frag);
+  if (last) {
+    const range = document.createRange();
+    range.selectNodeContents(last);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+}
+
 function isCursorAtEndOfNode(range: Range, inlineEl: HTMLElement): boolean {
   if (!range.collapsed) return false;
   try {
@@ -450,6 +487,8 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       if (!sel || sel.rangeCount === 0) return;
 
       const range = sel.getRangeAt(0);
+      // Text in a code block is already code; inline code there would nest code inside code.
+      if (closestInEditor(range.commonAncestorContainer, 'pre', editor)) return;
       const selectedText = range.toString();
 
       if (selectedText) {
@@ -502,13 +541,30 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       if (!sel || sel.rangeCount === 0) return;
 
       const range = sel.getRangeAt(0);
+
+      // Already inside a code block: toggle it back to plain text instead of nesting another block.
+      const existingPre = closestInEditor(range.commonAncestorContainer, 'pre', editor);
+      if (existingPre) {
+        unwrapCodeBlock(existingPre, sel);
+        if (onTyping) onTyping(editor.innerText.replace(/​/g, ''));
+        return;
+      }
+
+      // Inside inline code: drop that formatting first so we never get code inside code.
+      const inlineCode = closestInEditor(range.commonAncestorContainer, 'code', editor);
+      if (inlineCode) {
+        const text = document.createTextNode(inlineCode.textContent || '');
+        inlineCode.replaceWith(text);
+        range.selectNodeContents(text);
+      }
+
       const selectedText = range.toString();
 
       const pre = document.createElement('pre');
       pre.className =
         'bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-lg p-2.5 my-1.5 font-mono text-xs text-[var(--theme-text)] block overflow-x-auto';
       const code = document.createElement('code');
-      code.textContent = selectedText || '// type code here';
+      code.textContent = selectedText || CODE_BLOCK_PLACEHOLDER;
       pre.appendChild(code);
 
       range.deleteContents();
@@ -607,7 +663,12 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         const sel = window.getSelection();
         if (sel && sel.rangeCount > 0) {
           const range = sel.getRangeAt(0);
-          if (range.collapsed && range.startContainer.nodeType === Node.TEXT_NODE) {
+          if (
+            range.collapsed &&
+            range.startContainer.nodeType === Node.TEXT_NODE &&
+            // Backticks inside a code block are literal code, not inline-code markers.
+            !closestInEditor(range.startContainer, 'pre', editor)
+          ) {
             const textNode = range.startContainer;
             const fullText = textNode.textContent || '';
             const beforeCursor = fullText.slice(0, range.startOffset);
