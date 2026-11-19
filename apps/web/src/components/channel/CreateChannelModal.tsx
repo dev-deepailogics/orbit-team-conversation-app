@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { Channel } from '@orbit/types';
 import { Hash, Lock, Mask, Search } from '@/components/ui/icons';
 import { api } from '../../lib/api';
+import { useChatStore } from '../../stores/chatStore';
 import { Avatar } from '../project/projectViewUtils';
 import {
   ModalShell,
@@ -63,6 +64,13 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
     const finalName = toChannelName(name).replace(/^-+|-+$/g, '');
     if (finalName.length < 2) {
       setError('Channel names need at least 2 characters.');
+      return;
+    }
+    const isDuplicate = useChatStore.getState().channels.some(
+      (c) => c.workspaceId === workspaceId && c.type !== 'DIRECT' && c.name.toLowerCase() === finalName.toLowerCase()
+    );
+    if (isDuplicate) {
+      setError(`A channel named "#${finalName}" already exists in this workspace`);
       return;
     }
     setIsSubmitting(true);

@@ -19,7 +19,6 @@ import {
   Trash2,
   ZoomIn,
   ZoomOut,
-  Maximize2,
   Sparkles,
   Users,
   X,
@@ -727,9 +726,22 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
   const findElementAtCoords = (coords: { x: number; y: number }): CanvasElement | null => {
     return (
       [...elements].reverse().find((el) => {
-        if (el.type === 'rect' || el.type === 'sticky') {
-          const w = el.width || (el.type === 'sticky' ? 160 : 100);
-          const h = el.height || (el.type === 'sticky' ? 160 : 100);
+        if (el.type === 'rect') {
+          const w = el.width || 100;
+          const h = el.height || 100;
+          return (
+            coords.x >= el.x &&
+            coords.x <= el.x + w &&
+            coords.y >= el.y &&
+            coords.y <= el.y + h
+          );
+        }
+        if (el.type === 'sticky') {
+          const w = el.width || 180;
+          let h = el.height || 180;
+          const lineCount = (el.text || '').split('\n').length || 1;
+          const estLineCount = Math.max(lineCount, Math.ceil((el.text || '').length / 22));
+          h = Math.max(h, estLineCount * (el.fontSize || 20) * 1.25 + 48);
           return (
             coords.x >= el.x &&
             coords.x <= el.x + w &&
@@ -1325,17 +1337,30 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
 
     const renderList = currentElement ? [...elements, currentElement] : elements;
 
-    // Helper to render rich lines with markdown heading, bold, code chips, and quotes
-    const renderFormattedLines = (
+    // Helper to calculate wrapped formatted lines and their total height
+    const getFormattedLinesData = (
       fullText: string,
-      startX: number,
-      startY: number,
-      defaultColor: string,
       baseSize: number,
       isGlobalBold?: boolean,
-      isHandwriting?: boolean
-    ) => {
-      // Pre-process multi-line bold (**...** across lines) and italic (*...*) so each line retains markdown tags
+      isHandwriting?: boolean,
+      maxWidth?: number
+    ): {
+      visualLines: {
+        tokens: {
+          text: string;
+          width: number;
+          fontSize: number;
+          isBold: boolean;
+          isItalic: boolean;
+          isStrike: boolean;
+          isCode: boolean;
+          isHandwriting: boolean;
+        }[];
+        lineHeight: number;
+        isQuote: boolean;
+      }[];
+      totalHeight: number;
+    } => {
       const normalizedText = (fullText || '')
         .replace(/\*\*([\s\S]*?)\*\*/g, (_, text) => {
           return text
@@ -1357,7 +1382,21 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         });
 
       const rawLines = normalizedText.split('\n');
-      let currentY = startY;
+      const visualLines: {
+        tokens: {
+          text: string;
+          width: number;
+          fontSize: number;
+          isBold: boolean;
+          isItalic: boolean;
+          isStrike: boolean;
+          isCode: boolean;
+          isHandwriting: boolean;
+        }[];
+        lineHeight: number;
+        isQuote: boolean;
+      }[] = [];
+      let totalHeight = 0;
 
       rawLines.forEach((raw) => {
         let line = raw;
@@ -1384,19 +1423,18 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
           line = '• ' + line.slice(2);
         }
 
-        let currentX = startX;
-
-        // Draw quote line indicator
-        if (isQuote) {
-          ctx.save();
-          ctx.fillStyle = '#007A5A';
-          ctx.fillRect(startX - 6, currentY - fontSize + 2, 3, fontSize * 1.2);
-          ctx.restore();
-          currentX += 4;
-        }
-
-        // Parse inline formatting: **bold**, *italic*, ~~strike~~, `code`
+        const effectiveMaxWidth = maxWidth ? (isQuote ? maxWidth - 4 : maxWidth) : undefined;
         const parts = line.split(/(\*\*[^*]+\*\*|\*[^*\n]+\*|~~[^~]+~~|`[^`]+`)/g);
+        const tokens: {
+          text: string;
+          width: number;
+          fontSize: number;
+          isBold: boolean;
+          isItalic: boolean;
+          isStrike: boolean;
+          isCode: boolean;
+          isHandwriting: boolean;
+        }[] = [];
 
         parts.forEach((part) => {
           if (!part) return;
@@ -1428,14 +1466,153 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
             : 'sans-serif';
           ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
 
-          const textWidth = ctx.measureText(text).width;
+          // Split part into words and whitespace
+          const segments = text.split(/(\s+)/);
+          segments.forEach((seg) => {
+            if (!seg) return;
+            const segWidth = ctx.measureText(seg).width + (isCode ? 4 : 0);
+
+            // If a single unbroken token exceeds effectiveMaxWidth, chunk it into character blocks
+            if (effectiveMaxWidth && segWidth > effectiveMaxWidth && !/^\s+$/.test(seg)) {
+              let curChunk = '';
+              for (const ch of seg) {
+                const testW = ctx.measureText(curChunk + ch).width + (isCode ? 4 : 0);
+                if (testW > effectiveMaxWidth && curChunk.length > 0) {
+                  tokens.push({
+                    text: curChunk,
+                    width: ctx.measureText(curChunk).width + (isCode ? 4 : 0),
+                    fontSize,
+                    isBold: !!isBold,
+                    isItalic: !!isItalic,
+                    isStrike,
+                    isCode,
+                    isHandwriting: !!isHandwriting,
+                  });
+                  curChunk = ch;
+                } else {
+                  curChunk += ch;
+                }
+              }
+              if (curChunk) {
+                tokens.push({
+                  text: curChunk,
+                  width: ctx.measureText(curChunk).width + (isCode ? 4 : 0),
+                  fontSize,
+                  isBold: !!isBold,
+                  isItalic: !!isItalic,
+                  isStrike,
+                  isCode,
+                  isHandwriting: !!isHandwriting,
+                });
+              }
+            } else {
+              tokens.push({
+                text: seg,
+                width: segWidth,
+                fontSize,
+                isBold: !!isBold,
+                isItalic: !!isItalic,
+                isStrike,
+                isCode,
+                isHandwriting: !!isHandwriting,
+              });
+            }
+          });
+        });
+
+        // Group tokens into wrapped visual lines
+        if (effectiveMaxWidth) {
+          let currentLineTokens: typeof tokens = [];
+          let currentLineWidth = 0;
+
+          tokens.forEach((tok) => {
+            // Drop leading whitespace at the start of a wrapped line
+            if (currentLineTokens.length === 0 && /^\s+$/.test(tok.text)) {
+              return;
+            }
+
+            if (currentLineTokens.length > 0 && currentLineWidth + tok.width > effectiveMaxWidth) {
+              const maxLineFont = Math.max(...currentLineTokens.map((t) => t.fontSize), fontSize);
+              const lh = maxLineFont * (isHandwriting ? 1.25 : 1.35);
+              visualLines.push({ tokens: currentLineTokens, lineHeight: lh, isQuote });
+              totalHeight += lh;
+              currentLineTokens = [];
+              currentLineWidth = 0;
+              if (/^\s+$/.test(tok.text)) return;
+            }
+
+            currentLineTokens.push(tok);
+            currentLineWidth += tok.width;
+          });
+
+          if (currentLineTokens.length > 0) {
+            const maxLineFont = Math.max(...currentLineTokens.map((t) => t.fontSize), fontSize);
+            const lh = maxLineFont * (isHandwriting ? 1.25 : 1.35);
+            visualLines.push({ tokens: currentLineTokens, lineHeight: lh, isQuote });
+            totalHeight += lh;
+          } else if (tokens.length === 0) {
+            const lh = fontSize * (isHandwriting ? 1.25 : 1.35);
+            visualLines.push({ tokens: [], lineHeight: lh, isQuote });
+            totalHeight += lh;
+          }
+        } else {
+          const maxLineFont = tokens.length > 0 ? Math.max(...tokens.map((t) => t.fontSize)) : fontSize;
+          const lh = maxLineFont * (isHandwriting ? 1.25 : 1.35);
+          visualLines.push({ tokens, lineHeight: lh, isQuote });
+          totalHeight += lh;
+        }
+      });
+
+      return { visualLines, totalHeight };
+    };
+
+    // Helper to render rich lines with markdown heading, bold, code chips, quotes, and word wrapping
+    const renderFormattedLines = (
+      fullText: string,
+      startX: number,
+      startY: number,
+      defaultColor: string,
+      baseSize: number,
+      isGlobalBold?: boolean,
+      isHandwriting?: boolean,
+      maxWidth?: number
+    ) => {
+      const { visualLines } = getFormattedLinesData(
+        fullText,
+        baseSize,
+        isGlobalBold,
+        isHandwriting,
+        maxWidth
+      );
+
+      let currentY = startY;
+
+      visualLines.forEach((vLine) => {
+        let currentX = startX;
+
+        // Draw quote line indicator
+        if (vLine.isQuote) {
+          ctx.save();
+          ctx.fillStyle = '#007A5A';
+          ctx.fillRect(startX - 6, currentY - vLine.lineHeight * 0.8, 3, vLine.lineHeight);
+          ctx.restore();
+          currentX += 4;
+        }
+
+        vLine.tokens.forEach((tok) => {
+          const fontStyle = tok.isItalic ? 'italic' : 'normal';
+          const fontWeight = tok.isBold ? 'bold' : (tok.isHandwriting ? '600' : '500');
+          const fontFamily = tok.isHandwriting
+            ? "'Caveat', 'Kalam', 'Patrick Hand', 'Comic Sans MS', cursive, sans-serif"
+            : 'sans-serif';
+          ctx.font = `${fontStyle} ${fontWeight} ${tok.fontSize}px ${fontFamily}`;
 
           // Draw code chip background
-          if (isCode) {
+          if (tok.isCode) {
             ctx.save();
             ctx.fillStyle = theme.surfaceHoverColor || theme.surfaceColor;
             ctx.beginPath();
-            ctx.roundRect(currentX - 2, currentY - fontSize + 2, textWidth + 4, fontSize * 1.2, 4);
+            ctx.roundRect(currentX - 2, currentY - tok.fontSize + 2, tok.width, tok.fontSize * 1.2, 4);
             ctx.fill();
             ctx.strokeStyle = theme.borderColor;
             ctx.lineWidth = 1;
@@ -1447,24 +1624,24 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
             ctx.fillStyle = defaultColor;
           }
 
-          ctx.fillText(text, currentX, currentY);
+          ctx.fillText(tok.text, currentX, currentY);
 
           // Draw strikethrough line
-          if (isStrike) {
+          if (tok.isStrike) {
             ctx.save();
             ctx.strokeStyle = defaultColor;
             ctx.lineWidth = 1.5;
             ctx.beginPath();
-            ctx.moveTo(currentX, currentY - fontSize / 3);
-            ctx.lineTo(currentX + textWidth, currentY - fontSize / 3);
+            ctx.moveTo(currentX, currentY - tok.fontSize / 3);
+            ctx.lineTo(currentX + tok.width, currentY - tok.fontSize / 3);
             ctx.stroke();
             ctx.restore();
           }
 
-          currentX += textWidth + (isCode ? 4 : 0);
+          currentX += tok.width;
         });
 
-        currentY += fontSize * (isHandwriting ? 1.25 : 1.35);
+        currentY += vLine.lineHeight;
       });
     };
 
@@ -1529,7 +1706,14 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         }
       } else if (el.type === 'sticky') {
         const w = el.width || 180;
-        const h = el.height || 180;
+        const textData = getFormattedLinesData(
+          el.text || '',
+          el.fontSize || 20,
+          el.isBold,
+          true,
+          w - 28
+        );
+        const h = Math.max(el.height || 180, textData.totalHeight + 48);
 
         // Realistic paper drop shadow
         ctx.save();
@@ -1590,6 +1774,12 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         ctx.restore();
 
         if (!isCurrentlyEditing) {
+          ctx.save();
+          // Clip to paper rounded rect to guarantee text never bleeds outside paper
+          ctx.beginPath();
+          ctx.roundRect(el.x, el.y, w, h, 8);
+          ctx.clip();
+
           renderFormattedLines(
             el.text || '',
             el.x + 14,
@@ -1597,8 +1787,10 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
             el.color || '#713F12',
             el.fontSize || 20,
             el.isBold,
-            true
+            true,
+            w - 28
           );
+          ctx.restore();
         }
       } else if (el.type === 'text') {
         if (!isCurrentlyEditing) {
@@ -1608,7 +1800,9 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
             el.y + 20,
             ink(el.color),
             el.fontSize || 18,
-            el.isBold
+            el.isBold,
+            false,
+            el.width
           );
         }
       }
@@ -1622,8 +1816,19 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
         const pad = 6;
         let bx = el.x - pad;
         let by = el.y - pad;
-        let bw = (el.width || 100) + pad * 2;
-        let bh = (el.height || 100) + pad * 2;
+        let bw = (el.width || (el.type === 'sticky' ? 180 : 100)) + pad * 2;
+        let bh = (el.height || (el.type === 'sticky' ? 180 : 100)) + pad * 2;
+
+        if (el.type === 'sticky') {
+          const textData = getFormattedLinesData(
+            el.text || '',
+            el.fontSize || 20,
+            el.isBold,
+            true,
+            (el.width || 180) - 28
+          );
+          bh = Math.max(el.height || 180, textData.totalHeight + 48) + pad * 2;
+        }
 
         if (el.type === 'pen' && el.points && el.points.length > 0) {
           const xs = el.points.map((p) => p.x);
@@ -1749,7 +1954,6 @@ export const WhiteboardView: React.FC<WhiteboardViewProps> = ({
       }`}
       style={{ backgroundColor: 'var(--theme-bg-surface-hover)' }}
     >
-
       {/* Floating Formatting Toolbar (When Text / Sticky Note is Selected) */}
       {selectedElement && (selectedElement.type === 'text' || selectedElement.type === 'sticky') && (
         <div
