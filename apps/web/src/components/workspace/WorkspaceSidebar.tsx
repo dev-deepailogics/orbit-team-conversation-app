@@ -76,7 +76,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [themeExpanded, setThemeExpanded] = useState(false);
-  const [themeModalTab, setThemeModalTab] = useState<'presets' | 'custom' | 'general' | null>(null);
+  const [themeModalTab, setThemeModalTab] = useState<'presets' | 'custom' | 'general' | 'profile' | null>(null);
   const [showStorage, setShowStorage] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
@@ -311,7 +311,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                   <div className="h-px" style={{ backgroundColor: 'var(--theme-border)' }} />
                 </div>
                 <AccountRow Icon={User} label="View profile" onClick={() => { setShowAccount(false); openProfile(); }} />
-                <AccountRow Icon={Settings} label="Settings" onClick={() => { setShowAccount(false); setThemeModalTab('general'); }} />
+                <AccountRow Icon={Settings} label="Settings" onClick={() => { setShowAccount(false); setThemeModalTab('profile'); }} />
                 <AccountRow Icon={LogOut} label="Sign out" onClick={() => { setShowAccount(false); onLogout(); }} />
               </div>
             )}
@@ -326,10 +326,6 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           onClose={() => setThemeModalTab(null)}
           workspace={currentWorkspace}
           isAdminOrOwner={isAdminOrOwner}
-          onOpenProfile={() => {
-            setThemeModalTab(null);
-            openProfile();
-          }}
           onSignOut={onLogout}
         />
       )}
@@ -340,10 +336,6 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           currentUser={currentUser}
           onClose={() => setShowStorage(false)}
           onFileDeleted={(id) => useChatStore.getState().removeAttachment(id)}
-          onOpenProfile={() => {
-            setShowStorage(false);
-            openProfile();
-          }}
           onSignOut={onLogout}
         />
       )}

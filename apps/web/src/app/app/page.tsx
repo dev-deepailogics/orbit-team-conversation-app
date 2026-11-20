@@ -53,6 +53,7 @@ import { usePinStore } from "@/stores/pinnedStore";
 import { useSidebarSortStore } from "@/stores/sidebarSortStore";
 import { useArchivedStore } from "@/stores/archivedStore";
 import { useNavHistoryStore } from "@/stores/navHistoryStore";
+import { usePresenceStore } from "@/stores/presenceStore";
 import {
   ShieldCheck,
   Building2,
@@ -96,6 +97,8 @@ export default function AppDashboard() {
   } = useChatStore();
   // Check-in driven presence (working / break / offline) for everyone in the workspace
   const { presence, breakReasons } = useTeamPresence(currentWorkspace?.id);
+  // Shared with components opened from anywhere (the profile inside Settings) without a second subscription
+  useEffect(() => usePresenceStore.setState({ presence }), [presence]);
 
   const {
     startHuddle,
