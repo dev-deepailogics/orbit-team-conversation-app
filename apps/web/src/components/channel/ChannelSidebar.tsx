@@ -52,6 +52,7 @@ import { ThemeModal } from "../theme/ThemeModal";
 import { OrganizationControlModal } from "../availability/OrganizationControlModal";
 import { CreateChannelModal } from "./CreateChannelModal";
 import { NewDirectMessageModal } from "./NewDirectMessageModal";
+import { HistoryNav } from "../layout/HistoryNav";
 
 /** Animates a section open/closed (grid 0fr -> 1fr). Collapsed content is inert so it can't be tabbed into. */
 const Collapse: React.FC<{ open: boolean; children: React.ReactNode }> = ({
@@ -1160,30 +1161,32 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
             </div>
           </div>
         ) : (
-          onOpenSearch && (
-            <div className="px-1">
-              <button
-                onClick={onOpenSearch}
-                title="Search messages (Cmd+K / Ctrl+K)"
-                className="w-full h-8 flex items-center gap-[9px] pl-[9px] pr-4 rounded-lg transition hover:brightness-95"
-                style={{
-                  backgroundColor: "var(--theme-fill)",
-                  color: "var(--theme-text-muted)",
-                }}
-              >
-                <Search size={16} />
-                <span
-                  className="flex-1 text-left text-[13px]"
-                  style={{ color: "var(--theme-text)", opacity: 0.8 }}
-                >
-                  Search
-                </span>
-                <kbd className="font-sans text-[11px] font-medium opacity-80">
-                  ⌘K
-                </kbd>
-              </button>
-            </div>
-          )
+          // Back / forward through recent conversations, then search (Slack's layout)
+          <div className="px-1 flex items-center gap-1">
+            <HistoryNav onOpen={onSelectChannel} />
+            {onOpenSearch && (
+                  <button
+                    onClick={onOpenSearch}
+                    title="Search messages (Cmd+K / Ctrl+K)"
+                    className="flex-1 min-w-0 h-8 flex items-center gap-[9px] pl-[9px] pr-4 rounded-lg transition hover:brightness-95"
+                    style={{
+                      backgroundColor: "var(--theme-fill)",
+                      color: "var(--theme-text-muted)",
+                    }}
+                  >
+                    <Search size={16} />
+                    <span
+                      className="flex-1 text-left text-[13px]"
+                      style={{ color: "var(--theme-text)", opacity: 0.8 }}
+                    >
+                      Search
+                    </span>
+                    <kbd className="font-sans text-[11px] font-medium opacity-80">
+                      ⌘K
+                    </kbd>
+                  </button>
+            )}
+          </div>
         )}
 
         {/* Projects & Boards Section (Trello-like) — shown when toggled from the rail's Projects icon; title + create button live in the header above */}

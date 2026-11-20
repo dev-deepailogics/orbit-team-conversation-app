@@ -7,6 +7,7 @@ import { useChatStore } from '../../stores/chatStore';
 import { useAuthStore } from '../../stores/authStore';
 import { SearchOrbitButton } from '../project/docsCanvasUi';
 import { Avatar } from '../project/projectViewUtils';
+import { useHistoryShortcuts } from './HistoryNav';
 
 // Figma header utilities: "Search Orbit" field, unread bell and help.
 // The bell counts real unread messages (the same counts the sidebar shows) and lists those conversations.
@@ -17,6 +18,7 @@ export const HeaderUtilities: React.FC<{
   const channels = useChatStore((s) => s.channels);
   const unreadCounts = useChatStore((s) => s.unreadCounts);
   const meId = useAuthStore((s) => s.user?.id);
+  const historyKeys = useHistoryShortcuts();
   const [open, setOpen] = useState<'bell' | 'help' | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -141,6 +143,7 @@ export const HeaderUtilities: React.FC<{
           </p>
           {[
             ['Search Orbit', 'Ctrl K'],
+            ['Back / forward', `${historyKeys.back} / ${historyKeys.forward}`],
             ['Close a dialog', 'Esc'],
             ['Send message', 'Enter'],
             ['New line', 'Shift Enter'],

@@ -52,6 +52,7 @@ import { OfflineOverlay } from "@/components/brand/OfflineScreen";
 import { usePinStore } from "@/stores/pinnedStore";
 import { useSidebarSortStore } from "@/stores/sidebarSortStore";
 import { useArchivedStore } from "@/stores/archivedStore";
+import { useNavHistoryStore } from "@/stores/navHistoryStore";
 import {
   ShieldCheck,
   Building2,
@@ -218,6 +219,11 @@ export default function AppDashboard() {
     setChatView("messages");
   }, [currentChannel?.id]);
 
+  // Every way of opening a conversation (sidebar, search, notification, link, back/forward) ends here, so record it once
+  useEffect(() => {
+    if (currentChannel?.id) useNavHistoryStore.getState().visit(currentChannel.id);
+  }, [currentChannel?.id]);
+
   // 1. Check Auth
   useEffect(() => {
     fetchMe();
@@ -283,6 +289,7 @@ export default function AppDashboard() {
     setShowCanvasHub(false);
     setShowDocsHub(false);
     setCurrentWorkspace(workspace);
+    useNavHistoryStore.getState().reset(); // history is per workspace: other workspaces' conversations aren't here
     if (typeof window !== "undefined") {
       localStorage.setItem("orbit_active_workspace_id", workspace.id);
     }
@@ -451,6 +458,27 @@ export default function AppDashboard() {
       console.error("Failed to load channel messages", err);
     }
   };
+
+  // Back / forward through recent conversations: Alt+Left / Alt+Right (Cmd+[ / Cmd+] on Mac), like Slack. Taken over
+  // from the browser on purpose, whose own back would leave the app. The ref keeps the listener registered once.
+  const selectChannelRef = useRef(handleSelectChannel);
+  selectChannelRef.current = handleSelectChannel;
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const direction =
+        (e.altKey && !e.ctrlKey && !e.metaKey && e.key === "ArrowLeft") || (e.metaKey && e.key === "[")
+          ? -1
+          : (e.altKey && !e.ctrlKey && !e.metaKey && e.key === "ArrowRight") || (e.metaKey && e.key === "]")
+            ? 1
+            : 0;
+      if (!direction) return;
+      e.preventDefault();
+      const channel = useNavHistoryStore.getState().go(direction);
+      if (channel) selectChannelRef.current(channel);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   // 4b. Handle Project Selection
   // Last board the user opened, so the Projects rail icon can reopen it.
