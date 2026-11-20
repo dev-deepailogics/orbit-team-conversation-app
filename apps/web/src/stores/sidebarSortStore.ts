@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { api } from "../lib/api";
+import { saveMemberSettings } from "../lib/memberSettings";
 
 /** How the sidebar orders channels, group DMs and DMs. Unread conversations always rise above either order. */
 export type SidebarSort = "recent" | "alphabetical";
@@ -46,9 +46,7 @@ export const useSidebarSortStore = create<SidebarSortState>((set, get) => ({
         // Ignore quota / private-mode errors
       }
     }
-    api
-      .patch(`/api/workspaces/${workspaceId}/member-settings`, { sidebarSort: sort })
-      .catch((err) => console.debug("Failed to sync sidebar sort", err));
+    saveMemberSettings(workspaceId, { sidebarSort: sort });
   },
 }));
 

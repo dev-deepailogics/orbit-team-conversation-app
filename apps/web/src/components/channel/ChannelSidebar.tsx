@@ -2,7 +2,13 @@
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Avatar } from "@/components/project/projectViewUtils";
-import { Workspace, Channel, UserProfile, Project, UserStatus } from "@orbit/types";
+import {
+  Workspace,
+  Channel,
+  UserProfile,
+  Project,
+  UserStatus,
+} from "@orbit/types";
 import { Presence } from "../availability/useTeamPresence";
 import { StatusEmoji } from "../availability/StatusEmoji";
 import { isLiveOnline } from "./useLiveUserStatus";
@@ -22,7 +28,6 @@ import {
   Palette,
   Check,
   Building2,
-  
   FileText,
   Trash2,
   Share2,
@@ -31,12 +36,15 @@ import {
   Pen,
   Mask,
   Pin,
+  Archive,
+  ArchiveRestore,
 } from "@/components/ui/icons";
 import { ProjectDocument } from "@orbit/types";
 import { api } from "../../lib/api";
 import { useChatStore } from "../../stores/chatStore";
 import { usePinStore } from "../../stores/pinnedStore";
 import { useSidebarSort } from "../../stores/sidebarSortStore";
+import { useArchived, useArchivedStore } from "../../stores/archivedStore";
 import { orderConversations } from "../../lib/sidebarOrder";
 import { WorkspaceStorageModal } from "../workspace/WorkspaceStorageModal";
 import { AddWorkspaceMemberDialog } from "../workspace/AddWorkspaceMemberDialog";
@@ -46,7 +54,10 @@ import { CreateChannelModal } from "./CreateChannelModal";
 import { NewDirectMessageModal } from "./NewDirectMessageModal";
 
 /** Animates a section open/closed (grid 0fr -> 1fr). Collapsed content is inert so it can't be tabbed into. */
-const Collapse: React.FC<{ open: boolean; children: React.ReactNode }> = ({ open, children }) => (
+const Collapse: React.FC<{ open: boolean; children: React.ReactNode }> = ({
+  open,
+  children,
+}) => (
   <div
     className="grid transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none"
     style={{ gridTemplateRows: open ? "1fr" : "0fr", opacity: open ? 1 : 0 }}
@@ -64,7 +75,10 @@ const SectionHeader: React.FC<{
   onAdd?: () => void;
   addTitle?: string;
 }> = ({ label, collapsed, onToggle, onAdd, addTitle }) => (
-  <div className="flex items-center h-[26px] pr-2 select-none" style={{ color: "var(--theme-section)" }}>
+  <div
+    className="flex items-center h-[26px] pr-2 select-none"
+    style={{ color: "var(--theme-section)" }}
+  >
     <button
       onClick={onToggle}
       className="flex-1 h-full flex items-center gap-1.5 pl-1 text-left text-xs font-semibold transition hover:opacity-75 focus:outline-none min-w-0"
@@ -98,7 +112,10 @@ const ActiveBar = () => (
 const UnreadBadge: React.FC<{ count: number }> = ({ count }) => (
   <span
     className="ml-2 shrink-0 min-w-[22px] h-5 px-1.5 rounded-[10px] flex items-center justify-center text-xs font-bold"
-    style={{ backgroundColor: "var(--theme-accent)", color: "var(--theme-primary-text)" }}
+    style={{
+      backgroundColor: "var(--theme-accent)",
+      color: "var(--theme-primary-text)",
+    }}
   >
     {count}
   </span>
@@ -124,6 +141,27 @@ const RowIcon: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   >
     {children}
   </span>
+);
+
+/** Hover action that archives a conversation (or brings it back from the Archived section). */
+const ArchiveToggle: React.FC<{
+  archived: boolean;
+  label: string;
+  onClick: () => void;
+}> = ({ archived, label, onClick }) => (
+  <button
+    type="button"
+    onClick={(e) => {
+      e.stopPropagation();
+      onClick();
+    }}
+    title={archived ? `Unarchive ${label}` : `Archive ${label}`}
+    aria-label={archived ? `Unarchive ${label}` : `Archive ${label}`}
+    className="ml-1 shrink-0 p-1 rounded transition opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[var(--theme-fill)]"
+    style={{ color: "var(--theme-text-muted)" }}
+  >
+    {archived ? <ArchiveRestore size={12} /> : <Archive size={12} />}
+  </button>
 );
 
 interface ChannelSidebarProps {
@@ -209,7 +247,10 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   onMemberAdded,
 }) => {
   const [showCreateChannel, setShowCreateChannel] = useState(false);
-  const sidebar = useResizableSidebar({ storageKey: "orbit_sidebar_width", defaultWidth: 208 });
+  const sidebar = useResizableSidebar({
+    storageKey: "orbit_sidebar_width",
+    defaultWidth: 208,
+  });
   const [showStorageModal, setShowStorageModal] = useState(false);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [showThemeModal, setShowThemeModal] = useState(false);
@@ -220,20 +261,32 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   const workspaceMenuRef = useRef<HTMLDivElement>(null);
   const [isChannelsCollapsed, setIsChannelsCollapsed] = useState(false);
   const [isDmsCollapsed, setIsDmsCollapsed] = useState(false);
+  const [isArchivedCollapsed, setIsArchivedCollapsed] = useState(true);
   const [dmSearchQuery, setDmSearchQuery] = useState("");
   const [showDmSearch, setShowDmSearch] = useState(false);
   const [projectSearchQuery, setProjectSearchQuery] = useState("");
   const [canvasSearchQuery, setCanvasSearchQuery] = useState("");
   const [docSearchQuery, setDocSearchQuery] = useState("");
-  const [docActiveFilter, setDocActiveFilter] = useState<"all" | "project" | "shared" | "private">("all");
+  const [docActiveFilter, setDocActiveFilter] = useState<
+    "all" | "project" | "shared" | "private"
+  >("all");
   const unreadCounts = useChatStore((s) => s.unreadCounts);
   const lastActivity = useChatStore((s) => s.lastActivity);
   const sidebarSort = useSidebarSort(workspace?.id);
+  const archived = useArchived(workspace?.id);
+  const archiveConversation = useArchivedStore((s) => s.archive);
+  const unarchiveConversations = useArchivedStore((s) => s.unarchive);
 
   // Pin state
-  const pinnedChannelIds = usePinStore((s) => (workspace?.id ? s.getPinnedChannels(workspace.id) : []));
-  const pinnedUserIds = usePinStore((s) => (workspace?.id ? s.getPinnedUsers(workspace.id) : []));
-  const pinnedProjectIds = usePinStore((s) => (workspace?.id ? s.getPinnedProjects(workspace.id) : []));
+  const pinnedChannelIds = usePinStore((s) =>
+    workspace?.id ? s.getPinnedChannels(workspace.id) : [],
+  );
+  const pinnedUserIds = usePinStore((s) =>
+    workspace?.id ? s.getPinnedUsers(workspace.id) : [],
+  );
+  const pinnedProjectIds = usePinStore((s) =>
+    workspace?.id ? s.getPinnedProjects(workspace.id) : [],
+  );
   const togglePinChannel = usePinStore((s) => s.togglePinChannel);
   const togglePinUser = usePinStore((s) => s.togglePinUser);
   const togglePinProject = usePinStore((s) => s.togglePinProject);
@@ -241,9 +294,12 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   useEffect(() => {
     if (workspace?.id && currentUser?.id) {
       const memberObj = members?.find(
-        (m: any) => m.userId === currentUser.id || m.user?.id === currentUser.id
+        (m: any) =>
+          m.userId === currentUser.id || m.user?.id === currentUser.id,
       );
-      usePinStore.getState().initPins(workspace.id, currentUser.id, memberObj?.settings);
+      usePinStore
+        .getState()
+        .initPins(workspace.id, currentUser.id, memberObj?.settings);
     }
   }, [workspace?.id, currentUser?.id, members]);
 
@@ -252,15 +308,38 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
     const pinned = new Set(pinnedChannelIds);
     const keys = {
       name: (c: Channel) => c.name,
-      activity: (c: Channel) => lastActivity[c.id] ?? (Date.parse(c.createdAt) || 0),
+      activity: (c: Channel) =>
+        lastActivity[c.id] ?? (Date.parse(c.createdAt) || 0),
       unread: (c: Channel) => unreadCounts[c.id] || 0,
     };
+    const isArchived = new Set(archived.channels);
     const list = channels.filter((c) => c.type !== "DIRECT");
+    const open = list.filter((c) => !isArchived.has(c.id)); // archived wins over pinned
     return {
-      pinned: orderConversations(list.filter((c) => pinned.has(c.id)), sidebarSort, keys),
-      unpinned: orderConversations(list.filter((c) => !pinned.has(c.id)), sidebarSort, keys),
+      pinned: orderConversations(
+        open.filter((c) => pinned.has(c.id)),
+        sidebarSort,
+        keys,
+      ),
+      unpinned: orderConversations(
+        open.filter((c) => !pinned.has(c.id)),
+        sidebarSort,
+        keys,
+      ),
+      archived: orderConversations(
+        list.filter((c) => isArchived.has(c.id)),
+        sidebarSort,
+        keys,
+      ),
     };
-  }, [channels, pinnedChannelIds, lastActivity, unreadCounts, sidebarSort]);
+  }, [
+    channels,
+    pinnedChannelIds,
+    archived.channels,
+    lastActivity,
+    unreadCounts,
+    sidebarSort,
+  ]);
 
   // People to DM (members plus anyone we already have a 1:1 DM with, e.g. removed users), each with their DM channel
   const dmPeople = useMemo(() => {
@@ -268,7 +347,8 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
     const dmByPeer = new Map<string, Channel>();
     const people = new Map<string, { user: any; id: string }>();
     members.forEach((m) => {
-      if (m?.user) people.set(m.user.id, { user: m.user, id: m.id || m.user.id });
+      if (m?.user)
+        people.set(m.user.id, { user: m.user, id: m.id || m.user.id });
     });
     channels.forEach((c) => {
       if (c.type !== "DIRECT" || !Array.isArray(c.members)) return;
@@ -277,31 +357,114 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
       const peerId = peer ? peer.userId : me;
       if (peerId && !dmByPeer.has(peerId)) dmByPeer.set(peerId, c);
       c.members.forEach((cm: any) => {
-        if (cm?.user && !people.has(cm.user.id)) people.set(cm.user.id, { user: cm.user, id: `dm-peer-${cm.user.id}` });
+        if (cm?.user && !people.has(cm.user.id))
+          people.set(cm.user.id, {
+            user: cm.user,
+            id: `dm-peer-${cm.user.id}`,
+          });
       });
     });
-    return Array.from(people.values(), (p) => ({ ...p, dmChannel: dmByPeer.get(p.user.id) }));
+    return Array.from(people.values(), (p) => ({
+      ...p,
+      dmChannel: dmByPeer.get(p.user.id),
+    }));
   }, [members, channels, currentUser?.id]);
 
   const dmGroups = useMemo(() => {
     const query = dmSearchQuery.toLowerCase().trim();
+    const isArchived = new Set(archived.users);
+    // Searching looks through everyone, archived included, so an archived person can always be found
     const list = query
       ? dmPeople.filter(({ user: u }) =>
-          [u.displayName, u.username, u.email].some((v) => (v || "").toLowerCase().includes(query)),
+          [u.displayName, u.username, u.email].some((v) =>
+            (v || "").toLowerCase().includes(query),
+          ),
         )
-      : dmPeople;
+      : dmPeople.filter((p) => !isArchived.has(p.user.id));
     const pinned = new Set(pinnedUserIds);
     const keys = {
-      name: (p: (typeof dmPeople)[number]) => p.user.displayName || p.user.username || "",
+      name: (p: (typeof dmPeople)[number]) =>
+        p.user.displayName || p.user.username || "",
       activity: (p: (typeof dmPeople)[number]) =>
-        p.dmChannel ? lastActivity[p.dmChannel.id] ?? (Date.parse(p.dmChannel.createdAt) || 0) : 0,
-      unread: (p: (typeof dmPeople)[number]) => (p.dmChannel ? unreadCounts[p.dmChannel.id] || 0 : 0),
+        p.dmChannel
+          ? (lastActivity[p.dmChannel.id] ??
+            (Date.parse(p.dmChannel.createdAt) || 0))
+          : 0,
+      unread: (p: (typeof dmPeople)[number]) =>
+        p.dmChannel ? unreadCounts[p.dmChannel.id] || 0 : 0,
     };
     return {
-      pinned: orderConversations(list.filter((p) => pinned.has(p.user.id)), sidebarSort, keys),
-      unpinned: orderConversations(list.filter((p) => !pinned.has(p.user.id)), sidebarSort, keys),
+      pinned: orderConversations(
+        list.filter((p) => pinned.has(p.user.id)),
+        sidebarSort,
+        keys,
+      ),
+      unpinned: orderConversations(
+        list.filter((p) => !pinned.has(p.user.id)),
+        sidebarSort,
+        keys,
+      ),
+      archived: query
+        ? []
+        : orderConversations(
+            dmPeople.filter((p) => isArchived.has(p.user.id)),
+            sidebarSort,
+            keys,
+          ),
     };
-  }, [dmPeople, dmSearchQuery, pinnedUserIds, lastActivity, unreadCounts, sidebarSort]);
+  }, [
+    dmPeople,
+    dmSearchQuery,
+    pinnedUserIds,
+    archived.users,
+    lastActivity,
+    unreadCounts,
+    sidebarSort,
+  ]);
+
+  useEffect(() => {
+    if (
+      !workspace?.id ||
+      (archived.channels.length === 0 && archived.users.length === 0)
+    )
+      return;
+    const me = currentUser?.id;
+    const wantsAttention = (c?: Channel) =>
+      !!c &&
+      (unreadCounts[c.id] || 0) > 0 &&
+      c.members?.find((m) => m.userId === me)?.notificationPreference !==
+        "MUTED";
+    const archivedUsers = new Set(archived.users);
+    const wake = {
+      channels: channelGroups.archived.filter(wantsAttention).map((c) => c.id),
+      users: dmPeople
+        .filter(
+          (p) => archivedUsers.has(p.user.id) && wantsAttention(p.dmChannel),
+        )
+        .map((p) => p.user.id),
+    };
+    if (wake.channels.length || wake.users.length)
+      unarchiveConversations(workspace.id, wake);
+  }, [
+    workspace?.id,
+    currentUser?.id,
+    archived,
+    channelGroups.archived,
+    dmPeople,
+    unreadCounts,
+    unarchiveConversations,
+  ]);
+
+  // Archiving tidies a conversation away, so it also leaves the pinned group
+  const archiveChannel = (channelId: string) => {
+    if (pinnedChannelIds.includes(channelId))
+      togglePinChannel(workspace.id, channelId);
+    archiveConversation(workspace.id, "channels", channelId);
+  };
+  const archiveUser = (userId: string) => {
+    if (pinnedUserIds.includes(userId)) togglePinUser(workspace.id, userId);
+    archiveConversation(workspace.id, "users", userId);
+  };
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -328,6 +491,244 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
     currentUserMember?.role === "OWNER" ||
     currentUserMember?.role === "ADMIN" ||
     workspace.ownerId === currentUser?.id;
+
+  type DmPerson = (typeof dmPeople)[number];
+  const rowDivider = (
+    <div className="my-1 border-b border-black/5 dark:border-white/5 mx-2" />
+  );
+
+  // One row per channel or group DM, shared by the Channels list and the Archived section
+  const renderChannelRow = (
+    channel: Channel,
+    { isArchived = false, divider = false } = {},
+  ) => {
+    const isActive = currentChannel?.id === channel.id;
+    const isPinned = !isArchived && pinnedChannelIds.includes(channel.id);
+    const hasHuddle = activeHuddleChannelId === channel.id;
+    const unread = unreadCounts[channel.id] || 0;
+
+    return (
+      <React.Fragment key={channel.id}>
+        <div
+          onClick={() => onSelectChannel(channel)}
+          className={rowClass(isActive)}
+          style={rowStyle(isActive)}
+        >
+          {isActive && <ActiveBar />}
+          <RowIcon>
+            {channel.isAnonymous ? (
+              <Mask size={18} aria-label="Anonymous channel" />
+            ) : channel.type === "PRIVATE" ? (
+              <Lock size={18} aria-label="Private channel" />
+            ) : (
+              <Hash size={16} />
+            )}
+          </RowIcon>
+          <span {...rowLabel(isActive, unread > 0)}>{channel.name}</span>
+
+          {hasHuddle && (
+            <span
+              className="ml-2 shrink-0 flex items-center gap-1 px-1.5 h-5 rounded-full text-[10px] font-bold animate-pulse"
+              style={{
+                backgroundColor:
+                  "color-mix(in srgb, var(--theme-primary) 15%, transparent)",
+                color: "var(--theme-primary)",
+              }}
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ backgroundColor: "var(--theme-primary)" }}
+              />
+              LIVE
+            </span>
+          )}
+
+          {/* Pin Channel Action (archived conversations can't be pinned) */}
+          {!isArchived && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                togglePinChannel(workspace.id, channel.id);
+              }}
+              title={isPinned ? "Unpin channel" : "Pin channel to top"}
+              className={`ml-1 shrink-0 p-1 rounded transition ${
+                isPinned
+                  ? "text-amber-500 dark:text-amber-400 opacity-100 hover:bg-[var(--theme-fill)]"
+                  : "opacity-0 group-hover:opacity-100 hover:bg-[var(--theme-fill)]"
+              }`}
+              style={
+                isPinned ? undefined : { color: "var(--theme-text-muted)" }
+              }
+            >
+              <Pin
+                size={12}
+                className={
+                  isPinned ? "fill-amber-500 dark:fill-amber-400 rotate-45" : ""
+                }
+              />
+            </button>
+          )}
+
+          <ArchiveToggle
+            archived={isArchived}
+            label={channel.type === "GROUP_DIRECT" ? "conversation" : "channel"}
+            onClick={() =>
+              isArchived
+                ? unarchiveConversations(workspace.id, {
+                    channels: [channel.id],
+                  })
+                : archiveChannel(channel.id)
+            }
+          />
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onStartHuddle(channel);
+            }}
+            title={hasHuddle ? "Active Call - Click to join" : "Start Call"}
+            className={`ml-1 shrink-0 p-1 rounded transition ${
+              hasHuddle
+                ? ""
+                : "hidden group-hover:block hover:bg-[var(--theme-fill)]"
+            }`}
+            style={
+              hasHuddle
+                ? {
+                    backgroundColor: "var(--theme-primary)",
+                    color: "var(--theme-primary-text)",
+                  }
+                : { color: "var(--theme-text-muted)" }
+            }
+          >
+            <PhoneCall size={13} />
+          </button>
+
+          {unread > 0 && <UnreadBadge count={unread} />}
+        </div>
+        {divider && rowDivider}
+      </React.Fragment>
+    );
+  };
+
+  // One row per person, shared by the Direct messages list and the Archived section
+  const renderDmRow = (
+    person: DmPerson,
+    { isArchived = false, divider = false } = {},
+  ) => {
+    const user = person.user;
+    if (!user) return null;
+    const userPresence = presence[user.id] || "offline";
+    const inOrbit = isLiveOnline(liveStatus[user.id]);
+    const isSelf = user.id === currentUser?.id;
+    const isPinned = !isArchived && pinnedUserIds.includes(user.id);
+    const dmChannel = person.dmChannel;
+
+    const isSelectedDM =
+      currentChannel?.type === "DIRECT" &&
+      (isSelf
+        ? !currentChannel.members ||
+          currentChannel.members.length <= 1 ||
+          currentChannel.members.every((m) => m.userId === currentUser?.id)
+        : currentChannel.members?.some((m) => m.userId === user.id) &&
+          currentChannel.members?.some((m) => m.userId === currentUser?.id));
+
+    const unread = dmChannel ? unreadCounts[dmChannel.id] || 0 : 0;
+
+    return (
+      <React.Fragment key={person.id}>
+        <div
+          onClick={() => onSelectUserDM(user)}
+          className={rowClass(!!isSelectedDM)}
+          style={rowStyle(!!isSelectedDM)}
+        >
+          {isSelectedDM && <ActiveBar />}
+          <span className="relative ml-2 mr-1 w-6 h-6 shrink-0">
+            <Avatar
+              name={user.displayName || user.username}
+              src={user.avatarUrl}
+              size={24}
+            />
+            {/* Dot = connected to Orbit (web/app) right now; check-in status lives in the pill */}
+            <span
+              title={inOrbit ? "In Orbit right now" : "Not in Orbit"}
+              className={`absolute bottom-0 right-0 w-[7px] h-[7px] rounded-full ${inOrbit ? "bg-emerald-500" : "bg-black"}`}
+              style={{
+                boxShadow: `0 0 0 1.5px ${isSelectedDM ? "var(--theme-selected)" : "var(--theme-bg-sidebar)"}`,
+              }}
+            />
+          </span>
+          <span {...rowLabel(!!isSelectedDM, unread > 0)}>
+            {user.displayName}
+            <StatusEmoji
+              presence={userPresence}
+              breakReason={breakReasons[user.id]}
+            />
+            {user.customStatusEmoji && (
+              <span
+                className="ml-1.5 text-xs inline-block align-middle"
+                title="Status"
+              >
+                {user.customStatusEmoji}
+              </span>
+            )}
+            {isSelf && (
+              <span
+                className="ml-1.5 text-[11px] font-normal"
+                style={{ color: "var(--theme-text-muted)" }}
+              >
+                you
+              </span>
+            )}
+          </span>
+
+          {/* Pin User Action (hidden for self DM and archived conversations) */}
+          {!isSelf && !isArchived && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                togglePinUser(workspace.id, user.id);
+              }}
+              title={isPinned ? "Unpin user" : "Pin user to top"}
+              className={`ml-1 shrink-0 p-1 rounded transition ${
+                isPinned
+                  ? "text-amber-500 dark:text-amber-400 opacity-100 hover:bg-[var(--theme-fill)]"
+                  : "opacity-0 group-hover:opacity-100 hover:bg-[var(--theme-fill)]"
+              }`}
+              style={
+                isPinned ? undefined : { color: "var(--theme-text-muted)" }
+              }
+            >
+              <Pin
+                size={12}
+                className={
+                  isPinned ? "fill-amber-500 dark:fill-amber-400 rotate-45" : ""
+                }
+              />
+            </button>
+          )}
+
+          <ArchiveToggle
+            archived={isArchived}
+            label="conversation"
+            onClick={() =>
+              isArchived
+                ? unarchiveConversations(workspace.id, { users: [user.id] })
+                : archiveUser(user.id)
+            }
+          />
+
+          {unread > 0 && <UnreadBadge count={unread} />}
+        </div>
+        {divider && rowDivider}
+      </React.Fragment>
+    );
+  };
+
+  const archivedCount =
+    channelGroups.archived.length + dmGroups.archived.length;
 
   const copyInviteLink = () => {
     const inviteLink = `${window.location.origin}/join/${(workspace as any).inviteCode || workspace.id}`;
@@ -468,7 +869,10 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 onClick={() => setShowNewDm(true)}
                 title="New message"
                 className="w-8 h-8 rounded-lg flex items-center justify-center transition hover:brightness-95"
-                style={{ backgroundColor: "var(--theme-fill)", color: "var(--theme-text-muted)" }}
+                style={{
+                  backgroundColor: "var(--theme-fill)",
+                  color: "var(--theme-text-muted)",
+                }}
               >
                 <Pen size={18} />
               </button>
@@ -526,7 +930,10 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 className="w-full px-3.5 py-2 text-left text-xs flex items-center justify-between transition hover:bg-black/5 dark:hover:bg-white/10 group"
               >
                 <div className="flex items-center gap-2.5">
-                  <Building2 size={15} className="text-blue-600 dark:text-blue-400" />
+                  <Building2
+                    size={15}
+                    className="text-blue-600 dark:text-blue-400"
+                  />
                   <span className="font-semibold text-blue-700 dark:text-blue-300">
                     Organization Control
                   </span>
@@ -759,13 +1166,21 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 onClick={onOpenSearch}
                 title="Search messages (Cmd+K / Ctrl+K)"
                 className="w-full h-8 flex items-center gap-[9px] pl-[9px] pr-4 rounded-lg transition hover:brightness-95"
-                style={{ backgroundColor: "var(--theme-fill)", color: "var(--theme-text-muted)" }}
+                style={{
+                  backgroundColor: "var(--theme-fill)",
+                  color: "var(--theme-text-muted)",
+                }}
               >
                 <Search size={16} />
-                <span className="flex-1 text-left text-[13px]" style={{ color: "var(--theme-text)", opacity: 0.8 }}>
+                <span
+                  className="flex-1 text-left text-[13px]"
+                  style={{ color: "var(--theme-text)", opacity: 0.8 }}
+                >
                   Search
                 </span>
-                <kbd className="font-sans text-[11px] font-medium opacity-80">⌘K</kbd>
+                <kbd className="font-sans text-[11px] font-medium opacity-80">
+                  ⌘K
+                </kbd>
               </button>
             </div>
           )
@@ -781,11 +1196,17 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                     (p) => (p.status || "active").toLowerCase() === "active",
                   )
                   .filter((p) =>
-                    p.name.toLowerCase().includes(projectSearchQuery.trim().toLowerCase()),
+                    p.name
+                      .toLowerCase()
+                      .includes(projectSearchQuery.trim().toLowerCase()),
                   );
 
-                const pinnedProjects = activeProjects.filter((p) => pinnedProjectIds.includes(p.id));
-                const unpinnedProjects = activeProjects.filter((p) => !pinnedProjectIds.includes(p.id));
+                const pinnedProjects = activeProjects.filter((p) =>
+                  pinnedProjectIds.includes(p.id),
+                );
+                const unpinnedProjects = activeProjects.filter(
+                  (p) => !pinnedProjectIds.includes(p.id),
+                );
                 const sortedProjects = [...pinnedProjects, ...unpinnedProjects];
 
                 return sortedProjects.map((project, idx) => {
@@ -832,17 +1253,27 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                               e.stopPropagation();
                               togglePinProject(workspace.id, project.id);
                             }}
-                            title={isPinned ? "Unpin project" : "Pin project to top"}
+                            title={
+                              isPinned ? "Unpin project" : "Pin project to top"
+                            }
                             className={`p-1 rounded transition ${
                               isPinned
                                 ? "text-amber-500 dark:text-amber-400 opacity-100 hover:bg-black/5 dark:hover:bg-white/10"
                                 : "opacity-0 group-hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10"
                             }`}
-                            style={isPinned ? undefined : { color: "var(--theme-text-muted)" }}
+                            style={
+                              isPinned
+                                ? undefined
+                                : { color: "var(--theme-text-muted)" }
+                            }
                           >
                             <Pin
                               size={12}
-                              className={isPinned ? "fill-amber-500 dark:fill-amber-400 rotate-45" : ""}
+                              className={
+                                isPinned
+                                  ? "fill-amber-500 dark:fill-amber-400 rotate-45"
+                                  : ""
+                              }
                             />
                           </button>
                           <span
@@ -965,7 +1396,8 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
             <div className="space-y-0.5">
               {documents
                 .filter((doc) => {
-                  if (docActiveFilter === "project") return doc.isPublicInProject;
+                  if (docActiveFilter === "project")
+                    return doc.isPublicInProject;
                   if (docActiveFilter === "shared") {
                     return (
                       !doc.isPublicInProject &&
@@ -1070,277 +1502,115 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
         )}
 
         {!showProjects && !showCanvas && !showDocs && (
-        <>
-        {/* Channels Section */}
-        <div>
-          <SectionHeader
-            label="Channels"
-            collapsed={isChannelsCollapsed}
-            onToggle={() => setIsChannelsCollapsed((prev) => !prev)}
-            onAdd={() => setShowCreateChannel(true)}
-            addTitle="Create a channel"
-          />
+          <>
+            {/* Channels Section */}
+            <div>
+              <SectionHeader
+                label="Channels"
+                collapsed={isChannelsCollapsed}
+                onToggle={() => setIsChannelsCollapsed((prev) => !prev)}
+                onAdd={() => setShowCreateChannel(true)}
+                addTitle="Create a channel"
+              />
 
-          <Collapse open={!isChannelsCollapsed}>
-            <div className="space-y-0.5">
-              {(() => {
-                const { pinned: pinnedChannels, unpinned: unpinnedChannels } = channelGroups;
-                const sortedChannels = [...pinnedChannels, ...unpinnedChannels];
-
-                return sortedChannels.map((channel, idx) => {
-                  const isActive = currentChannel?.id === channel.id;
-                  const isPinned = pinnedChannelIds.includes(channel.id);
-                  const hasHuddle = activeHuddleChannelId === channel.id;
-                  const unread = unreadCounts[channel.id] || 0;
-                  const showDivider =
-                    pinnedChannels.length > 0 &&
-                    idx === pinnedChannels.length - 1 &&
-                    unpinnedChannels.length > 0;
-
-                  return (
-                    <React.Fragment key={channel.id}>
-                      <div
-                        onClick={() => onSelectChannel(channel)}
-                        className={rowClass(isActive)}
-                        style={rowStyle(isActive)}
-                      >
-                        {isActive && <ActiveBar />}
-                        <RowIcon>
-                          {channel.isAnonymous ? (
-                            <Mask size={18} aria-label="Anonymous channel" />
-                          ) : channel.type === "PRIVATE" ? (
-                            <Lock size={18} aria-label="Private channel" />
-                          ) : (
-                            <Hash size={16} />
-                          )}
-                        </RowIcon>
-                        <span {...rowLabel(isActive, unread > 0)}>{channel.name}</span>
-
-                        {hasHuddle && (
-                          <span
-                            className="ml-2 shrink-0 flex items-center gap-1 px-1.5 h-5 rounded-full text-[10px] font-bold animate-pulse"
-                            style={{
-                              backgroundColor: "color-mix(in srgb, var(--theme-primary) 15%, transparent)",
-                              color: "var(--theme-primary)",
-                            }}
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "var(--theme-primary)" }} />
-                            LIVE
-                          </span>
-                        )}
-
-                        {/* Pin Channel Action */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            togglePinChannel(workspace.id, channel.id);
-                          }}
-                          title={isPinned ? "Unpin channel" : "Pin channel to top"}
-                          className={`ml-1 shrink-0 p-1 rounded transition ${
-                            isPinned
-                              ? "text-amber-500 dark:text-amber-400 opacity-100 hover:bg-[var(--theme-fill)]"
-                              : "opacity-0 group-hover:opacity-100 hover:bg-[var(--theme-fill)]"
-                          }`}
-                          style={isPinned ? undefined : { color: "var(--theme-text-muted)" }}
-                        >
-                          <Pin
-                            size={12}
-                            className={isPinned ? "fill-amber-500 dark:fill-amber-400 rotate-45" : ""}
-                          />
-                        </button>
-
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onStartHuddle(channel);
-                          }}
-                          title={hasHuddle ? "Active Call - Click to join" : "Start Call"}
-                          className={`ml-1 shrink-0 p-1 rounded transition ${
-                            hasHuddle ? "" : "hidden group-hover:block hover:bg-[var(--theme-fill)]"
-                          }`}
-                          style={
-                            hasHuddle
-                              ? { backgroundColor: "var(--theme-primary)", color: "var(--theme-primary-text)" }
-                              : { color: "var(--theme-text-muted)" }
-                          }
-                        >
-                          <PhoneCall size={13} />
-                        </button>
-
-                        {unread > 0 && <UnreadBadge count={unread} />}
-                      </div>
-                      {showDivider && (
-                        <div className="my-1 border-b border-black/5 dark:border-white/5 mx-2" />
-                      )}
-                    </React.Fragment>
-                  );
-                });
-              })()}
-            </div>
-          </Collapse>
-        </div>
-
-        {/* Direct Messages Section */}
-        <div>
-          <SectionHeader
-            label="Direct messages"
-            collapsed={isDmsCollapsed}
-            onToggle={() => setIsDmsCollapsed((prev) => !prev)}
-            onAdd={() => setShowNewDm(true)}
-            addTitle="New message"
-          />
-
-          <Collapse open={!isDmsCollapsed}>
-            <div className="space-y-0.5">
-              {showDmSearch && (
-                <div className="px-1 pt-1 pb-1.5">
-                  <div
-                    className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[13px]"
-                    style={{
-                      backgroundColor: "var(--theme-fill)",
-                      color: "var(--theme-text-primary)",
-                    }}
-                  >
-                    <Search size={12} className="shrink-0 opacity-60" />
-                    <input
-                      type="text"
-                      value={dmSearchQuery}
-                      onChange={(e) => setDmSearchQuery(e.target.value)}
-                      placeholder="Search users..."
-                      autoFocus
-                      className="bg-transparent border-none outline-none w-full text-xs placeholder:text-[var(--theme-text-muted)] focus:outline-none"
-                    />
-                    {dmSearchQuery && (
-                      <button
-                        onClick={() => setDmSearchQuery("")}
-                        className="opacity-60 hover:opacity-100 transition focus:outline-none"
-                      >
-                        <X size={12} />
-                      </button>
-                    )}
-                  </div>
+              <Collapse open={!isChannelsCollapsed}>
+                <div className="space-y-0.5">
+                  {[...channelGroups.pinned, ...channelGroups.unpinned].map(
+                    (channel, idx) =>
+                      renderChannelRow(channel, {
+                        divider:
+                          idx === channelGroups.pinned.length - 1 &&
+                          channelGroups.unpinned.length > 0,
+                      }),
+                  )}
                 </div>
-              )}
-              {(() => {
-                const { pinned: pinnedDMs, unpinned: unpinnedDMs } = dmGroups;
+              </Collapse>
+            </div>
 
-                if (pinnedDMs.length + unpinnedDMs.length === 0 && dmSearchQuery.trim()) {
-                  return (
+            {/* Direct Messages Section */}
+            <div>
+              <SectionHeader
+                label="Direct messages"
+                collapsed={isDmsCollapsed}
+                onToggle={() => setIsDmsCollapsed((prev) => !prev)}
+                onAdd={() => setShowNewDm(true)}
+                addTitle="New message"
+              />
+
+              <Collapse open={!isDmsCollapsed}>
+                <div className="space-y-0.5">
+                  {showDmSearch && (
+                    <div className="px-1 pt-1 pb-1.5">
+                      <div
+                        className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[13px]"
+                        style={{
+                          backgroundColor: "var(--theme-fill)",
+                          color: "var(--theme-text-primary)",
+                        }}
+                      >
+                        <Search size={12} className="shrink-0 opacity-60" />
+                        <input
+                          type="text"
+                          value={dmSearchQuery}
+                          onChange={(e) => setDmSearchQuery(e.target.value)}
+                          placeholder="Search users..."
+                          autoFocus
+                          className="bg-transparent border-none outline-none w-full text-xs placeholder:text-[var(--theme-text-muted)] focus:outline-none"
+                        />
+                        {dmSearchQuery && (
+                          <button
+                            onClick={() => setDmSearchQuery("")}
+                            className="opacity-60 hover:opacity-100 transition focus:outline-none"
+                          >
+                            <X size={12} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {dmGroups.pinned.length + dmGroups.unpinned.length === 0 &&
+                  dmSearchQuery.trim() ? (
                     <div
                       className="px-3 py-2 text-xs text-center italic"
                       style={{ color: "var(--theme-text-muted)" }}
                     >
                       No users found
                     </div>
-                  );
-                }
-
-                const sortedDMs = [...pinnedDMs, ...unpinnedDMs];
-
-                return sortedDMs.map((member, idx) => {
-                  const user = member.user;
-                  if (!user) return null;
-                  const userPresence = presence[user.id] || "offline";
-                  const inOrbit = isLiveOnline(liveStatus[user.id]);
-                  const isSelf = user.id === currentUser?.id;
-                  const isPinned = pinnedUserIds.includes(user.id);
-                  const showDivider =
-                    pinnedDMs.length > 0 &&
-                    idx === pinnedDMs.length - 1 &&
-                    unpinnedDMs.length > 0;
-
-                  const dmChannel = member.dmChannel;
-
-                  const isSelectedDM =
-                    currentChannel?.type === "DIRECT" &&
-                    (isSelf
-                      ? !currentChannel.members ||
-                        currentChannel.members.length <= 1 ||
-                        currentChannel.members.every(
-                          (m) => m.userId === currentUser?.id,
-                        )
-                      : currentChannel.members?.some(
-                          (m) => m.userId === user.id,
-                        ) &&
-                        currentChannel.members?.some(
-                          (m) => m.userId === currentUser?.id,
-                        ));
-
-                  const unread = dmChannel
-                    ? unreadCounts[dmChannel.id] || 0
-                    : 0;
-
-                  return (
-                    <React.Fragment key={member.id}>
-                      <div
-                        onClick={() => onSelectUserDM(user)}
-                        className={rowClass(!!isSelectedDM)}
-                        style={rowStyle(!!isSelectedDM)}
-                      >
-                        {isSelectedDM && <ActiveBar />}
-                        <span className="relative ml-2 mr-1 w-6 h-6 shrink-0">
-                          <Avatar name={user.displayName || user.username} src={user.avatarUrl} size={24} />
-                          {/* Dot = connected to Orbit (web/app) right now; check-in status lives in the pill */}
-                          <span
-                            title={inOrbit ? "In Orbit right now" : "Not in Orbit"}
-                            className={`absolute bottom-0 right-0 w-[7px] h-[7px] rounded-full ${inOrbit ? "bg-emerald-500" : "bg-black"}`}
-                            style={{
-                              boxShadow: `0 0 0 1.5px ${isSelectedDM ? "var(--theme-selected)" : "var(--theme-bg-sidebar)"}`,
-                            }}
-                          />
-                        </span>
-                        <span {...rowLabel(!!isSelectedDM, unread > 0)}>
-                          {user.displayName}
-                          <StatusEmoji presence={userPresence} breakReason={breakReasons[user.id]} />
-                          {user.customStatusEmoji && (
-                            <span className="ml-1.5 text-xs inline-block align-middle" title="Status">
-                              {user.customStatusEmoji}
-                            </span>
-                          )}
-                          {isSelf && (
-                            <span className="ml-1.5 text-[11px] font-normal" style={{ color: "var(--theme-text-muted)" }}>
-                              you
-                            </span>
-                          )}
-                        </span>
-
-                        {/* Pin User Action (hidden for self DM) */}
-                        {!isSelf && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              togglePinUser(workspace.id, user.id);
-                            }}
-                            title={isPinned ? "Unpin user" : "Pin user to top"}
-                            className={`ml-1 shrink-0 p-1 rounded transition ${
-                              isPinned
-                                ? "text-amber-500 dark:text-amber-400 opacity-100 hover:bg-[var(--theme-fill)]"
-                                : "opacity-0 group-hover:opacity-100 hover:bg-[var(--theme-fill)]"
-                            }`}
-                            style={isPinned ? undefined : { color: "var(--theme-text-muted)" }}
-                          >
-                            <Pin
-                              size={12}
-                              className={isPinned ? "fill-amber-500 dark:fill-amber-400 rotate-45" : ""}
-                            />
-                          </button>
-                        )}
-
-                        {unread > 0 && <UnreadBadge count={unread} />}
-                      </div>
-                      {showDivider && (
-                        <div className="my-1 border-b border-black/5 dark:border-white/5 mx-2" />
-                      )}
-                    </React.Fragment>
-                  );
-                });
-              })()}
+                  ) : (
+                    [...dmGroups.pinned, ...dmGroups.unpinned].map(
+                      (person, idx) =>
+                        renderDmRow(person, {
+                          divider:
+                            idx === dmGroups.pinned.length - 1 &&
+                            dmGroups.unpinned.length > 0,
+                        }),
+                    )
+                  )}
+                </div>
+              </Collapse>
             </div>
-          </Collapse>
-        </div>
-        </>
+
+            {/* Archived Section: only this user's archive, hidden until something is archived */}
+            {archivedCount > 0 && (
+              <div>
+                <SectionHeader
+                  label={`Archived (${archivedCount})`}
+                  collapsed={isArchivedCollapsed}
+                  onToggle={() => setIsArchivedCollapsed((prev) => !prev)}
+                />
+                <Collapse open={!isArchivedCollapsed}>
+                  <div className="space-y-0.5">
+                    {channelGroups.archived.map((channel) =>
+                      renderChannelRow(channel, { isArchived: true }),
+                    )}
+                    {dmGroups.archived.map((person) =>
+                      renderDmRow(person, { isArchived: true }),
+                    )}
+                  </div>
+                </Collapse>
+              </div>
+            )}
+          </>
         )}
       </div>
 

@@ -51,6 +51,7 @@ import { ProfileModal } from "@/components/profile/ProfileModal";
 import { OfflineOverlay } from "@/components/brand/OfflineScreen";
 import { usePinStore } from "@/stores/pinnedStore";
 import { useSidebarSortStore } from "@/stores/sidebarSortStore";
+import { useArchivedStore } from "@/stores/archivedStore";
 import {
   ShieldCheck,
   Building2,
@@ -323,6 +324,7 @@ export default function AppDashboard() {
         );
         usePinStore.getState().initPins(workspace.id, user.id, myMember?.settings);
         useSidebarSortStore.getState().init(workspace.id, user.id, myMember?.settings);
+        useArchivedStore.getState().init(workspace.id, user.id, myMember?.settings);
       }
 
       const projectsData: Project[] = projRes?.data || [];

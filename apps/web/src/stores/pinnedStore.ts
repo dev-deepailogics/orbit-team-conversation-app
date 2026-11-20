@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { api } from "../lib/api";
+import { saveMemberSettings } from "../lib/memberSettings";
 
 export interface WorkspacePins {
   channels: string[];
@@ -57,14 +57,8 @@ const saveToStorage = (workspaceId: string, userId: string, pins: WorkspacePins)
   }
 };
 
-const syncToServer = async (workspaceId: string, pins: WorkspacePins) => {
-  try {
-    await api.patch(`/api/workspaces/${workspaceId}/member-settings`, { pins });
-  } catch (err) {
-    // Silent fail; localStorage already has it
-    console.debug("Failed to sync pins to server", err);
-  }
-};
+// localStorage already has it, so a failed save only means other devices don't see it yet
+const syncToServer = (workspaceId: string, pins: WorkspacePins) => saveMemberSettings(workspaceId, { pins });
 
 const EMPTY_PINS: string[] = [];
 
