@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Channel, Message, UserProfile } from "@orbit/types";
 import {
   Hash,
@@ -393,6 +393,19 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       onSelectChannel(ch);
     }
   };
+
+  // Stable identities (always calling the latest version) so memoized message bodies don't re-render
+  // on every keystroke: typing re-renders ChatArea, and fresh handler functions would defeat the memo.
+  const latestLinkHandlers = useRef({ handleMentionClick, handleChannelClick });
+  latestLinkHandlers.current = { handleMentionClick, handleChannelClick };
+  const onMentionClickStable = useCallback(
+    (username: string) => latestLinkHandlers.current.handleMentionClick(username),
+    [],
+  );
+  const onChannelClickStable = useCallback(
+    (channelId: string) => latestLinkHandlers.current.handleChannelClick(channelId),
+    [],
+  );
 
   // Close more menu when clicking outside
   useEffect(() => {
@@ -2044,8 +2057,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                                           currentUsername={
                                             currentUser?.username
                                           }
-                                          onMentionClick={handleMentionClick}
-                                          onChannelClick={handleChannelClick}
+                                          onMentionClick={onMentionClickStable}
+                                          onChannelClick={onChannelClickStable}
                                         />
                                       </div>
 

@@ -10,16 +10,88 @@ interface Todo {
   done: boolean;
 }
 
+// Floating button position, as distance from the bottom-right corner so it stays put when the window
+// resizes. The default sits above the message composer, clear of its Send button.
+type Offset = { right: number; bottom: number };
+const BUTTON_SIZE = 44;
+const EDGE = 8;
+const DEFAULT_OFFSET: Offset = { right: 20, bottom: 120 };
+const POSITION_KEY = 'orbit.quickTodos.position';
+const DRAG_THRESHOLD = 4; // px of movement before a press counts as a drag rather than a click
+
+const clampOffset = ({ right, bottom }: Offset): Offset => ({
+  right: Math.min(Math.max(EDGE, right), Math.max(EDGE, window.innerWidth - BUTTON_SIZE - EDGE)),
+  bottom: Math.min(Math.max(EDGE, bottom), Math.max(EDGE, window.innerHeight - BUTTON_SIZE - EDGE)),
+});
+
 // Personal quick to-dos. Alt+T (or the floating button) opens the panel with the input focused:
-// type, Enter, and the next one is ready. Click a row to tick it off.
+// type, Enter, and the next one is ready. Click a row to tick it off. Drag the button to move it.
 export const QuickTodos: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [text, setText] = useState('');
   const [error, setError] = useState('');
   const [loaded, setLoaded] = useState(false);
+  const [offset, setOffset] = useState<Offset>(DEFAULT_OFFSET);
+  const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ x: number; y: number; start: Offset; moved: boolean } | null>(null);
+
+  // Restore the saved spot (after mount, so server and client render the same markup), and keep it on screen.
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(POSITION_KEY) || 'null');
+      if (saved && Number.isFinite(saved.right) && Number.isFinite(saved.bottom)) setOffset(clampOffset(saved));
+    } catch {
+      /* storage blocked or bad value: keep the default */
+    }
+    const onResize = () => setOffset((o) => clampOffset(o));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const onPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    dragRef.current = { x: e.clientX, y: e.clientY, start: offset, moved: false };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const dx = e.clientX - d.x;
+    const dy = e.clientY - d.y;
+    if (!d.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+    if (!d.moved) {
+      d.moved = true;
+      setDragging(true);
+    }
+    setOffset(clampOffset({ right: d.start.right - dx, bottom: d.start.bottom - dy }));
+  };
+  const onPointerUp = () => {
+    const d = dragRef.current;
+    dragRef.current = null;
+    if (!d) return;
+    if (!d.moved) {
+      setOpen((o) => !o); // a plain click
+      return;
+    }
+    setDragging(false);
+    setOffset((o) => {
+      try {
+        localStorage.setItem(POSITION_KEY, JSON.stringify(o));
+      } catch {
+        /* not saved; it still moves for this session */
+      }
+      return o;
+    });
+  };
+
+  // Open the panel toward the roomier side of the screen.
+  const [panelBelow, panelLeftAligned] =
+    typeof window === 'undefined'
+      ? [false, false]
+      : [offset.bottom > window.innerHeight / 2, offset.right > window.innerWidth / 2];
 
   const load = useCallback(async () => {
     try {
@@ -114,7 +186,11 @@ export const QuickTodos: React.FC = () => {
   const done = todos.filter((t) => t.done);
 
   return (
-    <div ref={panelRef} className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2">
+    <div
+      ref={panelRef}
+      style={{ right: offset.right, bottom: offset.bottom }}
+      className={`fixed z-40 flex gap-2 ${panelBelow ? 'flex-col-reverse' : 'flex-col'} ${panelLeftAligned ? 'items-start' : 'items-end'}`}
+    >
       {open && (
         <div
           className="w-[340px] max-w-[calc(100vw-2rem)] max-h-[70vh] flex flex-col rounded-2xl border overflow-hidden"
@@ -212,10 +288,17 @@ export const QuickTodos: React.FC = () => {
 
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
-        title="Quick to-dos (Alt+T)"
+        // Click toggles (handled in onPointerUp so a drag doesn't also open it); keyboard Enter/Space still clicks.
+        onClick={(e) => e.detail === 0 && setOpen((o) => !o)}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        title="Quick to-dos (Alt+T) · drag to move"
         aria-label="Quick to-dos"
-        className="relative w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition hover:brightness-110"
+        className={`relative w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition hover:brightness-110 touch-none select-none ${
+          dragging ? 'cursor-grabbing scale-105' : 'cursor-pointer'
+        }`}
         style={{ backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-text)' }}
       >
         <ListChecks size={20} />
