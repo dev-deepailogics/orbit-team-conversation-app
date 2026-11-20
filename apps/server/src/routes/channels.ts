@@ -580,14 +580,7 @@ export const channelRoutes: FastifyPluginAsync = async (
         },
       });
 
-      // Update the author's previous messages in this anonymous channel to the new persona
-      await prisma.message.updateMany({
-        where: { channelId, userId },
-        data: {
-          anonName,
-          anonEmoji,
-        },
-      });
+      // Earlier messages keep the persona they were posted under; only new messages use the new one.
 
       return reply.send({ anonName, anonEmoji });
     },
