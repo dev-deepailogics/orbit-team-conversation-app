@@ -13,6 +13,10 @@ interface MarkdownRendererProps {
   currentUsername?: string;
 }
 
+// A bare clip URL (not already inside a markdown link). Markdown here has no autolinking, so without this
+// a shared clip stays plain text and never becomes the inline video preview.
+const BARE_CLIP_URL = /(^|\s)(https?:\/\/[^\s<>()]+\/clip\/[a-zA-Z0-9-]{8,})(?=$|[\s.,!?)])/g;
+
 export function formatMentions(text: string): string {
   if (!text) return '';
   // Split by code blocks (```...```) and inline code (`...`) to preserve them
@@ -20,8 +24,10 @@ export function formatMentions(text: string): string {
   return parts
     .map((part) => {
       if (part.startsWith('`')) return part;
-      // Convert @username (preceded by start of line, whitespace, or bracket) to markdown link: [@username](mention://username)
-      return part.replace(/(^|[\s(])@([a-zA-Z0-9_\.\-]+)/g, '$1[@$2](mention://$2)');
+      return part
+        .replace(BARE_CLIP_URL, '$1[$2]($2)')
+        // Convert @username (preceded by start of line, whitespace, or bracket) to markdown link: [@username](mention://username)
+        .replace(/(^|[\s(])@([a-zA-Z0-9_\.\-]+)/g, '$1[@$2](mention://$2)');
     })
     .join('');
 }

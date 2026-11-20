@@ -100,6 +100,7 @@ model User {
   todos             Todo[]
   createdCanvases   Canvas[]          @relation("CanvasCreator")
   createdRecordings Recording[]       @relation("RecordingCreator")
+  recordingViews    RecordingView[]
 
   @@index([email])
   @@index([username])
@@ -340,12 +341,29 @@ model Recording {
   message      Message?   @relation(fields: [messageId], references: [id], onDelete: SetNull)
   creator      User?      @relation("RecordingCreator", fields: [creatorId], references: [id], onDelete: SetNull)
   attachment   Attachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  views        RecordingView[]
 
   @@index([workspaceId, isDeleted])
   @@index([channelId])
   @@index([messageId])
   @@index([shareSlug])
   @@index([creatorId])
+}
+
+// "Seen by" for a recording: one row per signed-in workspace member who played it (the creator excluded).
+// Anonymous plays of the public link only bump Recording.viewCount.
+model RecordingView {
+  recordingId   String
+  userId        String
+  firstViewedAt DateTime  @default(now())
+  lastViewedAt  DateTime  @default(now())
+  plays         Int       @default(1)
+
+  recording     Recording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([recordingId, userId])
+  @@index([userId])
 }
 
 model Reaction {

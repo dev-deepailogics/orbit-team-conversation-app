@@ -2615,8 +2615,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           openRecorder({
                             workspaceId: channel.workspaceId,
                             channelId: channel.id,
-                            onInsertLink: (link) =>
-                              editorRef.current?.insertEmoji(link),
                           }),
                         active: false,
                       },

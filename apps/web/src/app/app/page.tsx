@@ -1961,12 +1961,11 @@ export default function AppDashboard() {
       {recorderState.isOpen && recorderState.workspaceId && (
         <RecorderOverlay
           workspaceId={recorderState.workspaceId}
+          suggestedChannelId={recorderState.channelId || undefined}
           channels={channels}
           members={members}
           currentUserId={user?.id}
           onClose={closeRecorder}
-          // Saved to the library, or already posted into the chosen conversation by the overlay.
-          onUploaded={closeRecorder}
         />
       )}
     </div>

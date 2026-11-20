@@ -1,12 +1,23 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { Recording, UserProfile } from '@orbit/types';
-import { ArrowLeft, Search, Play, Clock, Eye, ChevronDown, Film, Loader2, Video as VideoIcon } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Recording, RecordingViewedEvent, SOCKET_EVENTS, UserProfile } from '@orbit/types';
+import { ArrowLeft, Search, Play, ChevronDown, Film, Loader2, Plus, Video as VideoIcon } from 'lucide-react';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
 import { formatDuration } from '../recording/recordingUtils';
 import { RecordingPlayer } from '../recording/RecordingPlayer';
+import { RecordingViewCount } from '../recording/RecordingViewers';
+import { useRecorderStore } from '../../stores/recorderStore';
+
+const NewVideoButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
+  <button
+    onClick={onClick}
+    className="flex items-center gap-1.5 px-3.5 py-2 bg-slack-green hover:bg-slack-green/90 text-white rounded-lg text-sm font-semibold transition whitespace-nowrap"
+  >
+    <Plus size={15} /> New video
+  </button>
+);
 
 interface VideoLibraryViewProps {
   workspaceId: string;
@@ -16,6 +27,9 @@ interface VideoLibraryViewProps {
 
 type SortOption = 'newest' | 'oldest' | 'most_viewed';
 type OwnerFilter = 'all' | 'mine';
+type LibraryPage = { recordings: Recording[]; hasMore: boolean };
+
+const PAGE_SIZE = 48;
 
 const SORT_LABELS: Record<SortOption, string> = {
   newest: 'Newest to oldest',
@@ -32,48 +46,109 @@ export const VideoLibraryView: React.FC<VideoLibraryViewProps> = ({ workspaceId,
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const [ownerMenuOpen, setOwnerMenuOpen] = useState(false);
   const [activeRecording, setActiveRecording] = useState<Recording | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  // Each query gets an id; responses from superseded queries (fast typing, filter changes) are dropped
+  // so an older, slower response can never overwrite newer results.
+  const queryIdRef = useRef(0);
 
-  const fetchRecordings = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get<Recording[]>(`/api/recordings/workspace/${workspaceId}`, {
-        params: { sort, search: search.trim() || undefined, mine: owner === 'mine' ? '1' : undefined },
-      });
-      setRecordings(res.data);
-    } catch {
-      setRecordings([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchPage = (offset: number) =>
+    api.get<LibraryPage>(`/api/recordings/workspace/${workspaceId}`, {
+      params: {
+        sort,
+        search: search.trim() || undefined,
+        mine: owner === 'mine' ? '1' : undefined,
+        limit: PAGE_SIZE,
+        offset,
+      },
+    });
 
   useEffect(() => {
-    const timeout = setTimeout(fetchRecordings, 250);
+    const queryId = ++queryIdRef.current;
+    setLoading(true);
+    const timeout = setTimeout(() => {
+      fetchPage(0)
+        .then((res) => {
+          if (queryId !== queryIdRef.current) return;
+          setRecordings(res.data.recordings);
+          setHasMore(res.data.hasMore);
+        })
+        .catch(() => {
+          if (queryId !== queryIdRef.current) return;
+          setRecordings([]);
+          setHasMore(false);
+        })
+        .finally(() => queryId === queryIdRef.current && setLoading(false));
+    }, 250);
     return () => clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId, sort, owner, search]);
 
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    const queryId = queryIdRef.current;
+    setLoadingMore(true);
+    try {
+      const res = await fetchPage(recordings.length);
+      if (queryId !== queryIdRef.current) return;
+      setRecordings((prev) => {
+        const seen = new Set(prev.map((r) => r.id));
+        return [...prev, ...res.data.recordings.filter((r) => !seen.has(r.id))];
+      });
+      setHasMore(res.data.hasMore);
+    } catch {
+      /* keep what's shown; the button stays available to retry */
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Live updates. A new clip is only inserted if it matches the active filters.
+  const filtersRef = useRef({ owner, search });
+  filtersRef.current = { owner, search };
   useEffect(() => {
     const socket = getSocket();
+    const matches = (r: Recording) => {
+      const { owner: o, search: s } = filtersRef.current;
+      if (o === 'mine' && r.creatorId !== currentUser?.id) return false;
+      const q = s.trim().toLowerCase();
+      return !q || r.title.toLowerCase().includes(q);
+    };
     const onNew = (recording: Recording) => {
-      if (recording.workspaceId === workspaceId) {
-        setRecordings((prev) => [recording, ...prev.filter((r) => r.id !== recording.id)]);
-      }
+      if (recording.workspaceId !== workspaceId || !matches(recording)) return;
+      setRecordings((prev) => [recording, ...prev.filter((r) => r.id !== recording.id)]);
+    };
+    const onUpdate = (recording: Recording) => {
+      if (recording.workspaceId !== workspaceId) return;
+      setRecordings((prev) => prev.map((r) => (r.id === recording.id ? { ...r, ...recording } : r)));
     };
     const onDelete = (payload: { recordingId: string; workspaceId?: string }) => {
-      if (payload.workspaceId === workspaceId) {
-        setRecordings((prev) => prev.filter((r) => r.id !== payload.recordingId));
-      }
+      if (payload.workspaceId !== workspaceId) return;
+      setRecordings((prev) => prev.filter((r) => r.id !== payload.recordingId));
+      setActiveRecording((a) => (a?.id === payload.recordingId ? null : a));
     };
-    socket.on('recording:new', onNew);
-    socket.on('recording:delete', onDelete);
+    // Sent only to the creator: someone just played one of my clips.
+    const onViewed = ({ recordingId, viewCount }: RecordingViewedEvent) => {
+      setRecordings((prev) => prev.map((r) => (r.id === recordingId ? { ...r, viewCount } : r)));
+    };
+    socket.on(SOCKET_EVENTS.RECORDING_NEW, onNew);
+    socket.on(SOCKET_EVENTS.RECORDING_UPDATE, onUpdate);
+    socket.on(SOCKET_EVENTS.RECORDING_DELETE, onDelete);
+    socket.on(SOCKET_EVENTS.RECORDING_VIEWED, onViewed);
     return () => {
-      socket.off('recording:new', onNew);
-      socket.off('recording:delete', onDelete);
+      socket.off(SOCKET_EVENTS.RECORDING_NEW, onNew);
+      socket.off(SOCKET_EVENTS.RECORDING_UPDATE, onUpdate);
+      socket.off(SOCKET_EVENTS.RECORDING_DELETE, onDelete);
+      socket.off(SOCKET_EVENTS.RECORDING_VIEWED, onViewed);
     };
-  }, [workspaceId]);
+  }, [workspaceId, currentUser?.id]);
 
   const totalViews = useMemo(() => recordings.reduce((sum, r) => sum + (r.viewCount || 0), 0), [recordings]);
+
+  // Same recorder as the chat composer's button. The finished clip saves itself to the library and
+  // appears here through the live "recording:new" update.
+  const openRecorder = useRecorderStore((s) => s.open);
+  const startNewVideo = () => openRecorder({ workspaceId });
 
   const handleDeleted = (recordingId: string) => {
     setRecordings((prev) => prev.filter((r) => r.id !== recordingId));
@@ -97,21 +172,26 @@ export const VideoLibraryView: React.FC<VideoLibraryViewProps> = ({ workspaceId,
             <div>
               <h1 className="text-lg font-bold text-[var(--theme-text)] leading-tight">Video Library</h1>
               <p className="text-xs text-[var(--theme-text-muted)]">
-                {recordings.length} recording{recordings.length === 1 ? '' : 's'} · {totalViews} total view{totalViews === 1 ? '' : 's'}
+                {recordings.length}
+                {hasMore ? '+' : ''} recording{recordings.length === 1 && !hasMore ? '' : 's'} · {totalViews}
+                {hasMore ? '+' : ''} view{totalViews === 1 && !hasMore ? '' : 's'}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="relative w-64">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--theme-text-muted)]" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search recordings..."
-            className="w-full text-sm bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-lg pl-9 pr-3 py-2 text-[var(--theme-text)] focus:outline-none focus:border-slack-green"
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative w-64">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--theme-text-muted)]" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search recordings..."
+              className="w-full text-sm bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-lg pl-9 pr-3 py-2 text-[var(--theme-text)] focus:outline-none focus:border-slack-green"
+            />
+          </div>
+          <NewVideoButton onClick={startNewVideo} />
         </div>
       </div>
 
@@ -189,15 +269,25 @@ export const VideoLibraryView: React.FC<VideoLibraryViewProps> = ({ workspaceId,
         ) : recordings.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-60 gap-2 text-[var(--theme-text-muted)]">
             <Film size={32} />
-            <p className="text-sm">No recordings yet. Record a clip from any channel to see it here.</p>
+            <p className="text-sm">{search.trim() ? 'No recordings match your search.' : 'No recordings yet.'}</p>
+            {!search.trim() && <NewVideoButton onClick={startNewVideo} />}
           </div>
         ) : (
           <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
             {recordings.map((rec) => (
-              <button
+              // A div, not a <button>: the creator's view count inside is itself a button.
+              <div
                 key={rec.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => setActiveRecording(rec)}
-                className="group flex flex-col bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] hover:border-slack-green/60 rounded-xl overflow-hidden shadow-sm transition text-left"
+                onKeyDown={(e) => {
+                  if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault();
+                    setActiveRecording(rec);
+                  }
+                }}
+                className="group cursor-pointer flex flex-col bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] hover:border-slack-green/60 rounded-xl overflow-hidden shadow-sm transition text-left"
               >
                 <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
                   {rec.thumbnailUrl ? (
@@ -219,13 +309,28 @@ export const VideoLibraryView: React.FC<VideoLibraryViewProps> = ({ workspaceId,
                   </span>
                   <div className="flex items-center justify-between text-[10px] text-[var(--theme-text-muted)]">
                     <span className="truncate">{rec.creator?.displayName || 'Unknown'}</span>
-                    <span className="flex items-center gap-1 font-mono">
-                      <Eye size={10} /> {rec.viewCount}
-                    </span>
+                    <RecordingViewCount
+                      recordingId={rec.id}
+                      title={rec.title}
+                      viewCount={rec.viewCount}
+                      isCreator={!!currentUser?.id && rec.creatorId === currentUser.id}
+                    />
                   </div>
                 </div>
-              </button>
+              </div>
             ))}
+          </div>
+        )}
+        {!loading && hasMore && (
+          <div className="flex justify-center pt-5">
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="flex items-center gap-2 text-xs px-4 py-2 rounded-lg border border-[var(--theme-border)] text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] transition disabled:opacity-60"
+            >
+              {loadingMore && <Loader2 size={13} className="animate-spin" />}
+              {loadingMore ? 'Loading...' : 'Load more'}
+            </button>
           </div>
         )}
       </div>

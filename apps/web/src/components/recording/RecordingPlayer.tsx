@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Recording } from '@orbit/types';
-import { Copy, Check, Trash2, Eye } from 'lucide-react';
+import { Copy, Check, Trash2 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { formatDuration, clipShareUrl } from './recordingUtils';
+import { RecordingViewCount } from './RecordingViewers';
 
 interface RecordingPlayerProps {
   recording: Recording;
@@ -21,6 +22,20 @@ export const RecordingPlayer: React.FC<RecordingPlayerProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [views, setViews] = useState(recording.viewCount);
+  const countedRef = useRef(false);
+
+  const isCreator = !!currentUserId && recording.creatorId === currentUserId;
+
+  // A view is a real playback, counted once per player, not a page load or a chat embed rendering.
+  // The request carries the session token when signed in, which puts the viewer on the creator's
+  // "Seen by" list; the creator's own plays aren't counted (the server skips them too).
+  const handlePlay = () => {
+    if (countedRef.current) return;
+    countedRef.current = true;
+    if (!isCreator) setViews((v) => v + 1);
+    api.post(`/api/recordings/share/${recording.shareSlug}/view`).catch(() => {});
+  };
 
   const handleCopyLink = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -47,13 +62,16 @@ export const RecordingPlayer: React.FC<RecordingPlayerProps> = ({
     }
   };
 
-  const canDelete = currentUserId && recording.creatorId === currentUserId;
+  const canDelete = isCreator;
 
   return (
     <div className="max-w-md bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-xl overflow-hidden shadow-lg">
       <video
         controls
         autoPlay={autoPlay}
+        playsInline
+        preload="metadata"
+        onPlay={handlePlay}
         poster={recording.thumbnailUrl || undefined}
         src={recording.attachment.fileUrl}
         className="w-full max-h-80 bg-black"
@@ -65,9 +83,7 @@ export const RecordingPlayer: React.FC<RecordingPlayerProps> = ({
           </span>
           <div className="flex items-center gap-2 text-[10px] text-[var(--theme-text-muted)] font-mono">
             <span>{formatDuration(recording.durationSec)}</span>
-            <span className="flex items-center gap-0.5">
-              <Eye size={10} /> {recording.viewCount}
-            </span>
+            <RecordingViewCount recordingId={recording.id} title={recording.title} viewCount={views} isCreator={isCreator} />
           </div>
         </div>
         <div className="flex items-center gap-1">

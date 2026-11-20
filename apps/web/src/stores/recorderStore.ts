@@ -3,9 +3,9 @@ import { create } from 'zustand';
 interface RecorderState {
   isOpen: boolean;
   workspaceId: string | null;
+  /** Conversation the recorder was opened from; listed first under "Share in Orbit". */
   channelId: string | null;
-  onInsertLink: ((link: string) => void) | null;
-  open: (params: { workspaceId: string; channelId?: string; onInsertLink?: (link: string) => void }) => void;
+  open: (params: { workspaceId: string; channelId?: string }) => void;
   close: () => void;
 }
 
@@ -16,8 +16,6 @@ export const useRecorderStore = create<RecorderState>((set) => ({
   isOpen: false,
   workspaceId: null,
   channelId: null,
-  onInsertLink: null,
-  open: ({ workspaceId, channelId, onInsertLink }) =>
-    set({ isOpen: true, workspaceId, channelId: channelId || null, onInsertLink: onInsertLink || null }),
-  close: () => set({ isOpen: false, workspaceId: null, channelId: null, onInsertLink: null }),
+  open: ({ workspaceId, channelId }) => set({ isOpen: true, workspaceId, channelId: channelId || null }),
+  close: () => set({ isOpen: false, workspaceId: null, channelId: null }),
 }));
