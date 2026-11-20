@@ -206,6 +206,16 @@ interface ChatAreaProps {
   onOpenQuickCanvas?: () => void;
 }
 
+const BannerTip: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <span
+    role="tooltip"
+    className="pointer-events-none absolute right-0 top-full mt-1.5 z-50 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-medium opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+    style={{ backgroundColor: "var(--theme-text)", color: "var(--theme-bg-app)" }}
+  >
+    {children}
+  </span>
+);
+
 export const ChatArea: React.FC<ChatAreaProps> = ({
   channel,
   messages,
@@ -1068,29 +1078,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
           {/* Actions */}
           <div className="flex items-center gap-2 shrink-0">
-            {channel.isAnonymous && anonProfile && revealAnon && (
-              <button
-                onClick={() => setShowAnonPersonaModal(true)}
-                title="Change your character name"
-                className="h-9 pl-1.5 pr-3 rounded-[18px] flex items-center gap-2 transition hover:brightness-95"
-                style={{ backgroundColor: tint(ANON_WARM, 12) }}
-              >
-                <AnonAvatar
-                  name={anonProfile.anonName}
-                  emoji={anonProfile.anonEmoji}
-                  size={24}
-                  rounded="full"
-                />
-                <span
-                  className="hidden sm:inline text-[13px] font-semibold whitespace-nowrap"
-                  style={{ color: ANON_WARM_TEXT }}
-                >
-                  You are {anonProfile.anonName}
-                </span>
-                <Pencil size={14} style={{ color: ANON_WARM_TEXT }} />
-              </button>
-            )}
-
             {isDirect && (
               <button
                 onClick={() => setShowSidePanel((v) => !v)}
@@ -1109,7 +1096,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               <button
                 onClick={onOpenSearch}
                 title="Search messages (Cmd+K / Ctrl+K)"
-                className="hidden xl:flex w-[340px] h-11 pl-4 pr-2.5 rounded-[22px] border items-center gap-2.5 transition hover:brightness-[0.98]"
+                className="hidden xl:flex w-[300px] h-9 pl-3 pr-2 rounded-[18px] border items-center gap-2 transition hover:brightness-[0.98]"
                 style={{
                   backgroundColor: "var(--theme-bg-surface-hover)",
                   borderColor: "var(--theme-border)",
@@ -1348,30 +1335,39 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             Everything here is posted under a character name, not your profile.
             Keep it kind and follow the community rules.
           </span>
-          {anonProfile && (
-            <button
-              onClick={toggleRevealAnon}
-              title={revealAnon ? "Hide your persona" : "Show your persona"}
-              aria-label={
-                revealAnon ? "Hide your persona" : "Show your persona"
-              }
-              className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition hover:brightness-95"
-              style={{
-                backgroundColor: tint(ANON_WARM, 14),
-                color: ANON_WARM_TEXT,
-              }}
-            >
-              {revealAnon ? <EyeOff size={15} /> : <Eye size={15} />}
-            </button>
-          )}
-          {anonProfile && (
-            <button
-              onClick={() => setShowAnonPersonaModal(true)}
-              className="font-semibold whitespace-nowrap hover:underline shrink-0"
+          {anonProfile && revealAnon && (
+            <span
+              className="hidden sm:inline text-[13px] font-semibold whitespace-nowrap shrink-0"
               style={{ color: ANON_WARM_TEXT }}
             >
-              Change name
-            </button>
+              You are {anonProfile.anonName}
+            </span>
+          )}
+          {anonProfile && (
+            <span className="relative group shrink-0">
+              <button
+                onClick={toggleRevealAnon}
+                aria-label={revealAnon ? "Hide your name" : "Show your name"}
+                className="w-7 h-7 rounded-full flex items-center justify-center transition hover:brightness-95"
+                style={{ backgroundColor: tint(ANON_WARM, 14), color: ANON_WARM_TEXT }}
+              >
+                {revealAnon ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+              <BannerTip>{revealAnon ? "Hide your name" : "Show your name"}</BannerTip>
+            </span>
+          )}
+          {anonProfile && (
+            <span className="relative group shrink-0">
+              <button
+                onClick={() => setShowAnonPersonaModal(true)}
+                aria-label="Change name"
+                className="w-7 h-7 rounded-full flex items-center justify-center transition hover:brightness-95"
+                style={{ backgroundColor: tint(ANON_WARM, 14), color: ANON_WARM_TEXT }}
+              >
+                <Pencil size={14} />
+              </button>
+              <BannerTip>Change name</BannerTip>
+            </span>
           )}
         </div>
       )}
@@ -1621,11 +1617,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       const canDelete =
                         !msg.isDeleted && (isSelf || isWsAdmin || isSuperAdmin);
                       // Your own persona stays hidden until you reveal it with the eye toggle.
-                      const hideSelfAnon = isAnon && isSelf && !revealAnon;
                       const authorName = isAnon
-                        ? hideSelfAnon
-                          ? "Anonymous"
-                          : msg.anonName || "Anonymous"
+                        ? msg.anonName || "Anonymous"
                         : isBot
                           ? msg.bot?.name
                           : msg.user?.displayName || "Unknown";

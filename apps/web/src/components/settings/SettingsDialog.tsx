@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { ThemeConfig, UserProfile, Workspace } from '@orbit/types';
+import { Keyboard } from 'lucide-react';
 import { Bot, ChevronLeft, HardDrive, Link2, LogOut, Palette, User } from '@/components/ui/icons';
 import { DEFAULT_THEME, applyTheme } from '../../lib/theme';
 import { useThemeStore } from '../../stores/themeStore';
@@ -10,8 +11,9 @@ import { ThemeSettings, ThemeTab } from './ThemeSettings';
 import { BotSettings } from './BotSettings';
 import { StorageSettings } from './StorageSettings';
 import { InviteSettings } from './InviteSettings';
+import { GeneralSettings } from './GeneralSettings';
 
-export type SettingsSection = 'theme-presets' | 'theme-custom' | 'bots' | 'storage' | 'invite';
+export type SettingsSection = 'theme-presets' | 'theme-custom' | 'bots' | 'storage' | 'invite' | 'general';
 
 export interface SettingsDialogProps {
   initialSection: SettingsSection;
@@ -164,6 +166,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
           <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-3 flex flex-col">
             <GroupLabel label="PERSONAL" first />
             {onOpenProfile && <NavItem icon={<User size={18} />} label="Profile & status" onClick={onOpenProfile} />}
+            <NavItem icon={<Keyboard size={18} />} label="Shortcuts & quick to-dos" active={section === 'general'} onClick={() => setSection('general')} />
             <NavItem icon={<Palette size={18} />} label="Theme & appearance" bold={inTheme} onClick={() => setSection('theme-presets')} />
             <SubItem label="Theme templates" active={section === 'theme-presets'} onClick={() => setSection('theme-presets')} />
             <SubItem label="Custom theme" active={section === 'theme-custom'} onClick={() => setSection('theme-custom')} />
@@ -191,6 +194,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
             </button>
             {(
               [
+                ['general', 'Shortcuts'],
                 ['theme-presets', 'Templates'],
                 ['theme-custom', 'Custom'],
                 ...(workspace ? ([['bots', 'Bots'], ['storage', 'Storage'], ['invite', 'Invite']] as const) : []),
@@ -227,6 +231,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
               onSetAsDefault={setSetAsDefault}
             />
           )}
+          {section === 'general' && <GeneralSettings />}
           {section === 'bots' && workspace && <BotSettings workspace={workspace} />}
           {section === 'storage' && workspace && (
             <StorageSettings workspace={workspace} currentUser={currentUser} onFileDeleted={onFileDeleted} />

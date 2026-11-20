@@ -382,7 +382,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   const canDeleteParent = !parentMessage.isDeleted && (isParentSelf || isWsAdmin || isSuperAdmin);
   const revealAnon = useAnonStore((s) => s.reveal);
   const authorName = isParentAnon
-    ? (isParentSelf && !revealAnon ? 'Anonymous' : (parentMessage.anonName || 'Anonymous'))
+    ? (parentMessage.anonName || 'Anonymous')
     : (parentMessage.user?.displayName || parentMessage.bot?.name || 'Unknown');
   const parentAnonEmoji = parentMessage.anonEmoji || '🎭';
   const avatarUrl = parentMessage.user?.avatarUrl || parentMessage.bot?.avatarUrl || `/api/avatar/bottts/svg?seed=${authorName}`;
@@ -673,7 +673,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
           const canEditReply = !reply.isDeleted && isReplySelf;
           const canDeleteReply = !reply.isDeleted && (isReplySelf || isWsAdmin || isSuperAdmin);
           const replyAuthor = isReplyAnon
-            ? (isReplySelf && !revealAnon ? 'Anonymous' : (reply.anonName || 'Anonymous'))
+            ? (reply.anonName || 'Anonymous')
             : (reply.user?.displayName || 'Unknown');
           const replyEmoji = reply.anonEmoji || '🎭';
           const replyAvatar = reply.user?.avatarUrl || `/api/avatar/bottts/svg?seed=${replyAuthor}`;

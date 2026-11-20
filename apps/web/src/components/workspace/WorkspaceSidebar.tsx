@@ -73,7 +73,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [themeExpanded, setThemeExpanded] = useState(false);
-  const [themeModalTab, setThemeModalTab] = useState<'presets' | 'custom' | null>(null);
+  const [themeModalTab, setThemeModalTab] = useState<'presets' | 'custom' | 'general' | null>(null);
   const [showStorage, setShowStorage] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
@@ -307,61 +307,8 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                   <div className="h-px" style={{ backgroundColor: 'var(--theme-border)' }} />
                 </div>
                 <AccountRow Icon={User} label="View profile" onClick={() => { setShowAccount(false); openProfile(); }} />
-                <AccountRow Icon={Settings} label="Settings" onClick={() => { setShowAccount(false); setShowSettings(true); }} />
+                <AccountRow Icon={Settings} label="Settings" onClick={() => { setShowAccount(false); setThemeModalTab('general'); }} />
                 <AccountRow Icon={LogOut} label="Sign out" onClick={() => { setShowAccount(false); onLogout(); }} />
-              </div>
-            )}
-            {showSettings && (
-              <div
-                className="absolute left-full bottom-0 ml-3 w-[264px] rounded-[14px] border p-2 flex flex-col gap-0.5 z-50 animate-in fade-in zoom-in-95 duration-150"
-                style={{
-                  backgroundColor: 'var(--theme-bg-app)',
-                  borderColor: 'var(--theme-border)',
-                  boxShadow: '0 12px 16px rgba(20, 26, 46, 0.2)',
-                  color: 'var(--theme-text)',
-                }}
-              >
-                <p
-                  className="px-2.5 py-1.5 text-[11px] font-bold tracking-[0.6px]"
-                  style={{ color: 'var(--theme-text-muted)' }}
-                >
-                  SETTINGS
-                </p>
-
-                <SettingsRow Icon={User} label="Profile & status" onClick={closeMenuThen(() => openProfile())} />
-
-                <SettingsRow
-                  Icon={Palette}
-                  label="Theme & appearance"
-                  expanded={themeExpanded}
-                  onClick={() => setThemeExpanded((v) => !v)}
-                />
-                {themeExpanded && (
-                  <>
-                    <SettingsSubRow label="Theme templates" onClick={closeMenuThen(() => setThemeModalTab('presets'))} />
-                    <SettingsSubRow label="Custom theme" badge="New" onClick={closeMenuThen(() => setThemeModalTab('custom'))} />
-                  </>
-                )}
-
-                {onOpenBotPortal && (
-                  <SettingsRow Icon={Bot} label="Bot & app integrations" onClick={closeMenuThen(onOpenBotPortal)} />
-                )}
-                {currentWorkspace && (
-                  <SettingsRow Icon={HardDrive} label="Workspace storage" onClick={closeMenuThen(() => setShowStorage(true))} />
-                )}
-                {currentWorkspace && (
-                  <SettingsRow
-                    Icon={copiedInvite ? Check : Link2}
-                    label={copiedInvite ? 'Invite link copied' : 'Invite link'}
-                    onClick={copyInviteLink}
-                  />
-                )}
-
-                <div className="py-1">
-                  <div className="h-px" style={{ backgroundColor: 'var(--theme-border)' }} />
-                </div>
-
-                <SettingsRow Icon={LogOut} label="Sign out" onClick={closeMenuThen(onLogout)} />
               </div>
             )}
           </div>

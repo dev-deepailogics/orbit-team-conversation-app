@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ListChecks, Trash2, X } from 'lucide-react';
 import { api } from '../../lib/api';
+import { usePrefsStore, hydratePrefs } from '../../stores/prefsStore';
 
 interface Todo {
   id: string;
@@ -10,7 +11,11 @@ interface Todo {
   done: boolean;
 }
 
-// Personal quick to-dos. Alt+T (or the floating button) opens the panel with the input focused:
+const BTN = 44;
+const PANEL_W = 340;
+const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), Math.max(lo, hi));
+
+// Personal quick to-dos. Ctrl+Shift+Space / Alt+T (or the draggable floating button) opens the panel with the input focused:
 // type, Enter, and the next one is ready. Click a row to tick it off.
 export const QuickTodos: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -20,6 +25,57 @@ export const QuickTodos: React.FC = () => {
   const [loaded, setLoaded] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const showButton = usePrefsStore((s) => s.showTodoButton);
+  const savedPos = usePrefsStore((s) => s.todoPos);
+  const setSavedPos = usePrefsStore((s) => s.setTodoPos);
+  const [viewport, setViewport] = useState({ w: 1280, h: 800 });
+  const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
+  const drag = useRef<{ dx: number; dy: number; sx: number; sy: number; moved: boolean } | null>(null);
+
+  useEffect(() => {
+    hydratePrefs();
+    const measure = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
+
+  // Default: right edge, vertically centred.
+  const base = savedPos ?? { x: viewport.w - BTN - 16, y: viewport.h / 2 - BTN / 2 };
+  const pos = dragPos ?? {
+    x: clamp(base.x, 8, viewport.w - BTN - 8),
+    y: clamp(base.y, 8, viewport.h - BTN - 8),
+  };
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    drag.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y, sx: e.clientX, sy: e.clientY, moved: false };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d) return;
+    if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 5) return;
+    d.moved = true;
+    setDragPos({
+      x: clamp(e.clientX - d.dx, 8, viewport.w - BTN - 8),
+      y: clamp(e.clientY - d.dy, 8, viewport.h - BTN - 8),
+    });
+  };
+  const onPointerUp = () => {
+    const d = drag.current;
+    drag.current = null;
+    if (!d) return;
+    if (d.moved && dragPos) {
+      setSavedPos(dragPos);
+    } else {
+      setOpen((o) => !o);
+    }
+    setDragPos(null);
+  };
+
+  // Panel sits beside the button, on whichever side has room.
+  const panelLeft = pos.x > PANEL_W + 24 ? pos.x - PANEL_W - 8 : pos.x + BTN + 8;
+  const panelTop = clamp(pos.y - 160, 8, viewport.h - 460);
 
   const load = useCallback(async () => {
     try {
@@ -37,7 +93,9 @@ export const QuickTodos: React.FC = () => {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyT') {
+      const altT = e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyT';
+      const chord = (e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'Space';
+      if (altT || chord) {
         e.preventDefault();
         setOpen((o) => !o);
       } else if (e.key === 'Escape') {
@@ -114,11 +172,13 @@ export const QuickTodos: React.FC = () => {
   const done = todos.filter((t) => t.done);
 
   return (
-    <div ref={panelRef} className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2">
+    <div ref={panelRef}>
       {open && (
         <div
-          className="w-[340px] max-w-[calc(100vw-2rem)] max-h-[70vh] flex flex-col rounded-2xl border overflow-hidden"
+          className="fixed z-40 w-[340px] max-w-[calc(100vw-2rem)] max-h-[70vh] flex flex-col rounded-2xl border overflow-hidden"
           style={{
+            left: clamp(panelLeft, 8, viewport.w - PANEL_W - 8),
+            top: panelTop,
             backgroundColor: 'var(--theme-bg-app)',
             borderColor: 'var(--theme-border)',
             boxShadow: '0 12px 16px rgba(20, 26, 46, 0.2)',
@@ -210,24 +270,46 @@ export const QuickTodos: React.FC = () => {
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        title="Quick to-dos (Alt+T)"
-        aria-label="Quick to-dos"
-        className="relative w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition hover:brightness-110"
-        style={{ backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-text)' }}
-      >
-        <ListChecks size={20} />
-        {open_.length > 0 && (
-          <span
-            className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center"
-            style={{ backgroundColor: '#DC2626', color: '#fff' }}
-          >
-            {open_.length > 99 ? '99+' : open_.length}
-          </span>
-        )}
-      </button>
+      {showButton && (
+        <button
+          type="button"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={() => {
+            drag.current = null;
+            setDragPos(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setOpen((o) => !o);
+            }
+          }}
+          title="Quick to-dos (Ctrl+Shift+Space). Drag to move"
+          aria-label="Quick to-dos"
+          className="fixed z-40 rounded-full flex items-center justify-center shadow-lg hover:brightness-110 touch-none select-none"
+          style={{
+            left: pos.x,
+            top: pos.y,
+            width: BTN,
+            height: BTN,
+            cursor: dragPos ? 'grabbing' : 'grab',
+            backgroundColor: 'var(--theme-primary)',
+            color: 'var(--theme-primary-text)',
+          }}
+        >
+          <ListChecks size={20} />
+          {open_.length > 0 && (
+            <span
+              className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center"
+              style={{ backgroundColor: '#DC2626', color: '#fff' }}
+            >
+              {open_.length > 99 ? '99+' : open_.length}
+            </span>
+          )}
+        </button>
+      )}
     </div>
   );
 };
