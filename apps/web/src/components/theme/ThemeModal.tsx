@@ -9,8 +9,8 @@ interface ThemeModalProps extends Pick<SettingsDialogProps, 'onOpenProfile' | 'o
   onClose: () => void;
   workspace?: Workspace | null;
   isAdminOrOwner?: boolean;
-  initialTab?: 'presets' | 'custom';
+  initialTab?: 'presets' | 'custom' | 'general';
 }
 
 export const ThemeModal: React.FC<ThemeModalProps> = ({ isOpen, initialTab = 'presets', ...rest }) =>
-  isOpen ? <SettingsDialog initialSection={initialTab === 'custom' ? 'theme-custom' : 'theme-presets'} {...rest} /> : null;
+  isOpen ? <SettingsDialog initialSection={initialTab === 'general' ? 'general' : initialTab === 'custom' ? 'theme-custom' : 'theme-presets'} {...rest} /> : null;

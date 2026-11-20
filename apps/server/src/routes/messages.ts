@@ -5,8 +5,10 @@ import { SOCKET_EVENTS } from '@orbit/types';
 import { z } from 'zod';
 import { quotedMessageInclude, verifyMessageAccess, verifyQuotable, verifyWorkspaceMember } from '../utils/security.js';
 import { handleMessageMentions } from '../services/mentionService.js';
-import { getOrCreateAnonProfile, sanitizeMessageForViewer } from '../services/anonymousService.js';
+import { emitPerViewer, getOrCreateAnonProfile, sanitizeMessageForViewer } from '../services/anonymousService.js';
 import { ACTIVITY_CHANNEL, postActivity } from '../services/systemBot.js';
+
+export const MIN_SEARCH_LENGTH = 3;
 
 const searchQuerySchema = z.object({
   workspaceId: z.string().min(1, 'workspaceId is required'),
@@ -87,6 +89,12 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       });
     }
 
+    // Text searches need at least MIN_SEARCH_LENGTH characters ("a" matches nearly every message); a shorter one
+    // returns nothing. Filter-only searches (by author / attachments) are unaffected.
+    if (queryTerm.length > 0 && queryTerm.length < MIN_SEARCH_LENGTH) {
+      return reply.send({ messages: [], total: 0, page: 1, limit: parseInt(limit, 10) || 20, hasMore: false });
+    }
+
     // If query is empty and no specific filters are applied, return empty
     if (!queryTerm && !filterUserId && hasAttachment !== 'true') {
       return reply.send({
@@ -106,6 +114,11 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       isDeleted: false,
     };
 
+    // Filtering by author would unmask anonymous posts, so those channels are left out of author-filtered searches.
+    if (filterUserId) {
+      whereClause.channel = { isAnonymous: false };
+    }
+
     if (queryTerm) {
       whereClause.content = {
         contains: queryTerm,
@@ -123,11 +136,13 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       };
     }
 
-    const [messages, total] = await Promise.all([
+    // Fetch one extra row to know whether another page exists, and only count the total on the first page
+    // (counting every page on every keystroke is what made broad searches expensive).
+    const [fetched, total] = await Promise.all([
       prisma.message.findMany({
         where: whereClause,
-        orderBy: { createdAt: 'desc' },
-        take: limitNum,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: limitNum + 1,
         skip: offsetNum,
         include: {
           user: {
@@ -152,6 +167,7 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
               name: true,
               type: true,
               topic: true,
+              isAnonymous: true,
             },
           },
           attachments: {
@@ -176,14 +192,18 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           },
         },
       }),
-      prisma.message.count({ where: whereClause }),
+      pageNum === 1 ? prisma.message.count({ where: whereClause }) : Promise.resolve(null),
     ]);
+    const hasMore = fetched.length > limitNum;
+    const messages = fetched.slice(0, limitNum);
 
     return reply.send({
-      messages,
+      // Anonymous channels: hide the real author (and anything else that identifies them) per viewer.
+      messages: messages.map((m) => sanitizeMessageForViewer(m, currentUserId, !!m.channel?.isAnonymous)),
       total,
       page: pageNum,
       limit: limitNum,
+      hasMore,
     });
   });
 
@@ -451,14 +471,28 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       },
     });
 
+    const maskReactions = (viewerId: string) =>
+      sanitizeMessageForViewer({ ...message, userId: message?.userId }, viewerId, true).reactions;
+
     if (fastify.io && message) {
-      fastify.io.to(`channel:${message.channelId}`).emit(SOCKET_EVENTS.MESSAGE_REACTION, {
-        messageId,
-        userId,
-        emoji,
-        action,
-        reactions: message.reactions,
-      });
+      if (access.channel.isAnonymous) {
+        // Each viewer gets reactions masked, except their own (so their reaction still shows as theirs).
+        await emitPerViewer(fastify.io as any, `channel:${message.channelId}`, SOCKET_EVENTS.MESSAGE_REACTION, (viewerId) => ({
+          messageId,
+          userId: viewerId === userId ? userId : 'anonymous',
+          emoji,
+          action,
+          reactions: maskReactions(viewerId),
+        }));
+      } else {
+        fastify.io.to(`channel:${message.channelId}`).emit(SOCKET_EVENTS.MESSAGE_REACTION, {
+          messageId,
+          userId,
+          emoji,
+          action,
+          reactions: message.reactions,
+        });
+      }
     }
 
     // Only public, non-anonymous channels: DMs, private and anonymous activity must not leak into #activity.
@@ -473,7 +507,11 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       );
     }
 
-    return reply.send({ success: true, action, reactions: message?.reactions || [] });
+    return reply.send({
+      success: true,
+      action,
+      reactions: message ? (access.channel.isAnonymous ? maskReactions(userId) : message.reactions) : [],
+    });
   });
 
   // Edit message (Author only)
@@ -669,17 +707,30 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       },
     });
 
+    const isAnonPin = access.channel.isAnonymous;
     if (fastify.io) {
-      fastify.io.to(`channel:${updated.channelId}`).emit('message:updated', updated);
-      fastify.io.to(`channel:${updated.channelId}`).emit('message:pinned', {
-        messageId: updated.id,
-        channelId: updated.channelId,
-        isPinned: updated.isPinned,
-        pinnedBy: userId,
-        message: updated,
-      });
+      if (isAnonPin) {
+        // Per viewer, so the author still sees their own message as theirs; the pinner isn't revealed.
+        const room = `channel:${updated.channelId}`;
+        await emitPerViewer(fastify.io as any, room, 'message:updated', (v) => sanitizeMessageForViewer(updated, v, true));
+        await emitPerViewer(fastify.io as any, room, 'message:pinned', (v) => ({
+          messageId: updated.id,
+          channelId: updated.channelId,
+          isPinned: updated.isPinned,
+          message: sanitizeMessageForViewer(updated, v, true),
+        }));
+      } else {
+        fastify.io.to(`channel:${updated.channelId}`).emit('message:updated', updated);
+        fastify.io.to(`channel:${updated.channelId}`).emit('message:pinned', {
+          messageId: updated.id,
+          channelId: updated.channelId,
+          isPinned: updated.isPinned,
+          pinnedBy: userId,
+          message: updated,
+        });
+      }
     }
 
-    return reply.send({ success: true, message: updated });
+    return reply.send({ success: true, message: sanitizeMessageForViewer(updated, userId, isAnonPin) });
   });
 };

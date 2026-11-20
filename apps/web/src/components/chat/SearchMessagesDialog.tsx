@@ -45,6 +45,8 @@ interface SearchMessagesDialogProps {
 
 type ResultType = 'projects' | 'channels' | 'messages' | 'people' | 'documents' | 'canvases';
 
+const MIN_SEARCH_LENGTH = 3;
+
 const TYPES: { id: ResultType; label: string; group: string }[] = [
   { id: 'projects', label: 'Projects & tickets', group: 'PROJECTS & TICKETS' },
   { id: 'channels', label: 'Channels', group: 'CHANNELS' },
@@ -143,6 +145,11 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
   const [results, setResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [hasSearched, setHasSearched] = useState<boolean>(false);
+  const [hasMore, setHasMore] = useState<boolean>(false);
+  const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
+  const pageRef = useRef(1);
+  const searchIdRef = useRef(0); // bumped per new search so a slow older response can't overwrite a newer one
+  const paramsRef = useRef<Record<string, string> | null>(null);
   const [selectedFullMessage, setSelectedFullMessage] = useState<any | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [documents, setDocuments] = useState<ProjectDocument[]>([]);
@@ -236,8 +243,12 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
   useEffect(() => {
     if (!isOpen || !workspace) return;
     const trimmed = searchText.trim();
-    if (!trimmed && !effectiveUserId && !hasAttachmentOnly) {
+    const tooShort = trimmed.length > 0 && trimmed.length < MIN_SEARCH_LENGTH;
+    if ((!trimmed && !effectiveUserId && !hasAttachmentOnly) || tooShort) {
+      searchIdRef.current++;
+      paramsRef.current = null;
       setResults([]);
+      setHasMore(false);
       setIsLoading(false);
       setHasSearched(false);
       return;
@@ -250,11 +261,17 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
         if (effectiveChannelId) params.channelId = effectiveChannelId;
         if (effectiveUserId) params.userId = effectiveUserId;
         if (hasAttachmentOnly) params.hasAttachment = 'true';
-        const res = await api.get('/api/messages/search', { params });
+        const searchId = ++searchIdRef.current;
+        paramsRef.current = params;
+        pageRef.current = 1;
+        const res = await api.get('/api/messages/search', { params: { ...params, page: '1' } });
+        if (searchId !== searchIdRef.current) return;
         setResults(res.data.messages || []);
+        setHasMore(!!res.data.hasMore);
       } catch (err) {
         console.error('Failed to search messages', err);
         setResults([]);
+        setHasMore(false);
       } finally {
         setHasSearched(true);
         setIsLoading(false);
@@ -272,7 +289,31 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchText, effectiveChannelId, effectiveUserId, hasAttachmentOnly, isOpen, workspace]);
 
-  const term = searchText.trim().toLowerCase();
+  const loadMore = async () => {
+    const params = paramsRef.current;
+    if (!params || !hasMore || isLoadingMore || isLoading) return;
+    const searchId = searchIdRef.current;
+    const nextPage = pageRef.current + 1;
+    setIsLoadingMore(true);
+    try {
+      const res = await api.get('/api/messages/search', { params: { ...params, page: String(nextPage) } });
+      if (searchId !== searchIdRef.current) return;
+      pageRef.current = nextPage;
+      const more: any[] = res.data.messages || [];
+      setResults((prev) => {
+        const seen = new Set(prev.map((m) => m.id));
+        return [...prev, ...more.filter((m) => !seen.has(m.id))];
+      });
+      setHasMore(!!res.data.hasMore);
+    } catch (err) {
+      console.error('Failed to load more results', err);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
+  const shortQuery = searchText.trim().length > 0 && searchText.trim().length < MIN_SEARCH_LENGTH;
+  const term = shortQuery ? '' : searchText.trim().toLowerCase();
   const minTime = (() => {
     const opt = DATE_OPTIONS.find((o) => o.value === dateRange);
     if (!opt || !opt.days) return 0;
@@ -331,7 +372,7 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
   const totalCount = Object.values(counts).reduce((a, b) => a + b, 0);
   const visibleTypes = TYPES.filter((t) => (effectiveType === 'all' || effectiveType === t.id) && counts[t.id] > 0);
   const visibleCount = visibleTypes.reduce((a, t) => a + counts[t.id], 0);
-  const hasQuery = !!query.trim() || !!effectiveUserId || hasAttachmentOnly;
+  const hasQuery = (!!query.trim() && !shortQuery) || !!effectiveUserId || hasAttachmentOnly;
   const showCounts = hasSearched && !isLoading && totalCount > 0;
   const noResults = hasQuery && hasSearched && !isLoading && visibleCount === 0;
 
@@ -521,11 +562,21 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
 
             {/* Body */}
             <div className="flex-1 min-h-0 flex">
-              <div className="flex-1 min-w-0 overflow-y-auto">
+              <div
+                className="flex-1 min-w-0 overflow-y-auto"
+                onScroll={(e) => {
+                  const el = e.currentTarget;
+                  if (el.scrollHeight - el.scrollTop - el.clientHeight < 240) loadMore();
+                }}
+              >
                 {!hasQuery && !isLoading && (
                   <EmptyState
                     title={`Search ${workspace.name}`}
-                    body="Find projects, tickets, channels, messages, people, documents and canvases."
+                    body={
+                      shortQuery
+                        ? `Type at least ${MIN_SEARCH_LENGTH} characters to search.`
+                        : 'Find projects, tickets, channels, messages, people, documents and canvases.'
+                    }
                   />
                 )}
 
@@ -655,6 +706,17 @@ export const SearchMessagesDialog: React.FC<SearchMessagesDialogProps> = ({
                               />
                             );
                           })}
+                        {t.id === 'messages' && hasMore && (
+                          <button
+                            onClick={loadMore}
+                            disabled={isLoadingMore}
+                            className="w-full h-10 flex items-center justify-center gap-2 text-[13px] font-semibold hover:bg-[var(--theme-fill-hover)]"
+                            style={{ color: 'var(--theme-primary)' }}
+                          >
+                            {isLoadingMore ? <Loader2 size={14} className="animate-spin" /> : null}
+                            {isLoadingMore ? 'Loading…' : 'Load more messages'}
+                          </button>
+                        )}
 
                         {t.id === 'people' &&
                           grouped.people.map((u: any) => (
