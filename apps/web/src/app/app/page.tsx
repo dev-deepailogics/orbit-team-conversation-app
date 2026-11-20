@@ -50,6 +50,7 @@ import { EmptyState } from "@/components/brand/EmptyState";
 import { ProfileModal } from "@/components/profile/ProfileModal";
 import { OfflineOverlay } from "@/components/brand/OfflineScreen";
 import { usePinStore } from "@/stores/pinnedStore";
+import { useSidebarSortStore } from "@/stores/sidebarSortStore";
 import {
   ShieldCheck,
   Building2,
@@ -287,11 +288,15 @@ export default function AppDashboard() {
     setCurrentProject(null);
     try {
       // All independent: fetch in parallel. Only the workspace itself is required; the rest degrade gracefully.
-      const [res, unread, projRes, sidebarRes] = await Promise.all([
+      const [res, unread, activity, projRes, sidebarRes] = await Promise.all([
         api.get(`/api/workspaces/${workspace.id}`),
         // Server-side counts (since each member's lastReadAt); a failure just means no badges.
         api
           .get(`/api/channels/workspaces/${workspace.id}/unread`)
+          .catch(() => null),
+        // Last message time per conversation, for "recent" sidebar sorting; a failure falls back to creation order.
+        api
+          .get(`/api/channels/workspaces/${workspace.id}/activity`)
           .catch(() => null),
         api
           .get(`/api/projects/workspaces/${workspace.id}/projects`)
@@ -308,6 +313,7 @@ export default function AppDashboard() {
         }),
       ]);
       useChatStore.getState().setUnreadCounts(unread?.data ?? {});
+      useChatStore.getState().setLastActivity(activity?.data ?? {});
       setChannels(res.data.channels || []);
       setMembers(res.data.members || []);
 
@@ -316,6 +322,7 @@ export default function AppDashboard() {
           (m: any) => m.userId === user.id || m.user?.id === user.id
         );
         usePinStore.getState().initPins(workspace.id, user.id, myMember?.settings);
+        useSidebarSortStore.getState().init(workspace.id, user.id, myMember?.settings);
       }
 
       const projectsData: Project[] = projRes?.data || [];
@@ -907,6 +914,11 @@ export default function AppDashboard() {
 
       // Their message arrived, so they are no longer typing it
       if (msg.userId && !msg.parentMessageId) clearTyping(msg.channelId, msg.userId);
+
+      // Any new top-level message (including our own) makes the conversation the most recent one
+      if (!msg.parentMessageId) {
+        useChatStore.getState().bumpActivity(msg.channelId, Date.parse(msg.createdAt) || Date.now());
+      }
 
       if (msg.parentMessageId) {
         addThreadReply(msg);

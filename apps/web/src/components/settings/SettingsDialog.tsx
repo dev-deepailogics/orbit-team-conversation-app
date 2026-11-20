@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { ThemeConfig, UserProfile, Workspace } from '@orbit/types';
-import { Bot, ChevronLeft, HardDrive, Link2, LogOut, Palette, User } from '@/components/ui/icons';
+import { ArrowUpDown, Bot, ChevronLeft, HardDrive, Link2, LogOut, Palette, User } from '@/components/ui/icons';
 import { DEFAULT_THEME, applyTheme } from '../../lib/theme';
 import { useThemeStore } from '../../stores/themeStore';
 import { useAuthStore } from '../../stores/authStore';
@@ -10,8 +10,9 @@ import { ThemeSettings, ThemeTab } from './ThemeSettings';
 import { BotSettings } from './BotSettings';
 import { StorageSettings } from './StorageSettings';
 import { InviteSettings } from './InviteSettings';
+import { SidebarSettings } from './SidebarSettings';
 
-export type SettingsSection = 'theme-presets' | 'theme-custom' | 'bots' | 'storage' | 'invite';
+export type SettingsSection = 'theme-presets' | 'theme-custom' | 'sidebar' | 'bots' | 'storage' | 'invite';
 
 export interface SettingsDialogProps {
   initialSection: SettingsSection;
@@ -168,6 +169,9 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
             <SubItem label="Theme templates" active={section === 'theme-presets'} onClick={() => setSection('theme-presets')} />
             <SubItem label="Custom theme" active={section === 'theme-custom'} onClick={() => setSection('theme-custom')} />
             {workspace && (
+              <NavItem icon={<ArrowUpDown size={18} />} label="Sidebar sorting" active={section === 'sidebar'} onClick={() => setSection('sidebar')} />
+            )}
+            {workspace && (
               <>
                 <GroupLabel label="WORKSPACE" />
                 <NavItem icon={<Bot size={18} />} label="Bot & app integrations" active={section === 'bots'} onClick={() => setSection('bots')} />
@@ -193,7 +197,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
               [
                 ['theme-presets', 'Templates'],
                 ['theme-custom', 'Custom'],
-                ...(workspace ? ([['bots', 'Bots'], ['storage', 'Storage'], ['invite', 'Invite']] as const) : []),
+                ...(workspace ? ([['sidebar', 'Sidebar'], ['bots', 'Bots'], ['storage', 'Storage'], ['invite', 'Invite']] as const) : []),
               ] as [SettingsSection, string][]
             ).map(([id, label]) => (
               <button
@@ -227,6 +231,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
               onSetAsDefault={setSetAsDefault}
             />
           )}
+          {section === 'sidebar' && workspace && <SidebarSettings workspace={workspace} />}
           {section === 'bots' && workspace && <BotSettings workspace={workspace} />}
           {section === 'storage' && workspace && (
             <StorageSettings workspace={workspace} currentUser={currentUser} onFileDeleted={onFileDeleted} />

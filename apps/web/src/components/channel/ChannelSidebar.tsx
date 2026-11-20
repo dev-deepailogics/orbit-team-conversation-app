@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Avatar } from "@/components/project/projectViewUtils";
 import { Workspace, Channel, UserProfile, Project, UserStatus } from "@orbit/types";
 import { Presence } from "../availability/useTeamPresence";
@@ -36,6 +36,8 @@ import { ProjectDocument } from "@orbit/types";
 import { api } from "../../lib/api";
 import { useChatStore } from "../../stores/chatStore";
 import { usePinStore } from "../../stores/pinnedStore";
+import { useSidebarSort } from "../../stores/sidebarSortStore";
+import { orderConversations } from "../../lib/sidebarOrder";
 import { WorkspaceStorageModal } from "../workspace/WorkspaceStorageModal";
 import { AddWorkspaceMemberDialog } from "../workspace/AddWorkspaceMemberDialog";
 import { ThemeModal } from "../theme/ThemeModal";
@@ -225,6 +227,8 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   const [docSearchQuery, setDocSearchQuery] = useState("");
   const [docActiveFilter, setDocActiveFilter] = useState<"all" | "project" | "shared" | "private">("all");
   const unreadCounts = useChatStore((s) => s.unreadCounts);
+  const lastActivity = useChatStore((s) => s.lastActivity);
+  const sidebarSort = useSidebarSort(workspace?.id);
 
   // Pin state
   const pinnedChannelIds = usePinStore((s) => (workspace?.id ? s.getPinnedChannels(workspace.id) : []));
@@ -242,6 +246,62 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
       usePinStore.getState().initPins(workspace.id, currentUser.id, memberObj?.settings);
     }
   }, [workspace?.id, currentUser?.id, members]);
+
+  // Channels and group DMs: pinned first, then unread, then the user's chosen order (recent activity or A-Z)
+  const channelGroups = useMemo(() => {
+    const pinned = new Set(pinnedChannelIds);
+    const keys = {
+      name: (c: Channel) => c.name,
+      activity: (c: Channel) => lastActivity[c.id] ?? (Date.parse(c.createdAt) || 0),
+      unread: (c: Channel) => unreadCounts[c.id] || 0,
+    };
+    const list = channels.filter((c) => c.type !== "DIRECT");
+    return {
+      pinned: orderConversations(list.filter((c) => pinned.has(c.id)), sidebarSort, keys),
+      unpinned: orderConversations(list.filter((c) => !pinned.has(c.id)), sidebarSort, keys),
+    };
+  }, [channels, pinnedChannelIds, lastActivity, unreadCounts, sidebarSort]);
+
+  // People to DM (members plus anyone we already have a 1:1 DM with, e.g. removed users), each with their DM channel
+  const dmPeople = useMemo(() => {
+    const me = currentUser?.id;
+    const dmByPeer = new Map<string, Channel>();
+    const people = new Map<string, { user: any; id: string }>();
+    members.forEach((m) => {
+      if (m?.user) people.set(m.user.id, { user: m.user, id: m.id || m.user.id });
+    });
+    channels.forEach((c) => {
+      if (c.type !== "DIRECT" || !Array.isArray(c.members)) return;
+      const peer = c.members.find((m) => m.userId !== me);
+      // A DM whose only member is us is the self-DM
+      const peerId = peer ? peer.userId : me;
+      if (peerId && !dmByPeer.has(peerId)) dmByPeer.set(peerId, c);
+      c.members.forEach((cm: any) => {
+        if (cm?.user && !people.has(cm.user.id)) people.set(cm.user.id, { user: cm.user, id: `dm-peer-${cm.user.id}` });
+      });
+    });
+    return Array.from(people.values(), (p) => ({ ...p, dmChannel: dmByPeer.get(p.user.id) }));
+  }, [members, channels, currentUser?.id]);
+
+  const dmGroups = useMemo(() => {
+    const query = dmSearchQuery.toLowerCase().trim();
+    const list = query
+      ? dmPeople.filter(({ user: u }) =>
+          [u.displayName, u.username, u.email].some((v) => (v || "").toLowerCase().includes(query)),
+        )
+      : dmPeople;
+    const pinned = new Set(pinnedUserIds);
+    const keys = {
+      name: (p: (typeof dmPeople)[number]) => p.user.displayName || p.user.username || "",
+      activity: (p: (typeof dmPeople)[number]) =>
+        p.dmChannel ? lastActivity[p.dmChannel.id] ?? (Date.parse(p.dmChannel.createdAt) || 0) : 0,
+      unread: (p: (typeof dmPeople)[number]) => (p.dmChannel ? unreadCounts[p.dmChannel.id] || 0 : 0),
+    };
+    return {
+      pinned: orderConversations(list.filter((p) => pinned.has(p.user.id)), sidebarSort, keys),
+      unpinned: orderConversations(list.filter((p) => !pinned.has(p.user.id)), sidebarSort, keys),
+    };
+  }, [dmPeople, dmSearchQuery, pinnedUserIds, lastActivity, unreadCounts, sidebarSort]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -1024,9 +1084,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
           <Collapse open={!isChannelsCollapsed}>
             <div className="space-y-0.5">
               {(() => {
-                const nonDirectChannels = channels.filter((c) => c.type !== "DIRECT");
-                const pinnedChannels = nonDirectChannels.filter((c) => pinnedChannelIds.includes(c.id));
-                const unpinnedChannels = nonDirectChannels.filter((c) => !pinnedChannelIds.includes(c.id));
+                const { pinned: pinnedChannels, unpinned: unpinnedChannels } = channelGroups;
                 const sortedChannels = [...pinnedChannels, ...unpinnedChannels];
 
                 return sortedChannels.map((channel, idx) => {
@@ -1165,54 +1223,9 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 </div>
               )}
               {(() => {
-                // Collect users from members + any user from existing DIRECT channels (e.g. kicked users with chat history)
-                const userMap = new Map<string, { user: any; id: string }>();
+                const { pinned: pinnedDMs, unpinned: unpinnedDMs } = dmGroups;
 
-                // 1. Add current workspace members
-                members.forEach((m) => {
-                  if (m?.user) {
-                    userMap.set(m.user.id, {
-                      user: m.user,
-                      id: m.id || m.user.id,
-                    });
-                  }
-                });
-
-                // 2. Add any other participant in an existing 1:1 DIRECT channel
-                channels
-                  .filter(
-                    (c) => c.type === "DIRECT" && Array.isArray(c.members),
-                  )
-                  .forEach((c) => {
-                    c.members?.forEach((cm: any) => {
-                      if (cm?.user && !userMap.has(cm.user.id)) {
-                        userMap.set(cm.user.id, {
-                          user: cm.user,
-                          id: `dm-peer-${cm.user.id}`,
-                        });
-                      }
-                    });
-                  });
-
-                let dmList = Array.from(userMap.values());
-
-                if (dmSearchQuery.trim()) {
-                  const query = dmSearchQuery.toLowerCase().trim();
-                  dmList = dmList.filter((m) => {
-                    const u = m.user;
-                    if (!u) return false;
-                    const name = (u.displayName || "").toLowerCase();
-                    const username = (u.username || "").toLowerCase();
-                    const email = (u.email || "").toLowerCase();
-                    return (
-                      name.includes(query) ||
-                      username.includes(query) ||
-                      email.includes(query)
-                    );
-                  });
-                }
-
-                if (dmList.length === 0 && dmSearchQuery.trim()) {
+                if (pinnedDMs.length + unpinnedDMs.length === 0 && dmSearchQuery.trim()) {
                   return (
                     <div
                       className="px-3 py-2 text-xs text-center italic"
@@ -1223,8 +1236,6 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                   );
                 }
 
-                const pinnedDMs = dmList.filter((m) => m?.user && pinnedUserIds.includes(m.user.id));
-                const unpinnedDMs = dmList.filter((m) => m?.user && !pinnedUserIds.includes(m.user.id));
                 const sortedDMs = [...pinnedDMs, ...unpinnedDMs];
 
                 return sortedDMs.map((member, idx) => {
@@ -1239,17 +1250,7 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                     idx === pinnedDMs.length - 1 &&
                     unpinnedDMs.length > 0;
 
-                  // Find matching DM channel to check selection and unread counts
-                  const dmChannel = channels.find(
-                    (c) =>
-                      c.type === "DIRECT" &&
-                      c.members &&
-                      (isSelf
-                        ? c.members.length === 1 ||
-                          c.members.every((m) => m.userId === currentUser?.id)
-                        : c.members.some((m) => m.userId === user.id) &&
-                          c.members.some((m) => m.userId === currentUser?.id)),
-                  );
+                  const dmChannel = member.dmChannel;
 
                   const isSelectedDM =
                     currentChannel?.type === "DIRECT" &&
