@@ -66,7 +66,13 @@ export const EmployeeStatusView: React.FC<EmployeeStatusViewProps> = ({
     try {
       setIsLoading(true);
       const res = await api.get(`/api/availability/team/${workspace.id}`);
-      setTeamMembers(res.data.team || []);
+      const all: TeamMemberStatusItem[] = res.data.team || [];
+      // This dashboard is for Owner/Admin/Manager/HR; anyone else only sees themselves.
+      setTeamMembers(
+        res.data.permissions?.viewTeamAvailability
+          ? all
+          : all.filter((m) => m.user.id === currentUser?.id),
+      );
     } catch (err) {
       console.error('Failed to load employee status list:', err);
     } finally {

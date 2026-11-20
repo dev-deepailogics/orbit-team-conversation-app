@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyPluginAsync } from "fastify";
+import { hasWorkspacePermission } from "../services/permissions.js";
 import { prisma } from "@orbit/db";
 import { SOCKET_EVENTS } from "@orbit/types";
 import { z } from "zod";
@@ -211,9 +212,7 @@ async function projectAccessError(
   }
 
   const isAdmin =
-    membership.role === "OWNER" ||
-    membership.role === "ADMIN" ||
-    membership.user.systemRole === "SUPER_ADMIN" ||
+    hasWorkspacePermission(membership.role, "manageAllProjects", membership.user.systemRole) ||
     membership.user.systemRole === "WORKSPACE_ADMIN";
   if (isAdmin || project.createdById === userId) return null;
 
@@ -289,9 +288,7 @@ export const projectRoutes: FastifyPluginAsync = async (
       }
 
       const isAdmin =
-        membership.role === "OWNER" ||
-        membership.role === "ADMIN" ||
-        membership.user.systemRole === "SUPER_ADMIN" ||
+        hasWorkspacePermission(membership.role, "manageAllProjects", membership.user.systemRole) ||
         membership.user.systemRole === "WORKSPACE_ADMIN";
 
       const projects = await prisma.project.findMany({

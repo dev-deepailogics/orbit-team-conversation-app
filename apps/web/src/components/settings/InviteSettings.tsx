@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { UserProfile, Workspace } from '@orbit/types';
-import { Check, Copy, Link2, Loader2, Mail, Shield, UserPlus, Users } from '@/components/ui/icons';
+import { AssignableWorkspaceRole, UserProfile, Workspace } from '@orbit/types';
+import { Briefcase, Check, Contact, Copy, Link2, Loader2, Mail, Shield, UserPlus, Users } from '@/components/ui/icons';
 import { api } from '../../lib/api';
 import { Card, CardTitle, PageHeader, PrimaryButton, SUCCESS, DANGER, onTint, tint } from './ui';
 
@@ -13,7 +13,7 @@ export const InviteSettings: React.FC<{
 }> = ({ workspace, onMemberAdded }) => {
   const [copied, setCopied] = useState(false);
   const [emailOrUsername, setEmailOrUsername] = useState('');
-  const [role, setRole] = useState<'MEMBER' | 'ADMIN'>('MEMBER');
+  const [role, setRole] = useState<AssignableWorkspaceRole>('MEMBER');
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -104,7 +104,9 @@ export const InviteSettings: React.FC<{
               <div className="h-11 p-1 rounded-xl flex items-center gap-0.5" style={{ backgroundColor: 'var(--theme-bg-surface-hover)' }}>
                 {(
                   [
-                    ['MEMBER', 'Member', Users],
+                    ['MEMBER', 'Employee', Users],
+                    ['MANAGER', 'Manager', Briefcase],
+                    ['HR', 'HR', Contact],
                     ['ADMIN', 'Admin', Shield],
                   ] as const
                 ).map(([value, label, Icon]) => (
@@ -134,7 +136,7 @@ export const InviteSettings: React.FC<{
               </PrimaryButton>
             </div>
             <p className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>
-              Members can chat, start huddles and share files. Admins can also manage channels, bots and members.
+              Employees can chat, start huddles and share files and see only their own availability. Managers and HR can also see everyone's availability (managers manage all projects too). Admins can also manage channels, bots, members and roles.
             </p>
             {error && (
               <span className="self-start px-3 py-2 rounded-[10px] text-[13px] font-semibold" style={{ backgroundColor: tint(DANGER, 12), color: DANGER }}>

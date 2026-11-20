@@ -80,6 +80,8 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
 
   // Team tracking state
   const [teamMembers, setTeamMembers] = useState<TeamMemberAvailability[]>([]);
+  // Team tab is only for roles that may view everyone's availability (Owner/Admin/Manager/HR)
+  const [canViewTeam, setCanViewTeam] = useState<boolean>(false);
   const [isLoadingTeam, setIsLoadingTeam] = useState<boolean>(false);
 
   const actionLockTimer = useRef<NodeJS.Timeout | null>(null);
@@ -115,6 +117,7 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
       setIsLoadingTeam(true);
       const res = await api.get(`/api/availability/team/${workspace.id}`);
       setTeamMembers(res.data.team || []);
+      setCanViewTeam(!!res.data.permissions?.viewTeamAvailability);
     } catch (err) {
       console.error('Failed to load team availability:', err);
     } finally {
@@ -340,6 +343,7 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
             <span>My Shift & Availability</span>
           </button>
 
+          {canViewTeam && (
           <button
             onClick={() => setActiveTab('team')}
             className={`flex items-center gap-2 px-4 py-2.5 border-b-2 transition ${
@@ -354,11 +358,12 @@ export const OrganizationControlModal: React.FC<OrganizationControlModalProps> =
               {teamMembers.length}
             </span>
           </button>
+          )}
         </div>
 
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {activeTab === 'self' ? (
+          {activeTab === 'self' || !canViewTeam ? (
             <div className="space-y-6">
               {/* Employee Availability Toolbar Showcase */}
               <div
