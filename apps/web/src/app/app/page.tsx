@@ -38,6 +38,9 @@ import { CreateProjectModal } from "@/components/project/CreateProjectModal";
 import { CreateTicketFromMessageDialog } from "@/components/project/CreateTicketFromMessageDialog";
 import { OrganizationControlView } from "@/components/availability/OrganizationControlView";
 import { CanvasView } from "@/components/whiteboard/CanvasView";
+import { VideoLibraryView } from "@/components/video/VideoLibraryView";
+import { RecorderOverlay } from "@/components/recording/RecorderOverlay";
+import { useRecorderStore } from "@/stores/recorderStore";
 import { ProjectDocsView } from "@/components/project/ProjectDocsView";
 import { ShareDocumentModal } from "@/components/project/ShareDocumentModal";
 import { useTeamPresence } from "@/components/availability/useTeamPresence";
@@ -129,6 +132,9 @@ export default function AppDashboard() {
   const [showCanvasHub, setShowCanvasHub] = useState(false);
   const [showDocsHub, setShowDocsHub] = useState(false);
   const [showProjectsPanel, setShowProjectsPanel] = useState(false);
+  const [showVideoLibrary, setShowVideoLibrary] = useState(false);
+  const recorderState = useRecorderStore((s) => s);
+  const closeRecorder = useRecorderStore((s) => s.close);
   const [canvases, setCanvases] = useState<any[]>([]);
   const [newCanvasSignal, setNewCanvasSignal] = useState(0);
   const [showProfilePage, setShowProfilePage] = useState(false);
@@ -154,7 +160,10 @@ export default function AppDashboard() {
   }, [showProfilePage]);
   // The canvas hub is toggled from several places; any of them leaves the profile page.
   useEffect(() => {
-    if (showCanvasHub) setShowProfilePage(false);
+    if (showCanvasHub) {
+      setShowProfilePage(false);
+      setShowVideoLibrary(false);
+    }
   }, [showCanvasHub]);
   const [newDocSignal, setNewDocSignal] = useState(0);
   const [selectedCanvasId, setSelectedCanvasId] = useState<string | null>(null);
@@ -405,6 +414,7 @@ export default function AppDashboard() {
     setShowCanvasHub(false);
     setShowDocsHub(false);
     setShowProjectsPanel(false);
+    setShowVideoLibrary(false);
     setCurrentProject(null);
     setCurrentChannel(channel);
     markChannelRead(channel.id);
@@ -442,6 +452,7 @@ export default function AppDashboard() {
     setShowOrgControl(false);
     setShowCanvasHub(false);
     setShowDocsHub(false);
+    setShowVideoLibrary(false);
     // A board is always shown with the Projects list beside it, however it was opened
     // (sidebar, search, URL, Organization Control).
     setShowProjectsPanel(true);
@@ -459,6 +470,7 @@ export default function AppDashboard() {
     setShowCanvasHub(false);
     setShowDocsHub(false);
     setShowProjectsPanel(false);
+    setShowVideoLibrary(false);
     setCurrentProject(null);
     setOrgControlResetKey((prev) => prev + 1);
     if (typeof window !== "undefined") {
@@ -603,6 +615,7 @@ export default function AppDashboard() {
     setShowCanvasHub(false);
     setShowOrgControl(false);
     setShowProjectsPanel(false);
+    setShowVideoLibrary(false);
     setCurrentProject(null);
     setDocsInitialId(docId);
     setShowDocsHub(true);
@@ -622,6 +635,7 @@ export default function AppDashboard() {
     setShowDocsHub(false);
     setShowOrgControl(false);
     setShowProjectsPanel(false);
+    setShowVideoLibrary(false);
     setCurrentProject(null);
     // The channel stays loaded underneath other views; only fetch one if none was ever opened
     // (e.g. the app was loaded straight onto a project or docs URL).
@@ -650,7 +664,27 @@ export default function AppDashboard() {
     setShowCanvasHub(false);
     setShowDocsHub(false);
     setShowOrgControl(false);
+    setShowVideoLibrary(false);
     setShowProjectsPanel(true);
+  };
+
+  // Video Library: every recording in this workspace (Loom-style grid). Like Canvas, it owns the
+  // main area with no secondary sidebar; clicking it again goes Home.
+  const openVideoLibrary = () => {
+    setShowProfilePage(false);
+    setShowCanvasHub(false);
+    setShowDocsHub(false);
+    setShowOrgControl(false);
+    setShowProjectsPanel(false);
+    setCurrentProject(null);
+    setShowVideoLibrary(true);
+    if (typeof window !== "undefined") {
+      window.history.replaceState(
+        null,
+        "",
+        currentChannel ? `?channelId=${currentChannel.id}` : window.location.pathname,
+      );
+    }
   };
 
   // Point the URL back at the current channel / project
@@ -698,6 +732,7 @@ export default function AppDashboard() {
     setShowCanvasHub(false);
     setShowDocsHub(false);
     setShowOrgControl(false);
+    setShowVideoLibrary(false);
     setIsMobileSidebarOpen(false);
     setShowProfilePage(true);
     setProfileInUrl(true);
@@ -1191,7 +1226,7 @@ export default function AppDashboard() {
     }
   };
 
-  // One continuous boot screen (session → workspace → restored view + its first messages),
+  // One continuous boot screen (session â†’ workspace â†’ restored view + its first messages),
   // so a refresh goes straight from loading to the finished page with no intermediate flashes.
   if (isLoading || isDataLoading) return <WorkspaceSkeleton />;
 
@@ -1215,7 +1250,9 @@ export default function AppDashboard() {
           ? ("docs" as const)
           : showProjectsPanel
             ? ("projects" as const)
-            : ("home" as const),
+            : showVideoLibrary
+              ? ("video" as const)
+              : ("home" as const),
     // Every rail item switches sidebar AND main area together; clicking the active one goes Home.
     onGoHome: currentWorkspace ? goHome : undefined,
     onOpenCanvas: currentWorkspace
@@ -1241,6 +1278,9 @@ export default function AppDashboard() {
       : undefined,
     onOpenProjects: currentWorkspace
       ? () => (showProjectsPanel && !showProfilePage ? goHome() : openProjects())
+      : undefined,
+    onOpenVideoLibrary: currentWorkspace
+      ? () => (showVideoLibrary && !showProfilePage ? goHome() : openVideoLibrary())
       : undefined,
   };
 
@@ -1271,7 +1311,7 @@ export default function AppDashboard() {
               }}
             />
             {/* Show Channels & DMs / Projects / Canvas / Docs sidebar */}
-            {currentWorkspace && !showOrgControl && (
+            {currentWorkspace && !showOrgControl && !showVideoLibrary && (
               <ChannelSidebar
                 workspace={currentWorkspace}
                 channels={channels}
@@ -1384,7 +1424,7 @@ export default function AppDashboard() {
       </div>
 
       {/* 2. Channels & Members / Projects / Canvas / Docs Sidebar (Desktop) */}
-      {currentWorkspace && !showOrgControl && (
+      {currentWorkspace && !showOrgControl && !showVideoLibrary && (
         <div className="hidden md:flex shrink-0 h-full">
           <ChannelSidebar
             workspace={currentWorkspace}
@@ -1614,6 +1654,12 @@ export default function AppDashboard() {
           }
           onClose={goHome}
           onOpenCanvasSidebar={() => setIsMobileSidebarOpen(true)}
+        />
+      ) : showVideoLibrary && currentWorkspace ? (
+        <VideoLibraryView
+          workspaceId={currentWorkspace.id}
+          currentUser={user}
+          onClose={goHome}
         />
       ) : showOrgControl && currentWorkspace ? (
         <OrganizationControlView
@@ -1917,6 +1963,19 @@ export default function AppDashboard() {
 
       {/* 13. Quick to-dos (Alt+T) */}
       <QuickTodos />
+
+      {/* 14. Screen Recorder — rendered once at the dashboard root so an in-progress
+          recording survives switching between Chat / Video Library / Canvas / Docs */}
+      {recorderState.isOpen && recorderState.workspaceId && (
+        <RecorderOverlay
+          workspaceId={recorderState.workspaceId}
+          suggestedChannelId={recorderState.channelId || undefined}
+          channels={channels}
+          members={members}
+          currentUserId={user?.id}
+          onClose={closeRecorder}
+        />
+      )}
     </div>
   );
 }

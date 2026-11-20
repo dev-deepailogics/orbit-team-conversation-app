@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Channel, Message, UserProfile } from "@orbit/types";
 import {
   Hash,
@@ -36,6 +36,7 @@ import {
   Bell,
   BellOff,
   Forward,
+  Video,
 } from "@/components/ui/icons";
 import { EyeOff } from "lucide-react";
 import { useAnonStore } from "../../stores/anonStore";
@@ -57,6 +58,7 @@ import { getTopEmojis, recordEmojiUsage } from "../../lib/emojiStore";
 import { CanvasView } from "../whiteboard/CanvasView";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { RichTextEditor, RichTextEditorRef } from "./RichTextEditor";
+import { useRecorderStore } from "../../stores/recorderStore";
 import {
   FileAttachmentList,
   formatFileSize,
@@ -366,6 +368,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const isInitialLoadRef = useRef(true);
   const previousMessagesCountRef = useRef(0);
   const editorRef = useRef<RichTextEditorRef>(null);
+  const openRecorder = useRecorderStore((s) => s.open);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -400,6 +403,19 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       onSelectChannel(ch);
     }
   };
+
+  // Stable identities (always calling the latest version) so memoized message bodies don't re-render
+  // on every keystroke: typing re-renders ChatArea, and fresh handler functions would defeat the memo.
+  const latestLinkHandlers = useRef({ handleMentionClick, handleChannelClick });
+  latestLinkHandlers.current = { handleMentionClick, handleChannelClick };
+  const onMentionClickStable = useCallback(
+    (username: string) => latestLinkHandlers.current.handleMentionClick(username),
+    [],
+  );
+  const onChannelClickStable = useCallback(
+    (channelId: string) => latestLinkHandlers.current.handleChannelClick(channelId),
+    [],
+  );
 
   // Close more menu when clicking outside
   useEffect(() => {
@@ -2034,8 +2050,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                                           currentUsername={
                                             currentUser?.username
                                           }
-                                          onMentionClick={handleMentionClick}
-                                          onChannelClick={handleChannelClick}
+                                          onMentionClick={onMentionClickStable}
+                                          onChannelClick={onChannelClickStable}
                                         />
                                       </div>
 
@@ -2596,6 +2612,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         title: "Attach files (images, docs, code, zip...)",
                         Icon: Paperclip,
                         onClick: () => fileInputRef.current?.click(),
+                        active: false,
+                      },
+                      {
+                        title: "Record a screen clip (Loom-style)",
+                        Icon: Video,
+                        onClick: () =>
+                          openRecorder({
+                            workspaceId: channel.workspaceId,
+                            channelId: channel.id,
+                          }),
                         active: false,
                       },
                     ].map(({ title, Icon, onClick, active }) => (

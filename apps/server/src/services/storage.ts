@@ -78,7 +78,13 @@ export class LocalStorageDriver implements StorageDriver {
     const absolutePath = path.join(this.baseDir, relativeKey);
 
     const writeStream = fs.createWriteStream(absolutePath);
-    await pipeline(stream, writeStream);
+    try {
+      await pipeline(stream, writeStream);
+    } catch (err) {
+      // Aborted / oversized / failed upload: don't leave a half-written orphan file on disk.
+      await fs.promises.unlink(absolutePath).catch(() => {});
+      throw err;
+    }
 
     const stat = await fs.promises.stat(absolutePath);
 

@@ -23,6 +23,7 @@ import {
   ChevronRight,
   ChevronDown,
   Check,
+  Video,
 } from '@/components/ui/icons';
 import { api } from '../../lib/api';
 import { EmployeeAvailabilityHeader } from '../availability/EmployeeAvailabilityHeader';
@@ -37,12 +38,13 @@ interface WorkspaceSidebarProps {
   currentUser?: UserProfile | null;
   onSelectWorkspace: (workspace: Workspace) => void;
   onWorkspaceCreated: (workspace: Workspace) => void;
-  activeFeature?: 'home' | 'canvas' | 'docs' | 'projects' | null;
+  activeFeature?: 'home' | 'canvas' | 'docs' | 'projects' | 'video' | null;
   // Handlers are undefined when the feature has no target (no channel / no project)
   onGoHome?: () => void;
   onOpenCanvas?: () => void;
   onOpenDocs?: () => void;
   onOpenProjects?: () => void;
+  onOpenVideoLibrary?: () => void;
   onOpenBotPortal?: () => void;
   // Opens the profile page in the main area
   onOpenProfile: () => void;
@@ -64,6 +66,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   onOpenCanvas,
   onOpenDocs,
   onOpenProjects,
+  onOpenVideoLibrary,
   onOpenBotPortal,
   onOpenProfile,
   members = [],
@@ -214,6 +217,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
             { key: 'canvas', label: 'Canvas', Icon: Canvas, onClick: onOpenCanvas },
             { key: 'docs', label: 'Docs', Icon: FileText, onClick: onOpenDocs },
             { key: 'projects', label: 'Projects', Icon: Board, onClick: onOpenProjects },
+            { key: 'video', label: 'Videos', Icon: Video, onClick: onOpenVideoLibrary },
           ] as const).map(({ key, label, Icon, onClick }) => {
             const isActive = activeFeature === key;
             return (

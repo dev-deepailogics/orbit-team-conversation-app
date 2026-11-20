@@ -155,6 +155,56 @@ export interface Attachment {
   uploader?: UserProfile;
 }
 
+/**
+ * Screen-recording limits, shared by the recorder (browser) and the upload route (server) so the
+ * two can never disagree. A 5-minute clip at the recorder's target bitrate is ~100 MB; the byte cap
+ * leaves headroom for bitrate overshoot while still bounding storage per clip.
+ */
+export const RECORDING_LIMITS = {
+  maxDurationSec: 5 * 60,
+  maxBytes: 150 * 1024 * 1024,
+  /** Containers the recorder produces and the server accepts (browsers add ;codecs=... parameters). */
+  allowedMimeTypes: ['video/webm', 'video/mp4'],
+} as const;
+
+export interface Recording {
+  id: string;
+  workspaceId: string;
+  channelId?: string | null;
+  messageId?: string | null;
+  creatorId?: string | null;
+  title: string;
+  attachmentId: string;
+  thumbnailUrl?: string | null;
+  durationSec?: number | null;
+  shareSlug: string;
+  viewCount: number;
+  isDeleted?: boolean;
+  createdAt: string;
+  updatedAt?: string;
+  creator?: UserProfile | null;
+  attachment: Attachment;
+}
+
+export type RecordingViewerUser = Pick<UserProfile, 'id' | 'username' | 'displayName' | 'avatarUrl'>;
+
+/** "Seen by" for a recording, visible to its creator only. */
+export interface RecordingViewers {
+  viewCount: number;
+  /** Conversations the clip was posted in. A DM's name is the other people's names. */
+  sharedIn: { id: string; type: ChannelType; name: string }[];
+  /** Workspace members who played it, most recent first. */
+  seen: { user: RecordingViewerUser; firstViewedAt: string; lastViewedAt: string; plays: number }[];
+  /** Members of those conversations who haven't played it yet. */
+  notSeen: RecordingViewerUser[];
+}
+
+/** Sent to the creator's own socket room when someone plays their clip. */
+export interface RecordingViewedEvent {
+  recordingId: string;
+  viewCount: number;
+}
+
 export interface StorageCategoryStat {
   category:
     | "images"
@@ -477,6 +527,12 @@ export const SOCKET_EVENTS = {
   WHITEBOARD_CLEAR: "whiteboard:clear",
   CANVAS_JOIN: "canvas:join",
   CANVAS_LEAVE: "canvas:leave",
+
+  // Recordings (Loom-style clips)
+  RECORDING_NEW: "recording:new",
+  RECORDING_UPDATE: "recording:update",
+  RECORDING_DELETE: "recording:delete",
+  RECORDING_VIEWED: "recording:viewed",
 
   // Projects & Kanban Boards (Trello-like)
   PROJECT_NEW: "project:new",

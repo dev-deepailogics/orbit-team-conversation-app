@@ -23,6 +23,7 @@ import { messageRoutes } from "./routes/messages.js";
 import { huddleRoutes } from "./routes/huddles.js";
 import { botRoutes } from "./routes/bots.js";
 import { fileRoutes } from "./routes/files.js";
+import { recordingRoutes } from "./routes/recordings.js";
 import { adminRoutes } from "./routes/admin.js";
 import { projectRoutes } from "./routes/projects.js";
 import { pushRoutes } from "./routes/push.js";
@@ -186,6 +187,7 @@ async function bootstrap() {
   await fastify.register(huddleRoutes, { prefix: "/api/huddles" });
   await fastify.register(botRoutes, { prefix: "/api/bot" });
   await fastify.register(fileRoutes, { prefix: "/api/files" });
+  await fastify.register(recordingRoutes, { prefix: "/api/recordings" });
   await fastify.register(adminRoutes, { prefix: "/api/admin" });
   await fastify.register(projectRoutes, { prefix: "/api/projects" });
   await fastify.register(pushRoutes, { prefix: "/api/push" });
