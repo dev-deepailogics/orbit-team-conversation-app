@@ -233,28 +233,16 @@ export const ChannelDetailsModal: React.FC<ChannelDetailsModalProps> = ({
           <div className="flex flex-col -mt-2">
             {members.map((m) => {
               const u = m.user || {};
-              const isSelf = isAnon ? !!m.isSelf : u.id === currentUser?.id;
-              const name = isAnon ? m.anonName || 'Anonymous member' : u.displayName || u.username || 'Member';
+              const isSelf = u.id === currentUser?.id;
+              const name = u.displayName || u.username || 'Member';
               const isOwner = !isAnon && details?.createdById === u.id;
-              const sub = isAnon
-                ? isSelf
-                  ? 'Your identity is hidden from others'
-                  : 'Identity hidden'
-                : isOwner
+              // Anonymous channels list people by their real name; which character name is theirs is never shown.
+              const sub = isOwner
                   ? 'Channel owner'
                   : u.email || `@${u.username || 'user'}`;
               return (
                 <div key={m.id || u.id} className="h-12 px-1.5 flex items-center gap-2.5">
-                  {isAnon ? (
-                    <span
-                      className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-base"
-                      style={{ backgroundColor: `color-mix(in srgb, #D97706 14%, transparent)` }}
-                    >
-                      {m.anonEmoji || <Mask size={16} style={{ color: '#D97706' }} />}
-                    </span>
-                  ) : (
-                    <PresenceAvatar name={name} src={u.avatarUrl} size={32} presence={presence[u.id]} />
-                  )}
+                  <PresenceAvatar name={name} src={u.avatarUrl} size={32} presence={presence[u.id]} />
                   <span className="flex-1 min-w-0 flex flex-col">
                     <span className="text-sm font-semibold truncate" style={{ color: 'var(--theme-text)' }}>
                       {name}

@@ -12,6 +12,8 @@ import {
   generateRandomPersona,
   getOrCreateAnonProfile,
   sanitizeMessageForViewer,
+  sanitizeChannelForViewer,
+  emitPerViewer,
 } from "../services/anonymousService.js";
 import {
   quotedMessageInclude,
@@ -65,6 +67,17 @@ const postMessageSchema = z
 export const channelRoutes: FastifyPluginAsync = async (
   fastify: FastifyInstance,
 ) => {
+  // Sends a channel object to a room. Anonymous channels are sent per viewer so the roster carries no personas
+  // while each person still keeps their own membership fields.
+  const emitChannel = async (room: string, event: string, channel: any) => {
+    if (!fastify.io) return;
+    if (channel?.isAnonymous) {
+      await emitPerViewer(fastify.io as any, room, event, (viewerId) => sanitizeChannelForViewer(channel, viewerId));
+    } else {
+      fastify.io.to(room).emit(event, channel);
+    }
+  };
+
   // Create channel in workspace
   fastify.post(
     "/workspaces/:workspaceId/channels",
@@ -174,17 +187,15 @@ export const channelRoutes: FastifyPluginAsync = async (
 
       if (fastify.io) {
         if (type === "PUBLIC") {
-          fastify.io
-            .to(`workspace:${workspaceId}`)
-            .emit(SOCKET_EVENTS.CHANNEL_NEW, channel);
+          await emitChannel(`workspace:${workspaceId}`, SOCKET_EVENTS.CHANNEL_NEW, channel);
         } else {
           fastify.io
             .to(`user:${userId}`)
-            .emit(SOCKET_EVENTS.CHANNEL_NEW, channel);
+            .emit(SOCKET_EVENTS.CHANNEL_NEW, sanitizeChannelForViewer(channel, userId));
         }
       }
 
-      return reply.status(201).send(channel);
+      return reply.status(201).send(sanitizeChannelForViewer(channel, userId));
     },
   );
 
@@ -511,28 +522,8 @@ export const channelRoutes: FastifyPluginAsync = async (
 
       if (channel.isAnonymous) {
         myAnonProfile = await getOrCreateAnonProfile(channelId, userId);
-        sanitizedMembers = channel.members.map((m) => {
-          const isSelf = m.userId === userId;
-          const anonName = m.anonName || "Anonymous Member";
-          const anonEmoji = m.anonEmoji || "🎭";
-          return {
-            ...m,
-            userId: isSelf ? userId : "anonymous",
-            anonName,
-            anonEmoji,
-            user: {
-              id: isSelf ? userId : "anonymous",
-              username: isSelf ? m.user?.username || "you" : "anonymous",
-              displayName: anonName,
-              avatarUrl: null,
-              anonEmoji,
-              isAnonymous: true,
-              status: "ONLINE" as const,
-              systemRole: "USER" as const,
-              email: "",
-            },
-          };
-        });
+        // Real names of who is in the channel, with no link to anyone's character name.
+        sanitizedMembers = sanitizeChannelForViewer(channel, userId).members;
         // In anonymous channels, creator is also anonymous
         creator = {
           id: "anonymous",
@@ -817,7 +808,7 @@ export const channelRoutes: FastifyPluginAsync = async (
         for (const uId of userIds) {
           fastify.io
             .to(`user:${uId}`)
-            .emit(SOCKET_EVENTS.CHANNEL_NEW, updatedChannel);
+            .emit(SOCKET_EVENTS.CHANNEL_NEW, sanitizeChannelForViewer(updatedChannel, uId));
         }
 
         if (!channel.isAnonymous) {
@@ -853,32 +844,12 @@ export const channelRoutes: FastifyPluginAsync = async (
             );
           }
         } else {
-          // Emit sanitized channel object for anonymous channel room
-          const sanitized = {
-            ...updatedChannel,
-            members: updatedChannel.members.map((m) => ({
-              id: m.id,
-              channelId: m.channelId,
-              anonName: m.anonName,
-              anonEmoji: m.anonEmoji,
-              user: {
-                id: `anon-${m.id.slice(0, 8)}`,
-                username: (m.anonName || "anonymous")
-                  .toLowerCase()
-                  .replace(/\s+/g, "_"),
-                displayName: m.anonName || "Anonymous Member",
-                avatarUrl: null,
-                status: "ONLINE",
-              },
-            })),
-          };
-          fastify.io
-            .to(`channel:${channelId}`)
-            .emit("channel:updated", sanitized);
+          // Anonymous channel: everyone gets the roster of real names with no personas attached.
+          await emitChannel(`channel:${channelId}`, "channel:updated", updatedChannel);
         }
       }
 
-      return reply.send(updatedChannel);
+      return reply.send(updatedChannel ? sanitizeChannelForViewer(updatedChannel, currentUserId) : updatedChannel);
     },
   );
 
@@ -1132,13 +1103,11 @@ export const channelRoutes: FastifyPluginAsync = async (
       });
 
       if (fastify.io) {
-        fastify.io.to(`channel:${channelId}`).emit("channel:updated", updated);
-        fastify.io
-          .to(`workspace:${updated.workspaceId}`)
-          .emit("channel:updated", updated);
+        await emitChannel(`channel:${channelId}`, "channel:updated", updated);
+        await emitChannel(`workspace:${updated.workspaceId}`, "channel:updated", updated);
       }
 
-      return reply.send(updated);
+      return reply.send(sanitizeChannelForViewer(updated, userId));
     },
   );
 

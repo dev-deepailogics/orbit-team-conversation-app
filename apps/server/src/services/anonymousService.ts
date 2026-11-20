@@ -25,6 +25,27 @@ export async function emitPerViewer(
   }
 }
 
+/**
+ * Channel as a viewer may see it. In an anonymous channel the member list is the plain roster (real names, so people
+ * can see who is in the room) with every trace of personas removed, so nobody can tell who is behind which character.
+ * Only the viewer's own membership keeps its per-member fields (read state, notification preference).
+ */
+export function sanitizeChannelForViewer<T extends { isAnonymous?: boolean; members?: any[] }>(
+  channel: T,
+  viewerUserId: string | null,
+): T {
+  if (!channel || !channel.isAnonymous || !Array.isArray(channel.members)) return channel;
+  const members = channel.members
+    .map((m: any) => {
+      const { anonName: _n, anonEmoji: _e, ...rest } = m;
+      if (viewerUserId && m.userId === viewerUserId) return rest;
+      return { id: m.id, channelId: m.channelId, userId: m.userId, user: m.user };
+    })
+    // Alphabetical, so the order carries no hint of join order or activity.
+    .sort((a: any, b: any) => (a.user?.displayName || '').localeCompare(b.user?.displayName || ''));
+  return { ...channel, members };
+}
+
 /** Drops who uploaded a file; the uploader would identify the author of an anonymous message. */
 function stripUploader(attachments: any[] | undefined) {
   return (attachments || []).map(({ uploaderId: _u, uploader: _up, ...rest }: any) => rest);
