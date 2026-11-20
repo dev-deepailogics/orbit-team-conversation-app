@@ -278,11 +278,12 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                 setShowAccount((v) => !v);
               }}
               title={`${currentUser.displayName} · ${PRESENCE_STYLE[myPresence].label}`}
-              className="relative w-6 h-6 shrink-0 rounded-full transition hover:opacity-85 block"
+              className="relative w-9 h-9 shrink-0 rounded-full transition hover:opacity-85 block"
             >
-              <Avatar name={currentUser.displayName || currentUser.username} src={currentUser.avatarUrl} size={24} />
+              <Avatar name={currentUser.displayName || currentUser.username} src={currentUser.avatarUrl} size={36} />
+              {/* Presence dot tucked into the avatar's corner, ~1/4 of its size */}
               <span
-                className={`absolute left-4 top-4 w-2.5 h-2.5 rounded-full ${PRESENCE_STYLE[myPresence].dot}`}
+                className={`absolute right-0 bottom-0 w-2.5 h-2.5 rounded-full ${PRESENCE_STYLE[myPresence].dot}`}
                 style={{ boxShadow: '0 0 0 2px var(--theme-bg-workspace)' }}
               />
             </button>
