@@ -11,6 +11,11 @@ const SHORTCUTS: { label: string; hint: string; keys: string[][] }[] = [
     hint: 'Opens the panel with the cursor in the input, ready to type. Press again to close',
     keys: [['Ctrl', 'Shift', 'Space'], ['Alt', 'T']],
   },
+  {
+    label: 'Back / forward',
+    hint: 'Step through the conversations you opened recently (Cmd [ and Cmd ] on a Mac)',
+    keys: [['Alt', '←'], ['Alt', '→']],
+  },
   { label: 'Close panels and dialogs', hint: 'Dismiss the quick to-dos panel, search and dialogs', keys: [['Esc']] },
 ];
 
