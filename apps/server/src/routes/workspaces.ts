@@ -658,6 +658,38 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
     });
   });
 
+  // Update member settings (e.g. pinned items, user preferences)
+  fastify.patch('/:workspaceId/member-settings', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const member = await prisma.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId, userId } },
+    });
+
+    if (!member) {
+      return reply.status(403).send({ error: 'You are not a member of this workspace' });
+    }
+
+    const existingMemberSettings = (member.settings as any) || {};
+    const body = (request.body as Record<string, any>) || {};
+
+    const updatedMemberSettings = {
+      ...existingMemberSettings,
+      ...body,
+    };
+
+    const updated = await prisma.workspaceMember.update({
+      where: { id: member.id },
+      data: { settings: updatedMemberSettings },
+    });
+
+    return reply.send({
+      success: true,
+      settings: updated.settings,
+    });
+  });
+
   // General Workspace Settings (Extensible for all future workspace settings)
   fastify.patch('/:workspaceId/settings', { preHandler: [fastify.authenticate] }, async (request, reply) => {
     const { workspaceId } = request.params as { workspaceId: string };

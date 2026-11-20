@@ -46,6 +46,7 @@ import { Splash, WorkspaceSkeleton } from "@/components/brand/LoadingScreens";
 import { EmptyState } from "@/components/brand/EmptyState";
 import { ProfileModal } from "@/components/profile/ProfileModal";
 import { OfflineOverlay } from "@/components/brand/OfflineScreen";
+import { usePinStore } from "@/stores/pinnedStore";
 import {
   ShieldCheck,
   Building2,
@@ -272,6 +273,13 @@ export default function AppDashboard() {
       useChatStore.getState().setUnreadCounts(unread?.data ?? {});
       setChannels(res.data.channels || []);
       setMembers(res.data.members || []);
+
+      if (user?.id) {
+        const myMember = (res.data.members || []).find(
+          (m: any) => m.userId === user.id || m.user?.id === user.id
+        );
+        usePinStore.getState().initPins(workspace.id, user.id, myMember?.settings);
+      }
 
       // Load Workspace Projects
       let projectsData: Project[] = [];

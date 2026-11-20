@@ -94,6 +94,21 @@ export const channelRoutes: FastifyPluginAsync = async (
           .send({ error: "You are not a member of this workspace" });
       }
 
+      // Channel names must be unique within the same workspace (case-insensitive, excluding DIRECT)
+      const existingChannel = await prisma.channel.findFirst({
+        where: {
+          workspaceId,
+          name: { equals: name, mode: 'insensitive' },
+          type: { not: 'DIRECT' },
+        },
+      });
+
+      if (existingChannel) {
+        return reply.status(409).send({
+          error: `A channel named "#${name}" already exists in this workspace`,
+        });
+      }
+
       const initialPersona = isAnonymous ? generateRandomPersona() : null;
 
       // Public channels include every current workspace member by default;
@@ -1043,6 +1058,7 @@ export const channelRoutes: FastifyPluginAsync = async (
       if (!access) return;
 
       const updateSchema = z.object({
+        name: z.string().min(2).max(50).regex(/^[a-z0-9-]+$/).optional(),
         topic: z.string().max(250).optional(),
         description: z.string().max(500).optional(),
       });
@@ -1052,6 +1068,25 @@ export const channelRoutes: FastifyPluginAsync = async (
         return reply
           .status(400)
           .send({ error: parseResult.error.errors[0].message });
+      }
+
+      if (parseResult.data.name && parseResult.data.name.toLowerCase() !== access.channel.name.toLowerCase()) {
+        if (parseResult.data.name === ACTIVITY_CHANNEL) {
+          return reply.status(409).send({ error: `#${ACTIVITY_CHANNEL} is a reserved channel name` });
+        }
+        const existingChannel = await prisma.channel.findFirst({
+          where: {
+            workspaceId: access.channel.workspaceId,
+            name: { equals: parseResult.data.name, mode: 'insensitive' },
+            type: { not: 'DIRECT' },
+            id: { not: channelId },
+          },
+        });
+        if (existingChannel) {
+          return reply.status(409).send({
+            error: `A channel named "#${parseResult.data.name}" already exists in this workspace`,
+          });
+        }
       }
 
       // Always include the full member list in the broadcast payload: clients
