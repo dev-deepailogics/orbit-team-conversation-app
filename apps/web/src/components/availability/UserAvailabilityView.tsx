@@ -89,7 +89,11 @@ export const UserAvailabilityView: React.FC<UserAvailabilityViewProps> = ({
     try {
       setIsLoading(true);
       const res = await api.get(`/api/availability/team/${workspace.id}`);
-      const list: TeamMemberItem[] = res.data.team || [];
+      const all: TeamMemberItem[] = res.data.team || [];
+      // Employees only get their own availability; Owner/Admin/Manager/HR see everyone.
+      const list = res.data.permissions?.viewTeamAvailability
+        ? all
+        : all.filter((m) => m.user.id === currentUser?.id);
       setTeamMembers(list);
 
       // Auto-select initial user, current logged-in user, or first user

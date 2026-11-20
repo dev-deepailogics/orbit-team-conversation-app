@@ -44,7 +44,57 @@ export interface AuthTokens {
 // ==========================================
 // 2. Workspace / Organization & Roles
 // ==========================================
-export type WorkspaceRole = "OWNER" | "ADMIN" | "MEMBER" | "GUEST";
+export type WorkspaceRole = "OWNER" | "ADMIN" | "MANAGER" | "HR" | "MEMBER" | "GUEST";
+
+/** Roles an admin can give to a member (OWNER is fixed to the workspace creator). */
+export const ASSIGNABLE_WORKSPACE_ROLES = ["ADMIN", "MANAGER", "HR", "MEMBER", "GUEST"] as const;
+export type AssignableWorkspaceRole = (typeof ASSIGNABLE_WORKSPACE_ROLES)[number];
+
+export const WORKSPACE_ROLE_LABELS: Record<WorkspaceRole, string> = {
+  OWNER: "Owner",
+  ADMIN: "Admin",
+  MANAGER: "Manager",
+  HR: "HR",
+  MEMBER: "Employee",
+  GUEST: "Guest",
+};
+
+export const WORKSPACE_ROLE_DESCRIPTIONS: Record<WorkspaceRole, string> = {
+  OWNER: "Full control of the workspace. Can't be removed or re-assigned.",
+  ADMIN: "Manages members, roles, channels, bots and settings. Sees everyone's availability.",
+  MANAGER: "Sees everyone's availability and manages all projects.",
+  HR: "Sees everyone's availability and attendance history (read-only).",
+  MEMBER: "Chats, joins calls, creates projects and manages their own availability.",
+  GUEST: "Limited member. Sees only their own availability.",
+};
+
+/**
+ * Single source of truth for role-based access, shared by server and web.
+ * - viewTeamAvailability: see other members' check-in times, breaks and history
+ * - manageAllProjects:    see and manage every project, not only assigned ones
+ * - manageMembers:        add/remove members and change their roles
+ */
+export type WorkspacePermission = "viewTeamAvailability" | "manageAllProjects" | "manageMembers";
+
+export const WORKSPACE_ROLE_PERMISSIONS: Record<WorkspaceRole, readonly WorkspacePermission[]> = {
+  OWNER: ["viewTeamAvailability", "manageAllProjects", "manageMembers"],
+  ADMIN: ["viewTeamAvailability", "manageAllProjects", "manageMembers"],
+  MANAGER: ["viewTeamAvailability", "manageAllProjects"],
+  HR: ["viewTeamAvailability"],
+  MEMBER: [],
+  GUEST: [],
+};
+
+/** SUPER_ADMIN has every permission in every workspace. */
+export function hasWorkspacePermission(
+  role: WorkspaceRole | string | null | undefined,
+  permission: WorkspacePermission,
+  systemRole?: SystemRole | string | null,
+): boolean {
+  if (systemRole === "SUPER_ADMIN") return true;
+  if (!role) return false;
+  return WORKSPACE_ROLE_PERMISSIONS[role as WorkspaceRole]?.includes(permission) ?? false;
+}
 
 export interface ThemeConfig {
   id?: string;

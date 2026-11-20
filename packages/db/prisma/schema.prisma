@@ -18,7 +18,9 @@ enum UserStatus {
 enum WorkspaceRole {
   OWNER
   ADMIN
-  MEMBER
+  MANAGER // sees team availability, manages all projects
+  HR // sees team availability (read-only)
+  MEMBER // employee
   GUEST
 }
 
