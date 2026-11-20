@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { anonId, sanitizeMessageForViewer, emitPerViewer } from './anonymousService.js';
+import { anonId, sanitizeMessageForViewer, sanitizeChannelForViewer, emitPerViewer } from './anonymousService.js';
 
 const msg = {
   id: 'm1234567-aaaa',
@@ -44,4 +44,27 @@ test('emitPerViewer builds one payload per socket user', async () => {
   };
   await emitPerViewer(io, 'room', 'ev', (v) => ({ v }));
   assert.deepEqual(sent, [['s1', { v: 'u1' }], ['s2', { v: 'u2' }]]);
+});
+
+const channel = {
+  id: 'c1',
+  isAnonymous: true,
+  members: [
+    { id: 'm2', channelId: 'c1', userId: 'u2', anonName: 'Owl', anonEmoji: '🦉', lastReadAt: 'x', user: { id: 'u2', displayName: 'Zed' } },
+    { id: 'm1', channelId: 'c1', userId: 'u1', anonName: 'Fox', anonEmoji: '🦊', lastReadAt: 'y', notificationPreference: 'ALL', user: { id: 'u1', displayName: 'Amy' } },
+  ],
+};
+
+test('anonymous channel roster shows real names with no persona anywhere', () => {
+  const out = sanitizeChannelForViewer(channel, 'u1');
+  const json = JSON.stringify(out);
+  assert.ok(!json.includes('Owl') && !json.includes('Fox') && !json.includes('anonName') && !json.includes('anonEmoji'));
+  assert.deepEqual(out.members.map((m: any) => m.user.displayName), ['Amy', 'Zed'], 'sorted by real name');
+  assert.equal(out.members[0].notificationPreference, 'ALL', 'own membership keeps its own fields');
+  assert.equal(out.members[1].lastReadAt, undefined, 'others do not expose read state');
+});
+
+test('regular channels are left untouched', () => {
+  const c = { id: 'c', isAnonymous: false, members: [{ id: 'm', userId: 'u', anonName: null }] };
+  assert.equal(sanitizeChannelForViewer(c, 'u'), c);
 });

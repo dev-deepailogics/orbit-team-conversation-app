@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
+import { sanitizeChannelForViewer } from '../services/anonymousService.js';
 import { prisma } from '@orbit/db';
 import { z } from 'zod';
 import { ACTIVITY_CHANNEL, ACTIVITY_CHANNEL_TOPIC, sendSystemNotification } from '../services/systemBot.js';
@@ -215,7 +216,11 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       return reply.status(404).send({ error: 'Workspace not found' });
     }
 
-    return reply.send(workspace);
+    // Anonymous channels list their members by real name only, never with character names.
+    return reply.send({
+      ...workspace,
+      channels: workspace.channels.map((c) => sanitizeChannelForViewer(c, userId)),
+    });
   });
 
   // Join workspace using inviteCode
