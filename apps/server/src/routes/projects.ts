@@ -407,6 +407,20 @@ export const projectRoutes: FastifyPluginAsync = async (
         clientEmail,
       } = parseResult.data;
 
+      // Project names must be unique within the same workspace (case-insensitive)
+      const existingProject = await prisma.project.findFirst({
+        where: {
+          workspaceId,
+          name: { equals: name.trim(), mode: "insensitive" },
+        },
+      });
+
+      if (existingProject) {
+        return reply.status(409).send({
+          error: `A project named "${name.trim()}" already exists in this workspace`,
+        });
+      }
+
       let targetNotifChannelId = notificationChannelId;
       if (!targetNotifChannelId) {
         const generalChannel = await prisma.channel.findFirst({
@@ -616,6 +630,25 @@ export const projectRoutes: FastifyPluginAsync = async (
         return reply
           .status(400)
           .send({ error: parseResult.error.errors[0].message });
+      }
+
+      // If renaming project, ensure the new name is unique within the workspace
+      if (
+        parseResult.data.name &&
+        parseResult.data.name.trim().toLowerCase() !== project.name.toLowerCase()
+      ) {
+        const existingProject = await prisma.project.findFirst({
+          where: {
+            workspaceId: project.workspaceId,
+            name: { equals: parseResult.data.name.trim(), mode: "insensitive" },
+            id: { not: projectId },
+          },
+        });
+        if (existingProject) {
+          return reply.status(409).send({
+            error: `A project named "${parseResult.data.name.trim()}" already exists in this workspace`,
+          });
+        }
       }
 
       const updated = await prisma.project.update({

@@ -30,10 +30,12 @@ import {
   Board,
   Pen,
   Mask,
+  Pin,
 } from "@/components/ui/icons";
 import { ProjectDocument } from "@orbit/types";
 import { api } from "../../lib/api";
 import { useChatStore } from "../../stores/chatStore";
+import { usePinStore } from "../../stores/pinnedStore";
 import { WorkspaceStorageModal } from "../workspace/WorkspaceStorageModal";
 import { AddWorkspaceMemberDialog } from "../workspace/AddWorkspaceMemberDialog";
 import { ThemeModal } from "../theme/ThemeModal";
@@ -223,6 +225,23 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   const [docSearchQuery, setDocSearchQuery] = useState("");
   const [docActiveFilter, setDocActiveFilter] = useState<"all" | "project" | "shared" | "private">("all");
   const unreadCounts = useChatStore((s) => s.unreadCounts);
+
+  // Pin state
+  const pinnedChannelIds = usePinStore((s) => (workspace?.id ? s.getPinnedChannels(workspace.id) : []));
+  const pinnedUserIds = usePinStore((s) => (workspace?.id ? s.getPinnedUsers(workspace.id) : []));
+  const pinnedProjectIds = usePinStore((s) => (workspace?.id ? s.getPinnedProjects(workspace.id) : []));
+  const togglePinChannel = usePinStore((s) => s.togglePinChannel);
+  const togglePinUser = usePinStore((s) => s.togglePinUser);
+  const togglePinProject = usePinStore((s) => s.togglePinProject);
+
+  useEffect(() => {
+    if (workspace?.id && currentUser?.id) {
+      const memberObj = members?.find(
+        (m: any) => m.userId === currentUser.id || m.user?.id === currentUser.id
+      );
+      usePinStore.getState().initPins(workspace.id, currentUser.id, memberObj?.settings);
+    }
+  }, [workspace?.id, currentUser?.id, members]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -696,65 +715,102 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
         {showProjects && (
           <div>
             <div className="space-y-0.5">
-              {projects
-                .filter(
-                  (p) => (p.status || "active").toLowerCase() === "active",
-                )
-                .filter((p) =>
-                  p.name.toLowerCase().includes(projectSearchQuery.trim().toLowerCase()),
-                )
-                .map((project) => {
+              {(() => {
+                const activeProjects = projects
+                  .filter(
+                    (p) => (p.status || "active").toLowerCase() === "active",
+                  )
+                  .filter((p) =>
+                    p.name.toLowerCase().includes(projectSearchQuery.trim().toLowerCase()),
+                  );
+
+                const pinnedProjects = activeProjects.filter((p) => pinnedProjectIds.includes(p.id));
+                const unpinnedProjects = activeProjects.filter((p) => !pinnedProjectIds.includes(p.id));
+                const sortedProjects = [...pinnedProjects, ...unpinnedProjects];
+
+                return sortedProjects.map((project, idx) => {
                   const isActive = currentProject?.id === project.id;
+                  const isPinned = pinnedProjectIds.includes(project.id);
                   const ticketCount =
                     project._count?.tickets ?? project.tickets?.length ?? 0;
+                  const showDivider =
+                    pinnedProjects.length > 0 &&
+                    idx === pinnedProjects.length - 1 &&
+                    unpinnedProjects.length > 0;
 
                   return (
-                    <div
-                      key={project.id}
-                      onClick={() => onSelectProject?.(project)}
-                      className={`group flex items-center justify-between h-7 pl-5 pr-2 rounded-md text-[15px] transition cursor-pointer ${
-                        isActive
-                          ? "font-semibold"
-                          : "hover:bg-black/5 dark:hover:bg-white/10"
-                      }`}
-                      style={
-                        isActive
-                          ? {
-                              backgroundColor: "var(--theme-selected)",
-                              color: "var(--theme-text)",
-                            }
-                          : {
-                              color: "var(--theme-text-primary)",
-                            }
-                      }
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        <span className="text-sm shrink-0">
-                          {project.icon || "📋"}
-                        </span>
-                        <span className="truncate">{project.name}</span>
-                      </div>
-
-                      <span
-                        className="text-[10px] font-mono px-1.5 py-0.5 rounded-full transition"
+                    <React.Fragment key={project.id}>
+                      <div
+                        onClick={() => onSelectProject?.(project)}
+                        className={`group flex items-center justify-between h-7 pl-5 pr-2 rounded-md text-[15px] transition cursor-pointer ${
+                          isActive
+                            ? "font-semibold"
+                            : "hover:bg-black/5 dark:hover:bg-white/10"
+                        }`}
                         style={
                           isActive
                             ? {
-                                backgroundColor: "rgba(0, 0, 0, 0.2)",
-                                color: "inherit",
+                                backgroundColor: "var(--theme-selected)",
+                                color: "var(--theme-text)",
                               }
                             : {
-                                backgroundColor:
-                                  "var(--theme-bg-surface-hover)",
-                                color: "var(--theme-text-muted)",
+                                color: "var(--theme-text-primary)",
                               }
                         }
                       >
-                        {ticketCount}
-                      </span>
-                    </div>
+                        <div className="flex items-center gap-2 truncate min-w-0">
+                          <span className="text-sm shrink-0">
+                            {project.icon || "📋"}
+                          </span>
+                          <span className="truncate">{project.name}</span>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              togglePinProject(workspace.id, project.id);
+                            }}
+                            title={isPinned ? "Unpin project" : "Pin project to top"}
+                            className={`p-1 rounded transition ${
+                              isPinned
+                                ? "text-amber-500 dark:text-amber-400 opacity-100 hover:bg-black/5 dark:hover:bg-white/10"
+                                : "opacity-0 group-hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10"
+                            }`}
+                            style={isPinned ? undefined : { color: "var(--theme-text-muted)" }}
+                          >
+                            <Pin
+                              size={12}
+                              className={isPinned ? "fill-amber-500 dark:fill-amber-400 rotate-45" : ""}
+                            />
+                          </button>
+                          <span
+                            className="text-[10px] font-mono px-1.5 py-0.5 rounded-full transition"
+                            style={
+                              isActive
+                                ? {
+                                    backgroundColor: "rgba(0, 0, 0, 0.2)",
+                                    color: "inherit",
+                                  }
+                                : {
+                                    backgroundColor:
+                                      "var(--theme-bg-surface-hover)",
+                                    color: "var(--theme-text-muted)",
+                                  }
+                            }
+                          >
+                            {ticketCount}
+                          </span>
+                        </div>
+                      </div>
+                      {showDivider && (
+                        <div className="my-1 border-b border-black/5 dark:border-white/5 mx-2" />
+                      )}
+                    </React.Fragment>
                   );
-                })}
+                });
+              })()}
 
               {projects.length === 0 && onOpenCreateProject && (
                 <button
@@ -967,67 +1023,102 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
 
           <Collapse open={!isChannelsCollapsed}>
             <div className="space-y-0.5">
-              {channels
-                .filter((c) => c.type !== "DIRECT")
-                .map((channel) => {
+              {(() => {
+                const nonDirectChannels = channels.filter((c) => c.type !== "DIRECT");
+                const pinnedChannels = nonDirectChannels.filter((c) => pinnedChannelIds.includes(c.id));
+                const unpinnedChannels = nonDirectChannels.filter((c) => !pinnedChannelIds.includes(c.id));
+                const sortedChannels = [...pinnedChannels, ...unpinnedChannels];
+
+                return sortedChannels.map((channel, idx) => {
                   const isActive = currentChannel?.id === channel.id;
+                  const isPinned = pinnedChannelIds.includes(channel.id);
                   const hasHuddle = activeHuddleChannelId === channel.id;
                   const unread = unreadCounts[channel.id] || 0;
+                  const showDivider =
+                    pinnedChannels.length > 0 &&
+                    idx === pinnedChannels.length - 1 &&
+                    unpinnedChannels.length > 0;
 
                   return (
-                    <div
-                      key={channel.id}
-                      onClick={() => onSelectChannel(channel)}
-                      className={rowClass(isActive)}
-                      style={rowStyle(isActive)}
-                    >
-                      {isActive && <ActiveBar />}
-                      <RowIcon>
-                        {channel.isAnonymous ? (
-                          <Mask size={18} aria-label="Anonymous channel" />
-                        ) : channel.type === "PRIVATE" ? (
-                          <Lock size={18} aria-label="Private channel" />
-                        ) : (
-                          <Hash size={16} />
-                        )}
-                      </RowIcon>
-                      <span {...rowLabel(isActive, unread > 0)}>{channel.name}</span>
-
-                      {hasHuddle && (
-                        <span
-                          className="ml-2 shrink-0 flex items-center gap-1 px-1.5 h-5 rounded-full text-[10px] font-bold animate-pulse"
-                          style={{
-                            backgroundColor: "color-mix(in srgb, var(--theme-primary) 15%, transparent)",
-                            color: "var(--theme-primary)",
-                          }}
-                        >
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "var(--theme-primary)" }} />
-                          LIVE
-                        </span>
-                      )}
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onStartHuddle(channel);
-                        }}
-                        title={hasHuddle ? "Active Call - Click to join" : "Start Call"}
-                        className={`ml-1 shrink-0 p-1 rounded transition ${
-                          hasHuddle ? "" : "hidden group-hover:block hover:bg-[var(--theme-fill)]"
-                        }`}
-                        style={
-                          hasHuddle
-                            ? { backgroundColor: "var(--theme-primary)", color: "var(--theme-primary-text)" }
-                            : { color: "var(--theme-text-muted)" }
-                        }
+                    <React.Fragment key={channel.id}>
+                      <div
+                        onClick={() => onSelectChannel(channel)}
+                        className={rowClass(isActive)}
+                        style={rowStyle(isActive)}
                       >
-                        <PhoneCall size={13} />
-                      </button>
+                        {isActive && <ActiveBar />}
+                        <RowIcon>
+                          {channel.isAnonymous ? (
+                            <Mask size={18} aria-label="Anonymous channel" />
+                          ) : channel.type === "PRIVATE" ? (
+                            <Lock size={18} aria-label="Private channel" />
+                          ) : (
+                            <Hash size={16} />
+                          )}
+                        </RowIcon>
+                        <span {...rowLabel(isActive, unread > 0)}>{channel.name}</span>
 
-                      {unread > 0 && <UnreadBadge count={unread} />}
-                    </div>
+                        {hasHuddle && (
+                          <span
+                            className="ml-2 shrink-0 flex items-center gap-1 px-1.5 h-5 rounded-full text-[10px] font-bold animate-pulse"
+                            style={{
+                              backgroundColor: "color-mix(in srgb, var(--theme-primary) 15%, transparent)",
+                              color: "var(--theme-primary)",
+                            }}
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "var(--theme-primary)" }} />
+                            LIVE
+                          </span>
+                        )}
+
+                        {/* Pin Channel Action */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            togglePinChannel(workspace.id, channel.id);
+                          }}
+                          title={isPinned ? "Unpin channel" : "Pin channel to top"}
+                          className={`ml-1 shrink-0 p-1 rounded transition ${
+                            isPinned
+                              ? "text-amber-500 dark:text-amber-400 opacity-100 hover:bg-[var(--theme-fill)]"
+                              : "opacity-0 group-hover:opacity-100 hover:bg-[var(--theme-fill)]"
+                          }`}
+                          style={isPinned ? undefined : { color: "var(--theme-text-muted)" }}
+                        >
+                          <Pin
+                            size={12}
+                            className={isPinned ? "fill-amber-500 dark:fill-amber-400 rotate-45" : ""}
+                          />
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onStartHuddle(channel);
+                          }}
+                          title={hasHuddle ? "Active Call - Click to join" : "Start Call"}
+                          className={`ml-1 shrink-0 p-1 rounded transition ${
+                            hasHuddle ? "" : "hidden group-hover:block hover:bg-[var(--theme-fill)]"
+                          }`}
+                          style={
+                            hasHuddle
+                              ? { backgroundColor: "var(--theme-primary)", color: "var(--theme-primary-text)" }
+                              : { color: "var(--theme-text-muted)" }
+                          }
+                        >
+                          <PhoneCall size={13} />
+                        </button>
+
+                        {unread > 0 && <UnreadBadge count={unread} />}
+                      </div>
+                      {showDivider && (
+                        <div className="my-1 border-b border-black/5 dark:border-white/5 mx-2" />
+                      )}
+                    </React.Fragment>
                   );
-                })}
+                });
+              })()}
             </div>
           </Collapse>
         </div>
@@ -1132,12 +1223,21 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                   );
                 }
 
-                return dmList.map((member) => {
+                const pinnedDMs = dmList.filter((m) => m?.user && pinnedUserIds.includes(m.user.id));
+                const unpinnedDMs = dmList.filter((m) => m?.user && !pinnedUserIds.includes(m.user.id));
+                const sortedDMs = [...pinnedDMs, ...unpinnedDMs];
+
+                return sortedDMs.map((member, idx) => {
                   const user = member.user;
                   if (!user) return null;
                   const userPresence = presence[user.id] || "offline";
                   const inOrbit = isLiveOnline(liveStatus[user.id]);
                   const isSelf = user.id === currentUser?.id;
+                  const isPinned = pinnedUserIds.includes(user.id);
+                  const showDivider =
+                    pinnedDMs.length > 0 &&
+                    idx === pinnedDMs.length - 1 &&
+                    unpinnedDMs.length > 0;
 
                   // Find matching DM channel to check selection and unread counts
                   const dmChannel = channels.find(
@@ -1171,35 +1271,68 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                     : 0;
 
                   return (
-                    <div
-                      key={member.id}
-                      onClick={() => onSelectUserDM(user)}
-                      className={rowClass(!!isSelectedDM)}
-                      style={rowStyle(!!isSelectedDM)}
-                    >
-                      {isSelectedDM && <ActiveBar />}
-                      <span className="relative ml-2 mr-1 w-6 h-6 shrink-0">
-                        <Avatar name={user.displayName || user.username} src={user.avatarUrl} size={24} />
-                        {/* Dot = connected to Orbit (web/app) right now; check-in status lives in the pill */}
-                        <span
-                          title={inOrbit ? "In Orbit right now" : "Not in Orbit"}
-                          className={`absolute bottom-0 right-0 w-[7px] h-[7px] rounded-full ${inOrbit ? "bg-emerald-500" : "bg-black"}`}
-                          style={{
-                            boxShadow: `0 0 0 1.5px ${isSelectedDM ? "var(--theme-selected)" : "var(--theme-bg-sidebar)"}`,
-                          }}
-                        />
-                      </span>
-                      <span {...rowLabel(!!isSelectedDM, unread > 0)}>
-                        {user.displayName}
-                        <StatusEmoji presence={userPresence} breakReason={breakReasons[user.id]} />
-                        {isSelf && (
-                          <span className="ml-1.5 text-[11px] font-normal" style={{ color: "var(--theme-text-muted)" }}>
-                            you
-                          </span>
+                    <React.Fragment key={member.id}>
+                      <div
+                        onClick={() => onSelectUserDM(user)}
+                        className={rowClass(!!isSelectedDM)}
+                        style={rowStyle(!!isSelectedDM)}
+                      >
+                        {isSelectedDM && <ActiveBar />}
+                        <span className="relative ml-2 mr-1 w-6 h-6 shrink-0">
+                          <Avatar name={user.displayName || user.username} src={user.avatarUrl} size={24} />
+                          {/* Dot = connected to Orbit (web/app) right now; check-in status lives in the pill */}
+                          <span
+                            title={inOrbit ? "In Orbit right now" : "Not in Orbit"}
+                            className={`absolute bottom-0 right-0 w-[7px] h-[7px] rounded-full ${inOrbit ? "bg-emerald-500" : "bg-black"}`}
+                            style={{
+                              boxShadow: `0 0 0 1.5px ${isSelectedDM ? "var(--theme-selected)" : "var(--theme-bg-sidebar)"}`,
+                            }}
+                          />
+                        </span>
+                        <span {...rowLabel(!!isSelectedDM, unread > 0)}>
+                          {user.displayName}
+                          <StatusEmoji presence={userPresence} breakReason={breakReasons[user.id]} />
+                          {user.customStatusEmoji && (
+                            <span className="ml-1.5 text-xs inline-block align-middle" title="Status">
+                              {user.customStatusEmoji}
+                            </span>
+                          )}
+                          {isSelf && (
+                            <span className="ml-1.5 text-[11px] font-normal" style={{ color: "var(--theme-text-muted)" }}>
+                              you
+                            </span>
+                          )}
+                        </span>
+
+                        {/* Pin User Action (hidden for self DM) */}
+                        {!isSelf && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              togglePinUser(workspace.id, user.id);
+                            }}
+                            title={isPinned ? "Unpin user" : "Pin user to top"}
+                            className={`ml-1 shrink-0 p-1 rounded transition ${
+                              isPinned
+                                ? "text-amber-500 dark:text-amber-400 opacity-100 hover:bg-[var(--theme-fill)]"
+                                : "opacity-0 group-hover:opacity-100 hover:bg-[var(--theme-fill)]"
+                            }`}
+                            style={isPinned ? undefined : { color: "var(--theme-text-muted)" }}
+                          >
+                            <Pin
+                              size={12}
+                              className={isPinned ? "fill-amber-500 dark:fill-amber-400 rotate-45" : ""}
+                            />
+                          </button>
                         )}
-                      </span>
-                      {unread > 0 && <UnreadBadge count={unread} />}
-                    </div>
+
+                        {unread > 0 && <UnreadBadge count={unread} />}
+                      </div>
+                      {showDivider && (
+                        <div className="my-1 border-b border-black/5 dark:border-white/5 mx-2" />
+                      )}
+                    </React.Fragment>
                   );
                 });
               })()}
