@@ -374,6 +374,32 @@ export const channelRoutes: FastifyPluginAsync = async (
     },
   );
 
+  // When each conversation the user can see last had a message (epoch ms), so the sidebar can sort by recent activity.
+  // One index seek per channel on Message(channelId, createdAt) via LATERAL, rather than aggregating every message.
+  fastify.get(
+    "/workspaces/:workspaceId/activity",
+    { preHandler: [fastify.authenticate] },
+    async (request) => {
+      const { workspaceId } = request.params as { workspaceId: string };
+      const userId = (request.user as { id: string }).id;
+      const rows = await prisma.$queryRaw<{ channelId: string; at: Date }[]>`
+      SELECT ch.id AS "channelId", last."createdAt" AS at
+      FROM "Channel" ch
+      CROSS JOIN LATERAL (
+        SELECT m."createdAt" FROM "Message" m
+        WHERE m."channelId" = ch.id AND m."parentMessageId" IS NULL AND m."isDeleted" = false
+        ORDER BY m."createdAt" DESC LIMIT 1
+      ) last
+      WHERE ch."workspaceId" = ${workspaceId}
+        -- Outsiders get nothing, not even public channels' timestamps
+        AND EXISTS (SELECT 1 FROM "WorkspaceMember" wm WHERE wm."workspaceId" = ${workspaceId} AND wm."userId" = ${userId})
+        AND (ch.type = 'PUBLIC' OR EXISTS (
+          SELECT 1 FROM "ChannelMember" cm WHERE cm."channelId" = ch.id AND cm."userId" = ${userId}
+        ))`;
+      return Object.fromEntries(rows.map((r) => [r.channelId, r.at.getTime()]));
+    },
+  );
+
   fastify.post(
     "/:channelId/read",
     { preHandler: [fastify.authenticate] },
@@ -580,14 +606,7 @@ export const channelRoutes: FastifyPluginAsync = async (
         },
       });
 
-      // Update the author's previous messages in this anonymous channel to the new persona
-      await prisma.message.updateMany({
-        where: { channelId, userId },
-        data: {
-          anonName,
-          anonEmoji,
-        },
-      });
+      // Earlier messages keep the persona they were posted under; only new messages use the new one.
 
       return reply.send({ anonName, anonEmoji });
     },

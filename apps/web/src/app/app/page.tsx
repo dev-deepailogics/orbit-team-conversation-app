@@ -50,6 +50,10 @@ import { EmptyState } from "@/components/brand/EmptyState";
 import { ProfileModal } from "@/components/profile/ProfileModal";
 import { OfflineOverlay } from "@/components/brand/OfflineScreen";
 import { usePinStore } from "@/stores/pinnedStore";
+import { useSidebarSortStore } from "@/stores/sidebarSortStore";
+import { useArchivedStore } from "@/stores/archivedStore";
+import { useNavHistoryStore } from "@/stores/navHistoryStore";
+import { usePresenceStore } from "@/stores/presenceStore";
 import {
   ShieldCheck,
   Building2,
@@ -93,6 +97,8 @@ export default function AppDashboard() {
   } = useChatStore();
   // Check-in driven presence (working / break / offline) for everyone in the workspace
   const { presence, breakReasons } = useTeamPresence(currentWorkspace?.id);
+  // Shared with components opened from anywhere (the profile inside Settings) without a second subscription
+  useEffect(() => usePresenceStore.setState({ presence }), [presence]);
 
   const {
     startHuddle,
@@ -216,6 +222,11 @@ export default function AppDashboard() {
     setChatView("messages");
   }, [currentChannel?.id]);
 
+  // Every way of opening a conversation (sidebar, search, notification, link, back/forward) ends here, so record it once
+  useEffect(() => {
+    if (currentChannel?.id) useNavHistoryStore.getState().visit(currentChannel.id);
+  }, [currentChannel?.id]);
+
   // 1. Check Auth
   useEffect(() => {
     fetchMe();
@@ -281,17 +292,22 @@ export default function AppDashboard() {
     setShowCanvasHub(false);
     setShowDocsHub(false);
     setCurrentWorkspace(workspace);
+    useNavHistoryStore.getState().reset(); // history is per workspace: other workspaces' conversations aren't here
     if (typeof window !== "undefined") {
       localStorage.setItem("orbit_active_workspace_id", workspace.id);
     }
     setCurrentProject(null);
     try {
       // All independent: fetch in parallel. Only the workspace itself is required; the rest degrade gracefully.
-      const [res, unread, projRes, sidebarRes] = await Promise.all([
+      const [res, unread, activity, projRes, sidebarRes] = await Promise.all([
         api.get(`/api/workspaces/${workspace.id}`),
         // Server-side counts (since each member's lastReadAt); a failure just means no badges.
         api
           .get(`/api/channels/workspaces/${workspace.id}/unread`)
+          .catch(() => null),
+        // Last message time per conversation, for "recent" sidebar sorting; a failure falls back to creation order.
+        api
+          .get(`/api/channels/workspaces/${workspace.id}/activity`)
           .catch(() => null),
         api
           .get(`/api/projects/workspaces/${workspace.id}/projects`)
@@ -308,6 +324,7 @@ export default function AppDashboard() {
         }),
       ]);
       useChatStore.getState().setUnreadCounts(unread?.data ?? {});
+      useChatStore.getState().setLastActivity(activity?.data ?? {});
       setChannels(res.data.channels || []);
       setMembers(res.data.members || []);
 
@@ -316,6 +333,8 @@ export default function AppDashboard() {
           (m: any) => m.userId === user.id || m.user?.id === user.id
         );
         usePinStore.getState().initPins(workspace.id, user.id, myMember?.settings);
+        useSidebarSortStore.getState().init(workspace.id, user.id, myMember?.settings);
+        useArchivedStore.getState().init(workspace.id, user.id, myMember?.settings);
       }
 
       const projectsData: Project[] = projRes?.data || [];
@@ -442,6 +461,27 @@ export default function AppDashboard() {
       console.error("Failed to load channel messages", err);
     }
   };
+
+  // Back / forward through recent conversations: Alt+Left / Alt+Right (Cmd+[ / Cmd+] on Mac), like Slack. Taken over
+  // from the browser on purpose, whose own back would leave the app. The ref keeps the listener registered once.
+  const selectChannelRef = useRef(handleSelectChannel);
+  selectChannelRef.current = handleSelectChannel;
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const direction =
+        (e.altKey && !e.ctrlKey && !e.metaKey && e.key === "ArrowLeft") || (e.metaKey && e.key === "[")
+          ? -1
+          : (e.altKey && !e.ctrlKey && !e.metaKey && e.key === "ArrowRight") || (e.metaKey && e.key === "]")
+            ? 1
+            : 0;
+      if (!direction) return;
+      e.preventDefault();
+      const channel = useNavHistoryStore.getState().go(direction);
+      if (channel) selectChannelRef.current(channel);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   // 4b. Handle Project Selection
   // Last board the user opened, so the Projects rail icon can reopen it.
@@ -907,6 +947,11 @@ export default function AppDashboard() {
 
       // Their message arrived, so they are no longer typing it
       if (msg.userId && !msg.parentMessageId) clearTyping(msg.channelId, msg.userId);
+
+      // Any new top-level message (including our own) makes the conversation the most recent one
+      if (!msg.parentMessageId) {
+        useChatStore.getState().bumpActivity(msg.channelId, Date.parse(msg.createdAt) || Date.now());
+      }
 
       if (msg.parentMessageId) {
         addThreadReply(msg);

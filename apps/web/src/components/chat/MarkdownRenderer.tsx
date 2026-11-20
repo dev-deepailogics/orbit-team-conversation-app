@@ -32,6 +32,16 @@ export function formatMentions(text: string): string {
     .join('');
 }
 
+// Chat messages keep the author's line breaks: a single newline becomes a hard break
+// (markdown would otherwise fold it into a space). Code blocks are left untouched.
+export function preserveLineBreaks(text: string): string {
+  if (!text) return '';
+  return text
+    .split(/(```[\s\S]*?```)/g)
+    .map((part) => (part.startsWith('```') ? part : part.replace(/([^\n])\n(?!\n)/g, '$1  \n')))
+    .join('');
+}
+
 // Per-message values the element renderers need. Passed through context so the renderers below can be
 // defined ONCE: an inline `components={{...}}` object gives every element a new component type on each
 // render, which makes React tear down and rebuild every message (images reload, clip previews refetch)
@@ -190,7 +200,7 @@ export const MarkdownRenderer = React.memo(function MarkdownRenderer({
   onChannelClick,
   currentUsername,
 }: MarkdownRendererProps) {
-  const formattedContent = useMemo(() => formatMentions(content), [content]);
+  const formattedContent = useMemo(() => preserveLineBreaks(formatMentions(content)), [content]);
   const ctx = useMemo(
     () => ({ onMentionClick, onChannelClick, currentUsername }),
     [onMentionClick, onChannelClick, currentUsername],

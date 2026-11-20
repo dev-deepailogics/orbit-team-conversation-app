@@ -98,6 +98,10 @@ const updateColumnSchema = z.object({
 
 const TICKET_TYPES = ["TASK", "BUG", "STORY", "EPIC"] as const;
 
+/** "Sara", "Sara and Ali", "Sara, Ali and Omar". */
+const joinNames = (names: string[]) =>
+  names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+
 // Which user-visible fields an update actually changes (the edit form re-sends every field on each save, so compare
 // with what's stored). Used to tell people a ticket was edited; checklist ticks, ordering and the git branch are too
 // minor to notify about.
@@ -1202,20 +1206,37 @@ export const projectRoutes: FastifyPluginAsync = async (
         await createMissingTicketAttachments(images, project.workspaceId, userId);
       }
 
-      const notifyActor =
-        newAssigneeIds.length > 0 || editedFields.length > 0 || movedToColumnName
-          ? await prisma.user.findUnique({ where: { id: userId }, select: { displayName: true } })
-          : null;
-      const actorName = notifyActor?.displayName || "A team member";
+      // Names for the messages: the actor, plus the new assignees (the shared channel message names them).
+      // One query for all of them, and none when there's nothing to announce.
+      const hasEdits = editedFields.length > 0 || !!movedToColumnName;
+      const people =
+        newAssigneeIds.length > 0 || hasEdits
+          ? await prisma.user.findMany({
+              where: { id: { in: [userId, ...newAssigneeIds] } },
+              select: { id: true, displayName: true, username: true },
+            })
+          : [];
+      const nameOf = (id: string) => {
+        const p = people.find((x) => x.id === id);
+        return p?.displayName || p?.username || "a team member";
+      };
+      const actorName = people.some((p) => p.id === userId) ? nameOf(userId) : "A team member";
 
-      // Check if assignee changed
+      const editParts: string[] = [];
+      if (editedFields.length > 0) editParts.push(`edited ticket (${editedFields.join(", ")})`);
+      if (movedToColumnName) {
+        editParts.push(editedFields.length > 0 ? `moved it to "${movedToColumnName}"` : `moved ticket to "${movedToColumnName}"`);
+      }
+
       if (newAssigneeIds.length > 0) {
         await sendTicketBotNotification({
           workspaceId: project.workspaceId,
           actorName,
           ticketTitle: updated.title,
           projectName: project.name,
+          // The assignees are told "you"; the channel is read by everyone, so it names who was assigned.
           actionText: "assigned you to ticket",
+          channelActionText: `assigned ${joinNames(newAssigneeIds.map(nameOf))} to ticket`,
           targetUserIds: newAssigneeIds,
           channelId: project.notificationChannelId,
           io: fastify.io,
@@ -1225,7 +1246,7 @@ export const projectRoutes: FastifyPluginAsync = async (
       // Edited fields, or a column change made from the edit form (drag and drop has its own route above): tell the
       // people involved with the ticket (assignees, creator, watchers), except whoever just did it and anyone who
       // was just told they were assigned.
-      if (editedFields.length > 0 || movedToColumnName) {
+      if (hasEdits) {
         const stakeholders = new Set<string>([
           ...(updated.assigneeId ? [updated.assigneeId] : []),
           ...(Array.isArray(updated.assignees) ? (updated.assignees as any[]).map((a) => a?.uid) : []),
@@ -1235,15 +1256,12 @@ export const projectRoutes: FastifyPluginAsync = async (
         const targetUserIds = [...stakeholders].filter(
           (id) => id && id !== userId && !newAssigneeIds.includes(id),
         );
-        const parts: string[] = [];
-        if (editedFields.length > 0) parts.push(`edited ticket (${editedFields.join(", ")})`);
-        if (movedToColumnName) parts.push(editedFields.length > 0 ? `moved it to "${movedToColumnName}"` : `moved ticket to "${movedToColumnName}"`);
         await sendTicketBotNotification({
           workspaceId: project.workspaceId,
           actorName,
           ticketTitle: updated.title,
           projectName: project.name,
-          actionText: parts.join(" and "),
+          actionText: editParts.join(" and "),
           targetUserIds,
           channelId: project.notificationChannelId,
           io: fastify.io,

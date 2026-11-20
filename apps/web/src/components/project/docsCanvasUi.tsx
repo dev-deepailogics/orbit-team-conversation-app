@@ -41,7 +41,7 @@ export const SearchOrbitButton: React.FC<{ onClick: () => void }> = ({ onClick }
   <button
     type="button"
     onClick={onClick}
-    className="hidden md:flex w-[320px] h-10 pl-3 pr-2 rounded-xl items-center gap-2 text-left transition hover:brightness-[0.98]"
+    className="hidden md:flex w-[300px] h-9 pl-3 pr-2 rounded-[18px] items-center gap-2 text-left transition hover:brightness-[0.98]"
     style={{ backgroundColor: "var(--theme-bg-surface-hover)", color: "var(--theme-text-muted)" }}
   >
     <Search size={16} />

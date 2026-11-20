@@ -1,4 +1,34 @@
+import { createHmac, randomBytes } from 'crypto';
 import { prisma } from '@orbit/db';
+
+// Key for pseudonymous ids. Never sent to clients; without it an `anon-…` id can't be tied back to a user.
+const ANON_ID_KEY = process.env.JWT_SECRET || process.env.ANON_ID_SECRET || randomBytes(32).toString('hex');
+
+/**
+ * Stable per-channel pseudonym for a user (used for typing indicators). A keyed hash, so it can't be matched against
+ * the workspace member list the way a slice of the real id could, and differs between channels.
+ */
+export function anonId(channelId: string, userId: string): string {
+  return `anon-${createHmac('sha256', ANON_ID_KEY).update(`${channelId}:${userId}`).digest('hex').slice(0, 16)}`;
+}
+
+/** Emits to every socket in `room`, building the payload for each socket's own user (so "mine" survives masking). */
+export async function emitPerViewer(
+  io: { in: (room: string) => { fetchSockets: () => Promise<Array<{ id: string; data: any }>> }; to: (room: string) => { emit: (ev: string, p: any) => any } },
+  room: string,
+  event: string,
+  build: (viewerUserId: string) => any,
+) {
+  const sockets = await io.in(room).fetchSockets();
+  for (const s of sockets) {
+    io.to(s.id).emit(event, build(s.data?.userId ?? 'public'));
+  }
+}
+
+/** Drops who uploaded a file; the uploader would identify the author of an anonymous message. */
+function stripUploader(attachments: any[] | undefined) {
+  return (attachments || []).map(({ uploaderId: _u, uploader: _up, ...rest }: any) => rest);
+}
 
 const ADJECTIVES = [
   'Thoughtful', 'Curious', 'Brave', 'Philosophical', 'Silent',
@@ -136,6 +166,7 @@ export function sanitizeMessageForViewer(message: any, viewerUserId: string, isA
     },
     quotedMessage: sanitizedQuotedMessage,
     reactions: sanitizedReactions,
+    ...(message.attachments ? { attachments: stripUploader(message.attachments) } : {}),
     anonName: anonDisplayName,
     anonEmoji,
     isAnonymous: true,

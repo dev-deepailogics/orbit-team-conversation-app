@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ThemeConfig, UserProfile, Workspace } from '@orbit/types';
-import { Bot, ChevronLeft, HardDrive, Link2, LogOut, Palette, User } from '@/components/ui/icons';
+import { ArrowUpDown, Bot, ChevronLeft, HardDrive, Keyboard, Link2, LogOut, Palette, User } from '@/components/ui/icons';
 import { DEFAULT_THEME, applyTheme } from '../../lib/theme';
 import { useThemeStore } from '../../stores/themeStore';
 import { useAuthStore } from '../../stores/authStore';
@@ -10,8 +11,12 @@ import { ThemeSettings, ThemeTab } from './ThemeSettings';
 import { BotSettings } from './BotSettings';
 import { StorageSettings } from './StorageSettings';
 import { InviteSettings } from './InviteSettings';
+import { SidebarSettings } from './SidebarSettings';
+import { GeneralSettings } from './GeneralSettings';
+import { ProfileModal } from '../profile/ProfileModal';
+import { useMyPresence } from '../../stores/presenceStore';
 
-export type SettingsSection = 'theme-presets' | 'theme-custom' | 'bots' | 'storage' | 'invite';
+export type SettingsSection = 'profile' | 'theme-presets' | 'theme-custom' | 'general' | 'sidebar' | 'bots' | 'storage' | 'invite';
 
 export interface SettingsDialogProps {
   initialSection: SettingsSection;
@@ -21,8 +26,7 @@ export interface SettingsDialogProps {
   isAdminOrOwner?: boolean;
   onFileDeleted?: (fileId: string) => void;
   onMemberAdded?: () => void;
-  /** Shown in the nav only when provided (the profile modal and logout live with the caller). */
-  onOpenProfile?: () => void;
+  /** Sign-out handler from the caller; falls back to the auth store's logout. */
   onSignOut?: () => void;
 }
 
@@ -37,16 +41,18 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   isAdminOrOwner: isAdminProp,
   onFileDeleted,
   onMemberAdded,
-  onOpenProfile,
   onSignOut,
 }) => {
   const authUser = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
+  const signOut = onSignOut ?? logout;
   const currentUser = currentUserProp ?? authUser;
   const isAdminOrOwner =
     isAdminProp ??
     (currentUser?.systemRole === 'SUPER_ADMIN' || (!!workspace && workspace.ownerId === currentUser?.id));
 
   const [section, setSection] = useState<SettingsSection>(initialSection);
+  const myPresence = useMyPresence(currentUser?.id);
   const { currentTheme, setTheme } = useThemeStore();
   const [draft, setDraft] = useState<ThemeConfig>(currentTheme);
   const [saving, setSaving] = useState(false);
@@ -132,7 +138,9 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
     </p>
   );
 
-  return (
+  // Portalled to <body>: callers open Settings from inside the sidebars, whose stacking context would otherwise let
+  // their headers paint over the dialog no matter its z-index.
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center sm:p-4 animate-in fade-in duration-150"
       style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
@@ -163,10 +171,16 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-3 flex flex-col">
             <GroupLabel label="PERSONAL" first />
-            {onOpenProfile && <NavItem icon={<User size={18} />} label="Profile & status" onClick={onOpenProfile} />}
+            {currentUser && (
+              <NavItem icon={<User size={18} />} label="Profile & status" active={section === 'profile'} onClick={() => setSection('profile')} />
+            )}
+            <NavItem icon={<Keyboard size={18} />} label="Shortcuts & quick to-dos" active={section === 'general'} onClick={() => setSection('general')} />
             <NavItem icon={<Palette size={18} />} label="Theme & appearance" bold={inTheme} onClick={() => setSection('theme-presets')} />
             <SubItem label="Theme templates" active={section === 'theme-presets'} onClick={() => setSection('theme-presets')} />
             <SubItem label="Custom theme" active={section === 'theme-custom'} onClick={() => setSection('theme-custom')} />
+            {workspace && (
+              <NavItem icon={<ArrowUpDown size={18} />} label="Sidebar sorting" active={section === 'sidebar'} onClick={() => setSection('sidebar')} />
+            )}
             {workspace && (
               <>
                 <GroupLabel label="WORKSPACE" />
@@ -175,11 +189,9 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                 <NavItem icon={<Link2 size={18} />} label="Invite link" active={section === 'invite'} onClick={() => setSection('invite')} />
               </>
             )}
-            {onSignOut && (
-              <div className="mt-auto pt-3">
-                <NavItem icon={<LogOut size={18} />} label="Sign out" onClick={onSignOut} />
-              </div>
-            )}
+            <div className="mt-auto pt-3">
+              <NavItem icon={<LogOut size={18} />} label="Sign out" onClick={signOut} />
+            </div>
           </div>
         </nav>
 
@@ -191,9 +203,11 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
             </button>
             {(
               [
+                ...(currentUser ? ([['profile', 'Profile']] as const) : []),
+                ['general', 'Shortcuts'],
                 ['theme-presets', 'Templates'],
                 ['theme-custom', 'Custom'],
-                ...(workspace ? ([['bots', 'Bots'], ['storage', 'Storage'], ['invite', 'Invite']] as const) : []),
+                ...(workspace ? ([['sidebar', 'Sidebar'], ['bots', 'Bots'], ['storage', 'Storage'], ['invite', 'Invite']] as const) : []),
               ] as [SettingsSection, string][]
             ).map(([id, label]) => (
               <button
@@ -227,6 +241,11 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
               onSetAsDefault={setSetAsDefault}
             />
           )}
+          {section === 'profile' && currentUser && (
+            <ProfileModal user={currentUser} workspaceId={workspace?.id} presence={myPresence} onLogout={signOut} />
+          )}
+          {section === 'general' && <GeneralSettings />}
+          {section === 'sidebar' && workspace && <SidebarSettings workspace={workspace} />}
           {section === 'bots' && workspace && <BotSettings workspace={workspace} />}
           {section === 'storage' && workspace && (
             <StorageSettings workspace={workspace} currentUser={currentUser} onFileDeleted={onFileDeleted} />
@@ -236,6 +255,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };

@@ -68,7 +68,8 @@ interface ProfileModalProps {
   user: UserProfile;
   workspaceId?: string;
   presence: Presence;
-  onClose: () => void;
+  /** Standalone page only; inside Settings the dialog's own "Back to Orbit" closes it, so no X is shown. */
+  onClose?: () => void;
   onLogout: () => void;
 }
 
@@ -240,15 +241,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 </span>
               </span>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close"
-              className="w-10 h-10 rounded-xl flex items-center justify-center transition hover:bg-[var(--theme-fill-hover)]"
-              style={{ color: 'var(--theme-text-muted)' }}
-            >
-              <X size={20} />
-            </button>
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close"
+                className="w-10 h-10 rounded-xl flex items-center justify-center transition hover:bg-[var(--theme-fill-hover)]"
+                style={{ color: 'var(--theme-text-muted)' }}
+              >
+                <X size={20} />
+              </button>
+            )}
           </div>
           <div className="h-12 px-6 flex items-center justify-between">
             <div className="h-12 flex items-start gap-5">

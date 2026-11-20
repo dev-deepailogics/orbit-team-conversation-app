@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ListChecks, Trash2, X } from 'lucide-react';
 import { api } from '../../lib/api';
+import { usePrefsStore, hydratePrefs } from '../../stores/prefsStore';
 
 interface Todo {
   id: string;
@@ -10,88 +11,71 @@ interface Todo {
   done: boolean;
 }
 
-// Floating button position, as distance from the bottom-right corner so it stays put when the window
-// resizes. The default sits above the message composer, clear of its Send button.
-type Offset = { right: number; bottom: number };
-const BUTTON_SIZE = 44;
-const EDGE = 8;
-const DEFAULT_OFFSET: Offset = { right: 20, bottom: 120 };
-const POSITION_KEY = 'orbit.quickTodos.position';
-const DRAG_THRESHOLD = 4; // px of movement before a press counts as a drag rather than a click
+const BTN = 44;
+const PANEL_W = 340;
+const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), Math.max(lo, hi));
 
-const clampOffset = ({ right, bottom }: Offset): Offset => ({
-  right: Math.min(Math.max(EDGE, right), Math.max(EDGE, window.innerWidth - BUTTON_SIZE - EDGE)),
-  bottom: Math.min(Math.max(EDGE, bottom), Math.max(EDGE, window.innerHeight - BUTTON_SIZE - EDGE)),
-});
-
-// Personal quick to-dos. Alt+T (or the floating button) opens the panel with the input focused:
-// type, Enter, and the next one is ready. Click a row to tick it off. Drag the button to move it.
+// Personal quick to-dos. Ctrl+Shift+Space / Alt+T (or the draggable floating button) opens the panel with the input focused:
+// type, Enter, and the next one is ready. Click a row to tick it off.
 export const QuickTodos: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [text, setText] = useState('');
   const [error, setError] = useState('');
   const [loaded, setLoaded] = useState(false);
-  const [offset, setOffset] = useState<Offset>(DEFAULT_OFFSET);
-  const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ x: number; y: number; start: Offset; moved: boolean } | null>(null);
+  const showButton = usePrefsStore((s) => s.showTodoButton);
+  const savedPos = usePrefsStore((s) => s.todoPos);
+  const setSavedPos = usePrefsStore((s) => s.setTodoPos);
+  const [viewport, setViewport] = useState({ w: 1280, h: 800 });
+  const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
+  const drag = useRef<{ dx: number; dy: number; sx: number; sy: number; moved: boolean } | null>(null);
 
-  // Restore the saved spot (after mount, so server and client render the same markup), and keep it on screen.
   useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(POSITION_KEY) || 'null');
-      if (saved && Number.isFinite(saved.right) && Number.isFinite(saved.bottom)) setOffset(clampOffset(saved));
-    } catch {
-      /* storage blocked or bad value: keep the default */
-    }
-    const onResize = () => setOffset((o) => clampOffset(o));
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    hydratePrefs();
+    const measure = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
   }, []);
 
-  const onPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
-    if (e.button !== 0) return;
-    dragRef.current = { x: e.clientX, y: e.clientY, start: offset, moved: false };
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-  const onPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
-    const d = dragRef.current;
-    if (!d) return;
-    const dx = e.clientX - d.x;
-    const dy = e.clientY - d.y;
-    if (!d.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
-    if (!d.moved) {
-      d.moved = true;
-      setDragging(true);
-    }
-    setOffset(clampOffset({ right: d.start.right - dx, bottom: d.start.bottom - dy }));
-  };
-  const onPointerUp = () => {
-    const d = dragRef.current;
-    dragRef.current = null;
-    if (!d) return;
-    if (!d.moved) {
-      setOpen((o) => !o); // a plain click
-      return;
-    }
-    setDragging(false);
-    setOffset((o) => {
-      try {
-        localStorage.setItem(POSITION_KEY, JSON.stringify(o));
-      } catch {
-        /* not saved; it still moves for this session */
-      }
-      return o;
-    });
+  // Default: right edge, vertically centred.
+  const base = savedPos ?? { x: viewport.w - BTN - 16, y: viewport.h / 2 - BTN / 2 };
+  const pos = dragPos ?? {
+    x: clamp(base.x, 8, viewport.w - BTN - 8),
+    y: clamp(base.y, 8, viewport.h - BTN - 8),
   };
 
-  // Open the panel toward the roomier side of the screen.
-  const [panelBelow, panelLeftAligned] =
-    typeof window === 'undefined'
-      ? [false, false]
-      : [offset.bottom > window.innerHeight / 2, offset.right > window.innerWidth / 2];
+  const onPointerDown = (e: React.PointerEvent) => {
+    drag.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y, sx: e.clientX, sy: e.clientY, moved: false };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d) return;
+    if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 5) return;
+    d.moved = true;
+    setDragPos({
+      x: clamp(e.clientX - d.dx, 8, viewport.w - BTN - 8),
+      y: clamp(e.clientY - d.dy, 8, viewport.h - BTN - 8),
+    });
+  };
+  const onPointerUp = () => {
+    const d = drag.current;
+    drag.current = null;
+    if (!d) return;
+    if (d.moved && dragPos) {
+      setSavedPos(dragPos);
+    } else {
+      setOpen((o) => !o);
+    }
+    setDragPos(null);
+  };
+
+  // Panel sits beside the button, on whichever side has room.
+  const panelLeft = pos.x > PANEL_W + 24 ? pos.x - PANEL_W - 8 : pos.x + BTN + 8;
+  const panelTop = clamp(pos.y - 160, 8, viewport.h - 460);
 
   const load = useCallback(async () => {
     try {
@@ -109,7 +93,9 @@ export const QuickTodos: React.FC = () => {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyT') {
+      const altT = e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyT';
+      const chord = (e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'Space';
+      if (altT || chord) {
         e.preventDefault();
         setOpen((o) => !o);
       } else if (e.key === 'Escape') {
@@ -186,15 +172,13 @@ export const QuickTodos: React.FC = () => {
   const done = todos.filter((t) => t.done);
 
   return (
-    <div
-      ref={panelRef}
-      style={{ right: offset.right, bottom: offset.bottom }}
-      className={`fixed z-40 flex gap-2 ${panelBelow ? 'flex-col-reverse' : 'flex-col'} ${panelLeftAligned ? 'items-start' : 'items-end'}`}
-    >
+    <div ref={panelRef}>
       {open && (
         <div
-          className="w-[340px] max-w-[calc(100vw-2rem)] max-h-[70vh] flex flex-col rounded-2xl border overflow-hidden"
+          className="fixed z-40 w-[340px] max-w-[calc(100vw-2rem)] max-h-[70vh] flex flex-col rounded-2xl border overflow-hidden"
           style={{
+            left: clamp(panelLeft, 8, viewport.w - PANEL_W - 8),
+            top: panelTop,
             backgroundColor: 'var(--theme-bg-app)',
             borderColor: 'var(--theme-border)',
             boxShadow: '0 12px 16px rgba(20, 26, 46, 0.2)',
@@ -286,31 +270,46 @@ export const QuickTodos: React.FC = () => {
         </div>
       )}
 
-      <button
-        type="button"
-        // Click toggles (handled in onPointerUp so a drag doesn't also open it); keyboard Enter/Space still clicks.
-        onClick={(e) => e.detail === 0 && setOpen((o) => !o)}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        title="Quick to-dos (Alt+T) · drag to move"
-        aria-label="Quick to-dos"
-        className={`relative w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition hover:brightness-110 touch-none select-none ${
-          dragging ? 'cursor-grabbing scale-105' : 'cursor-pointer'
-        }`}
-        style={{ backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-text)' }}
-      >
-        <ListChecks size={20} />
-        {open_.length > 0 && (
-          <span
-            className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center"
-            style={{ backgroundColor: '#DC2626', color: '#fff' }}
-          >
-            {open_.length > 99 ? '99+' : open_.length}
-          </span>
-        )}
-      </button>
+      {showButton && (
+        <button
+          type="button"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={() => {
+            drag.current = null;
+            setDragPos(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setOpen((o) => !o);
+            }
+          }}
+          title="Quick to-dos (Ctrl+Shift+Space). Drag to move"
+          aria-label="Quick to-dos"
+          className="fixed z-40 rounded-full flex items-center justify-center shadow-lg hover:brightness-110 touch-none select-none"
+          style={{
+            left: pos.x,
+            top: pos.y,
+            width: BTN,
+            height: BTN,
+            cursor: dragPos ? 'grabbing' : 'grab',
+            backgroundColor: 'var(--theme-primary)',
+            color: 'var(--theme-primary-text)',
+          }}
+        >
+          <ListChecks size={20} />
+          {open_.length > 0 && (
+            <span
+              className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center"
+              style={{ backgroundColor: '#DC2626', color: '#fff' }}
+            >
+              {open_.length > 99 ? '99+' : open_.length}
+            </span>
+          )}
+        </button>
+      )}
     </div>
   );
 };

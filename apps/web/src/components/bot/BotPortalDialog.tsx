@@ -4,7 +4,7 @@ import React from 'react';
 import { Workspace } from '@orbit/types';
 import { SettingsDialog, SettingsDialogProps } from '../settings/SettingsDialog';
 
-interface BotPortalDialogProps extends Pick<SettingsDialogProps, 'isAdminOrOwner' | 'onOpenProfile' | 'onSignOut'> {
+interface BotPortalDialogProps extends Pick<SettingsDialogProps, 'isAdminOrOwner' | 'onSignOut'> {
   workspace: Workspace;
   onClose: () => void;
 }

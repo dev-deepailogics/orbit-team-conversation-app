@@ -18,6 +18,8 @@ const newTicket = async (extra: object = {}, as: keyof typeof u = 'cara') =>
 const notifs = (who: keyof typeof u) => prisma.notification.findMany({ where: { userId: u[who] }, orderBy: { createdAt: 'asc' } });
 const botMessages = () => prisma.message.count({ where: { channelId, botAppId: { not: null } } });
 const last = async (who: keyof typeof u) => (await notifs(who)).at(-1)?.body ?? null;
+const lastBotMessage = async () =>
+  (await prisma.message.findFirst({ where: { channelId, botAppId: { not: null } }, orderBy: { createdAt: 'desc' } }))?.content ?? null;
 
 before(async () => {
   app = Fastify();
@@ -54,6 +56,15 @@ describe('assigning a ticket', () => {
     assert.equal((await call('PUT', `/tickets/${t.id}`, { assigneeId: u.bob })).statusCode, 200);
     assert.match((await last('bob'))!, /actor assigned you to ticket "Fix the login page"/);
     assert.equal((await notifs('actor')).length, 0);
+  });
+
+  it('names the assignee in the shared channel message (everyone reads it, so never "you")', async () => {
+    const t = await newTicket({ title: 'Created unassigned' }); // e.g. made from a chat message
+    await call('PUT', `/tickets/${t.id}`, { assigneeId: u.dan });
+    const msg = (await lastBotMessage())!;
+    assert.match(msg, /actor assigned dan to ticket \*\*"Created unassigned"\*\*/);
+    assert.doesNotMatch(msg, /assigned you/);
+    assert.match((await last('dan'))!, /actor assigned you to ticket "Created unassigned"/, 'the assignee is still told "you"');
   });
 
   it('tells someone who is assigned again after being replaced (the web form sends one assignee at a time)', async () => {
@@ -119,6 +130,7 @@ describe('editing a ticket', () => {
     const messages = await botMessages();
     await call('PUT', `/tickets/${t.id}`, { assigneeId: u.bob, priority: 'LOW' });
     assert.equal(await botMessages(), messages + 1, 'one activity message, not two');
+    assert.match((await lastBotMessage())!, /actor assigned bob to ticket \*\*"Both"\*\*/, 'the channel just says who was assigned');
     assert.match((await last('bob'))!, /assigned you to ticket/);
     assert.match((await last('cara'))!, /edited ticket \(priority\)/);
   });

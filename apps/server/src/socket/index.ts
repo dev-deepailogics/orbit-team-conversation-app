@@ -2,6 +2,7 @@ import { Server as SocketIOServer, Socket } from "socket.io";
 import { FastifyInstance } from "fastify";
 import { prisma } from "@orbit/db";
 import { SOCKET_EVENTS } from "@orbit/types";
+import { anonId } from "../services/anonymousService.js";
 import {
   canUserAccessWorkspace,
   canUserAccessChannel,
@@ -153,7 +154,7 @@ export function setupSocketServer(
           socket.to(`channel:${channelId}`).emit(SOCKET_EVENTS.TYPING_START, {
             channelId,
             username: safeName,
-            userId: `anon-${userId.slice(0, 8)}`,
+            userId: anonId(channelId, userId),
           });
         } else {
           socket
@@ -171,7 +172,7 @@ export function setupSocketServer(
           select: { isAnonymous: true },
         });
         const safeUserId = channel?.isAnonymous
-          ? `anon-${userId.slice(0, 8)}`
+          ? anonId(channelId, userId)
           : userId;
         socket
           .to(`channel:${channelId}`)
