@@ -2561,7 +2561,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       isDragOver
                         ? "Drop file here to upload to channel..."
                         : channel.isAnonymous
-                          ? `Post as ${anonProfile?.anonName || "Anonymous"}`
+                          ? revealAnon && anonProfile?.anonName
+                            ? `Post as ${anonProfile.anonName}`
+                            : "Post anonymously"
                           : channel.type === "DIRECT"
                             ? `Message ${dmName}`
                             : `Message #${channel.name}`
