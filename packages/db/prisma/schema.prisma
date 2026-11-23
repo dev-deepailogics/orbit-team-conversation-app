@@ -556,6 +556,9 @@ model Project {
   clientUsername    String?
   clientEmail       String?
 
+  // Last ticket number issued in this project; tickets are numbered 1, 2, 3… per project
+  ticketCounter     Int             @default(0)
+
   workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   creator     User            @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: Cascade)
   notificationChannel Channel?  @relation("ProjectNotificationChannel", fields: [notificationChannelId], references: [id], onDelete: SetNull)
