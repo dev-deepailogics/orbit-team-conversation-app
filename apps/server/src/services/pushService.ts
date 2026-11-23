@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { getAlertRecipientIds, getThreadAlertRecipientIds } from './alertRecipients.js';
 import webpush from 'web-push';
 import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
@@ -149,7 +150,22 @@ async function sendToUser(userId: string, payload: object) {
   );
 }
 
-async function notifyMessage(io: any, messageId: string) {
+/** Who a message's push goes to, and the conversation a tap should open, instead of the usual channel fan-out. */
+export interface PushOverride {
+  userIds: string[];
+  open: { channelId: string; parentMessageId?: string };
+}
+const pushOverride = new AsyncLocalStorage<PushOverride>();
+
+/**
+ * Messages created inside `create` push only to `override.userIds`, and tapping the push opens `override.open`.
+ * Scoped to that call (not a global), so concurrent requests can't pick it up.
+ */
+export function withPushOverride<T>(override: PushOverride, create: () => Promise<T>): Promise<T> {
+  return pushOverride.run(override, create);
+}
+
+async function notifyMessage(io: any, messageId: string, override?: PushOverride) {
   const msg = await prisma.message.findUnique({
     where: { id: messageId },
     include: {
@@ -177,9 +193,11 @@ async function notifyMessage(io: any, messageId: string) {
   // Thread replies only notify people in the thread (parent author + earlier repliers), like Slack. Either way, anyone
   // @mentioned is always notified, even in a muted channel; MENTIONS and MUTED members only then.
   const content = msg.content || '';
-  const memberIds = msg.parentMessageId
-    ? await getThreadAlertRecipientIds(msg.parentMessageId, msg.channelId, msg.userId, content)
-    : await getAlertRecipientIds(msg.channelId, content, msg.userId);
+  const memberIds = override
+    ? override.userIds
+    : msg.parentMessageId
+      ? await getThreadAlertRecipientIds(msg.parentMessageId, msg.channelId, msg.userId, content)
+      : await getAlertRecipientIds(msg.channelId, content, msg.userId);
   if (memberIds.length === 0) {
     console.log('Push fan-out: no recipients want this notification');
     return;
@@ -194,14 +212,16 @@ async function notifyMessage(io: any, messageId: string) {
   const text = content.trim();
   const bodyText = text ? text.slice(0, 160) : msg.attachments.length ? 'Sent an attachment' : 'New message';
 
+  // A tap opens the conversation (an override can point elsewhere, e.g. at the message someone was mentioned in).
   // Thread replies open the thread itself (the web app reads ?threadId= on load) and stack per thread, like mobile.
-  const url = msg.parentMessageId
-    ? `/?channelId=${msg.channelId}&threadId=${msg.parentMessageId}`
-    : `/?channelId=${msg.channelId}`;
+  const open = override?.open ?? { channelId: msg.channelId, parentMessageId: msg.parentMessageId ?? undefined };
+  const url = open.parentMessageId
+    ? `/?channelId=${open.channelId}&threadId=${open.parentMessageId}`
+    : `/?channelId=${open.channelId}`;
   const tag = msg.parentMessageId ? `thread:${msg.parentMessageId}` : `channel:${msg.channelId}`;
 
   // Mobile: always send. FCM doesn't show notifications while the app is foregrounded; the app draws its own banner.
-  await sendToDevices(memberIds, { title, body: bodyText, channelId: msg.channelId, parentMessageId: msg.parentMessageId ?? undefined });
+  await sendToDevices(memberIds, { title, body: bodyText, channelId: open.channelId, parentMessageId: open.parentMessageId });
 
   // Only users that have web push subscriptions
   const subscribed = await prisma.pushSubscription.findMany({
@@ -238,9 +258,10 @@ export function registerPushMiddleware(io: any) {
   prisma.$use(async (params, next) => {
     const result = await next(params);
     if (params.model === 'Message' && params.action === 'create' && result?.id) {
+      const override = pushOverride.getStore();
       // Delay slightly so attachments created right after are visible; never block the request
       setTimeout(() => {
-        notifyMessage(io, result.id).catch((e) => console.error('Push fan-out error', e));
+        notifyMessage(io, result.id, override).catch((e) => console.error('Push fan-out error', e));
       }, 500);
     }
     return result;

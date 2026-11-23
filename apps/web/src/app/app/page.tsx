@@ -26,7 +26,8 @@ import { useThemeStore } from "@/stores/themeStore";
 import { WorkspaceSidebar } from "@/components/workspace/WorkspaceSidebar";
 import { ChannelSidebar } from "@/components/channel/ChannelSidebar";
 import { ChatArea } from "@/components/chat/ChatArea";
-import { ThreadSidebar } from "@/components/chat/ThreadSidebar";
+import { ThreadSidebar, ThreadSidebarSkeleton } from "@/components/chat/ThreadSidebar";
+import { OPEN_MESSAGE_EVENT, parseMessageLink, type MessageTarget } from "@/lib/messageLinks";
 import { QuickTodos } from "@/components/layout/QuickTodos";
 import { HuddleModal } from "@/components/huddle/HuddleModal";
 import { IncomingCallDialog } from "@/components/huddle/IncomingCallDialog";
@@ -91,6 +92,7 @@ export default function AppDashboard() {
     setThreadReplies,
     prependThreadReplies,
     threadHasMore,
+    threadLoading,
     addThreadReply,
     setTypingUser,
     incrementUnread,
@@ -430,8 +432,18 @@ export default function AppDashboard() {
     }, 2000);
   };
 
+  // A thread being opened by id (see openThreadById): its id while the panel shows as a skeleton, and the latest
+  // requested thread, so a slower earlier request never opens over a newer one or over a closed panel
+  const [openingThreadId, setOpeningThreadId] = useState<string | null>(null);
+  const threadRequestRef = useRef<string | null>(null);
+  const cancelThreadOpening = () => {
+    threadRequestRef.current = null;
+    setOpeningThreadId(null);
+  };
+
   // 4. Handle Channel Selection (Chunked Initial Load)
   const handleSelectChannel = async (channel: Channel) => {
+    cancelThreadOpening();
     setShowProfilePage(false);
     setShowOrgControl(false);
     setShowCanvasHub(false);
@@ -903,6 +915,22 @@ export default function AppDashboard() {
     }
   };
 
+  // A message link (e.g. "Jump to message" in a mention note, or clicking that note's notification) opens the message
+  // exactly as picking it in search does: its channel, then its thread or a highlight. Through a ref so the window
+  // listener and the socket handlers always call the current version.
+  const openMessageRef = useRef<(target: MessageTarget) => void>(() => {});
+  openMessageRef.current = (target: MessageTarget) =>
+    handleSelectSearchedMessage({
+      id: target.messageId,
+      channelId: target.channelId,
+      parentMessageId: target.parentMessageId,
+    });
+  useEffect(() => {
+    const onOpenMessage = (e: Event) => openMessageRef.current((e as CustomEvent<MessageTarget>).detail);
+    window.addEventListener(OPEN_MESSAGE_EVENT, onOpenMessage);
+    return () => window.removeEventListener(OPEN_MESSAGE_EVENT, onOpenMessage);
+  }, []);
+
   // 5. Socket.IO Realtime listeners
   useEffect(() => {
     if (!user || !currentWorkspace) return;
@@ -927,6 +955,9 @@ export default function AppDashboard() {
         msg.user?.avatarUrl || msg.bot?.avatarUrl,
         async () => {
           window.focus();
+          // Orbit Bot's mention note: go straight to the message it is about
+          const mentioned = msg.bot ? parseMessageLink(msg.content) : null;
+          if (mentioned) return openMessageRef.current(mentioned);
           const allChannels = useChatStore.getState().channels;
           const targetChannel = allChannels.find((c) => c.id === msg.channelId);
           if (!targetChannel) return;
@@ -1207,7 +1238,8 @@ export default function AppDashboard() {
   // 6. Handle Opening Thread
   // Replies load newest-first in pages (like channel messages); earlier ones come in as the user scrolls up
   const handleOpenThread = async (message: Message) => {
-    setActiveThread(message);
+    cancelThreadOpening();
+    setActiveThread(message); // shows the parent at once, with reply placeholders until they load
     try {
       const res = await api.get(`/api/messages/${message.id}/replies`, { params: { limit: THREAD_PAGE_SIZE } });
       setThreadReplies(res.data.replies || [], message.id, {
@@ -1216,15 +1248,22 @@ export default function AppDashboard() {
       });
     } catch (err) {
       console.error("Failed to load thread replies", err);
+      setThreadReplies([], message.id); // end the placeholders (ignored if another thread is open by now)
     }
   };
 
-  // Opens a thread known only by its parent's id (notification click, ?threadId= link, search). One request loads the
-  // parent and its first page. Skipped if the user has moved to another channel while it loaded.
+  // Opens a thread known only by its parent's id (notification click, ?threadId= link, search, message link). One
+  // request loads the parent and its first page; the whole panel shows as a skeleton meanwhile. Only the latest
+  // request may open: one the user closed, or that a newer one / a channel switch replaced, is dropped.
   const openThreadById = async (parentId: string) => {
+    threadRequestRef.current = parentId;
+    if (useChatStore.getState().activeThread?.id === parentId) return;
+    setActiveThread(null);
+    setOpeningThreadId(parentId);
     try {
       const res = await api.get(`/api/messages/${parentId}/replies`, { params: { limit: THREAD_PAGE_SIZE } });
       const parent: Message | undefined = res.data.parent;
+      if (threadRequestRef.current !== parentId) return;
       if (!parent || useChatStore.getState().currentChannel?.id !== parent.channelId) return;
       setActiveThread(parent);
       setThreadReplies(res.data.replies || [], parent.id, {
@@ -1233,7 +1272,14 @@ export default function AppDashboard() {
       });
     } catch (err) {
       console.error("Failed to open thread", err);
+    } finally {
+      if (threadRequestRef.current === parentId) setOpeningThreadId(null);
     }
+  };
+
+  const closeThread = () => {
+    cancelThreadOpening();
+    setActiveThread(null);
   };
 
   const handleLoadOlderReplies = async () => {
@@ -1876,25 +1922,30 @@ export default function AppDashboard() {
       )}
 
       {/* 4. Active Thread Panel (Responsive Drawer on Mobile, Column on Desktop) */}
-      {activeThread && (
+      {(activeThread || openingThreadId) && (
         <div className="fixed inset-0 z-40 md:static md:z-20 md:flex h-full shrink-0">
           <div
             className="fixed inset-0 bg-black/60 md:hidden transition-opacity"
-            onClick={() => setActiveThread(null)}
+            onClick={closeThread}
           />
-          <ThreadSidebar
-            parentMessage={activeThread}
-            replies={threadReplies}
-            currentUser={user}
-            onClose={() => setActiveThread(null)}
-            onReplyAdded={addThreadReply}
-            hasMoreReplies={threadHasMore}
-            isLoadingOlderReplies={isLoadingOlderReplies}
-            onLoadOlderReplies={handleLoadOlderReplies}
-            members={members}
-            onSelectUserDM={handleSelectUserDM}
-            onSelectChannel={handleSelectChannel}
-          />
+          {activeThread ? (
+            <ThreadSidebar
+              parentMessage={activeThread}
+              replies={threadReplies}
+              currentUser={user}
+              onClose={closeThread}
+              onReplyAdded={addThreadReply}
+              hasMoreReplies={threadHasMore}
+              isLoadingOlderReplies={isLoadingOlderReplies}
+              onLoadOlderReplies={handleLoadOlderReplies}
+              isLoadingReplies={threadLoading}
+              members={members}
+              onSelectUserDM={handleSelectUserDM}
+              onSelectChannel={handleSelectChannel}
+            />
+          ) : (
+            <ThreadSidebarSkeleton onClose={closeThread} />
+          )}
         </div>
       )}
 

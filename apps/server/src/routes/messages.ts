@@ -409,7 +409,7 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         authorId: userId,
         content: content || '',
         messageId: replyMessage.id,
-        isThreadReply: true,
+        parentMessageId: parent.id,
         io: fastify.io,
       }).catch((err) => fastify.log.error(err, 'Failed to process thread reply mentions'));
     }

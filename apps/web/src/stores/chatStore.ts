@@ -20,6 +20,8 @@ interface ChatState {
   threadReplies: Message[];
   threadHasMore: boolean;
   threadNextCursor: string | null;
+  /** The open thread's first page of replies hasn't arrived yet (drives the thread skeleton). */
+  threadLoading: boolean;
   // Who is typing per channel, keyed by user id (typing:stop only carries the id, not the name)
   typingUsers: { [channelId: string]: TypingUser[] };
   unreadCounts: { [channelId: string]: number };
@@ -64,6 +66,7 @@ export const useChatStore = create<ChatState>((set) => ({
   threadReplies: [],
   threadHasMore: false,
   threadNextCursor: null,
+  threadLoading: false,
   typingUsers: {},
   unreadCounts: {},
   lastActivity: {},
@@ -78,6 +81,7 @@ export const useChatStore = create<ChatState>((set) => ({
       threadReplies: [],
       threadHasMore: false,
       threadNextCursor: null,
+      threadLoading: false,
       typingUsers: {},
       unreadCounts: {},
       lastActivity: {},
@@ -94,6 +98,7 @@ export const useChatStore = create<ChatState>((set) => ({
     set((state) => ({
       currentChannel: channel,
       activeThread: null,
+      threadLoading: false,
       unreadCounts: channel
         ? { ...state.unreadCounts, [channel.id]: 0 }
         : state.unreadCounts,
@@ -154,10 +159,10 @@ export const useChatStore = create<ChatState>((set) => ({
     set((state) => ({
       activeThread: message,
       // Opening a different thread (or closing it): drop the previous thread's replies right away instead of showing
-      // them under the new parent until its own replies finish loading
+      // them under the new parent until its own replies finish loading (setThreadReplies ends the loading state)
       ...(state.activeThread?.id === message?.id
         ? {}
-        : { threadReplies: [], threadHasMore: false, threadNextCursor: null }),
+        : { threadReplies: [], threadHasMore: false, threadNextCursor: null, threadLoading: !!message }),
     })),
   setThreadReplies: (replies, threadId, page) =>
     set((state) => {
@@ -167,6 +172,7 @@ export const useChatStore = create<ChatState>((set) => ({
         threadReplies: replies,
         threadHasMore: page?.hasMore ?? false,
         threadNextCursor: page?.nextCursor ?? null,
+        threadLoading: false,
       };
     }),
   prependThreadReplies: (older, threadId, page) =>

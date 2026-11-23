@@ -1024,7 +1024,6 @@ export const channelRoutes: FastifyPluginAsync = async (
           authorId: userId,
           content: content || "",
           messageId: message.id,
-          isThreadReply: false,
           io: fastify.io,
         }).catch((err) =>
           fastify.log.error(err, "Failed to process message mentions"),
