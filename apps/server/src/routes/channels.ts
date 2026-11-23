@@ -20,6 +20,13 @@ import {
   verifyChannelAccess,
   verifyQuotable,
 } from "../utils/security.js";
+import {
+  pollCreateData,
+  pollFallbackContent,
+  pollInclude,
+  pollInputSchema,
+  toPollView,
+} from "../services/pollService.js";
 
 const createChannelSchema = z.object({
   name: z
@@ -52,17 +59,23 @@ const postMessageSchema = z
         }),
       )
       .optional(),
+    // A poll is a message of its own: its content is generated, and it carries no attachments or quote
+    poll: pollInputSchema.optional(),
   })
   .refine(
     (data) =>
       (data.content && data.content.trim().length > 0) ||
       (data.attachments && data.attachments.length > 0) ||
-      !!data.quotedMessageId,
+      !!data.quotedMessageId ||
+      !!data.poll,
     {
       message:
         "Message must contain text content, an attachment, or a forwarded message",
     },
-  );
+  )
+  .refine((data) => !data.poll || (!data.attachments?.length && !data.quotedMessageId), {
+    message: "A poll can't include attachments or a forwarded message",
+  });
 
 export const channelRoutes: FastifyPluginAsync = async (
   fastify: FastifyInstance,
@@ -698,6 +711,7 @@ export const channelRoutes: FastifyPluginAsync = async (
               },
             },
           },
+          poll: pollInclude,
           _count: {
             select: {
               replies: true,
@@ -868,7 +882,7 @@ export const channelRoutes: FastifyPluginAsync = async (
           .send({ error: parseResult.error.errors[0].message });
       }
 
-      const { content, attachments, quotedMessageId } = parseResult.data;
+      const { content, attachments, quotedMessageId, poll } = parseResult.data;
 
       const access = await verifyChannelAccess(userId, channelId, reply);
       if (!access) return;
@@ -894,10 +908,15 @@ export const channelRoutes: FastifyPluginAsync = async (
         data: {
           channelId,
           userId,
-          content: isForward ? quoted!.content : content || "",
+          content: poll
+            ? pollFallbackContent(poll)
+            : isForward
+              ? quoted!.content
+              : content || "",
           quotedMessageId: quotedMessageId || undefined,
           anonName,
           anonEmoji,
+          ...(poll ? { poll: { create: pollCreateData(poll) } } : {}),
         },
       });
 
@@ -960,6 +979,7 @@ export const channelRoutes: FastifyPluginAsync = async (
           bot: true,
           attachments: true,
           reactions: true,
+          poll: pollInclude,
           _count: {
             select: { replies: true },
           },
@@ -977,6 +997,10 @@ export const channelRoutes: FastifyPluginAsync = async (
         replyCount: 0,
         workspaceId: channel.workspaceId,
       };
+      // Non-anonymous rooms get `payload` unsanitized, so its poll is turned into the shared view here
+      const broadcastPayload = fullMessage.poll
+        ? { ...payload, poll: toPollView(fullMessage.poll, null, channel.isAnonymous) }
+        : payload;
 
       const selfPayload = sanitizeMessageForViewer(
         payload,
@@ -1002,17 +1026,17 @@ export const channelRoutes: FastifyPluginAsync = async (
         } else if (channel.type === "PUBLIC") {
           fastify.io
             .to(`workspace:${channel.workspaceId}`)
-            .emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+            .emit(SOCKET_EVENTS.MESSAGE_NEW, broadcastPayload);
         } else {
           // Emit only to members of this private / direct channel
           for (const m of channel.members) {
             fastify.io
               .to(`user:${m.userId}`)
-              .emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+              .emit(SOCKET_EVENTS.MESSAGE_NEW, broadcastPayload);
           }
           fastify.io
             .to(`channel:${channel.id}`)
-            .emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+            .emit(SOCKET_EVENTS.MESSAGE_NEW, broadcastPayload);
         }
       }
 

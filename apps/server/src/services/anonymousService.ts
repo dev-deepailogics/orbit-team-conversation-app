@@ -1,5 +1,6 @@
 import { createHmac, randomBytes } from 'crypto';
 import { prisma } from '@orbit/db';
+import { isRawPoll, toPollView } from './pollService.js';
 
 // Key for pseudonymous ids. Never sent to clients; without it an `anon-…` id can't be tied back to a user.
 const ANON_ID_KEY = process.env.JWT_SECRET || process.env.ANON_ID_SECRET || randomBytes(32).toString('hex');
@@ -123,6 +124,12 @@ export async function getOrCreateAnonProfile(channelId: string, userId: string) 
 }
 
 export function sanitizeMessageForViewer(message: any, viewerUserId: string, isAnonymousChannel: boolean): any {
+  // Raw votes name every voter; only this viewer's view of the poll (counts only in anonymous channels) goes out, and
+  // nothing at all once the poll's message is deleted
+  if (isRawPoll(message?.poll)) {
+    message = { ...message, poll: message.isDeleted ? null : toPollView(message.poll, viewerUserId, isAnonymousChannel) };
+  }
+
   if (!isAnonymousChannel) {
     return {
       ...message,

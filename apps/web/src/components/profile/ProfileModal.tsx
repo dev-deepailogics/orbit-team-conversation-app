@@ -2,19 +2,16 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { UserProfile } from '@orbit/types';
-import { X, Upload, Check, LogOut, User, Loader2, Pencil, Mail, Clock, Calendar, Eye, EyeOff } from '@/components/ui/icons';
+import { Upload, LogOut, User, Loader2, Pencil, Mail, Clock, Calendar, Eye, EyeOff, Trash2 } from '@/components/ui/icons';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/authStore';
 import { useChatStore } from '../../stores/chatStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { Presence } from '../availability/useTeamPresence';
 import { TimeFormat, getTimeFormat, setTimeFormat } from '../../lib/timeFormat';
-import { identityColor, initialsOf } from '../project/projectViewUtils';
+import { Avatar, isUploadedAvatar } from '../project/projectViewUtils';
 
-const AVATAR_STYLES = ['bottts', 'avataaars', 'open-peeps', 'lorelei', 'notionists', 'thumbs'];
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
-
-export const defaultAvatar = (username: string) => `/api/avatar/bottts/svg?seed=${username}`;
 
 const PRESENCE_OPTIONS: Record<Presence, { label: string; hint: string; icon: string }> = {
   working: { label: 'Available', hint: 'Online and reachable', icon: '/icons/status-on.svg' },
@@ -68,8 +65,6 @@ interface ProfileModalProps {
   user: UserProfile;
   workspaceId?: string;
   presence: Presence;
-  /** Standalone page only; inside Settings the dialog's own "Back to Orbit" closes it, so no X is shown. */
-  onClose?: () => void;
   onLogout: () => void;
 }
 
@@ -79,7 +74,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   user,
   workspaceId,
   presence,
-  onClose,
   onLogout,
 }) => {
   const setAuth = useAuthStore((s) => s.setAuth);
@@ -92,7 +86,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   // Profile edit
   const [displayName, setDisplayName] = useState(user.displayName);
   const [username, setUsername] = useState(user.username);
-  const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl || defaultAvatar(user.username));
+  // null = no photo (initials are shown)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(user.avatarUrl ?? null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [timeFormat, setTimeFormatState] = useState<TimeFormat>(getTimeFormat);
@@ -112,11 +107,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     return () => clearInterval(id);
   }, []);
 
-
-  const presets = AVATAR_STYLES.flatMap((style) =>
-    [user.username, `${user.username}-alt`].map((seed) => `/api/avatar/${style}/svg?seed=${encodeURIComponent(seed)}`),
-  );
-
   const resetMessages = () => {
     setError('');
     setSuccess('');
@@ -129,6 +119,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   };
 
   const startEditing = () => {
+    // Start from the saved profile, not a draft left by an earlier Cancel
+    setDisplayName(user.displayName);
+    setUsername(user.username);
+    setAvatarUrl(user.avatarUrl ?? null);
     setTab('overview');
     setEditing(true);
     resetMessages();
@@ -212,8 +206,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       .filter((p) => (p.status || 'active').toLowerCase() === 'active')
       .map((p) => ({ id: p.id, label: p.name })),
   ];
-  const shownAvatar = editing ? avatarUrl : user.avatarUrl;
-  const fallback = identityColor(user.displayName || user.username);
+  const name = user.displayName || user.username;
 
   return (
     <div className="flex-1 min-w-0 h-full flex">
@@ -241,17 +234,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 </span>
               </span>
             </div>
-            {onClose && (
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Close"
-                className="w-10 h-10 rounded-xl flex items-center justify-center transition hover:bg-[var(--theme-fill-hover)]"
-                style={{ color: 'var(--theme-text-muted)' }}
-              >
-                <X size={20} />
-              </button>
-            )}
           </div>
           <div className="h-12 px-6 flex items-center justify-between">
             <div className="h-12 flex items-start gap-5">
@@ -298,16 +280,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               {/* Profile card */}
               <section className="lg:w-[360px] shrink-0 rounded-2xl border p-6 flex flex-col items-center gap-2.5" style={cardStyle}>
                 <span className="relative w-[104px] h-[104px]">
-                  {shownAvatar ? (
-                    <img src={shownAvatar} alt="" className="w-full h-full rounded-full object-cover" style={{ backgroundColor: 'var(--theme-bg-surface)' }} />
-                  ) : (
-                    <span
-                      className="w-full h-full rounded-full flex items-center justify-center text-[42px] font-semibold"
-                      style={{ backgroundColor: fallback.bg, color: fallback.fg }}
-                    >
-                      {initialsOf(user.displayName || user.username)}
-                    </span>
-                  )}
+                  <Avatar name={name} src={user.avatarUrl} size={104} />
                   <span
                     className="absolute left-[81px] top-[81px] w-[26px] h-[26px] rounded-full flex items-center justify-center"
                     style={{ backgroundColor: 'var(--theme-bg-app)' }}
@@ -405,50 +378,24 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
           {tab === 'overview' && editing && (
             <form onSubmit={handleSaveProfile} className="max-w-[720px] rounded-[14px] border p-5 flex flex-col gap-4" style={cardStyle}>
-              <CardHeading title="Edit profile" subtitle="Picture, name and username" />
+              <CardHeading title="Edit profile" subtitle="Photo, name and username" />
               <div>
                 <span className={fieldLabel} style={{ color: 'var(--theme-text-muted)' }}>
-                  Picture
+                  Photo
                 </span>
-                <div className="flex items-center gap-3 mb-3">
-                  <img src={avatarUrl} alt="Selected avatar" className="w-16 h-16 rounded-full object-cover" style={{ backgroundColor: 'var(--theme-bg-surface)' }} />
+                <div className="flex items-center gap-3">
+                  <Avatar name={displayName.trim() || name} src={avatarUrl} size={64} />
                   <OutlineButton type="button" onClick={() => fileRef.current?.click()} disabled={isUploading}>
                     {isUploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
                     Upload photo
                   </OutlineButton>
+                  {isUploadedAvatar(avatarUrl) && (
+                    <OutlineButton type="button" onClick={() => setAvatarUrl(null)} disabled={isUploading}>
+                      <Trash2 size={15} />
+                      Remove
+                    </OutlineButton>
+                  )}
                   <input ref={fileRef} type="file" accept="image/*" hidden onChange={handleUpload} />
-                </div>
-                <p className="text-xs mb-2" style={{ color: 'var(--theme-text-muted)' }}>
-                  Or pick an avatar
-                </p>
-                <div className="grid grid-cols-6 sm:grid-cols-12 gap-2">
-                  {presets.map((url) => {
-                    const selected = url === avatarUrl;
-                    return (
-                      <button
-                        key={url}
-                        type="button"
-                        onClick={() => setAvatarUrl(url)}
-                        aria-label="Select avatar"
-                        aria-pressed={selected}
-                        className="relative aspect-square rounded-full overflow-hidden transition hover:scale-105"
-                        style={{
-                          backgroundColor: 'var(--theme-bg-surface)',
-                          boxShadow: selected ? '0 0 0 2px var(--theme-primary)' : undefined,
-                        }}
-                      >
-                        <img src={url} alt="" loading="lazy" className="w-full h-full" />
-                        {selected && (
-                          <span
-                            className="absolute top-0.5 right-0.5 rounded-full p-0.5"
-                            style={{ backgroundColor: 'var(--theme-primary)', color: 'var(--theme-primary-text)' }}
-                          >
-                            <Check size={10} />
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
                 </div>
               </div>
 

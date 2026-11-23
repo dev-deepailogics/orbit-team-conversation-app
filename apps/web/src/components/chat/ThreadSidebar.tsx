@@ -13,6 +13,7 @@ import { AnonAvatar } from './AnonAvatar';
 import { BotAvatar } from '../bot/BotAvatar';
 import { getTopEmojis, recordEmojiUsage } from '../../lib/emojiStore';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { PollCard } from './PollCard';
 import { RichTextEditor, RichTextEditorRef } from './RichTextEditor';
 import { FileAttachmentList, formatFileSize, getFileCategory } from './FileAttachmentList';
 import { CompressFileConfirmModal } from './CompressFileConfirmModal';
@@ -434,7 +435,8 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   };
 
   const isParentSelf = parentMessage.isSelf || (!isParentAnon && parentMessage.userId === currentUser?.id);
-  const canEditParent = !parentMessage.isDeleted && isParentSelf; // admins can delete a message, not edit it
+  // Admins can delete a message, not edit it; a poll's text comes from its question and options, so nobody edits it
+  const canEditParent = !parentMessage.isDeleted && isParentSelf && !parentMessage.poll;
   const canDeleteParent = !parentMessage.isDeleted && (isParentSelf || isWsAdmin || isSuperAdmin);
   const revealAnon = useAnonStore((s) => s.reveal);
   const authorName = isParentAnon
@@ -542,14 +544,18 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
               </div>
             ) : (
               <>
-                <div className="text-xs text-[var(--theme-text)] mt-1 max-w-none break-words">
-                  <MarkdownRenderer
-                    content={parentMessage.content}
-                    currentUsername={currentUser?.username}
-                    onMentionClick={handleMentionClick}
-                    onChannelClick={handleChannelClick}
-                  />
-                </div>
+                {parentMessage.poll ? (
+                  <PollCard messageId={parentMessage.id} poll={parentMessage.poll} isAnonymous={isParentAnon} />
+                ) : (
+                  <div className="text-xs text-[var(--theme-text)] mt-1 max-w-none break-words">
+                    <MarkdownRenderer
+                      content={parentMessage.content}
+                      currentUsername={currentUser?.username}
+                      onMentionClick={handleMentionClick}
+                      onChannelClick={handleChannelClick}
+                    />
+                  </div>
+                )}
 
                 {/* Parent Message Attachments */}
                 {parentMessage.attachments && parentMessage.attachments.length > 0 && (

@@ -9,6 +9,7 @@ import {
   Message,
   Project,
   SOCKET_EVENTS,
+  type PollUpdatedPayload,
 } from "@orbit/types";
 import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
@@ -48,7 +49,6 @@ import { useTeamPresence } from "@/components/availability/useTeamPresence";
 import { useLiveUserStatus } from "@/components/channel/useLiveUserStatus";
 import { WorkspaceSkeleton } from "@/components/brand/LoadingScreens";
 import { EmptyState } from "@/components/brand/EmptyState";
-import { ProfileModal } from "@/components/profile/ProfileModal";
 import { OfflineOverlay } from "@/components/brand/OfflineScreen";
 import { usePinStore } from "@/stores/pinnedStore";
 import { useSidebarSortStore } from "@/stores/sidebarSortStore";
@@ -145,33 +145,9 @@ export default function AppDashboard() {
   const closeRecorder = useRecorderStore((s) => s.close);
   const [canvases, setCanvases] = useState<any[]>([]);
   const [newCanvasSignal, setNewCanvasSignal] = useState(0);
-  const [showProfilePage, setShowProfilePage] = useState(false);
-  const wasProfileOpen = useRef(false);
+  // The canvas hub is toggled from several places; any of them leaves the video library.
   useEffect(() => {
-    if (
-      wasProfileOpen.current &&
-      !showProfilePage &&
-      typeof window !== "undefined"
-    ) {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get("view") === "profile") {
-        params.delete("view");
-        const qs = params.toString();
-        window.history.replaceState(
-          null,
-          "",
-          qs ? `?${qs}` : window.location.pathname,
-        );
-      }
-    }
-    wasProfileOpen.current = showProfilePage;
-  }, [showProfilePage]);
-  // The canvas hub is toggled from several places; any of them leaves the profile page.
-  useEffect(() => {
-    if (showCanvasHub) {
-      setShowProfilePage(false);
-      setShowVideoLibrary(false);
-    }
+    if (showCanvasHub) setShowVideoLibrary(false);
   }, [showCanvasHub]);
   const [newDocSignal, setNewDocSignal] = useState(0);
   const [selectedCanvasId, setSelectedCanvasId] = useState<string | null>(null);
@@ -352,12 +328,10 @@ export default function AppDashboard() {
       let targetProject: Project | null = null;
       let targetIsOrgControl = false;
       let targetDocs: { docId: string | null } | null = null;
-      let targetProfile = false;
       let targetThreadId: string | null = null;
       if (typeof window !== "undefined") {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get("search") === "1") setShowSearchModal(true);
-        if (urlParams.get("view") === "profile") targetProfile = true;
         const urlView = urlParams.get("view");
         const urlChId = urlParams.get("channelId");
         const urlProjId = urlParams.get("projectId");
@@ -390,7 +364,6 @@ export default function AppDashboard() {
       }
       // Docs open on top of the default channel so Home has somewhere to go back to
       if (targetDocs && !targetIsOrgControl) handleOpenDocs(targetDocs.docId);
-      if (targetProfile) openProfilePage();
     } catch (err) {
       console.error("Failed to load workspace details", err);
     }
@@ -444,7 +417,6 @@ export default function AppDashboard() {
   // 4. Handle Channel Selection (Chunked Initial Load)
   const handleSelectChannel = async (channel: Channel) => {
     cancelThreadOpening();
-    setShowProfilePage(false);
     setShowOrgControl(false);
     setShowCanvasHub(false);
     setShowDocsHub(false);
@@ -504,7 +476,6 @@ export default function AppDashboard() {
   const lastProjectIdRef = useRef<string | null>(null);
 
   const handleSelectProject = (project: Project) => {
-    setShowProfilePage(false);
     setShowOrgControl(false);
     setShowCanvasHub(false);
     setShowDocsHub(false);
@@ -521,7 +492,6 @@ export default function AppDashboard() {
 
   // 4c. Handle Organization Control URL Sync
   const handleOpenOrgControl = (subview?: string) => {
-    setShowProfilePage(false);
     setShowOrgControl(true);
     setShowCanvasHub(false);
     setShowDocsHub(false);
@@ -667,7 +637,6 @@ export default function AppDashboard() {
   };
 
   const handleOpenDocs = (docId: string | null = null) => {
-    setShowProfilePage(false);
     setShowCanvasHub(false);
     setShowOrgControl(false);
     setShowProjectsPanel(false);
@@ -686,7 +655,6 @@ export default function AppDashboard() {
   // Home: close every feature view (incl. an open board) and show the channel. Every "close" or
   // "back" path uses this, so the rail, the sidebar and the main area always agree.
   const goHome = () => {
-    setShowProfilePage(false);
     setShowCanvasHub(false);
     setShowDocsHub(false);
     setShowOrgControl(false);
@@ -716,7 +684,6 @@ export default function AppDashboard() {
       return;
     }
     // No boards yet: show the (empty) list with its "create" action over the current channel.
-    setShowProfilePage(false);
     setShowCanvasHub(false);
     setShowDocsHub(false);
     setShowOrgControl(false);
@@ -727,7 +694,6 @@ export default function AppDashboard() {
   // Video Library: every recording in this workspace (Loom-style grid). Like Canvas, it owns the
   // main area with no secondary sidebar; clicking it again goes Home.
   const openVideoLibrary = () => {
-    setShowProfilePage(false);
     setShowCanvasHub(false);
     setShowDocsHub(false);
     setShowOrgControl(false);
@@ -763,45 +729,6 @@ export default function AppDashboard() {
         window.history.replaceState(null, "", window.location.pathname);
       }
     }
-  };
-
-  // Profile: a full page in the main area (?view=profile)
-  // Rewrites the URL to just the channel/project it already names, plus or minus view=profile.
-  // Reads the live URL (not state) so it is correct inside stale closures such as the initial load.
-  const setProfileInUrl = (on: boolean) => {
-    if (typeof window === "undefined") return;
-    const current = new URLSearchParams(window.location.search);
-    const next = new URLSearchParams();
-    const projectId = current.get("projectId");
-    const channelId = current.get("channelId");
-    if (projectId) next.set("projectId", projectId);
-    else if (channelId) next.set("channelId", channelId);
-    if (on) next.set("view", "profile");
-    const qs = next.toString();
-    window.history.replaceState(
-      null,
-      "",
-      qs ? `?${qs}` : window.location.pathname,
-    );
-  };
-  const openProfilePage = () => {
-    setShowCanvasHub(false);
-    setShowDocsHub(false);
-    setShowOrgControl(false);
-    setShowVideoLibrary(false);
-    setIsMobileSidebarOpen(false);
-    setShowProfilePage(true);
-    setProfileInUrl(true);
-  };
-  // Switching or creating a workspace leaves the profile page (the URL would otherwise reopen it)
-  const switchWorkspace = (ws: Workspace) => {
-    setShowProfilePage(false);
-    setProfileInUrl(false);
-    handleSelectWorkspace(ws);
-  };
-  const closeProfilePage = () => {
-    setShowProfilePage(false);
-    syncUrlToCurrent();
   };
 
   // 4a. Load Older Messages (Cursor-based Pagination)
@@ -864,7 +791,6 @@ export default function AppDashboard() {
 
   // 4c. Handle selection of searched message
   const handleSelectSearchedMessage = async (searchedMsg: any) => {
-    setShowProfilePage(false);
     try {
       // 1. If message belongs to a channel that is not currently selected, switch to that channel
       if (!currentChannel || currentChannel.id !== searchedMsg.channelId) {
@@ -1008,6 +934,11 @@ export default function AppDashboard() {
             ),
         );
       }
+    };
+
+    // Someone voted: new totals for everyone viewing the channel (each client keeps its own choice)
+    const onPollUpdated = ({ messageId, poll }: PollUpdatedPayload) => {
+      useChatStore.getState().applyPollUpdate(messageId, poll);
     };
 
     // Typing indicators are tracked per user id. They clear on typing:stop, when that person's message arrives, and
@@ -1184,6 +1115,7 @@ export default function AppDashboard() {
     socket.on("message:new", onNewMessage);
     socket.on("thread:reply_notify", alertForMessage);
     socket.on("message:reaction", onReaction);
+    socket.on(SOCKET_EVENTS.POLL_UPDATED, onPollUpdated);
     socket.on("message:updated", onMessageUpdated);
     socket.on("message:pinned", onMessagePinned);
     socket.on("message:deleted", onMessageDeleted);
@@ -1218,6 +1150,7 @@ export default function AppDashboard() {
       socket.off("message:new", onNewMessage);
       socket.off("thread:reply_notify", alertForMessage);
       socket.off("message:reaction", onReaction);
+      socket.off(SOCKET_EVENTS.POLL_UPDATED, onPollUpdated);
       socket.off("message:updated", onMessageUpdated);
       socket.off("message:pinned", onMessagePinned);
       socket.off("message:deleted", onMessageDeleted);
@@ -1350,10 +1283,7 @@ export default function AppDashboard() {
       setShowBotPortal(true);
     },
     onLogout: logout,
-    onOpenProfile: openProfilePage,
-    activeFeature: showProfilePage
-      ? null
-      : canvasActive
+    activeFeature: canvasActive
         ? ("canvas" as const)
         : docsActive
           ? ("docs" as const)
@@ -1370,7 +1300,6 @@ export default function AppDashboard() {
           setShowDocsHub(false);
           setShowOrgControl(false);
           setShowProjectsPanel(false);
-          setShowProfilePage(false);
           setCurrentProject(null);
           setShowCanvasHub(true);
           if (typeof window !== "undefined") {
@@ -1386,10 +1315,10 @@ export default function AppDashboard() {
       ? () => (docsActive ? goHome() : handleOpenDocs())
       : undefined,
     onOpenProjects: currentWorkspace
-      ? () => (showProjectsPanel && !showProfilePage ? goHome() : openProjects())
+      ? () => (showProjectsPanel ? goHome() : openProjects())
       : undefined,
     onOpenVideoLibrary: currentWorkspace
-      ? () => (showVideoLibrary && !showProfilePage ? goHome() : openVideoLibrary())
+      ? () => (showVideoLibrary ? goHome() : openVideoLibrary())
       : undefined,
   };
 
@@ -1413,10 +1342,10 @@ export default function AppDashboard() {
               workspaces={workspaces}
               currentWorkspace={currentWorkspace}
               currentUser={user}
-              onSelectWorkspace={switchWorkspace}
+              onSelectWorkspace={handleSelectWorkspace}
               onWorkspaceCreated={(ws) => {
                 setWorkspaces([...workspaces, ws]);
-                switchWorkspace(ws);
+                handleSelectWorkspace(ws);
               }}
             />
             {/* Show Channels & DMs / Projects / Canvas / Docs sidebar */}
@@ -1524,10 +1453,10 @@ export default function AppDashboard() {
           workspaces={workspaces}
           currentWorkspace={currentWorkspace}
           currentUser={user}
-          onSelectWorkspace={switchWorkspace}
+          onSelectWorkspace={handleSelectWorkspace}
           onWorkspaceCreated={(ws) => {
             setWorkspaces([...workspaces, ws]);
-            switchWorkspace(ws);
+            handleSelectWorkspace(ws);
           }}
         />
       </div>
@@ -1596,15 +1525,7 @@ export default function AppDashboard() {
       )}
 
       {/* 3. Main Chat View or Empty Workspace State */}
-      {showProfilePage && user ? (
-        <ProfileModal
-          user={user}
-          workspaceId={currentWorkspace?.id}
-          presence={presence[user.id] || "offline"}
-          onClose={closeProfilePage}
-          onLogout={logout}
-        />
-      ) : workspaces.length === 0 ? (
+      {workspaces.length === 0 ? (
         <div
           className="flex-1 flex flex-col items-center justify-center p-6 text-center relative overflow-y-auto"
           style={{ backgroundColor: "var(--theme-bg-app)" }}

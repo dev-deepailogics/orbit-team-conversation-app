@@ -1,12 +1,13 @@
 import { getThreadAlertRecipientIds } from '../services/alertRecipients.js';
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { prisma } from '@orbit/db';
-import { SOCKET_EVENTS } from '@orbit/types';
+import { POLL_LIMITS, SOCKET_EVENTS } from '@orbit/types';
 import { z } from 'zod';
 import { quotedMessageInclude, verifyMessageAccess, verifyQuotable, verifyWorkspaceMember } from '../utils/security.js';
 import { handleMessageMentions } from '../services/mentionService.js';
 import { emitPerViewer, getOrCreateAnonProfile, sanitizeMessageForViewer } from '../services/anonymousService.js';
 import { ACTIVITY_CHANNEL, postActivity } from '../services/systemBot.js';
+import { castPollVote, pollInclude, PollVoteError, toPollView } from '../services/pollService.js';
 
 export const MIN_SEARCH_LENGTH = 3;
 
@@ -42,6 +43,11 @@ const reactionSchema = z.object({
 
 const editMessageSchema = z.object({
   content: z.string().min(1, 'Message content cannot be empty'),
+});
+
+// The full set of options the voter now picks; [] takes their vote back
+const pollVoteSchema = z.object({
+  optionIds: z.array(z.string().min(1)).max(POLL_LIMITS.maxOptions),
 });
 
 export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
@@ -239,6 +245,7 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
             user: { select: { id: true, username: true, displayName: true } },
           },
         },
+        poll: pollInclude,
         // The total, now that a client only holds the replies it has loaded
         _count: { select: { replies: true } },
       },
@@ -417,6 +424,49 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     return reply.status(201).send(selfReply);
   });
 
+  // Vote on a poll (replaces the voter's previous answer)
+  fastify.post('/:messageId/poll/votes', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { messageId } = request.params as { messageId: string };
+    const userId = (request.user as { id: string }).id;
+
+    const parseResult = pollVoteSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.errors[0].message });
+    }
+
+    const access = await verifyMessageAccess(userId, messageId, reply);
+    if (!access) return;
+    if (access.message.isDeleted) {
+      return reply.status(400).send({ error: 'This poll was deleted' });
+    }
+
+    let poll;
+    try {
+      poll = await castPollVote(messageId, userId, parseResult.data.optionIds);
+    } catch (err) {
+      if (err instanceof PollVoteError) return reply.status(400).send({ error: err.message });
+      throw err;
+    }
+
+    // Everyone viewing the channel gets the new totals; nothing in it says who voted, and in anonymous channels no
+    // voter is listed at all. Each client keeps its own choice, which only the voter's response carries.
+    const isAnon = access.channel.isAnonymous;
+    fastify.io?.to(`channel:${access.message.channelId}`).emit(SOCKET_EVENTS.POLL_UPDATED, {
+      messageId,
+      channelId: access.message.channelId,
+      poll: toPollView(poll, null, isAnon),
+    });
+    // The voter's other tabs and devices also need their new choice (the user room is only this user's sockets)
+    const mine = toPollView(poll, userId, isAnon);
+    fastify.io?.to(`user:${userId}`).emit(SOCKET_EVENTS.POLL_UPDATED, {
+      messageId,
+      channelId: access.message.channelId,
+      poll: mine,
+    });
+
+    return reply.send(mine);
+  });
+
   // Toggle emoji reaction
   fastify.post('/:messageId/reactions', { preHandler: [fastify.authenticate] }, async (request, reply) => {
     const { messageId } = request.params as { messageId: string };
@@ -537,6 +587,11 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       if (quoted && quoted.channelId !== access.message.channelId) {
         return reply.status(400).send({ error: 'Forwarded messages cannot be edited' });
       }
+    }
+
+    // A poll's content is generated from its question and options; changing it would leave the two out of step
+    if (await prisma.poll.findUnique({ where: { messageId }, select: { id: true } })) {
+      return reply.status(400).send({ error: 'Polls cannot be edited' });
     }
 
     const parseResult = editMessageSchema.safeParse(request.body);

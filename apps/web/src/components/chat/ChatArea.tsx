@@ -28,6 +28,7 @@ import {
   Mask,
   Eye,
   Canvas,
+  BarChart3,
   More,
   Users,
   User as UserIcon,
@@ -74,6 +75,8 @@ import { UserHoverCard } from "./UserHoverCard";
 import { Presence, PRESENCE_STYLE } from "../availability/useTeamPresence";
 import { useTimeFormat, formatMessageTime } from "../../lib/timeFormat";
 import { ForwardMessageDialog } from "./ForwardMessageDialog";
+import { PollCard } from "./PollCard";
+import { CreatePollModal } from "./CreatePollModal";
 import { MessageChangeNote } from "./MessageChangeNote";
 // Anonymous-feed warm accent (Figma amber/600); text uses a darker mix so it stays readable on any theme.
 const ANON_WARM = "#D97706";
@@ -256,6 +259,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     null,
   );
   const [showEmoji, setShowEmoji] = useState(false);
+  const [showPollModal, setShowPollModal] = useState(false);
+  // A poll is started for one conversation; switching away (e.g. via a notification) drops the half-written one
+  useEffect(() => setShowPollModal(false), [channel.id]);
   const [activeEmojiMessageId, setActiveEmojiMessageId] = useState<
     string | null
   >(null);
@@ -1629,7 +1635,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         !!msg.quotedMessage &&
                         msg.quotedMessage.channelId !== msg.channelId;
                       // Only the author edits (admins can delete, not edit); forwards are read-only copies.
-                      const canEdit = !msg.isDeleted && isSelf && !isForward;
+                      const canEdit = !msg.isDeleted && isSelf && !isForward && !msg.poll;
                       const canDelete =
                         !msg.isDeleted && (isSelf || isWsAdmin || isSuperAdmin);
                       // Your own persona stays hidden until you reveal it with the eye toggle.
@@ -2041,19 +2047,27 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                                   {/* Message Content */}
                                   {!isForward && (
                                     <>
-                                      <div
-                                        className="text-sm leading-[21px] max-w-none break-words"
-                                        style={{ color: "var(--theme-text)" }}
-                                      >
-                                        <MarkdownRenderer
-                                          content={msg.content}
-                                          currentUsername={
-                                            currentUser?.username
-                                          }
-                                          onMentionClick={onMentionClickStable}
-                                          onChannelClick={onChannelClickStable}
+                                      {msg.poll ? (
+                                        <PollCard
+                                          messageId={msg.id}
+                                          poll={msg.poll}
+                                          isAnonymous={channel.isAnonymous}
                                         />
-                                      </div>
+                                      ) : (
+                                        <div
+                                          className="text-sm leading-[21px] max-w-none break-words"
+                                          style={{ color: "var(--theme-text)" }}
+                                        >
+                                          <MarkdownRenderer
+                                            content={msg.content}
+                                            currentUsername={
+                                              currentUser?.username
+                                            }
+                                            onMentionClick={onMentionClickStable}
+                                            onChannelClick={onChannelClickStable}
+                                          />
+                                        </div>
+                                      )}
 
                                       {/* Attachments */}
                                       {msg.attachments &&
@@ -2617,6 +2631,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         active: false,
                       },
                       {
+                        title: "Create poll",
+                        Icon: BarChart3,
+                        onClick: () => setShowPollModal(true),
+                        active: showPollModal,
+                      },
+                      {
                         title: "Record a screen clip (Loom-style)",
                         Icon: Video,
                         onClick: () =>
@@ -2731,6 +2751,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             // Update channel in store if needed
             useChatStore.getState().updateChannel(updated);
           }}
+        />
+      )}
+
+      {showPollModal && (
+        <CreatePollModal
+          channelId={channel.id}
+          isAnonymous={channel.isAnonymous}
+          onClose={() => setShowPollModal(false)}
+          onCreated={(message) => useChatStore.getState().addMessage(message)}
         />
       )}
 

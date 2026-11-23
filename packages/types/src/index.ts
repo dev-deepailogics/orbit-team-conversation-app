@@ -313,6 +313,42 @@ export interface Message {
   reactions?: Reaction[];
   replyCount?: number;
   latestReplyAt?: string | null;
+  poll?: MessagePoll | null;
+}
+
+/** Shared by the server's validation and the web's poll form. */
+export const POLL_LIMITS = { questionLength: 300, optionLength: 100, minOptions: 2, maxOptions: 10 } as const;
+
+export interface PollVoter {
+  id: string;
+  displayName: string;
+  avatarUrl?: string | null;
+}
+
+export interface PollOptionView {
+  id: string;
+  text: string;
+  voteCount: number;
+  /** Who picked this option. Never present in anonymous channels, where only counts are shared. */
+  voters?: PollVoter[];
+}
+
+/** A poll as one viewer sees it. */
+export interface MessagePoll {
+  id: string;
+  question: string;
+  allowMultiple: boolean;
+  options: PollOptionView[];
+  /** Distinct people who voted. */
+  voterCount: number;
+  /** Option ids the viewer picked. Absent on broadcasts, which go to everyone (clients keep their own). */
+  myVotes?: string[];
+}
+
+export interface PollUpdatedPayload {
+  messageId: string;
+  channelId: string;
+  poll: MessagePoll;
 }
 
 // ==========================================
@@ -606,6 +642,7 @@ export const SOCKET_EVENTS = {
   USER_STATUS_CHANGE: "user:status_change",
   // Sent only to the people in a thread (not the whole channel) when someone replies in it
   THREAD_REPLY_NOTIFY: "thread:reply_notify",
+  POLL_UPDATED: "poll:updated",
   NOTIFICATION_NEW: "notification:new",
 
   // Employee Availability & Time Tracking
