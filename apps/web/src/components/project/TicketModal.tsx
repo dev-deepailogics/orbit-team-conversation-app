@@ -152,7 +152,6 @@ export const TicketFields: React.FC<{
             initialValue={initialDescription || ''}
             placeholder="Add more detail, steps or links"
             minHeight="82px"
-            showToolbar={false}
           />
         </div>
       </Field>

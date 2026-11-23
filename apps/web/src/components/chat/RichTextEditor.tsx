@@ -77,6 +77,80 @@ function getInlineFormattingParent(node: Node | null, rootEl: HTMLElement): HTML
 
 const CODE_BLOCK_PLACEHOLDER = '// type code here';
 
+type Format = 'bold' | 'italic' | 'strike' | 'h1' | 'h2' | 'ul' | 'ol' | 'quote' | 'code' | 'codeBlock' | 'link';
+
+// Elements that light a toolbar button while the selection is inside them.
+const TAG_FORMATS: Record<string, Format> = {
+  h1: 'h1',
+  h2: 'h2',
+  ul: 'ul',
+  ol: 'ol',
+  blockquote: 'quote',
+  code: 'code',
+  pre: 'codeBlock',
+  a: 'link',
+};
+
+function queryState(command: string): boolean {
+  try {
+    return document.queryCommandState(command);
+  } catch {
+    return false;
+  }
+}
+
+/** Formats applied where the selection is, as a stable key (e.g. "ul,bold") so an unchanged result skips a re-render. */
+function getActiveFormats(root: HTMLElement): string {
+  const sel = window.getSelection();
+  const node = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).commonAncestorContainer : null;
+  if (!node || !root.contains(node)) return '';
+
+  const active = new Set<Format>();
+  for (let n: Node | null = node; n && n !== root; n = n.parentNode) {
+    const format = n.nodeType === Node.ELEMENT_NODE ? TAG_FORMATS[(n as Element).tagName.toLowerCase()] : undefined;
+    if (format) active.add(format);
+  }
+  if (active.has('codeBlock')) active.delete('code'); // a code block's own <code> isn't inline code
+
+  // Bold/italic/strike come from the browser, which also knows formatting switched on at an empty caret (not in the DOM
+  // until something is typed). Headings are bold and quotes italic by CSS alone, so those don't light the buttons.
+  if (queryState('bold') && !active.has('h1') && !active.has('h2')) active.add('bold');
+  if (queryState('italic') && !active.has('quote')) active.add('italic');
+  if (queryState('strikeThrough')) active.add('strike');
+  return Array.from(active).join(',');
+}
+
+function ToolbarButton({
+  title,
+  active,
+  onClick,
+  children,
+}: {
+  title: string;
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      aria-pressed={active}
+      // Keep focus (and the selection) in the editor
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onClick}
+      className={`p-1.5 rounded-lg transition active:scale-95 ${
+        active
+          ? 'text-[var(--theme-primary)] bg-[var(--theme-bg-surface-hover)]'
+          : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
 /** Nearest ancestor (or self) with the given tag, stopping at the editor root. */
 function closestInEditor(node: Node | null, tag: string, rootEl: HTMLElement): HTMLElement | null {
   let curr: Node | null = node;
@@ -265,6 +339,21 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
     ref
   ) => {
     const editorRef = useRef<HTMLDivElement | null>(null);
+
+    // Toolbar buttons light up for the formatting under the caret / selection
+    const [activeKey, setActiveKey] = useState('');
+    const activeFormats = React.useMemo(() => new Set(activeKey.split(',')), [activeKey]);
+    const refreshActiveFormats = () => {
+      if (showToolbar && editorRef.current) setActiveKey(getActiveFormats(editorRef.current));
+    };
+    useEffect(() => {
+      if (!showToolbar) return;
+      const onSelectionChange = () => {
+        if (editorRef.current) setActiveKey(getActiveFormats(editorRef.current));
+      };
+      document.addEventListener('selectionchange', onSelectionChange);
+      return () => document.removeEventListener('selectionchange', onSelectionChange);
+    }, [showToolbar]);
 
     // Mention Autocomplete State
     const [mentionState, setMentionState] = useState<{
@@ -1014,126 +1103,52 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       }, 0);
     };
 
+    const toolbarGroups: { format: Format; title: string; icon: React.ReactNode; run: () => void }[][] = [
+      [
+        { format: 'bold', title: 'Bold (Ctrl+B)', icon: <Bold size={14} />, run: () => executeCommand('bold') },
+        { format: 'italic', title: 'Italic (Ctrl+I)', icon: <Italic size={14} />, run: () => executeCommand('italic') },
+        { format: 'strike', title: 'Strikethrough', icon: <Strikethrough size={14} />, run: () => executeCommand('strikeThrough') },
+      ],
+      [
+        { format: 'h1', title: 'Heading 1', icon: <Heading1 size={14} />, run: () => handleFormatHeading(1) },
+        { format: 'h2', title: 'Heading 2', icon: <Heading2 size={14} />, run: () => handleFormatHeading(2) },
+      ],
+      [
+        { format: 'ul', title: 'Bullet List', icon: <List size={14} />, run: () => executeCommand('insertUnorderedList') },
+        { format: 'ol', title: 'Numbered List', icon: <ListOrdered size={14} />, run: () => executeCommand('insertOrderedList') },
+        { format: 'quote', title: 'Blockquote', icon: <Quote size={14} />, run: () => executeCommand('formatBlock', '<blockquote>') },
+      ],
+      [
+        { format: 'code', title: 'Inline Code', icon: <Code size={14} />, run: handleFormatInlineCode },
+        { format: 'codeBlock', title: 'Code Block', icon: <FileCode size={14} />, run: handleFormatCodeBlock },
+        { format: 'link', title: 'Link', icon: <LinkIcon size={14} />, run: handleFormatLink },
+      ],
+    ];
+
     return (
       <div className={`relative flex flex-col w-full ${className}`}>
         {/* Live Format Toolbar */}
         {showToolbar && (
           <div className="flex items-center gap-0.5 px-2.5 py-1.5 bg-[var(--theme-bg-surface)] border-b border-[var(--theme-border)] overflow-x-auto select-none">
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => executeCommand('bold')}
-              title="Bold (Ctrl+B)"
-              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition active:scale-95"
-            >
-              <Bold size={14} />
-            </button>
-
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => executeCommand('italic')}
-              title="Italic (Ctrl+I)"
-              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition active:scale-95"
-            >
-              <Italic size={14} />
-            </button>
-
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => executeCommand('strikeThrough')}
-              title="Strikethrough"
-              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition active:scale-95"
-            >
-              <Strikethrough size={14} />
-            </button>
-
-            <span className="w-px h-4 bg-[var(--theme-bg-surface-hover)] mx-1 shrink-0" />
-
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => handleFormatHeading(1)}
-              title="Heading 1"
-              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition active:scale-95"
-            >
-              <Heading1 size={14} />
-            </button>
-
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => handleFormatHeading(2)}
-              title="Heading 2"
-              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition active:scale-95"
-            >
-              <Heading2 size={14} />
-            </button>
-
-            <span className="w-px h-4 bg-[var(--theme-bg-surface-hover)] mx-1 shrink-0" />
-
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => executeCommand('insertUnorderedList')}
-              title="Bullet List"
-              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition active:scale-95"
-            >
-              <List size={14} />
-            </button>
-
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => executeCommand('insertOrderedList')}
-              title="Numbered List"
-              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition active:scale-95"
-            >
-              <ListOrdered size={14} />
-            </button>
-
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => executeCommand('formatBlock', '<blockquote>')}
-              title="Blockquote"
-              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition active:scale-95"
-            >
-              <Quote size={14} />
-            </button>
-
-            <span className="w-px h-4 bg-[var(--theme-bg-surface-hover)] mx-1 shrink-0" />
-
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={handleFormatInlineCode}
-              title="Inline Code"
-              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition active:scale-95"
-            >
-              <Code size={14} />
-            </button>
-
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={handleFormatCodeBlock}
-              title="Code Block"
-              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition active:scale-95"
-            >
-              <FileCode size={14} />
-            </button>
-
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={handleFormatLink}
-              title="Link"
-              className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition active:scale-95"
-            >
-              <LinkIcon size={14} />
-            </button>
+            {toolbarGroups.map((group, i) => (
+              <React.Fragment key={i}>
+                {i > 0 && <span className="w-px h-4 bg-[var(--theme-bg-surface-hover)] mx-1 shrink-0" />}
+                {group.map(({ format, title, icon, run }) => (
+                  <ToolbarButton
+                    key={format}
+                    title={title}
+                    active={activeFormats.has(format)}
+                    onClick={() => {
+                      run();
+                      // Formatting switched on at an empty caret doesn't move the selection, so no selectionchange fires
+                      refreshActiveFormats();
+                    }}
+                  >
+                    {icon}
+                  </ToolbarButton>
+                ))}
+              </React.Fragment>
+            ))}
           </div>
         )}
 
@@ -1195,7 +1210,11 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
             onPaste={handlePaste}
             onKeyDown={handleEditorKeyDown}
             onInput={handleInput}
-            onKeyUp={checkMentionTrigger}
+            onKeyUp={() => {
+              checkMentionTrigger();
+              // Ctrl+B / Ctrl+I at an empty caret change formatting without moving the selection
+              refreshActiveFormats();
+            }}
             onClick={checkMentionTrigger}
             style={{ minHeight, color: 'var(--theme-text-primary)' }}
             data-placeholder={placeholder}
