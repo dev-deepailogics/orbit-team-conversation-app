@@ -2,55 +2,61 @@ import { useColorScheme, vars } from 'nativewind';
 
 // The only place colors are defined. Tailwind classes read these through CSS variables
 // (set on the app root via `cssVars`); JS props (icons, spinners, editor/markdown styles) use useTheme().
-// Text/background pairs are WCAG AA (≥ 4.5:1); `brand` only carries large text and icons.
+// Every text/background pair is WCAG AA (≥ 4.5:1); icons on background/accent (primary checks) are ≥ 3:1.
+// Hues from web's Mint Teal (apps/web/src/lib/theme.ts), darkened where web's own values miss AA.
 const light = {
   background: '#FFFFFF',
-  foreground: '#1D1C1D',
-  muted: '#F8F8F8',
-  mutedForeground: '#616061',
-  subtle: '#868686',
-  border: '#E2E2E2',
-  input: '#C9C9C9',
-  brand: '#0F2C59',
+  foreground: '#10201D', // web textColor
+  muted: '#F6FAF9', // web surfaceColor
+  mutedForeground: '#466059', // web textMutedColor
+  subtle: '#587670',
+  border: '#DBE7E4', // web borderColor
+  input: '#C0D2CE', // slate/300
+  // Mobile's header stays dark in both schemes (white text), so it takes the brand scale, not web's light sidebar.
+  brand: '#134E4A', // brand/900
   brandForeground: '#FFFFFF',
-  primary: '#1D6FE0',
+  // brand/700: web's #0D9488 under white text is only 3.7:1.
+  primary: '#0F766E',
   primaryForeground: '#FFFFFF',
-  link: '#1D6FE0',
-  accent: '#E8F1FD',
-  accentForeground: '#1A5DC2',
+  link: '#0F766E',
+  accent: '#D5E6E2', // web selectedColor
+  accentForeground: '#115E59', // brand/800
   destructive: '#E01E5A',
   destructiveForeground: '#FFFFFF',
   success: '#007A5A',
   successForeground: '#FFFFFF',
   warning: '#E8912D',
-  codeBg: '#F8F8F8',
+  codeBg: '#F6FAF9',
   overlay: '#000000',
 };
 
 export type Palette = typeof light;
 export type Scheme = 'light' | 'dark';
 
+// Near-black with a faint teal cast under a deep-teal header (Slack's dark aubergine pattern).
 const dark: Palette = {
-  background: '#1A1D21',
-  foreground: '#D1D2D3',
-  muted: '#222529',
-  mutedForeground: '#ABABAD',
-  subtle: '#8C8D8F',
-  border: '#2E3136',
-  input: '#4A4D52',
-  brand: '#13294A',
+  background: '#080B0B',
+  foreground: '#D3DAD8',
+  muted: '#111615',
+  mutedForeground: '#A6B1AE',
+  subtle: '#8C9895',
+  border: '#1D2523',
+  input: '#4A5654',
+  // Slack keeps its aubergine in the dark header; same idea with a deep, muted teal (white text 12.5:1).
+  brand: '#0F3A36',
   brandForeground: '#FFFFFF',
-  primary: '#1D6FE0',
-  primaryForeground: '#FFFFFF',
-  link: '#6FAEEB',
-  accent: '#1D3047',
-  accentForeground: '#8DC0F2',
+  // Web's bright teal; white on it is 2.5:1, so it carries dark text (like `destructive` below).
+  primary: '#14B8A6',
+  primaryForeground: '#0D1312',
+  link: '#2DD4BF',
+  accent: '#173B37',
+  accentForeground: '#7EE0D0',
   destructive: '#E5507A',
-  destructiveForeground: '#1A1D21',
+  destructiveForeground: '#080B0B',
   success: '#007A5A',
   successForeground: '#FFFFFF',
   warning: '#E8912D',
-  codeBg: '#222529',
+  codeBg: '#111615',
   overlay: '#000000',
 };
 

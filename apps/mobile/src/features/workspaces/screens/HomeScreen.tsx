@@ -20,6 +20,7 @@ import { useAuthStore } from '@/features/auth/store';
 import { AvailabilitySheet } from '@/features/availability/components/AvailabilitySheet';
 import { PresenceAvatar } from '@/features/availability/components/PresenceAvatar';
 import { useTheme } from '@/lib/theme';
+import { cn } from '@/lib/utils';
 import type { TabScreenProps } from '@/navigation/types';
 import { ChannelRow } from '../components/ChannelRow';
 import { JoinWorkspaceForm } from '../components/JoinWorkspaceForm';
@@ -191,9 +192,15 @@ export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
               setRefreshing(false);
             }
           }}
-          renderItem={({ item }) =>
+          renderItem={({ item, index }) =>
             item.kind === 'header' ? (
-              <View className="mt-3 flex-row items-center justify-between pl-4 pr-2 pt-2">
+              <View
+                className={cn(
+                  'mt-3 flex-row items-center justify-between pl-4 pr-2 pt-2',
+                  // Hairline between sections (Channels | Direct messages), not above the first one.
+                  index > 0 && 'border-t border-border pt-3',
+                )}
+              >
                 <Text className="font-bold">{item.title}</Text>
                 {item.onAdd && (
                   <Pressable
