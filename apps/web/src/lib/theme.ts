@@ -1,20 +1,20 @@
-import { ThemeConfig } from '@orbit/types';
+import { ThemeConfig } from "@orbit/types";
 
 const ORBIT_DARK: ThemeConfig = {
-  id: 'orbit-dark',
-  name: 'Orbit Dark',
-  sidebarColor: '#1F2326',
-  workspaceColor: '#19171D',
-  backgroundColor: '#1A1D21',
-  surfaceColor: '#222529',
-  surfaceHoverColor: '#2C3136',
-  textColor: '#FFFFFF',
-  textMutedColor: '#9CA3AF',
-  primaryColor: '#007A5A',
-  primaryHoverColor: '#00664B',
-  primaryTextColor: '#FFFFFF',
-  secondaryColor: '#1164A3',
-  borderColor: '#383F45',
+  id: "orbit-dark",
+  name: "Orbit Dark",
+  sidebarColor: "#1F2326",
+  workspaceColor: "#19171D",
+  backgroundColor: "#1A1D21",
+  surfaceColor: "#222529",
+  surfaceHoverColor: "#2C3136",
+  textColor: "#FFFFFF",
+  textMutedColor: "#9CA3AF",
+  primaryColor: "#007A5A",
+  primaryHoverColor: "#00664B",
+  primaryTextColor: "#FFFFFF",
+  secondaryColor: "#1164A3",
+  borderColor: "#383F45",
 };
 
 export const THEME_PRESETS: ThemeConfig[] = [
@@ -22,313 +22,320 @@ export const THEME_PRESETS: ThemeConfig[] = [
   // Figma "Orbit Theme Guideline (Mint teal)". Light follows the Redesign v2/v3 screens:
   // the guideline's brand/900 sidebar needs a separate on-sidebar text color ThemeConfig can't express.
   {
-    id: 'mint-teal-light',
-    name: 'Mint Teal (Light)',
-    sidebarColor: '#F2F6F5',
-    workspaceColor: '#E6EDEB',
-    backgroundColor: '#FFFFFF',
-    surfaceColor: '#F6FAF9', // slate/50
-    surfaceHoverColor: '#EDF4F2', // slate/100
-    textColor: '#10201D', // slate/900
-    textMutedColor: '#466059', // slate/600
-    primaryColor: '#0D9488', // brand/600
-    primaryHoverColor: '#0F766E', // brand/700
-    primaryTextColor: '#FFFFFF',
-    secondaryColor: '#2D5855',
-    borderColor: '#DBE7E4', // slate/200
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-    selectedColor: '#D5E6E2',
-    accentColor: '#2D5855',
-    sectionColor: '#3E6F68',
+    id: "mint-teal-light",
+    name: "Mint Teal (Light)",
+    sidebarColor: "#F2F6F5",
+    workspaceColor: "#E6EDEB",
+    backgroundColor: "#FFFFFF",
+    surfaceColor: "#F6FAF9", // slate/50
+    surfaceHoverColor: "#EDF4F2", // slate/100
+    textColor: "#10201D", // slate/900
+    textMutedColor: "#466059", // slate/600
+    primaryColor: "#0D9488", // brand/600
+    primaryHoverColor: "#0F766E", // brand/700
+    primaryTextColor: "#FFFFFF",
+    secondaryColor: "#2D5855",
+    borderColor: "#DBE7E4", // slate/200
+    fontFamily:
+      "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    selectedColor: "#D5E6E2",
+    accentColor: "#2D5855",
+    sectionColor: "#3E6F68",
   },
   {
-    id: 'mint-teal-dark',
-    name: 'Mint Teal (Dark)',
-    sidebarColor: '#042F2E', // brand/950
-    workspaceColor: '#042F2E',
-    backgroundColor: '#10201D', // slate/900
-    surfaceColor: '#1F312D', // slate/800
-    surfaceHoverColor: '#304842', // slate/700
-    textColor: '#F6FAF9', // slate/50
-    textMutedColor: '#C0D2CE', // slate/300
-    primaryColor: '#14B8A6', // brand/500
-    primaryHoverColor: '#2DD4BF', // brand/400
-    primaryTextColor: '#FFFFFF',
-    secondaryColor: '#5EEAD4', // brand/300
-    borderColor: '#304842', // slate/700
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-    selectedColor: '#134E4A', // brand/900 (bg/selected, dark)
-    sectionColor: '#8BA7A1', // slate/400 (text/muted, dark)
+    id: "mint-teal-dark",
+    name: "Mint Teal (Dark)",
+    sidebarColor: "#042F2E", // brand/950
+    workspaceColor: "#042F2E",
+    backgroundColor: "#10201D", // slate/900
+    surfaceColor: "#1F312D", // slate/800
+    surfaceHoverColor: "#304842", // slate/700
+    textColor: "#F6FAF9", // slate/50
+    textMutedColor: "#C0D2CE", // slate/300
+    primaryColor: "#14B8A6", // brand/500
+    primaryHoverColor: "#2DD4BF", // brand/400
+    primaryTextColor: "#FFFFFF",
+    secondaryColor: "#5EEAD4", // brand/300
+    borderColor: "#304842", // slate/700
+    fontFamily:
+      "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    selectedColor: "#134E4A", // brand/900 (bg/selected, dark)
+    sectionColor: "#8BA7A1", // slate/400 (text/muted, dark)
   },
   {
-    id: 'navy-glass',
-    name: 'Navy Glass',
-    sidebarColor: '#1F4468',
-    workspaceColor: '#183858',
-    backgroundColor: '#24507A',
-    surfaceColor: '#2E5D8A', // glass rgba(58,95,133,.5) flattened onto navy
-    surfaceHoverColor: '#3A6A98',
-    textColor: '#F4F7FB',
-    textMutedColor: '#A9BED4', // lifted from #8FA6BF for 4.5:1 contrast on bg
-    primaryColor: '#F2B53A',
-    primaryHoverColor: '#E0A22A',
-    primaryTextColor: '#14284A',
-    secondaryColor: '#CBD5F0',
-    borderColor: '#3B6690',
+    id: "navy-glass",
+    name: "Navy Glass",
+    sidebarColor: "#1F4468",
+    workspaceColor: "#183858",
+    backgroundColor: "#24507A",
+    surfaceColor: "#2E5D8A", // glass rgba(58,95,133,.5) flattened onto navy
+    surfaceHoverColor: "#3A6A98",
+    textColor: "#F4F7FB",
+    textMutedColor: "#A9BED4", // lifted from #8FA6BF for 4.5:1 contrast on bg
+    primaryColor: "#F2B53A",
+    primaryHoverColor: "#E0A22A",
+    primaryTextColor: "#14284A",
+    secondaryColor: "#CBD5F0",
+    borderColor: "#3B6690",
   },
   {
-    id: 'navy-glass-light',
-    name: 'Navy Glass (Light)',
-    sidebarColor: '#DCE4F2',
-    workspaceColor: '#CBD7EA',
-    backgroundColor: '#E9EEF7', // soft blue-grey, no pure white glare
-    surfaceColor: '#F4F7FB',
-    surfaceHoverColor: '#D3DEEE',
-    textColor: '#14284A',
-    textMutedColor: '#4A6082', // ≥4.5:1 on sidebar + bg
-    primaryColor: '#2A5A86', // navy, not yellow: primary is also used as text/icon color
-    primaryHoverColor: '#1F4468',
-    primaryTextColor: '#FFFFFF',
-    secondaryColor: '#F2B53A',
-    borderColor: '#C3CFE3',
+    id: "navy-glass-light",
+    name: "Navy Glass (Light)",
+    sidebarColor: "#DCE4F2",
+    workspaceColor: "#CBD7EA",
+    backgroundColor: "#E9EEF7", // soft blue-grey, no pure white glare
+    surfaceColor: "#F4F7FB",
+    surfaceHoverColor: "#D3DEEE",
+    textColor: "#14284A",
+    textMutedColor: "#4A6082", // ≥4.5:1 on sidebar + bg
+    primaryColor: "#2A5A86", // navy, not yellow: primary is also used as text/icon color
+    primaryHoverColor: "#1F4468",
+    primaryTextColor: "#FFFFFF",
+    secondaryColor: "#F2B53A",
+    borderColor: "#C3CFE3",
   },
   {
-    id: 'aubergine-classic',
-    name: 'Aubergine Classic',
-    sidebarColor: '#3F0E40',
-    workspaceColor: '#350D36',
-    backgroundColor: '#1A1D21',
-    surfaceColor: '#28172B',
-    surfaceHoverColor: '#38223C',
-    textColor: '#FFFFFF',
-    textMutedColor: '#D3C4D6',
-    primaryColor: '#ECB22E',
-    primaryHoverColor: '#D99F20',
-    primaryTextColor: '#1A1D21',
-    secondaryColor: '#1164A3',
-    borderColor: '#4D1D4F',
+    id: "aubergine-classic",
+    name: "Aubergine Classic",
+    sidebarColor: "#3F0E40",
+    workspaceColor: "#350D36",
+    backgroundColor: "#1A1D21",
+    surfaceColor: "#28172B",
+    surfaceHoverColor: "#38223C",
+    textColor: "#FFFFFF",
+    textMutedColor: "#D3C4D6",
+    primaryColor: "#ECB22E",
+    primaryHoverColor: "#D99F20",
+    primaryTextColor: "#1A1D21",
+    secondaryColor: "#1164A3",
+    borderColor: "#4D1D4F",
   },
   {
-    id: 'midnight-navy',
-    name: 'Midnight Navy',
-    sidebarColor: '#0F172A',
-    workspaceColor: '#0B1120',
-    backgroundColor: '#090D16',
-    surfaceColor: '#1E293B',
-    surfaceHoverColor: '#334155',
-    textColor: '#F8FAFC',
-    textMutedColor: '#94A3B8',
-    primaryColor: '#38BDF8',
-    primaryHoverColor: '#0284C7',
-    primaryTextColor: '#0F172A',
-    secondaryColor: '#818CF8',
-    borderColor: '#1E293B',
+    id: "midnight-navy",
+    name: "Midnight Navy",
+    sidebarColor: "#0F172A",
+    workspaceColor: "#0B1120",
+    backgroundColor: "#090D16",
+    surfaceColor: "#1E293B",
+    surfaceHoverColor: "#334155",
+    textColor: "#F8FAFC",
+    textMutedColor: "#94A3B8",
+    primaryColor: "#38BDF8",
+    primaryHoverColor: "#0284C7",
+    primaryTextColor: "#0F172A",
+    secondaryColor: "#818CF8",
+    borderColor: "#1E293B",
   },
   {
-    id: 'emerald-forest',
-    name: 'Emerald Forest',
-    sidebarColor: '#064E3B',
-    workspaceColor: '#022C22',
-    backgroundColor: '#041C15',
-    surfaceColor: '#0B3B2F',
-    surfaceHoverColor: '#134E3F',
-    textColor: '#ECFDF5',
-    textMutedColor: '#6EE7B7',
-    primaryColor: '#10B981',
-    primaryHoverColor: '#059669',
-    primaryTextColor: '#FFFFFF',
-    secondaryColor: '#34D399',
-    borderColor: '#047857',
+    id: "emerald-forest",
+    name: "Emerald Forest",
+    sidebarColor: "#064E3B",
+    workspaceColor: "#022C22",
+    backgroundColor: "#041C15",
+    surfaceColor: "#0B3B2F",
+    surfaceHoverColor: "#134E3F",
+    textColor: "#ECFDF5",
+    textMutedColor: "#6EE7B7",
+    primaryColor: "#10B981",
+    primaryHoverColor: "#059669",
+    primaryTextColor: "#FFFFFF",
+    secondaryColor: "#34D399",
+    borderColor: "#047857",
   },
   {
-    id: 'cyberpunk-neon',
-    name: 'Cyberpunk Neon',
-    sidebarColor: '#180D2B',
-    workspaceColor: '#0E051D',
-    backgroundColor: '#120722',
-    surfaceColor: '#261245',
-    surfaceHoverColor: '#3B1E68',
-    textColor: '#FDF2F8',
-    textMutedColor: '#F472B6',
-    primaryColor: '#EC4899',
-    primaryHoverColor: '#DB2777',
-    primaryTextColor: '#FFFFFF',
-    secondaryColor: '#8B5CF6',
-    borderColor: '#4C1D95',
+    id: "cyberpunk-neon",
+    name: "Cyberpunk Neon",
+    sidebarColor: "#180D2B",
+    workspaceColor: "#0E051D",
+    backgroundColor: "#120722",
+    surfaceColor: "#261245",
+    surfaceHoverColor: "#3B1E68",
+    textColor: "#FDF2F8",
+    textMutedColor: "#F472B6",
+    primaryColor: "#EC4899",
+    primaryHoverColor: "#DB2777",
+    primaryTextColor: "#FFFFFF",
+    secondaryColor: "#8B5CF6",
+    borderColor: "#4C1D95",
   },
   {
-    id: 'dracula',
-    name: 'Dracula',
-    sidebarColor: '#282A36',
-    workspaceColor: '#21222C',
-    backgroundColor: '#1E1F29',
-    surfaceColor: '#44475A',
-    surfaceHoverColor: '#6272A4',
-    textColor: '#F8F8F2',
-    textMutedColor: '#BF93F9',
-    primaryColor: '#FF79C6',
-    primaryHoverColor: '#FF64B9',
-    primaryTextColor: '#1E1F29',
-    secondaryColor: '#8BE9FD',
-    borderColor: '#6272A4',
+    id: "dracula",
+    name: "Dracula",
+    sidebarColor: "#282A36",
+    workspaceColor: "#21222C",
+    backgroundColor: "#1E1F29",
+    surfaceColor: "#44475A",
+    surfaceHoverColor: "#6272A4",
+    textColor: "#F8F8F2",
+    textMutedColor: "#BF93F9",
+    primaryColor: "#FF79C6",
+    primaryHoverColor: "#FF64B9",
+    primaryTextColor: "#1E1F29",
+    secondaryColor: "#8BE9FD",
+    borderColor: "#6272A4",
   },
   {
-    id: 'sunset-warm',
-    name: 'Sunset Warm',
-    sidebarColor: '#431407',
-    workspaceColor: '#2C0D05',
-    backgroundColor: '#1C0A05',
-    surfaceColor: '#33160D',
-    surfaceHoverColor: '#4A2216',
-    textColor: '#FFF7ED',
-    textMutedColor: '#FDBA74',
-    primaryColor: '#F97316',
-    primaryHoverColor: '#EA580C',
-    primaryTextColor: '#FFFFFF',
-    secondaryColor: '#FB923C',
-    borderColor: '#542111',
+    id: "sunset-warm",
+    name: "Sunset Warm",
+    sidebarColor: "#431407",
+    workspaceColor: "#2C0D05",
+    backgroundColor: "#1C0A05",
+    surfaceColor: "#33160D",
+    surfaceHoverColor: "#4A2216",
+    textColor: "#FFF7ED",
+    textMutedColor: "#FDBA74",
+    primaryColor: "#F97316",
+    primaryHoverColor: "#EA580C",
+    primaryTextColor: "#FFFFFF",
+    secondaryColor: "#FB923C",
+    borderColor: "#542111",
   },
   {
-    id: 'clean-slate-light',
-    name: 'Clean Slate (Light)',
-    sidebarColor: '#F8FAFC',
-    workspaceColor: '#F1F5F9',
-    backgroundColor: '#FFFFFF',
-    surfaceColor: '#F1F5F9',
-    surfaceHoverColor: '#E2E8F0',
-    textColor: '#090D16',
-    textMutedColor: '#334155',
-    primaryColor: '#0284C7',
-    primaryHoverColor: '#0369A1',
-    primaryTextColor: '#FFFFFF',
-    secondaryColor: '#4F46E5',
-    borderColor: '#CBD5E1',
+    id: "clean-slate-light",
+    name: "Clean Slate (Light)",
+    sidebarColor: "#F8FAFC",
+    workspaceColor: "#F1F5F9",
+    backgroundColor: "#FFFFFF",
+    surfaceColor: "#F1F5F9",
+    surfaceHoverColor: "#E2E8F0",
+    textColor: "#090D16",
+    textMutedColor: "#334155",
+    primaryColor: "#0284C7",
+    primaryHoverColor: "#0369A1",
+    primaryTextColor: "#FFFFFF",
+    secondaryColor: "#4F46E5",
+    borderColor: "#CBD5E1",
   },
   {
-    id: 'slack-dark',
-    name: 'Slack Dark',
-    sidebarColor: '#19171D',
-    workspaceColor: '#121016',
-    backgroundColor: '#1A1D21',
-    surfaceColor: '#222529',
-    surfaceHoverColor: '#2C2D30',
-    textColor: '#D1D2D3',
-    textMutedColor: '#ABABAD',
-    primaryColor: '#1D9BD1',
-    primaryHoverColor: '#1264A3',
-    primaryTextColor: '#FFFFFF',
-    secondaryColor: '#2BAC76',
-    borderColor: '#35373B',
+    id: "slack-dark",
+    name: "Slack Dark",
+    sidebarColor: "#19171D",
+    workspaceColor: "#121016",
+    backgroundColor: "#1A1D21",
+    surfaceColor: "#222529",
+    surfaceHoverColor: "#2C2D30",
+    textColor: "#D1D2D3",
+    textMutedColor: "#ABABAD",
+    primaryColor: "#1D9BD1",
+    primaryHoverColor: "#1264A3",
+    primaryTextColor: "#FFFFFF",
+    secondaryColor: "#2BAC76",
+    borderColor: "#35373B",
     fontFamily: "'Lato'",
   },
   {
-    id: 'slack-light',
-    name: 'Slack Light',
-    sidebarColor: '#F8F4F8',
-    workspaceColor: '#EDE6EE',
-    backgroundColor: '#FFFFFF',
-    surfaceColor: '#F8F8F8',
-    surfaceHoverColor: '#EFEFEF',
-    textColor: '#1D1C1D',
-    textMutedColor: '#616061',
-    primaryColor: '#611F69',
-    primaryHoverColor: '#4A154B',
-    primaryTextColor: '#FFFFFF',
-    secondaryColor: '#1264A3',
-    borderColor: '#DDDDDD',
+    id: "slack-light",
+    name: "Slack Light",
+    sidebarColor: "#F8F4F8",
+    workspaceColor: "#EDE6EE",
+    backgroundColor: "#FFFFFF",
+    surfaceColor: "#F8F8F8",
+    surfaceHoverColor: "#EFEFEF",
+    textColor: "#1D1C1D",
+    textMutedColor: "#616061",
+    primaryColor: "#611F69",
+    primaryHoverColor: "#4A154B",
+    primaryTextColor: "#FFFFFF",
+    secondaryColor: "#1264A3",
+    borderColor: "#DDDDDD",
     fontFamily: "'Lato'",
   },
   {
-    id: 'teams-dark',
-    name: 'Teams Dark',
-    sidebarColor: '#1F1F1F',
-    workspaceColor: '#141414',
-    backgroundColor: '#292929',
-    surfaceColor: '#333333',
-    surfaceHoverColor: '#3D3D3D',
-    textColor: '#FFFFFF',
-    textMutedColor: '#ADADAD',
-    primaryColor: '#5B5FC7',
-    primaryHoverColor: '#4F52B2',
-    primaryTextColor: '#FFFFFF',
-    secondaryColor: '#7F85F5',
-    borderColor: '#424242',
+    id: "teams-dark",
+    name: "Teams Dark",
+    sidebarColor: "#1F1F1F",
+    workspaceColor: "#141414",
+    backgroundColor: "#292929",
+    surfaceColor: "#333333",
+    surfaceHoverColor: "#3D3D3D",
+    textColor: "#FFFFFF",
+    textMutedColor: "#ADADAD",
+    primaryColor: "#5B5FC7",
+    primaryHoverColor: "#4F52B2",
+    primaryTextColor: "#FFFFFF",
+    secondaryColor: "#7F85F5",
+    borderColor: "#424242",
     // ponytail: Segoe UI is Microsoft-licensed (no webfont); Mac/Linux get the fallbacks. Self-host a licensed copy if exact match matters.
-    fontFamily: "'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif",
+    fontFamily:
+      "'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif",
   },
   {
-    id: 'teams-light',
-    name: 'Teams Light',
-    sidebarColor: '#F5F5F5',
-    workspaceColor: '#E8EBFA',
-    backgroundColor: '#FFFFFF',
-    surfaceColor: '#F5F5F5',
-    surfaceHoverColor: '#EBEBEB',
-    textColor: '#242424',
-    textMutedColor: '#616161',
-    primaryColor: '#5B5FC7',
-    primaryHoverColor: '#4F52B2',
-    primaryTextColor: '#FFFFFF',
-    secondaryColor: '#0F6CBD',
-    borderColor: '#E0E0E0',
-    fontFamily: "'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif",
+    id: "teams-light",
+    name: "Teams Light",
+    sidebarColor: "#F5F5F5",
+    workspaceColor: "#E8EBFA",
+    backgroundColor: "#FFFFFF",
+    surfaceColor: "#F5F5F5",
+    surfaceHoverColor: "#EBEBEB",
+    textColor: "#242424",
+    textMutedColor: "#616161",
+    primaryColor: "#5B5FC7",
+    primaryHoverColor: "#4F52B2",
+    primaryTextColor: "#FFFFFF",
+    secondaryColor: "#0F6CBD",
+    borderColor: "#E0E0E0",
+    fontFamily:
+      "'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif",
   },
   {
-    id: 'clickup-light',
-    name: 'ClickUp Light',
-    sidebarColor: '#FFFFFF',
-    workspaceColor: '#0F0F10', // black nav rail against white panels
-    backgroundColor: '#FFFFFF',
-    surfaceColor: '#F7F8F9',
-    surfaceHoverColor: '#EEEFF2',
-    textColor: '#202020',
-    textMutedColor: '#646464',
-    primaryColor: '#6A57E3', // brand violet deepened from #7B68EE for 4.5:1 as text on white
-    primaryHoverColor: '#5B47D6',
-    primaryTextColor: '#FFFFFF',
-    secondaryColor: '#1090E0',
-    borderColor: '#E8E8EA',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    id: "clickup-light",
+    name: "ClickUp Light",
+    sidebarColor: "#FFFFFF",
+    workspaceColor: "#0F0F10", // black nav rail against white panels
+    backgroundColor: "#FFFFFF",
+    surfaceColor: "#F7F8F9",
+    surfaceHoverColor: "#EEEFF2",
+    textColor: "#202020",
+    textMutedColor: "#646464",
+    primaryColor: "#6A57E3", // brand violet deepened from #7B68EE for 4.5:1 as text on white
+    primaryHoverColor: "#5B47D6",
+    primaryTextColor: "#FFFFFF",
+    secondaryColor: "#1090E0",
+    borderColor: "#E8E8EA",
+    fontFamily:
+      "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   },
   {
-    id: 'primer-dark',
-    name: 'Primer Dark',
-    sidebarColor: '#010409',
-    workspaceColor: '#010409',
-    backgroundColor: '#0D1117',
-    surfaceColor: '#161B22',
-    surfaceHoverColor: '#21262D',
-    textColor: '#E6EDF3',
-    textMutedColor: '#8D96A0',
-    primaryColor: '#238636',
-    primaryHoverColor: '#2EA043',
-    primaryTextColor: '#FFFFFF',
-    secondaryColor: '#2F81F7',
-    borderColor: '#30363D',
+    id: "primer-dark",
+    name: "Primer Dark",
+    sidebarColor: "#010409",
+    workspaceColor: "#010409",
+    backgroundColor: "#0D1117",
+    surfaceColor: "#161B22",
+    surfaceHoverColor: "#21262D",
+    textColor: "#E6EDF3",
+    textMutedColor: "#8D96A0",
+    primaryColor: "#238636",
+    primaryHoverColor: "#2EA043",
+    primaryTextColor: "#FFFFFF",
+    secondaryColor: "#2F81F7",
+    borderColor: "#30363D",
   },
   {
-    id: 'material-light',
-    name: 'Material You (Light)',
-    sidebarColor: '#F3EDF7',
-    workspaceColor: '#ECE6F0',
-    backgroundColor: '#FEF7FF',
-    surfaceColor: '#F7F2FA',
-    surfaceHoverColor: '#E8DEF8',
-    textColor: '#1D1B20',
-    textMutedColor: '#49454F',
-    primaryColor: '#6750A4',
-    primaryHoverColor: '#4F378B',
-    primaryTextColor: '#FFFFFF',
-    secondaryColor: '#625B71',
-    borderColor: '#CAC4D0',
+    id: "material-light",
+    name: "Material You (Light)",
+    sidebarColor: "#F3EDF7",
+    workspaceColor: "#ECE6F0",
+    backgroundColor: "#FEF7FF",
+    surfaceColor: "#F7F2FA",
+    surfaceHoverColor: "#E8DEF8",
+    textColor: "#1D1B20",
+    textMutedColor: "#49454F",
+    primaryColor: "#6750A4",
+    primaryHoverColor: "#4F378B",
+    primaryTextColor: "#FFFFFF",
+    secondaryColor: "#625B71",
+    borderColor: "#CAC4D0",
   },
 ];
 
-export const DEFAULT_THEME: ThemeConfig = THEME_PRESETS.find((t) => t.id === 'mint-teal-light')!;
+export const DEFAULT_THEME: ThemeConfig = THEME_PRESETS.find(
+  (t) => t.id === "mint-teal-light",
+)!;
 
 export function isLightColor(hex?: string): boolean {
-  if (!hex || !hex.startsWith('#')) return false;
-  const c = hex.replace('#', '');
+  if (!hex || !hex.startsWith("#")) return false;
+  const c = hex.replace("#", "");
   if (c.length !== 6) return false;
   const r = parseInt(c.substring(0, 2), 16);
   const g = parseInt(c.substring(2, 4), 16);
@@ -338,30 +345,39 @@ export function isLightColor(hex?: string): boolean {
 }
 
 export function applyTheme(theme: ThemeConfig) {
-  if (typeof document === 'undefined') return;
+  if (typeof document === "undefined") return;
   const root = document.documentElement;
 
   // 1. Set CSS Custom Properties
-  root.style.setProperty('--theme-bg-sidebar', theme.sidebarColor);
-  root.style.setProperty('--theme-bg-workspace', theme.workspaceColor);
-  root.style.setProperty('--theme-bg-app', theme.backgroundColor);
-  root.style.setProperty('--theme-bg-surface', theme.surfaceColor);
-  root.style.setProperty('--theme-bg-surface-hover', theme.surfaceHoverColor || theme.surfaceColor);
-  root.style.setProperty('--theme-text-primary', theme.textColor);
-  root.style.setProperty('--theme-text', theme.textColor);
-  root.style.setProperty('--theme-text-muted', theme.textMutedColor);
-  root.style.setProperty('--theme-primary', theme.primaryColor);
-  root.style.setProperty('--theme-primary-hover', theme.primaryHoverColor || theme.primaryColor);
-  root.style.setProperty('--theme-primary-text', theme.primaryTextColor || '#FFFFFF');
-  root.style.setProperty('--theme-secondary', theme.secondaryColor);
-  root.style.setProperty('--theme-border', theme.borderColor);
+  root.style.setProperty("--theme-bg-sidebar", theme.sidebarColor);
+  root.style.setProperty("--theme-bg-workspace", theme.workspaceColor);
+  root.style.setProperty("--theme-bg-app", theme.backgroundColor);
+  root.style.setProperty("--theme-bg-surface", theme.surfaceColor);
+  root.style.setProperty(
+    "--theme-bg-surface-hover",
+    theme.surfaceHoverColor || theme.surfaceColor,
+  );
+  root.style.setProperty("--theme-text-primary", theme.textColor);
+  root.style.setProperty("--theme-text", theme.textColor);
+  root.style.setProperty("--theme-text-muted", theme.textMutedColor);
+  root.style.setProperty("--theme-primary", theme.primaryColor);
+  root.style.setProperty(
+    "--theme-primary-hover",
+    theme.primaryHoverColor || theme.primaryColor,
+  );
+  root.style.setProperty(
+    "--theme-primary-text",
+    theme.primaryTextColor || "#FFFFFF",
+  );
+  root.style.setProperty("--theme-secondary", theme.secondaryColor);
+  root.style.setProperty("--theme-border", theme.borderColor);
   // Themes saved before presets had fonts lack fontFamily; take it from the preset by id
   const preset = THEME_PRESETS.find((p) => p.id === theme.id);
   const optional: [string, string | undefined][] = [
-    ['--theme-font', theme.fontFamily ?? preset?.fontFamily],
-    ['--theme-selected', theme.selectedColor ?? preset?.selectedColor],
-    ['--theme-accent', theme.accentColor ?? preset?.accentColor],
-    ['--theme-section', theme.sectionColor ?? preset?.sectionColor],
+    ["--theme-font", theme.fontFamily ?? preset?.fontFamily],
+    ["--theme-selected", theme.selectedColor ?? preset?.selectedColor],
+    ["--theme-accent", theme.accentColor ?? preset?.accentColor],
+    ["--theme-section", theme.sectionColor ?? preset?.sectionColor],
   ];
   for (const [prop, value] of optional) {
     if (value) root.style.setProperty(prop, value);
@@ -369,41 +385,42 @@ export function applyTheme(theme: ThemeConfig) {
   }
 
   // 2. Synchronize Light / Dark theme class on document element
-  const isLight = isLightColor(theme.backgroundColor) || isLightColor(theme.sidebarColor);
+  const isLight =
+    isLightColor(theme.backgroundColor) || isLightColor(theme.sidebarColor);
   if (isLight) {
-    root.classList.remove('dark');
-    root.classList.add('light');
-    root.dataset.themeMode = 'light';
+    root.classList.remove("dark");
+    root.classList.add("light");
+    root.dataset.themeMode = "light";
   } else {
-    root.classList.add('dark');
-    root.classList.remove('light');
-    root.dataset.themeMode = 'dark';
+    root.classList.add("dark");
+    root.classList.remove("light");
+    root.dataset.themeMode = "dark";
   }
 }
 
 export function saveThemeLocally(theme: ThemeConfig, workspaceId?: string) {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
   try {
-    localStorage.setItem('orbit_theme_active', JSON.stringify(theme));
+    localStorage.setItem("orbit_theme_active", JSON.stringify(theme));
     if (workspaceId) {
       localStorage.setItem(`orbit_theme_${workspaceId}`, JSON.stringify(theme));
     }
   } catch (err) {
-    console.error('Failed to save theme in localStorage', err);
+    console.error("Failed to save theme in localStorage", err);
   }
 }
 
 export function getSavedTheme(workspaceId?: string): ThemeConfig {
-  if (typeof window === 'undefined') return DEFAULT_THEME;
+  if (typeof window === "undefined") return DEFAULT_THEME;
   try {
     if (workspaceId) {
       const wsSaved = localStorage.getItem(`orbit_theme_${workspaceId}`);
       if (wsSaved) return JSON.parse(wsSaved);
     }
-    const generalSaved = localStorage.getItem('orbit_theme_active');
+    const generalSaved = localStorage.getItem("orbit_theme_active");
     if (generalSaved) return JSON.parse(generalSaved);
   } catch (err) {
-    console.error('Failed to load theme from localStorage', err);
+    console.error("Failed to load theme from localStorage", err);
   }
   return DEFAULT_THEME;
 }

@@ -140,6 +140,19 @@ describe('refresh tokens', () => {
     expect(useAuthStore.getState().user).toBeNull();
   });
 
+  test('server error during refresh -> keeps the session', async () => {
+    keychain.password = saved('stale', 'r1');
+    serverWithExpiry();
+    jest
+      .spyOn(axios, 'post')
+      .mockRejectedValue(Object.assign(new Error('Bad Gateway'), { isAxiosError: true, response: { status: 502 } }));
+
+    await useAuthStore.getState().fetchMe();
+
+    expect(keychain.password).toBe(saved('stale', 'r1'));
+    expect(useAuthStore.getState().bootError).not.toBeNull();
+  });
+
   test('login stores both tokens', async () => {
     await useAuthStore.getState().setAuth(user as never, 'acc', 'ref');
     expect(JSON.parse(keychain.password!)).toEqual({ a: 'acc', r: 'ref' });

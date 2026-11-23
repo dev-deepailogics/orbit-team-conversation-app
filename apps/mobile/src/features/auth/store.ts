@@ -144,8 +144,10 @@ api.interceptors.response.use(undefined, async (err) => {
       config.headers.Authorization = `Bearer ${token}`;
       return api(config);
     } catch (refreshErr) {
-      // Offline: report the network error (not the stale 401) so callers keep the session.
-      if (axios.isAxiosError(refreshErr) && !refreshErr.response) return Promise.reject(refreshErr);
+      // Only a rejected refresh token (401/403) ends the session. Offline, timeouts, 5xx (e.g. a 502 while prod
+      // restarts) and keychain errors report that error instead of the stale 401, so callers keep the session.
+      const status = axios.isAxiosError(refreshErr) ? refreshErr.response?.status : undefined;
+      if (status !== 401 && status !== 403) return Promise.reject(refreshErr);
     }
   }
 

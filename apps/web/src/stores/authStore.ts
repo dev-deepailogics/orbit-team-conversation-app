@@ -50,10 +50,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       // The request may have refreshed the access token along the way.
       set({ user: res.data, token: localStorage.getItem(TOKEN_KEY) ?? token, isLoading: false });
     } catch {
-      if (typeof window !== 'undefined') {
-        clearSession();
-      }
-      set({ user: null, token: null, isLoading: false });
+      // A rejected session (401/403) was already cleared by the api interceptor. Anything else (server down,
+      // offline on reopen) must keep the stored tokens, or every cold start signs the user out.
+      set({ user: null, token: localStorage.getItem(TOKEN_KEY), isLoading: false });
     }
   },
 }));

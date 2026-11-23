@@ -31,23 +31,27 @@ let refreshing: Promise<string> | null = null;
 export function refreshAccessToken(): Promise<string> {
   if (refreshing) return refreshing;
   const usedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-  const usedAccessToken = localStorage.getItem(TOKEN_KEY);
   if (!usedRefreshToken) return Promise.reject(new Error('No refresh token'));
 
-  refreshing = axios
-    .post(`${SERVER_URL}/api/auth/refresh`, { refreshToken: usedRefreshToken })
-    .then((res) => {
-      localStorage.setItem(TOKEN_KEY, res.data.accessToken);
-      localStorage.setItem(REFRESH_TOKEN_KEY, res.data.refreshToken);
-      window.dispatchEvent(new CustomEvent(TOKEN_REFRESHED_EVENT, { detail: res.data.accessToken }));
-      return res.data.accessToken as string;
-    })
-    .catch((err) => {
-      // Another tab may have rotated the token first (storage is shared): use what it saved.
-      const current = localStorage.getItem(TOKEN_KEY);
-      if (current && current !== usedAccessToken) return current;
-      throw err;
-    })
+  const refresh = async (): Promise<string> => {
+    // Another tab rotated the token while we waited for the lock: use what it saved.
+    const current = localStorage.getItem(REFRESH_TOKEN_KEY);
+    const currentAccess = localStorage.getItem(TOKEN_KEY);
+    if (current && current !== usedRefreshToken && currentAccess) return currentAccess;
+
+    const res = await axios.post(`${SERVER_URL}/api/auth/refresh`, { refreshToken: usedRefreshToken });
+    localStorage.setItem(TOKEN_KEY, res.data.accessToken);
+    localStorage.setItem(REFRESH_TOKEN_KEY, res.data.refreshToken);
+    window.dispatchEvent(new CustomEvent(TOKEN_REFRESHED_EVENT, { detail: res.data.accessToken }));
+    return res.data.accessToken as string;
+  };
+
+  // Cross-tab lock: tabs restored together would otherwise race one refresh token, and the loser's 401
+  // signs every tab out. navigator.locks needs a secure context (missing on plain-http LAN dev).
+  const locked: Promise<string> = navigator.locks
+    ? navigator.locks.request('orbit-token-refresh', () => refresh()).then((t) => t)
+    : refresh();
+  refreshing = locked
     .finally(() => {
       refreshing = null;
     });
