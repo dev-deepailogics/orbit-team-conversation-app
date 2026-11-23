@@ -6,14 +6,14 @@ import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import { THEME_OPTIONS, useSettingsStore } from '../store';
 
-// Slack's Preferences → Dark mode picker.
+// More → Appearance (Slack's Preferences → Dark mode).
 export function ThemeSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const theme = useSettingsStore(s => s.theme);
   const setTheme = useSettingsStore(s => s.setTheme);
   const { colors } = useTheme();
 
   return (
-    <Sheet visible={visible} title="Dark mode" onClose={onClose}>
+    <Sheet visible={visible} title="Appearance" onClose={onClose}>
       <View className="overflow-hidden rounded-xl border border-border">
         {THEME_OPTIONS.map((o, i) => (
           <Pressable

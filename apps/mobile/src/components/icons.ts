@@ -2,6 +2,7 @@
 // 'lucide-react-native' barrel alone adds ~2 MB (all ~2,000 icons) to the bundle.
 // Add new icons here; file names are lucide's kebab-case names (see node_modules/lucide-react-native/dist/esm/icons).
 export type { LucideIcon } from 'lucide-react-native';
+export { default as Bell } from 'lucide-react-native/icons/bell';
 export { default as Bold } from 'lucide-react-native/icons/letter-b';
 export { default as Building2 } from 'lucide-react-native/icons/building-complex';
 export { default as CalendarDays } from 'lucide-react-native/icons/calendar-days';
@@ -10,8 +11,9 @@ export { default as ChevronDown } from 'lucide-react-native/icons/chevron-down';
 export { default as ChevronLeft } from 'lucide-react-native/icons/chevron-left';
 export { default as ChevronRight } from 'lucide-react-native/icons/chevron-right';
 export { default as ChevronUp } from 'lucide-react-native/icons/chevron-up';
-export { default as CircleUser } from 'lucide-react-native/icons/circle-user';
+export { default as CircleEllipsis } from 'lucide-react-native/icons/circle-ellipsis';
 export { default as Code } from 'lucide-react-native/icons/code';
+export { default as Coffee } from 'lucide-react-native/icons/coffee';
 export { default as Download } from 'lucide-react-native/icons/download';
 export { default as Ellipsis } from 'lucide-react-native/icons/ellipsis';
 export { default as Eye } from 'lucide-react-native/icons/eye';
@@ -35,6 +37,7 @@ export { default as MessagesSquare } from 'lucide-react-native/icons/messages-sq
 export { default as Mic } from 'lucide-react-native/icons/mic';
 export { default as MicOff } from 'lucide-react-native/icons/mic-off';
 export { default as Moon } from 'lucide-react-native/icons/moon';
+export { default as Palette } from 'lucide-react-native/icons/palette';
 export { default as Paperclip } from 'lucide-react-native/icons/paperclip';
 export { default as Pencil } from 'lucide-react-native/icons/pencil';
 export { default as Phone } from 'lucide-react-native/icons/phone';

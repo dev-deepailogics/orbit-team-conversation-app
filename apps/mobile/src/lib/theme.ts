@@ -22,6 +22,7 @@ const light = {
   destructiveForeground: '#FFFFFF',
   success: '#007A5A',
   successForeground: '#FFFFFF',
+  warning: '#E8912D',
   codeBg: '#F8F8F8',
   overlay: '#000000',
 };
@@ -48,6 +49,7 @@ const dark: Palette = {
   destructiveForeground: '#1A1D21',
   success: '#007A5A',
   successForeground: '#FFFFFF',
+  warning: '#E8912D',
   codeBg: '#222529',
   overlay: '#000000',
 };

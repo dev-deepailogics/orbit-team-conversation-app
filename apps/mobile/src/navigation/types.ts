@@ -9,7 +9,7 @@ export type TabParamList = {
   Home: undefined;
   DMs: undefined;
   Projects: undefined;
-  You: undefined;
+  More: undefined;
 };
 
 export type RootStackParamList = {

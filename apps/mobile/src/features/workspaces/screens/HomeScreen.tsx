@@ -7,7 +7,7 @@ import {
   View,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
-import { ChevronDown, Plus, SquarePen } from '@/components/icons';
+import { ChevronDown, Plus } from '@/components/icons';
 import { FlashList } from '@shopify/flash-list';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { Channel } from '@orbit/types';
@@ -17,6 +17,8 @@ import { Text } from '@/components/ui/text';
 import { CreateChannelSheet } from '../components/CreateChannelSheet';
 import { CreateWorkspaceSheet } from '@/features/admin/components/CreateWorkspaceSheet';
 import { useAuthStore } from '@/features/auth/store';
+import { AvailabilitySheet } from '@/features/availability/components/AvailabilitySheet';
+import { PresenceAvatar } from '@/features/availability/components/PresenceAvatar';
 import { useTheme } from '@/lib/theme';
 import type { TabScreenProps } from '@/navigation/types';
 import { ChannelRow } from '../components/ChannelRow';
@@ -32,7 +34,8 @@ type Row =
 
 export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
   const { colors } = useTheme();
-  const myId = useAuthStore(s => s.user?.id);
+  const me = useAuthStore(s => s.user);
+  const myId = me?.id;
   const canCreateWorkspace = useAuthStore(
     s =>
       s.user?.systemRole === 'SUPER_ADMIN' ||
@@ -47,6 +50,7 @@ export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
   const [showSwitcher, setShowSwitcher] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
+  const [showStatus, setShowStatus] = useState(false);
   // Local, not the store's isLoading: background refetches (e.g. after adding a member while Home is off-screen)
   // toggle that flag, and iOS RefreshControl can miss the true→false change and spin forever.
   const [refreshing, setRefreshing] = useState(false);
@@ -151,15 +155,22 @@ export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
           </Text>
           <ChevronDown size={18} color={colors.brandForeground} strokeWidth={2.5} />
         </Pressable>
-        <Pressable
-          onPress={() => navigation.navigate('NewMessage')}
-          hitSlop={6}
-          className="h-10 w-10 items-center justify-center rounded-full bg-brand-foreground/15 active:bg-brand-foreground/25"
-          accessibilityRole="button"
-          accessibilityLabel="New message"
-        >
-          <SquarePen size={18} color={colors.brandForeground} />
-        </Pressable>
+        {!!me && (
+          <Pressable
+            onPress={() => setShowStatus(true)}
+            hitSlop={6}
+            className="active:opacity-70"
+            accessibilityRole="button"
+            accessibilityLabel="Set your status"
+          >
+            <PresenceAvatar
+              name={me.displayName}
+              url={me.avatarUrl}
+              className="h-9 w-9 rounded-xl"
+              ringClassName="border-brand"
+            />
+          </Pressable>
+        )}
       </View>
 
       <View className="flex-1 overflow-hidden rounded-t-2xl bg-background">
@@ -216,6 +227,7 @@ export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
           navigation.navigate('Channel', { channelId: c.id });
         }}
       />
+      <AvailabilitySheet visible={showStatus} onClose={() => setShowStatus(false)} />
       <WorkspaceSwitcherSheet
         visible={showSwitcher}
         onClose={() => setShowSwitcher(false)}

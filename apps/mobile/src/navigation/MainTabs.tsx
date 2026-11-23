@@ -1,12 +1,13 @@
 import { useEffect } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { CircleUser, House, MessagesSquare, SquareKanban, type LucideIcon } from '@/components/icons';
+import { CircleEllipsis, House, MessagesSquare, SquareKanban, type LucideIcon } from '@/components/icons';
+import { useAvailabilityStore } from '@/features/availability/store';
 import { useChatStore } from '@/features/chat/store';
 import { useRealtime } from '@/features/chat/hooks/useRealtime';
 import { DMsScreen } from '@/features/dms/screens/DMsScreen';
 import { ProjectsScreen } from '@/features/projects/screens/ProjectsScreen';
 import { useProjectStore } from '@/features/projects/store';
-import { YouScreen } from '@/features/profile/screens/YouScreen';
+import { MoreScreen } from '@/features/profile/screens/MoreScreen';
 import { HomeScreen } from '@/features/workspaces/screens/HomeScreen';
 import { useWorkspaceStore } from '@/features/workspaces/store';
 import { isDirect } from '@/features/workspaces/utils';
@@ -32,7 +33,9 @@ export function MainTabs() {
 
   useEffect(() => {
     load();
+    useAvailabilityStore.getState().load();
     return () => {
+      useAvailabilityStore.getState().reset();
       useWorkspaceStore.getState().reset();
       useChatStore.getState().reset();
       useProjectStore.getState().reset();
@@ -57,7 +60,7 @@ export function MainTabs() {
         options={{ tabBarIcon: icon(MessagesSquare), tabBarBadge: dmUnread || undefined }}
       />
       <Tab.Screen name="Projects" component={ProjectsScreen} options={{ tabBarIcon: icon(SquareKanban) }} />
-      <Tab.Screen name="You" component={YouScreen} options={{ tabBarIcon: icon(CircleUser) }} />
+      <Tab.Screen name="More" component={MoreScreen} options={{ tabBarIcon: icon(CircleEllipsis) }} />
     </Tab.Navigator>
   );
 }

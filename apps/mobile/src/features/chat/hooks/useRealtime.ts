@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
-import type { Channel, Message, Project, ProjectColumn, Reaction, Ticket } from '@orbit/types';
+import type { Channel, Message, UserAvailabilityRecord, Project, ProjectColumn, Reaction, Ticket } from '@orbit/types';
 import { useAuthStore } from '@/features/auth/store';
 import { useWorkspaceStore } from '@/features/workspaces/store';
 import { connectSocket, disconnectSocket, EVENTS } from '@/lib/socket';
 import { markChannelRead } from '@/features/workspaces/services/workspaceApi';
 import { useProjectStore } from '@/features/projects/store';
 import { useCallStore } from '@/features/calls/store';
+import { useAvailabilityStore } from '@/features/availability/store';
 import type { IncomingCall } from '@/features/calls/types';
 import { useChatStore } from '../store';
 import { isMine } from '../utils';
@@ -97,6 +98,11 @@ export function useRealtime() {
     socket.on(EVENTS.HUDDLE_ENDED, (p: { channelId: string }) => {
       calls().setLive(p.channelId, false);
       if (calls().incoming?.channelId === p.channelId) calls().dismiss();
+    });
+
+    // The server broadcasts everyone's changes; only ours matter here (set on web, or the 4 AM auto-checkout).
+    socket.on(EVENTS.AVAILABILITY_UPDATE, (p: { userId: string; availability: UserAvailabilityRecord }) => {
+      if (p.userId === myId) useAvailabilityStore.getState().setRecord(p.availability);
     });
 
     return () => {

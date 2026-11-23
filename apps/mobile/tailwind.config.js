@@ -51,6 +51,7 @@ module.exports = {
           DEFAULT: v('success'),
           foreground: v('success-foreground'),
         },
+        warning: v('warning'),
         muted: {
           DEFAULT: v('muted'),
           foreground: v('muted-foreground'),

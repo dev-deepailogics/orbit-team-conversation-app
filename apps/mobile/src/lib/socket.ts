@@ -31,6 +31,7 @@ export const EVENTS = {
   HUDDLE_ENDED: 'huddle:ended',
   HUDDLE_JOINED: 'huddle:joined',
   HUDDLE_LEFT: 'huddle:left',
+  AVAILABILITY_UPDATE: 'availability:update',
 } as const;
 
 let socket: Socket | null = null;
