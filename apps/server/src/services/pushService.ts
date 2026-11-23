@@ -1,9 +1,8 @@
-import { getThreadParticipantIds } from './threadParticipants.js';
+import { getAlertRecipientIds, getThreadAlertRecipientIds } from './alertRecipients.js';
 import webpush from 'web-push';
 import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getMessaging, type MulticastMessage } from 'firebase-admin/messaging';
 import { prisma } from '@orbit/db';
-import { matchMentionedUserIds } from './mentionParser.js';
 
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
@@ -175,39 +174,12 @@ async function notifyMessage(io: any, messageId: string) {
   }
   console.log(`Push fan-out for message ${msg.id} in ${msg.channel.type} ${msg.channelId}`);
 
-  // Thread replies only notify people in the thread (parent author + earlier repliers), like Slack.
-  let participants: string[] | null = null;
-  if (msg.parentMessageId) {
-    participants = await getThreadParticipantIds(msg.parentMessageId, msg.channelId, msg.userId);
-  }
-
-  const members = await prisma.channelMember.findMany({
-    where: {
-      channelId: msg.channelId,
-      notificationPreference: { not: 'MUTED' },
-      ...(msg.userId ? { userId: { not: msg.userId } } : {}),
-      ...(participants ? { userId: { in: participants.filter((id) => id !== msg.userId) } } : {}),
-    },
-    select: {
-      notificationPreference: true,
-      user: { select: { id: true, username: true, displayName: true } },
-    },
-  });
-  if (members.length === 0) {
-    console.log('Push fan-out: no recipients');
-    return;
-  }
-
-  // 'MENTIONS' members only get a push when this specific message @mentions them.
-  const mentionedIds = new Set(
-    matchMentionedUserIds(
-      msg.content || '',
-      members.filter((m) => m.notificationPreference === 'MENTIONS').map((m) => m.user)
-    )
-  );
-  const memberIds = members
-    .filter((m) => m.notificationPreference === 'ALL' || mentionedIds.has(m.user.id))
-    .map((m) => m.user.id);
+  // Thread replies only notify people in the thread (parent author + earlier repliers), like Slack. Either way, MUTED
+  // members never get a push and MENTIONS members only when this message @mentions them.
+  const content = msg.content || '';
+  const memberIds = msg.parentMessageId
+    ? await getThreadAlertRecipientIds(msg.parentMessageId, msg.channelId, msg.userId, content)
+    : await getAlertRecipientIds(msg.channelId, content, msg.userId);
   if (memberIds.length === 0) {
     console.log('Push fan-out: no recipients want this notification');
     return;
@@ -217,11 +189,16 @@ async function notifyMessage(io: any, messageId: string) {
   const sender = msg.channel.isAnonymous
     ? 'Someone'
     : msg.user?.displayName || msg.user?.username || msg.bot?.name || 'New message';
-  const title = isDM ? sender : `${sender} in #${msg.channel.name}`;
-  const text = (msg.content || '').trim();
+  const where = isDM ? '' : ` in #${msg.channel.name}`;
+  const title = msg.parentMessageId ? `${sender} replied in a thread${where}` : `${sender}${where}`;
+  const text = content.trim();
   const bodyText = text ? text.slice(0, 160) : msg.attachments.length ? 'Sent an attachment' : 'New message';
 
-  const url = `/?channelId=${msg.channelId}`;
+  // Thread replies open the thread itself (the web app reads ?threadId= on load) and stack per thread, like mobile.
+  const url = msg.parentMessageId
+    ? `/?channelId=${msg.channelId}&threadId=${msg.parentMessageId}`
+    : `/?channelId=${msg.channelId}`;
+  const tag = msg.parentMessageId ? `thread:${msg.parentMessageId}` : `channel:${msg.channelId}`;
 
   // Mobile: always send. FCM doesn't show notifications while the app is foregrounded; the app draws its own banner.
   await sendToDevices(memberIds, { title, body: bodyText, channelId: msg.channelId, parentMessageId: msg.parentMessageId ?? undefined });
@@ -245,7 +222,7 @@ async function notifyMessage(io: any, messageId: string) {
       title,
       body: bodyText,
       url,
-      tag: `channel:${msg.channelId}`,
+      tag,
       channelId: msg.channelId,
     });
   }

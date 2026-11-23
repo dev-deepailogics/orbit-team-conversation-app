@@ -351,6 +351,7 @@ export default function AppDashboard() {
       let targetIsOrgControl = false;
       let targetDocs: { docId: string | null } | null = null;
       let targetProfile = false;
+      let targetThreadId: string | null = null;
       if (typeof window !== "undefined") {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get("search") === "1") setShowSearchModal(true);
@@ -366,6 +367,8 @@ export default function AppDashboard() {
         if (urlChId && res.data.channels) {
           targetChannel =
             res.data.channels.find((c: Channel) => c.id === urlChId) || null;
+          // Web push for a thread reply links here with ?threadId=; open it once its channel is selected
+          if (targetChannel) targetThreadId = urlParams.get("threadId");
         }
         if (urlProjId && projectsData.length > 0) {
           targetProject =
@@ -381,6 +384,7 @@ export default function AppDashboard() {
         // Awaited so the boot screen covers the first page of messages too (no empty-channel flash).
         const channel = targetChannel ?? res.data.channels?.[0];
         if (channel) await handleSelectChannel(channel);
+        if (targetChannel && targetThreadId) openThreadById(targetThreadId);
       }
       // Docs open on top of the default channel so Home has somewhere to go back to
       if (targetDocs && !targetIsOrgControl) handleOpenDocs(targetDocs.docId);
@@ -872,12 +876,7 @@ export default function AppDashboard() {
 
       // 2. If it's a thread reply, open the thread sidepanel
       if (searchedMsg.parentMessageId) {
-        const threadRes = await api.get(
-          `/api/messages/${searchedMsg.parentMessageId}/replies`,
-        );
-        if (threadRes.data.parent) {
-          handleOpenThread(threadRes.data.parent);
-        }
+        await openThreadById(searchedMsg.parentMessageId);
       } else {
         // 3. Highlight message in ChatArea
         setTimeout(() => {
@@ -917,20 +916,22 @@ export default function AppDashboard() {
       if (granted) registerPush();
     });
 
-    // Chime + desktop notification for a message addressed to this user
+    // Chime + desktop notification for a message addressed to this user. A thread reply says so, and clicking it
+    // opens that thread rather than just its channel.
     const alertForMessage = (msg: any) => {
       sounds.playMessageSound();
+      const sender = msg.user?.displayName || msg.bot?.name || "New Message";
       DesktopNotifier.send(
-        msg.user?.displayName || msg.bot?.name || "New Message",
+        msg.parentMessageId ? `${sender} replied in a thread` : sender,
         msg.content,
         msg.user?.avatarUrl || msg.bot?.avatarUrl,
-        () => {
+        async () => {
           window.focus();
           const allChannels = useChatStore.getState().channels;
           const targetChannel = allChannels.find((c) => c.id === msg.channelId);
-          if (targetChannel) {
-            handleSelectChannel(targetChannel);
-          }
+          if (!targetChannel) return;
+          await handleSelectChannel(targetChannel);
+          if (msg.parentMessageId) openThreadById(msg.parentMessageId);
         },
       );
     };
@@ -1215,6 +1216,23 @@ export default function AppDashboard() {
       });
     } catch (err) {
       console.error("Failed to load thread replies", err);
+    }
+  };
+
+  // Opens a thread known only by its parent's id (notification click, ?threadId= link, search). One request loads the
+  // parent and its first page. Skipped if the user has moved to another channel while it loaded.
+  const openThreadById = async (parentId: string) => {
+    try {
+      const res = await api.get(`/api/messages/${parentId}/replies`, { params: { limit: THREAD_PAGE_SIZE } });
+      const parent: Message | undefined = res.data.parent;
+      if (!parent || useChatStore.getState().currentChannel?.id !== parent.channelId) return;
+      setActiveThread(parent);
+      setThreadReplies(res.data.replies || [], parent.id, {
+        hasMore: !!res.data.hasMore,
+        nextCursor: res.data.nextCursor || null,
+      });
+    } catch (err) {
+      console.error("Failed to open thread", err);
     }
   };
 

@@ -1,4 +1,4 @@
-import { getThreadParticipantIds } from '../services/threadParticipants.js';
+import { getThreadAlertRecipientIds } from '../services/alertRecipients.js';
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { prisma } from '@orbit/db';
 import { SOCKET_EVENTS } from '@orbit/types';
@@ -390,10 +390,11 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       }
     }
 
-    // Alert only the people in the thread (the parent's author and earlier repliers), not the whole channel. Everyone
-    // in the channel still gets the message:new above, so reply counts and an open thread stay current silently.
+    // Alert only the people in the thread (the parent's author and earlier repliers) who want it (not muted; mentions-only
+    // when @mentioned), not the whole channel. Everyone in the channel still gets the message:new above, so reply counts
+    // and an open thread stay current silently.
     if (fastify.io) {
-      const threadPeople = await getThreadParticipantIds(parent.id, parent.channelId, userId);
+      const threadPeople = await getThreadAlertRecipientIds(parent.id, parent.channelId, userId, content || '');
       const alert = access.channel.isAnonymous ? publicReply : fullReplyMessage;
       for (const id of threadPeople) {
         fastify.io.to(`user:${id}`).emit(SOCKET_EVENTS.THREAD_REPLY_NOTIFY, { ...alert, isThreadReply: true });
