@@ -1,9 +1,11 @@
 import { prisma } from '@orbit/db';
-import { matchMentionedUserIds } from './mentionParser.js';
+import { extractMentionTokens, matchMentionedUserIds } from './mentionParser.js';
 
 /**
- * Members of `channelId` who want an alert for a new message: never MUTED members, and MENTIONS members only when
- * `content` @mentions them. `excludeUserId` is the author (null for bots). `among` narrows it to those users.
+ * Members of `channelId` who are alerted about a new message:
+ *  - anyone the message @mentions, always, even if they muted the channel or are outside `among`;
+ *  - otherwise members set to ALL, limited to `among` when given (e.g. the people in a thread).
+ * MENTIONS and MUTED members are therefore only alerted when mentioned. `excludeUserId` is the author (null for bots).
  * Shared by the in-app socket alert and push, so both always agree on who is alerted.
  */
 export async function getAlertRecipientIds(
@@ -12,40 +14,38 @@ export async function getAlertRecipientIds(
   excludeUserId: string | null,
   among?: string[],
 ): Promise<string[]> {
-  const candidates = among?.filter((id) => id !== excludeUserId);
-  if (candidates && candidates.length === 0) return [];
+  const scope = among?.filter((id) => id !== excludeUserId);
+  const hasMentions = extractMentionTokens(content).length > 0;
+  if (scope?.length === 0 && !hasMentions) return [];
 
+  // A mention can reach any member, so it needs the whole channel; otherwise only the in-scope ALL members can match.
+  const notAuthor = excludeUserId ? { userId: { not: excludeUserId } } : {};
   const members = await prisma.channelMember.findMany({
-    where: {
-      channelId,
-      notificationPreference: { not: 'MUTED' },
-      ...(candidates
-        ? { userId: { in: candidates } }
-        : excludeUserId
-          ? { userId: { not: excludeUserId } }
-          : {}),
-    },
+    where: hasMentions
+      ? { channelId, ...notAuthor }
+      : { channelId, notificationPreference: 'ALL', ...(scope ? { userId: { in: scope } } : notAuthor) },
     select: {
       notificationPreference: true,
       user: { select: { id: true, username: true, displayName: true } },
     },
   });
+  if (!hasMentions) return members.map((m) => m.user.id);
 
-  const mentioned = new Set(
-    matchMentionedUserIds(
-      content,
-      members.filter((m) => m.notificationPreference === 'MENTIONS').map((m) => m.user),
-    ),
-  );
+  const mentioned = new Set(matchMentionedUserIds(content, members.map((m) => m.user)));
+  const inScope = scope ? new Set(scope) : null;
   return members
-    .filter((m) => m.notificationPreference === 'ALL' || mentioned.has(m.user.id))
+    .filter(
+      (m) =>
+        mentioned.has(m.user.id) ||
+        (m.notificationPreference === 'ALL' && (!inScope || inScope.has(m.user.id))),
+    )
     .map((m) => m.user.id);
 }
 
 /**
- * Who is alerted about a thread reply: the people "in" the thread (the parent's author and everyone who has replied),
- * limited to current channel members who want the alert (see getAlertRecipientIds), never the reply's own author.
- * Bystanders in the channel are not alerted, like Slack; @mentioned people are alerted separately (mentionService).
+ * Who is alerted about a thread reply: the people "in" the thread (the parent's author and everyone who has replied)
+ * who are still in the channel and set to ALL, plus any channel member the reply @mentions (see getAlertRecipientIds).
+ * Never the reply's own author. Other members of the channel are not alerted, like Slack.
  */
 export async function getThreadAlertRecipientIds(
   parentMessageId: string,

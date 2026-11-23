@@ -174,8 +174,8 @@ async function notifyMessage(io: any, messageId: string) {
   }
   console.log(`Push fan-out for message ${msg.id} in ${msg.channel.type} ${msg.channelId}`);
 
-  // Thread replies only notify people in the thread (parent author + earlier repliers), like Slack. Either way, MUTED
-  // members never get a push and MENTIONS members only when this message @mentions them.
+  // Thread replies only notify people in the thread (parent author + earlier repliers), like Slack. Either way, anyone
+  // @mentioned is always notified, even in a muted channel; MENTIONS and MUTED members only then.
   const content = msg.content || '';
   const memberIds = msg.parentMessageId
     ? await getThreadAlertRecipientIds(msg.parentMessageId, msg.channelId, msg.userId, content)

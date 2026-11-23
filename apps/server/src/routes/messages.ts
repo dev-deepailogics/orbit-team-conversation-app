@@ -390,9 +390,9 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       }
     }
 
-    // Alert only the people in the thread (the parent's author and earlier repliers) who want it (not muted; mentions-only
-    // when @mentioned), not the whole channel. Everyone in the channel still gets the message:new above, so reply counts
-    // and an open thread stay current silently.
+    // Alert the people in the thread (the parent's author and earlier repliers) set to notify on everything, plus anyone
+    // the reply @mentions (always, even if muted), not the whole channel. Everyone in the channel still gets the
+    // message:new above, so reply counts and an open thread stay current silently.
     if (fastify.io) {
       const threadPeople = await getThreadAlertRecipientIds(parent.id, parent.channelId, userId, content || '');
       const alert = access.channel.isAnonymous ? publicReply : fullReplyMessage;

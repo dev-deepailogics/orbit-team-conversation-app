@@ -77,11 +77,22 @@ describe('thread reply alerts', () => {
   const setPreference = (who: keyof typeof users, notificationPreference: 'ALL' | 'MENTIONS' | 'MUTED') =>
     prisma.channelMember.update({ where: { channelId_userId: { channelId, userId: users[who] } }, data: { notificationPreference } });
 
-  it('does not alert a thread participant who muted the channel', async () => {
+  it('alerts a participant who muted the channel only when the reply @mentions them', async () => {
     await setPreference('a', 'MUTED');
     emitted.length = 0;
+    await reply('b', 'still there?');
+    assert.deepEqual(alertedRooms(), []);
+    emitted.length = 0;
     await reply('b', 'still there? @alice');
-    assert.deepEqual(alertedRooms(), [], 'muted means muted, even when mentioned');
+    assert.deepEqual(alertedRooms(), [room('a')], 'a mention always notifies');
+  });
+
+  it('alerts a channel member mentioned in the thread even if they never took part, nor muted them', async () => {
+    await setPreference('d', 'MUTED');
+    emitted.length = 0;
+    await reply('b', 'what do you think @dave');
+    assert.deepEqual(alertedRooms(), [room('d')]);
+    await setPreference('d', 'ALL');
   });
 
   it('alerts a mentions-only participant only when the reply @mentions them', async () => {
