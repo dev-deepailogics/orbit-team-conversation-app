@@ -30,6 +30,36 @@ interface ProjectPortfolioViewProps {
   onOpenProjectBoard?: (project: any) => void;
 }
 
+const SkeletonBar: React.FC<{ className: string }> = ({ className }) => (
+  <span className={`block rounded-md ${className}`} style={{ backgroundColor: 'var(--theme-border)' }} />
+);
+
+/** Placeholder project cards (same frame as the real ones) while the first page of projects loads. */
+const ProjectCardsSkeleton: React.FC = () => (
+  <>
+    {[0, 1, 2].map((card) => (
+      <div
+        key={card}
+        aria-hidden="true"
+        className="rounded-2xl border p-5 flex flex-col gap-4 animate-pulse"
+        style={{ backgroundColor: 'var(--theme-bg-surface)', borderColor: 'var(--theme-border)' }}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <SkeletonBar className="h-4 w-40" />
+          <SkeletonBar className="h-5 w-16 rounded-full" />
+        </div>
+        <SkeletonBar className="h-3 w-full" />
+        <SkeletonBar className="h-3 w-2/3" />
+        <div className="flex items-center gap-2 pt-2">
+          {[0, 1, 2].map((a) => (
+            <SkeletonBar key={a} className="w-7 h-7 rounded-full" />
+          ))}
+        </div>
+      </div>
+    ))}
+  </>
+);
+
 export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
   workspace,
   currentUser,
@@ -297,6 +327,8 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
 
         {/* 3-Column Grid of Project Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pt-1">
+          {/* First load only: a refresh keeps the current cards and spins the refresh icon instead */}
+          {isLoading && projects.length === 0 && <ProjectCardsSkeleton />}
           {filteredProjects.map((project) => {
             // Manager text
             let managerDisplay = 'Talal Siddiqui';

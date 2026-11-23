@@ -2,6 +2,7 @@ import { prisma } from '@orbit/db';
 import { SOCKET_EVENTS } from '@orbit/types';
 import { getOrCreateSystemBot } from './systemBot.js';
 import { extractMentionTokens, matchMentionedUserIds } from './mentionParser.js';
+import { withPushOverride } from './pushService.js';
 
 export async function handleMessageMentions({
   workspaceId,
@@ -9,7 +10,7 @@ export async function handleMessageMentions({
   authorId,
   content,
   messageId,
-  isThreadReply = false,
+  parentMessageId,
   io,
 }: {
   workspaceId: string;
@@ -17,7 +18,8 @@ export async function handleMessageMentions({
   authorId: string;
   content: string;
   messageId: string;
-  isThreadReply?: boolean;
+  /** Set when the mention is a thread reply: the thread's parent message. */
+  parentMessageId?: string;
   io?: any;
 }) {
   try {
@@ -61,9 +63,11 @@ export async function handleMessageMentions({
     const uniqueTargets = candidates.filter((u) => mentionedIds.has(u.id));
     if (uniqueTargets.length === 0) return;
 
-    const locationText = isThreadReply
+    const locationText = parentMessageId
       ? `in a thread in [#${channel.name}](channel://${channel.id})`
       : `in [#${channel.name}](channel://${channel.id})`;
+    // In-app link the web app opens at that exact message (and its thread): message://<channel>/<message>[/<parent>]
+    const messageLink = `message://${channel.id}/${messageId}${parentMessageId ? `/${parentMessageId}` : ''}`;
     const cleanSnippet = content.length > 250 ? `${content.slice(0, 247)}...` : content;
 
     // 6. Notify each mentioned user
@@ -144,48 +148,44 @@ export async function handleMessageMentions({
 
         // Post notification message via Orbit Bot into target user's DM
         const bot = await getOrCreateSystemBot(workspaceId);
-        const dmContent = `🤖 **Orbit Bot** • 🔔 **${authorName}** mentioned you ${locationText}:\n> ${cleanSnippet}`;
+        const dmContent = `🤖 **Orbit Bot** • 🔔 **${authorName}** mentioned you ${locationText}:\n> ${cleanSnippet}\n\n[Jump to message →](${messageLink})`;
 
-        const dmMessage = await prisma.message.create({
-          data: {
-            channelId: dmChannel.id,
-            botAppId: bot.id,
-            content: dmContent,
-          },
-          include: {
-            user: {
-              select: {
-                id: true,
-                username: true,
-                displayName: true,
-                avatarUrl: true,
-                status: true,
-              },
-            },
-            bot: true,
-            attachments: true,
-            reactions: {
+        // The note is for the mentioned person only: its push goes to them (not the author, who shares this DM) and a
+        // tap opens the message they were mentioned in.
+        const targetId = targetUser.id;
+        const dmMessage = await withPushOverride(
+          { userIds: [targetId], open: { channelId: channel.id, parentMessageId } },
+          () =>
+            prisma.message.create({
+              data: { channelId: dmChannel.id, botAppId: bot.id, content: dmContent },
               include: {
-                user: { select: { id: true, displayName: true } },
+                user: { select: { id: true, username: true, displayName: true, avatarUrl: true, status: true } },
+                bot: true,
+                attachments: true,
+                reactions: { include: { user: { select: { id: true, displayName: true } } } },
+                _count: { select: { replies: true } },
               },
-            },
-            _count: {
-              select: { replies: true },
-            },
-          },
-        });
+            }),
+        );
 
-        const dmPayload = {
+        // The author never sees the note arrive, so it mustn't come back as unread for them on their next load. Only
+        // when they had nothing unread in this DM already: moving lastReadAt would otherwise hide real unread messages.
+        // Mirrors the unread count query in routes/channels.ts.
+        await prisma.$executeRaw`
+          UPDATE "ChannelMember" cm SET "lastReadAt" = ${dmMessage.createdAt}
+          WHERE cm."channelId" = ${dmChannel.id} AND cm."userId" = ${authorId}
+            AND NOT EXISTS (
+              SELECT 1 FROM "Message" m
+              WHERE m."channelId" = cm."channelId" AND m."parentMessageId" IS NULL AND m."isDeleted" = false
+                AND m."userId" IS DISTINCT FROM ${authorId} AND m."createdAt" > cm."lastReadAt" AND m.id <> ${dmMessage.id}
+            )`;
+
+        // Only the mentioned person is told live; the author's open DM picks the note up on its next load.
+        io?.to(`user:${targetId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, {
           ...dmMessage,
           replyCount: dmMessage._count.replies,
           workspaceId,
-        };
-
-        if (io) {
-          io.to(`channel:${dmChannel.id}`).emit(SOCKET_EVENTS.MESSAGE_NEW, dmPayload);
-          io.to(`user:${targetUser.id}`).emit(SOCKET_EVENTS.MESSAGE_NEW, dmPayload);
-          io.to(`user:${authorId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, dmPayload);
-        }
+        });
       }
     }
   } catch (err) {

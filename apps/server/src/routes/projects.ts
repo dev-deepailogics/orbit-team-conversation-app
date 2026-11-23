@@ -971,41 +971,51 @@ export const projectRoutes: FastifyPluginAsync = async (
         },
       ];
 
-      const ticket = await prisma.ticket.create({
-        data: {
-          projectId,
-          columnId,
-          title,
-          description,
-          priority,
-          type,
-          orderIndex: nextOrderIndex,
-          dueDate: dueDate ? new Date(dueDate) : null,
-          createdById: userId,
-          assigneeId: assigneeId || null,
-          assignees: assignees ?? undefined,
-          images: images ?? undefined,
-          events: initialEvents,
-        },
-        include: {
-          creator: {
-            select: {
-              id: true,
-              username: true,
-              displayName: true,
-              avatarUrl: true,
-            },
+      // Next number in this project (1, 2, 3…). The increment locks the project row until the ticket is created, so two
+      // tickets created at once can never get the same number, and a failed create doesn't use one up.
+      const ticket = await prisma.$transaction(async (tx) => {
+        const { ticketCounter } = await tx.project.update({
+          where: { id: projectId },
+          data: { ticketCounter: { increment: 1 } },
+          select: { ticketCounter: true },
+        });
+        return tx.ticket.create({
+          data: {
+            projectId,
+            columnId,
+            issueNumber: ticketCounter,
+            title,
+            description,
+            priority,
+            type,
+            orderIndex: nextOrderIndex,
+            dueDate: dueDate ? new Date(dueDate) : null,
+            createdById: userId,
+            assigneeId: assigneeId || null,
+            assignees: assignees ?? undefined,
+            images: images ?? undefined,
+            events: initialEvents,
           },
-          assignee: {
-            select: {
-              id: true,
-              username: true,
-              displayName: true,
-              avatarUrl: true,
+          include: {
+            creator: {
+              select: {
+                id: true,
+                username: true,
+                displayName: true,
+                avatarUrl: true,
+              },
             },
+            assignee: {
+              select: {
+                id: true,
+                username: true,
+                displayName: true,
+                avatarUrl: true,
+              },
+            },
+            column: true,
           },
-          column: true,
-        },
+        });
       });
 
       await createMissingTicketAttachments(images, project.workspaceId, userId);

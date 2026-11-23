@@ -46,8 +46,6 @@ interface WorkspaceSidebarProps {
   onOpenProjects?: () => void;
   onOpenVideoLibrary?: () => void;
   onOpenBotPortal?: () => void;
-  // Opens the profile page in the main area
-  onOpenProfile: () => void;
   members?: any[];
   presence?: Record<string, Presence>;
   onLogout: () => void;
@@ -68,7 +66,6 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   onOpenProjects,
   onOpenVideoLibrary,
   onOpenBotPortal,
-  onOpenProfile,
   members = [],
   presence = {},
   onLogout,
@@ -80,7 +77,6 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   const [showStorage, setShowStorage] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
-  const openProfile = () => onOpenProfile();
   const accountRef = useRef<HTMLDivElement>(null);
 
   // Account and Settings menus share the avatar anchor; a click outside it closes both
@@ -311,7 +307,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                 <div className="py-1">
                   <div className="h-px" style={{ backgroundColor: 'var(--theme-border)' }} />
                 </div>
-                <AccountRow Icon={User} label="View profile" onClick={() => { setShowAccount(false); openProfile(); }} />
+                <AccountRow Icon={User} label="View profile" onClick={() => { setShowAccount(false); setThemeModalTab('profile'); }} />
                 <AccountRow Icon={Settings} label="Settings" onClick={() => { setShowAccount(false); setThemeModalTab('profile'); }} />
                 <AccountRow Icon={LogOut} label="Sign out" onClick={() => { setShowAccount(false); onLogout(); }} />
               </div>

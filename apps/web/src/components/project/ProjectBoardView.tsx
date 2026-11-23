@@ -690,8 +690,9 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
     );
 
   const columns = project.columns || [];
-  // The project list carries no columns, so until the details arrive (and unless a cached copy exists) show a skeleton
-  const isBoardLoading =
+  // The project list carries no columns, so until the details request finishes (and unless a cached copy exists) every
+  // view shows a skeleton. Finishing includes failing, so a failed load never leaves a skeleton spinning forever.
+  const isProjectLoading =
     loadedProjectId !== initialProject.id && project.columns === undefined;
   const totalTickets =
     project._count?.tickets ??
@@ -1064,7 +1065,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
       </header>
 
       {activeSection === "board" ? (
-        !projectLoaded ? (
+        isProjectLoading ? (
           <BoardSkeleton />
         ) : boardIsEmpty ? (
           <EmptyBoard
@@ -1449,21 +1450,29 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
           </div>
         )
       ) : activeSection === "list" ? (
-        <ProjectListView
-          project={project}
-          members={members}
-          loadingAll={loadingAll}
-          filterTicket={filterTicket}
-          onOpenTicket={setViewingDetailTicket}
-        />
+        isProjectLoading ? (
+          <ListSkeleton />
+        ) : (
+          <ProjectListView
+            project={project}
+            members={members}
+            loadingAll={loadingAll}
+            filterTicket={filterTicket}
+            onOpenTicket={setViewingDetailTicket}
+          />
+        )
       ) : activeSection === "summary" ? (
-        <ProjectSummaryView
-          project={project}
-          members={members}
-          currentUser={currentUser}
-          rangeDays={rangeDays}
-          onOpenTicket={setViewingDetailTicket}
-        />
+        isProjectLoading ? (
+          <SummarySkeleton />
+        ) : (
+          <ProjectSummaryView
+            project={project}
+            members={members}
+            currentUser={currentUser}
+            rangeDays={rangeDays}
+            onOpenTicket={setViewingDetailTicket}
+          />
+        )
       ) : null}
 
       {/* Ticket Create / Edit Modal */}
@@ -1820,6 +1829,57 @@ const BoardSkeleton: React.FC = () => (
         ))}
       </div>
     ))}
+  </div>
+);
+
+const SURFACE_CARD = { backgroundColor: "var(--theme-bg-app)", borderColor: "var(--theme-border)" };
+
+const ListSkeleton: React.FC = () => (
+  <div className="flex-1 min-h-0 overflow-hidden px-3 sm:px-6 py-4 animate-pulse" style={{ backgroundColor: "var(--theme-bg-app)" }}>
+    <div className="rounded-xl border overflow-hidden" style={SURFACE_CARD}>
+      {[0, 1].map((group) => (
+        <div key={group}>
+          <div
+            className="h-10 px-4 border-b flex items-center"
+            style={{ backgroundColor: "var(--theme-bg-surface-hover)", borderColor: "var(--theme-border)" }}
+          >
+            <SkeletonBar className="h-3.5 w-24 rounded" />
+          </div>
+          {[0, 1, 2].map((row) => (
+            <div key={row} className="h-12 px-4 border-b flex items-center gap-6" style={{ borderColor: "var(--theme-border)" }}>
+              <SkeletonBar className="h-3 w-16 rounded-md" />
+              <SkeletonBar className="h-3 flex-1 max-w-[320px] rounded-md" />
+              <SkeletonBar className="h-3 w-20 rounded-md" />
+              <SkeletonBar className="w-5 h-5 rounded-full" />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const SummarySkeleton: React.FC = () => (
+  <div
+    className="flex-1 min-h-0 overflow-hidden px-3 sm:px-6 py-4 flex flex-col gap-3.5 animate-pulse"
+    style={{ backgroundColor: "var(--theme-bg-surface)" }}
+  >
+    <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      {[0, 1, 2, 3].map((card) => (
+        <div key={card} className="rounded-xl border p-4 flex flex-col gap-2.5" style={SURFACE_CARD}>
+          <SkeletonBar className="h-3 w-20 rounded-md" />
+          <SkeletonBar className="h-6 w-12 rounded-md" />
+        </div>
+      ))}
+    </div>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {[0, 1].map((panel) => (
+        <div key={panel} className="h-56 rounded-xl border p-4 flex flex-col gap-3" style={SURFACE_CARD}>
+          <SkeletonBar className="h-3.5 w-32 rounded-md" />
+          <SkeletonBar className="flex-1 w-full rounded-lg" />
+        </div>
+      ))}
+    </div>
   </div>
 );
 

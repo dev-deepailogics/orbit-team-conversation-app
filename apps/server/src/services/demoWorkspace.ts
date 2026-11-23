@@ -577,6 +577,7 @@ export async function createDemoWorkspace(name: string) {
               clientEmail: `guest@${domain}`,
             }),
             columns: { create: COLUMNS },
+            ticketCounter: p.tickets.length,
           },
           include: { columns: { orderBy: { orderIndex: 'asc' } } },
         });
@@ -598,6 +599,7 @@ export async function createDemoWorkspace(name: string) {
             data: {
               projectId: project.id,
               columnId: project.columns[t.col].id,
+              issueNumber: ti + 1,
               title: t.title,
               description: t.desc,
               priority: t.priority,

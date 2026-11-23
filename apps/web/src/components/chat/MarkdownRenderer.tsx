@@ -1,9 +1,15 @@
 'use client';
 
 import React, { createContext, useContext, useMemo } from 'react';
-import ReactMarkdown, { Components } from 'react-markdown';
+import ReactMarkdown, { Components, defaultUrlTransform } from 'react-markdown';
 import { RecordingEmbed } from '../recording/RecordingEmbed';
 import { CLIP_LINK_PATTERN } from '../recording/recordingUtils';
+import { openMessage, parseMessageLink } from '@/lib/messageLinks';
+
+// react-markdown blanks every link whose scheme isn't http(s)/mailto/..., which would strip the app's own
+// mention://, channel:// and message:// links before Anchor sees them. Keep those; sanitize everything else as usual.
+const IN_APP_LINK = /^(mention|channel|message):\/\//;
+const urlTransform = (url: string) => (IN_APP_LINK.test(url) ? url : defaultUrlTransform(url));
 
 interface MarkdownRendererProps {
   content: string;
@@ -76,6 +82,26 @@ const Anchor: Components['a'] = ({ href, children }) => {
             : 'bg-[#1D3B53] text-[#36C5F0] border border-[#36C5F0]/30 hover:bg-[#234b6b] font-medium'
         }`}
         title={`Mention @${username}`}
+      >
+        {children}
+      </span>
+    );
+  }
+
+  const messageTarget = href?.startsWith('message://') ? parseMessageLink(href) : null;
+  if (messageTarget) {
+    return (
+      <span
+        role="link"
+        tabIndex={0}
+        onClick={(e) => {
+          e.stopPropagation();
+          openMessage(messageTarget);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') openMessage(messageTarget);
+        }}
+        className="text-[var(--theme-primary)] font-semibold hover:underline cursor-pointer inline-flex items-center gap-0.5"
       >
         {children}
       </span>
@@ -212,7 +238,9 @@ export const MarkdownRenderer = React.memo(function MarkdownRenderer({
         style={{ color: 'var(--theme-text-primary)' }}
         className={`max-w-none break-words text-sm leading-relaxed prose-code:before:content-none prose-code:after:content-none ${className}`}
       >
-        <ReactMarkdown components={COMPONENTS}>{formattedContent}</ReactMarkdown>
+        <ReactMarkdown components={COMPONENTS} urlTransform={urlTransform}>
+          {formattedContent}
+        </ReactMarkdown>
       </div>
     </MarkdownContext.Provider>
   );

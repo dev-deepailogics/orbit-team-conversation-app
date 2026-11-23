@@ -73,4 +73,36 @@ describe('thread reply alerts', () => {
     await reply('b', 'carol left');
     assert.deepEqual(alertedRooms(), [room('a')]);
   });
+
+  const setPreference = (who: keyof typeof users, notificationPreference: 'ALL' | 'MENTIONS' | 'MUTED') =>
+    prisma.channelMember.update({ where: { channelId_userId: { channelId, userId: users[who] } }, data: { notificationPreference } });
+
+  it('alerts a participant who muted the channel only when the reply @mentions them', async () => {
+    await setPreference('a', 'MUTED');
+    emitted.length = 0;
+    await reply('b', 'still there?');
+    assert.deepEqual(alertedRooms(), []);
+    emitted.length = 0;
+    await reply('b', 'still there? @alice');
+    assert.deepEqual(alertedRooms(), [room('a')], 'a mention always notifies');
+  });
+
+  it('alerts a channel member mentioned in the thread even if they never took part, nor muted them', async () => {
+    await setPreference('d', 'MUTED');
+    emitted.length = 0;
+    await reply('b', 'what do you think @dave');
+    assert.deepEqual(alertedRooms(), [room('d')]);
+    await setPreference('d', 'ALL');
+  });
+
+  it('alerts a mentions-only participant only when the reply @mentions them', async () => {
+    await setPreference('a', 'MENTIONS');
+    emitted.length = 0;
+    await reply('b', 'no mention here');
+    assert.deepEqual(alertedRooms(), []);
+    emitted.length = 0;
+    await reply('b', 'ping @alice');
+    assert.deepEqual(alertedRooms(), [room('a')]);
+    await setPreference('a', 'ALL');
+  });
 });

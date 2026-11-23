@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Workspace, Channel, Message } from '@orbit/types';
+import { Workspace, Channel, Message, MessagePoll } from '@orbit/types';
 
 export interface ThreadPage {
   hasMore: boolean;
@@ -20,6 +20,8 @@ interface ChatState {
   threadReplies: Message[];
   threadHasMore: boolean;
   threadNextCursor: string | null;
+  /** The open thread's first page of replies hasn't arrived yet (drives the thread skeleton). */
+  threadLoading: boolean;
   // Who is typing per channel, keyed by user id (typing:stop only carries the id, not the name)
   typingUsers: { [channelId: string]: TypingUser[] };
   unreadCounts: { [channelId: string]: number };
@@ -34,6 +36,8 @@ interface ChatState {
   prependMessages: (olderMessages: Message[]) => void;
   addMessage: (message: Message) => void;
   updateMessage: (message: Message) => void;
+  /** New poll results (from a vote response or a poll:updated broadcast). */
+  applyPollUpdate: (messageId: string, poll: MessagePoll) => void;
   setActiveThread: (message: Message | null) => void;
   // threadId: the thread these replies were fetched for; ignored if the open thread has changed since.
   // page: whether older replies exist and where to continue from (replies load newest-first, like channel messages)
@@ -64,6 +68,7 @@ export const useChatStore = create<ChatState>((set) => ({
   threadReplies: [],
   threadHasMore: false,
   threadNextCursor: null,
+  threadLoading: false,
   typingUsers: {},
   unreadCounts: {},
   lastActivity: {},
@@ -78,6 +83,7 @@ export const useChatStore = create<ChatState>((set) => ({
       threadReplies: [],
       threadHasMore: false,
       threadNextCursor: null,
+      threadLoading: false,
       typingUsers: {},
       unreadCounts: {},
       lastActivity: {},
@@ -94,6 +100,7 @@ export const useChatStore = create<ChatState>((set) => ({
     set((state) => ({
       currentChannel: channel,
       activeThread: null,
+      threadLoading: false,
       unreadCounts: channel
         ? { ...state.unreadCounts, [channel.id]: 0 }
         : state.unreadCounts,
@@ -127,10 +134,25 @@ export const useChatStore = create<ChatState>((set) => ({
 
   updateMessage: (message) =>
     set((state) => ({
-      messages: state.messages.map((m) => (m.id === message.id ? message : m)),
+      // Edit/pin/delete payloads don't carry the poll, so keep the one already shown
+      messages: state.messages.map((m) =>
+        m.id !== message.id ? m : message.poll === undefined && m.poll ? { ...message, poll: m.poll } : message,
+      ),
       threadReplies: state.threadReplies.map((r) => (r.id === message.id ? message : r)),
       activeThread: state.activeThread?.id === message.id ? { ...state.activeThread, ...message } : state.activeThread,
     })),
+
+  applyPollUpdate: (messageId, poll) =>
+    set((state) => {
+      const isTarget = (m: Message | null): m is Message => !!m?.poll && m.id === messageId;
+      if (!state.messages.some(isTarget) && !isTarget(state.activeThread)) return state;
+      // A broadcast carries no "my votes" (it goes to everyone): keep this viewer's own choice
+      const withPoll = (m: Message): Message => ({ ...m, poll: { ...poll, myVotes: poll.myVotes ?? m.poll?.myVotes } });
+      return {
+        messages: state.messages.map((m) => (isTarget(m) ? withPoll(m) : m)),
+        activeThread: isTarget(state.activeThread) ? withPoll(state.activeThread) : state.activeThread,
+      };
+    }),
 
   removeAttachment: (fileId) =>
     set((state) => ({
@@ -154,10 +176,10 @@ export const useChatStore = create<ChatState>((set) => ({
     set((state) => ({
       activeThread: message,
       // Opening a different thread (or closing it): drop the previous thread's replies right away instead of showing
-      // them under the new parent until its own replies finish loading
+      // them under the new parent until its own replies finish loading (setThreadReplies ends the loading state)
       ...(state.activeThread?.id === message?.id
         ? {}
-        : { threadReplies: [], threadHasMore: false, threadNextCursor: null }),
+        : { threadReplies: [], threadHasMore: false, threadNextCursor: null, threadLoading: !!message }),
     })),
   setThreadReplies: (replies, threadId, page) =>
     set((state) => {
@@ -167,6 +189,7 @@ export const useChatStore = create<ChatState>((set) => ({
         threadReplies: replies,
         threadHasMore: page?.hasMore ?? false,
         threadNextCursor: page?.nextCursor ?? null,
+        threadLoading: false,
       };
     }),
   prependThreadReplies: (older, threadId, page) =>

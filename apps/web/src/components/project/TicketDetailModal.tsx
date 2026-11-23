@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/icons';
 import { WorkspaceMember, ProjectColumn } from '@orbit/types';
 import { TicketTypeIcon } from './TicketTypeIcon';
+import { MarkdownRenderer } from '../chat/MarkdownRenderer';
 import { api } from '../../lib/api';
 import {
   Avatar,
@@ -361,7 +362,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
 
           <Section title="Description">
             {ticket.description ? (
-              <p className="text-sm leading-[21px] whitespace-pre-wrap break-words">{ticket.description}</p>
+              <MarkdownRenderer content={ticket.description} className="leading-[21px]" />
             ) : (
               <Muted>No description provided.</Muted>
             )}

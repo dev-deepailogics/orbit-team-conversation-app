@@ -9,6 +9,7 @@ import {
   Message,
   Project,
   SOCKET_EVENTS,
+  type PollUpdatedPayload,
 } from "@orbit/types";
 import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
@@ -26,7 +27,8 @@ import { useThemeStore } from "@/stores/themeStore";
 import { WorkspaceSidebar } from "@/components/workspace/WorkspaceSidebar";
 import { ChannelSidebar } from "@/components/channel/ChannelSidebar";
 import { ChatArea } from "@/components/chat/ChatArea";
-import { ThreadSidebar } from "@/components/chat/ThreadSidebar";
+import { ThreadSidebar, ThreadSidebarSkeleton } from "@/components/chat/ThreadSidebar";
+import { OPEN_MESSAGE_EVENT, parseMessageLink, type MessageTarget } from "@/lib/messageLinks";
 import { QuickTodos } from "@/components/layout/QuickTodos";
 import { HuddleModal } from "@/components/huddle/HuddleModal";
 import { IncomingCallDialog } from "@/components/huddle/IncomingCallDialog";
@@ -47,7 +49,6 @@ import { useTeamPresence } from "@/components/availability/useTeamPresence";
 import { useLiveUserStatus } from "@/components/channel/useLiveUserStatus";
 import { WorkspaceSkeleton } from "@/components/brand/LoadingScreens";
 import { EmptyState } from "@/components/brand/EmptyState";
-import { ProfileModal } from "@/components/profile/ProfileModal";
 import { OfflineOverlay } from "@/components/brand/OfflineScreen";
 import { usePinStore } from "@/stores/pinnedStore";
 import { useSidebarSortStore } from "@/stores/sidebarSortStore";
@@ -91,6 +92,7 @@ export default function AppDashboard() {
     setThreadReplies,
     prependThreadReplies,
     threadHasMore,
+    threadLoading,
     addThreadReply,
     setTypingUser,
     incrementUnread,
@@ -143,33 +145,9 @@ export default function AppDashboard() {
   const closeRecorder = useRecorderStore((s) => s.close);
   const [canvases, setCanvases] = useState<any[]>([]);
   const [newCanvasSignal, setNewCanvasSignal] = useState(0);
-  const [showProfilePage, setShowProfilePage] = useState(false);
-  const wasProfileOpen = useRef(false);
+  // The canvas hub is toggled from several places; any of them leaves the video library.
   useEffect(() => {
-    if (
-      wasProfileOpen.current &&
-      !showProfilePage &&
-      typeof window !== "undefined"
-    ) {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get("view") === "profile") {
-        params.delete("view");
-        const qs = params.toString();
-        window.history.replaceState(
-          null,
-          "",
-          qs ? `?${qs}` : window.location.pathname,
-        );
-      }
-    }
-    wasProfileOpen.current = showProfilePage;
-  }, [showProfilePage]);
-  // The canvas hub is toggled from several places; any of them leaves the profile page.
-  useEffect(() => {
-    if (showCanvasHub) {
-      setShowProfilePage(false);
-      setShowVideoLibrary(false);
-    }
+    if (showCanvasHub) setShowVideoLibrary(false);
   }, [showCanvasHub]);
   const [newDocSignal, setNewDocSignal] = useState(0);
   const [selectedCanvasId, setSelectedCanvasId] = useState<string | null>(null);
@@ -350,11 +328,10 @@ export default function AppDashboard() {
       let targetProject: Project | null = null;
       let targetIsOrgControl = false;
       let targetDocs: { docId: string | null } | null = null;
-      let targetProfile = false;
+      let targetThreadId: string | null = null;
       if (typeof window !== "undefined") {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get("search") === "1") setShowSearchModal(true);
-        if (urlParams.get("view") === "profile") targetProfile = true;
         const urlView = urlParams.get("view");
         const urlChId = urlParams.get("channelId");
         const urlProjId = urlParams.get("projectId");
@@ -366,6 +343,8 @@ export default function AppDashboard() {
         if (urlChId && res.data.channels) {
           targetChannel =
             res.data.channels.find((c: Channel) => c.id === urlChId) || null;
+          // Web push for a thread reply links here with ?threadId=; open it once its channel is selected
+          if (targetChannel) targetThreadId = urlParams.get("threadId");
         }
         if (urlProjId && projectsData.length > 0) {
           targetProject =
@@ -381,10 +360,10 @@ export default function AppDashboard() {
         // Awaited so the boot screen covers the first page of messages too (no empty-channel flash).
         const channel = targetChannel ?? res.data.channels?.[0];
         if (channel) await handleSelectChannel(channel);
+        if (targetChannel && targetThreadId) openThreadById(targetThreadId);
       }
       // Docs open on top of the default channel so Home has somewhere to go back to
       if (targetDocs && !targetIsOrgControl) handleOpenDocs(targetDocs.docId);
-      if (targetProfile) openProfilePage();
     } catch (err) {
       console.error("Failed to load workspace details", err);
     }
@@ -426,9 +405,18 @@ export default function AppDashboard() {
     }, 2000);
   };
 
+  // A thread being opened by id (see openThreadById): its id while the panel shows as a skeleton, and the latest
+  // requested thread, so a slower earlier request never opens over a newer one or over a closed panel
+  const [openingThreadId, setOpeningThreadId] = useState<string | null>(null);
+  const threadRequestRef = useRef<string | null>(null);
+  const cancelThreadOpening = () => {
+    threadRequestRef.current = null;
+    setOpeningThreadId(null);
+  };
+
   // 4. Handle Channel Selection (Chunked Initial Load)
   const handleSelectChannel = async (channel: Channel) => {
-    setShowProfilePage(false);
+    cancelThreadOpening();
     setShowOrgControl(false);
     setShowCanvasHub(false);
     setShowDocsHub(false);
@@ -488,7 +476,6 @@ export default function AppDashboard() {
   const lastProjectIdRef = useRef<string | null>(null);
 
   const handleSelectProject = (project: Project) => {
-    setShowProfilePage(false);
     setShowOrgControl(false);
     setShowCanvasHub(false);
     setShowDocsHub(false);
@@ -505,7 +492,6 @@ export default function AppDashboard() {
 
   // 4c. Handle Organization Control URL Sync
   const handleOpenOrgControl = (subview?: string) => {
-    setShowProfilePage(false);
     setShowOrgControl(true);
     setShowCanvasHub(false);
     setShowDocsHub(false);
@@ -651,7 +637,6 @@ export default function AppDashboard() {
   };
 
   const handleOpenDocs = (docId: string | null = null) => {
-    setShowProfilePage(false);
     setShowCanvasHub(false);
     setShowOrgControl(false);
     setShowProjectsPanel(false);
@@ -670,7 +655,6 @@ export default function AppDashboard() {
   // Home: close every feature view (incl. an open board) and show the channel. Every "close" or
   // "back" path uses this, so the rail, the sidebar and the main area always agree.
   const goHome = () => {
-    setShowProfilePage(false);
     setShowCanvasHub(false);
     setShowDocsHub(false);
     setShowOrgControl(false);
@@ -700,7 +684,6 @@ export default function AppDashboard() {
       return;
     }
     // No boards yet: show the (empty) list with its "create" action over the current channel.
-    setShowProfilePage(false);
     setShowCanvasHub(false);
     setShowDocsHub(false);
     setShowOrgControl(false);
@@ -711,7 +694,6 @@ export default function AppDashboard() {
   // Video Library: every recording in this workspace (Loom-style grid). Like Canvas, it owns the
   // main area with no secondary sidebar; clicking it again goes Home.
   const openVideoLibrary = () => {
-    setShowProfilePage(false);
     setShowCanvasHub(false);
     setShowDocsHub(false);
     setShowOrgControl(false);
@@ -747,45 +729,6 @@ export default function AppDashboard() {
         window.history.replaceState(null, "", window.location.pathname);
       }
     }
-  };
-
-  // Profile: a full page in the main area (?view=profile)
-  // Rewrites the URL to just the channel/project it already names, plus or minus view=profile.
-  // Reads the live URL (not state) so it is correct inside stale closures such as the initial load.
-  const setProfileInUrl = (on: boolean) => {
-    if (typeof window === "undefined") return;
-    const current = new URLSearchParams(window.location.search);
-    const next = new URLSearchParams();
-    const projectId = current.get("projectId");
-    const channelId = current.get("channelId");
-    if (projectId) next.set("projectId", projectId);
-    else if (channelId) next.set("channelId", channelId);
-    if (on) next.set("view", "profile");
-    const qs = next.toString();
-    window.history.replaceState(
-      null,
-      "",
-      qs ? `?${qs}` : window.location.pathname,
-    );
-  };
-  const openProfilePage = () => {
-    setShowCanvasHub(false);
-    setShowDocsHub(false);
-    setShowOrgControl(false);
-    setShowVideoLibrary(false);
-    setIsMobileSidebarOpen(false);
-    setShowProfilePage(true);
-    setProfileInUrl(true);
-  };
-  // Switching or creating a workspace leaves the profile page (the URL would otherwise reopen it)
-  const switchWorkspace = (ws: Workspace) => {
-    setShowProfilePage(false);
-    setProfileInUrl(false);
-    handleSelectWorkspace(ws);
-  };
-  const closeProfilePage = () => {
-    setShowProfilePage(false);
-    syncUrlToCurrent();
   };
 
   // 4a. Load Older Messages (Cursor-based Pagination)
@@ -848,7 +791,6 @@ export default function AppDashboard() {
 
   // 4c. Handle selection of searched message
   const handleSelectSearchedMessage = async (searchedMsg: any) => {
-    setShowProfilePage(false);
     try {
       // 1. If message belongs to a channel that is not currently selected, switch to that channel
       if (!currentChannel || currentChannel.id !== searchedMsg.channelId) {
@@ -872,12 +814,7 @@ export default function AppDashboard() {
 
       // 2. If it's a thread reply, open the thread sidepanel
       if (searchedMsg.parentMessageId) {
-        const threadRes = await api.get(
-          `/api/messages/${searchedMsg.parentMessageId}/replies`,
-        );
-        if (threadRes.data.parent) {
-          handleOpenThread(threadRes.data.parent);
-        }
+        await openThreadById(searchedMsg.parentMessageId);
       } else {
         // 3. Highlight message in ChatArea
         setTimeout(() => {
@@ -904,6 +841,22 @@ export default function AppDashboard() {
     }
   };
 
+  // A message link (e.g. "Jump to message" in a mention note, or clicking that note's notification) opens the message
+  // exactly as picking it in search does: its channel, then its thread or a highlight. Through a ref so the window
+  // listener and the socket handlers always call the current version.
+  const openMessageRef = useRef<(target: MessageTarget) => void>(() => {});
+  openMessageRef.current = (target: MessageTarget) =>
+    handleSelectSearchedMessage({
+      id: target.messageId,
+      channelId: target.channelId,
+      parentMessageId: target.parentMessageId,
+    });
+  useEffect(() => {
+    const onOpenMessage = (e: Event) => openMessageRef.current((e as CustomEvent<MessageTarget>).detail);
+    window.addEventListener(OPEN_MESSAGE_EVENT, onOpenMessage);
+    return () => window.removeEventListener(OPEN_MESSAGE_EVENT, onOpenMessage);
+  }, []);
+
   // 5. Socket.IO Realtime listeners
   useEffect(() => {
     if (!user || !currentWorkspace) return;
@@ -917,20 +870,25 @@ export default function AppDashboard() {
       if (granted) registerPush();
     });
 
-    // Chime + desktop notification for a message addressed to this user
+    // Chime + desktop notification for a message addressed to this user. A thread reply says so, and clicking it
+    // opens that thread rather than just its channel.
     const alertForMessage = (msg: any) => {
       sounds.playMessageSound();
+      const sender = msg.user?.displayName || msg.bot?.name || "New Message";
       DesktopNotifier.send(
-        msg.user?.displayName || msg.bot?.name || "New Message",
+        msg.parentMessageId ? `${sender} replied in a thread` : sender,
         msg.content,
         msg.user?.avatarUrl || msg.bot?.avatarUrl,
-        () => {
+        async () => {
           window.focus();
+          // Orbit Bot's mention note: go straight to the message it is about
+          const mentioned = msg.bot ? parseMessageLink(msg.content) : null;
+          if (mentioned) return openMessageRef.current(mentioned);
           const allChannels = useChatStore.getState().channels;
           const targetChannel = allChannels.find((c) => c.id === msg.channelId);
-          if (targetChannel) {
-            handleSelectChannel(targetChannel);
-          }
+          if (!targetChannel) return;
+          await handleSelectChannel(targetChannel);
+          if (msg.parentMessageId) openThreadById(msg.parentMessageId);
         },
       );
     };
@@ -941,7 +899,14 @@ export default function AppDashboard() {
 
       // Alert for channel messages from another user or bot. Thread replies reach everyone in the channel (to keep
       // reply counts and open threads current), but only the people in the thread are alerted, via thread:reply_notify.
-      if (isFromOther && !msg.parentMessageId) {
+      // Same rule as push: only conversations set to "All messages". Muted ones stay silent, and "Mentions" ones hear
+      // about mentions through Orbit Bot's note instead.
+      const myPreference =
+        useChatStore
+          .getState()
+          .channels.find((c) => c.id === msg.channelId)
+          ?.members?.find((m) => m.userId === user.id)?.notificationPreference ?? "ALL";
+      if (isFromOther && !msg.parentMessageId && myPreference === "ALL") {
         alertForMessage(msg);
       }
 
@@ -976,6 +941,11 @@ export default function AppDashboard() {
             ),
         );
       }
+    };
+
+    // Someone voted: new totals for everyone viewing the channel (each client keeps its own choice)
+    const onPollUpdated = ({ messageId, poll }: PollUpdatedPayload) => {
+      useChatStore.getState().applyPollUpdate(messageId, poll);
     };
 
     // Typing indicators are tracked per user id. They clear on typing:stop, when that person's message arrives, and
@@ -1152,6 +1122,7 @@ export default function AppDashboard() {
     socket.on("message:new", onNewMessage);
     socket.on("thread:reply_notify", alertForMessage);
     socket.on("message:reaction", onReaction);
+    socket.on(SOCKET_EVENTS.POLL_UPDATED, onPollUpdated);
     socket.on("message:updated", onMessageUpdated);
     socket.on("message:pinned", onMessagePinned);
     socket.on("message:deleted", onMessageDeleted);
@@ -1186,6 +1157,7 @@ export default function AppDashboard() {
       socket.off("message:new", onNewMessage);
       socket.off("thread:reply_notify", alertForMessage);
       socket.off("message:reaction", onReaction);
+      socket.off(SOCKET_EVENTS.POLL_UPDATED, onPollUpdated);
       socket.off("message:updated", onMessageUpdated);
       socket.off("message:pinned", onMessagePinned);
       socket.off("message:deleted", onMessageDeleted);
@@ -1206,7 +1178,8 @@ export default function AppDashboard() {
   // 6. Handle Opening Thread
   // Replies load newest-first in pages (like channel messages); earlier ones come in as the user scrolls up
   const handleOpenThread = async (message: Message) => {
-    setActiveThread(message);
+    cancelThreadOpening();
+    setActiveThread(message); // shows the parent at once, with reply placeholders until they load
     try {
       const res = await api.get(`/api/messages/${message.id}/replies`, { params: { limit: THREAD_PAGE_SIZE } });
       setThreadReplies(res.data.replies || [], message.id, {
@@ -1215,7 +1188,38 @@ export default function AppDashboard() {
       });
     } catch (err) {
       console.error("Failed to load thread replies", err);
+      setThreadReplies([], message.id); // end the placeholders (ignored if another thread is open by now)
     }
+  };
+
+  // Opens a thread known only by its parent's id (notification click, ?threadId= link, search, message link). One
+  // request loads the parent and its first page; the whole panel shows as a skeleton meanwhile. Only the latest
+  // request may open: one the user closed, or that a newer one / a channel switch replaced, is dropped.
+  const openThreadById = async (parentId: string) => {
+    threadRequestRef.current = parentId;
+    if (useChatStore.getState().activeThread?.id === parentId) return;
+    setActiveThread(null);
+    setOpeningThreadId(parentId);
+    try {
+      const res = await api.get(`/api/messages/${parentId}/replies`, { params: { limit: THREAD_PAGE_SIZE } });
+      const parent: Message | undefined = res.data.parent;
+      if (threadRequestRef.current !== parentId) return;
+      if (!parent || useChatStore.getState().currentChannel?.id !== parent.channelId) return;
+      setActiveThread(parent);
+      setThreadReplies(res.data.replies || [], parent.id, {
+        hasMore: !!res.data.hasMore,
+        nextCursor: res.data.nextCursor || null,
+      });
+    } catch (err) {
+      console.error("Failed to open thread", err);
+    } finally {
+      if (threadRequestRef.current === parentId) setOpeningThreadId(null);
+    }
+  };
+
+  const closeThread = () => {
+    cancelThreadOpening();
+    setActiveThread(null);
   };
 
   const handleLoadOlderReplies = async () => {
@@ -1286,10 +1290,7 @@ export default function AppDashboard() {
       setShowBotPortal(true);
     },
     onLogout: logout,
-    onOpenProfile: openProfilePage,
-    activeFeature: showProfilePage
-      ? null
-      : canvasActive
+    activeFeature: canvasActive
         ? ("canvas" as const)
         : docsActive
           ? ("docs" as const)
@@ -1306,7 +1307,6 @@ export default function AppDashboard() {
           setShowDocsHub(false);
           setShowOrgControl(false);
           setShowProjectsPanel(false);
-          setShowProfilePage(false);
           setCurrentProject(null);
           setShowCanvasHub(true);
           if (typeof window !== "undefined") {
@@ -1322,10 +1322,10 @@ export default function AppDashboard() {
       ? () => (docsActive ? goHome() : handleOpenDocs())
       : undefined,
     onOpenProjects: currentWorkspace
-      ? () => (showProjectsPanel && !showProfilePage ? goHome() : openProjects())
+      ? () => (showProjectsPanel ? goHome() : openProjects())
       : undefined,
     onOpenVideoLibrary: currentWorkspace
-      ? () => (showVideoLibrary && !showProfilePage ? goHome() : openVideoLibrary())
+      ? () => (showVideoLibrary ? goHome() : openVideoLibrary())
       : undefined,
   };
 
@@ -1349,10 +1349,10 @@ export default function AppDashboard() {
               workspaces={workspaces}
               currentWorkspace={currentWorkspace}
               currentUser={user}
-              onSelectWorkspace={switchWorkspace}
+              onSelectWorkspace={handleSelectWorkspace}
               onWorkspaceCreated={(ws) => {
                 setWorkspaces([...workspaces, ws]);
-                switchWorkspace(ws);
+                handleSelectWorkspace(ws);
               }}
             />
             {/* Show Channels & DMs / Projects / Canvas / Docs sidebar */}
@@ -1460,10 +1460,10 @@ export default function AppDashboard() {
           workspaces={workspaces}
           currentWorkspace={currentWorkspace}
           currentUser={user}
-          onSelectWorkspace={switchWorkspace}
+          onSelectWorkspace={handleSelectWorkspace}
           onWorkspaceCreated={(ws) => {
             setWorkspaces([...workspaces, ws]);
-            switchWorkspace(ws);
+            handleSelectWorkspace(ws);
           }}
         />
       </div>
@@ -1532,15 +1532,7 @@ export default function AppDashboard() {
       )}
 
       {/* 3. Main Chat View or Empty Workspace State */}
-      {showProfilePage && user ? (
-        <ProfileModal
-          user={user}
-          workspaceId={currentWorkspace?.id}
-          presence={presence[user.id] || "offline"}
-          onClose={closeProfilePage}
-          onLogout={logout}
-        />
-      ) : workspaces.length === 0 ? (
+      {workspaces.length === 0 ? (
         <div
           className="flex-1 flex flex-col items-center justify-center p-6 text-center relative overflow-y-auto"
           style={{ backgroundColor: "var(--theme-bg-app)" }}
@@ -1858,25 +1850,30 @@ export default function AppDashboard() {
       )}
 
       {/* 4. Active Thread Panel (Responsive Drawer on Mobile, Column on Desktop) */}
-      {activeThread && (
+      {(activeThread || openingThreadId) && (
         <div className="fixed inset-0 z-40 md:static md:z-20 md:flex h-full shrink-0">
           <div
             className="fixed inset-0 bg-black/60 md:hidden transition-opacity"
-            onClick={() => setActiveThread(null)}
+            onClick={closeThread}
           />
-          <ThreadSidebar
-            parentMessage={activeThread}
-            replies={threadReplies}
-            currentUser={user}
-            onClose={() => setActiveThread(null)}
-            onReplyAdded={addThreadReply}
-            hasMoreReplies={threadHasMore}
-            isLoadingOlderReplies={isLoadingOlderReplies}
-            onLoadOlderReplies={handleLoadOlderReplies}
-            members={members}
-            onSelectUserDM={handleSelectUserDM}
-            onSelectChannel={handleSelectChannel}
-          />
+          {activeThread ? (
+            <ThreadSidebar
+              parentMessage={activeThread}
+              replies={threadReplies}
+              currentUser={user}
+              onClose={closeThread}
+              onReplyAdded={addThreadReply}
+              hasMoreReplies={threadHasMore}
+              isLoadingOlderReplies={isLoadingOlderReplies}
+              onLoadOlderReplies={handleLoadOlderReplies}
+              isLoadingReplies={threadLoading}
+              members={members}
+              onSelectUserDM={handleSelectUserDM}
+              onSelectChannel={handleSelectChannel}
+            />
+          ) : (
+            <ThreadSidebarSkeleton onClose={closeThread} />
+          )}
         </div>
       )}
 

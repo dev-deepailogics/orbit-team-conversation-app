@@ -13,13 +13,73 @@ import { AnonAvatar } from './AnonAvatar';
 import { BotAvatar } from '../bot/BotAvatar';
 import { getTopEmojis, recordEmojiUsage } from '../../lib/emojiStore';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { PollCard } from './PollCard';
 import { RichTextEditor, RichTextEditorRef } from './RichTextEditor';
 import { FileAttachmentList, formatFileSize, getFileCategory } from './FileAttachmentList';
 import { CompressFileConfirmModal } from './CompressFileConfirmModal';
 import { compressFile } from '../../lib/compression';
 import { useTimeFormat, formatMessageTime } from '../../lib/timeFormat';
 import { MessageChangeNote } from './MessageChangeNote';
-import { useResizableSidebar } from '../layout/useResizableSidebar';
+import { useResizableSidebar, ResizableSidebarOptions } from '../layout/useResizableSidebar';
+
+// Shared by the panel and its loading skeleton so both open at the width the user last dragged it to
+const THREAD_SIDEBAR_SIZE: ResizableSidebarOptions = {
+  storageKey: 'orbit_thread_sidebar_width',
+  defaultWidth: 384,
+  minWidth: 300,
+  maxWidth: 720,
+  side: 'right',
+};
+const PANEL_CLASS =
+  'relative ml-auto h-full w-full sm:w-96 md:w-[var(--sidebar-w)] shadow-2xl md:shadow-none bg-[var(--theme-bg-surface)] border-l border-[var(--theme-border)] flex flex-col select-none';
+
+const ThreadHeader: React.FC<{ onClose: () => void }> = ({ onClose }) => (
+  <div className="h-14 border-b border-[var(--theme-border)] px-4 flex items-center justify-between">
+    <h3 className="font-bold text-[var(--theme-text)] text-sm">Thread</h3>
+    <button
+      onClick={onClose}
+      aria-label="Close thread"
+      className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition"
+    >
+      <X size={16} />
+    </button>
+  </div>
+);
+
+const SkeletonBar: React.FC<{ className: string }> = ({ className }) => (
+  <span className={`block rounded ${className}`} style={{ backgroundColor: 'var(--theme-border)' }} />
+);
+
+/** Placeholder message rows while a thread loads. */
+const MessageRowsSkeleton: React.FC<{ rows: number }> = ({ rows }) => (
+  <div className="space-y-4 animate-pulse" aria-hidden="true">
+    {Array.from({ length: rows }, (_, i) => (
+      <div key={i} className="flex gap-3 p-2">
+        <SkeletonBar className="w-8 h-8 rounded-lg shrink-0" />
+        <div className="flex-1 space-y-2 pt-0.5">
+          <SkeletonBar className="h-3 w-28" />
+          <SkeletonBar className={`h-3 ${i % 2 ? 'w-1/2' : 'w-4/5'}`} />
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+/** The whole panel as a skeleton, for a thread opened by id whose parent message hasn't loaded yet. */
+export const ThreadSidebarSkeleton: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const sidebar = useResizableSidebar(THREAD_SIDEBAR_SIZE);
+  return (
+    <div className={PANEL_CLASS} style={sidebar.style} aria-busy="true" aria-label="Loading thread">
+      <ThreadHeader onClose={onClose} />
+      <div className="flex-1 overflow-hidden p-4 space-y-4">
+        <div className="pb-3 border-b border-[var(--theme-border)]">
+          <MessageRowsSkeleton rows={1} />
+        </div>
+        <MessageRowsSkeleton rows={3} />
+      </div>
+    </div>
+  );
+};
 
 interface ThreadSidebarProps {
   parentMessage: Message;
@@ -34,6 +94,8 @@ interface ThreadSidebarProps {
   hasMoreReplies?: boolean;
   isLoadingOlderReplies?: boolean;
   onLoadOlderReplies?: () => void;
+  /** The first page of replies is still loading: show placeholders instead of an empty thread. */
+  isLoadingReplies?: boolean;
 }
 
 export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
@@ -48,6 +110,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   hasMoreReplies = false,
   isLoadingOlderReplies = false,
   onLoadOlderReplies,
+  isLoadingReplies = false,
 }) => {
   const timeFormat = useTimeFormat();
   // Unsent reply for this thread, restored from this device when the composer mounts (see lib/drafts.ts).
@@ -60,13 +123,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   useEffect(() => {
     setContent(initialDraft ?? '');
   }, [initialDraft, draftScope]);
-  const sidebar = useResizableSidebar({
-    storageKey: 'orbit_thread_sidebar_width',
-    defaultWidth: 384,
-    minWidth: 300,
-    maxWidth: 720,
-    side: 'right',
-  });
+  const sidebar = useResizableSidebar(THREAD_SIDEBAR_SIZE);
   const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [threadAttachments, setThreadAttachments] = useState<any[]>([]);
@@ -378,7 +435,8 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   };
 
   const isParentSelf = parentMessage.isSelf || (!isParentAnon && parentMessage.userId === currentUser?.id);
-  const canEditParent = !parentMessage.isDeleted && isParentSelf; // admins can delete a message, not edit it
+  // Admins can delete a message, not edit it; a poll's text comes from its question and options, so nobody edits it
+  const canEditParent = !parentMessage.isDeleted && isParentSelf && !parentMessage.poll;
   const canDeleteParent = !parentMessage.isDeleted && (isParentSelf || isWsAdmin || isSuperAdmin);
   const revealAnon = useAnonStore((s) => s.reveal);
   const authorName = isParentAnon
@@ -388,21 +446,9 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   const avatarUrl = parentMessage.user?.avatarUrl || parentMessage.bot?.avatarUrl || `/api/avatar/bottts/svg?seed=${authorName}`;
 
   return (
-    <div
-      className="relative ml-auto h-full w-full sm:w-96 md:w-[var(--sidebar-w)] shadow-2xl md:shadow-none bg-[var(--theme-bg-surface)] border-l border-[var(--theme-border)] flex flex-col select-none"
-      style={sidebar.style}
-    >
+    <div className={PANEL_CLASS} style={sidebar.style}>
       {sidebar.handle}
-      {/* Thread Header */}
-      <div className="h-14 border-b border-[var(--theme-border)] px-4 flex items-center justify-between">
-        <h3 className="font-bold text-[var(--theme-text)] text-sm">Thread</h3>
-        <button
-          onClick={onClose}
-          className="p-1.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded-lg transition"
-        >
-          <X size={16} />
-        </button>
-      </div>
+      <ThreadHeader onClose={onClose} />
 
       {/* Messages Scroll Area */}
       <div
@@ -498,14 +544,18 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
               </div>
             ) : (
               <>
-                <div className="text-xs text-[var(--theme-text)] mt-1 max-w-none break-words">
-                  <MarkdownRenderer
-                    content={parentMessage.content}
-                    currentUsername={currentUser?.username}
-                    onMentionClick={handleMentionClick}
-                    onChannelClick={handleChannelClick}
-                  />
-                </div>
+                {parentMessage.poll ? (
+                  <PollCard messageId={parentMessage.id} poll={parentMessage.poll} isAnonymous={isParentAnon} />
+                ) : (
+                  <div className="text-xs text-[var(--theme-text)] mt-1 max-w-none break-words">
+                    <MarkdownRenderer
+                      content={parentMessage.content}
+                      currentUsername={currentUser?.username}
+                      onMentionClick={handleMentionClick}
+                      onChannelClick={handleChannelClick}
+                    />
+                  </div>
+                )}
 
                 {/* Parent Message Attachments */}
                 {parentMessage.attachments && parentMessage.attachments.length > 0 && (
@@ -665,6 +715,8 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
             </button>
           </div>
         )}
+
+        {isLoadingReplies && <MessageRowsSkeleton rows={3} />}
 
         {/* Replies List */}
         {replies.map((reply, idx) => {

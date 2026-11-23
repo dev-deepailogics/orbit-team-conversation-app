@@ -98,6 +98,7 @@ model User {
   availabilities    UserAvailability[]
   ticketComments    TicketComment[]
   identities        UserIdentity[]
+  pollVotes         PollVote[]
   refreshTokens     RefreshToken[]
   todos             Todo[]
   createdCanvases   Canvas[]          @relation("CanvasCreator")
@@ -282,6 +283,7 @@ model Message {
   attachments     Attachment[]
   reactions       Reaction[]
   recordings      Recording[]
+  poll            Poll?
 
   @@index([channelId, createdAt])
   @@index([parentMessageId])
@@ -365,6 +367,48 @@ model RecordingView {
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([recordingId, userId])
+  @@index([userId])
+}
+
+// A poll posted as a channel message (the message's content holds a plain-text fallback for clients that don't render
+// polls). Votes keep the voter so each person votes once and sees their own choice; in anonymous channels voters are
+// never sent to clients, only counts (see apps/server/src/services/pollService.ts).
+model Poll {
+  id            String       @id @default(uuid())
+  messageId     String       @unique
+  question      String
+  allowMultiple Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+
+  message       Message      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  options       PollOption[]
+  votes         PollVote[]
+}
+
+model PollOption {
+  id        String     @id @default(uuid())
+  pollId    String
+  text      String
+  position  Int
+
+  poll      Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  votes     PollVote[]
+
+  @@index([pollId])
+}
+
+model PollVote {
+  pollId    String
+  optionId  String
+  userId    String
+  createdAt DateTime   @default(now())
+
+  poll      Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  option    PollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([optionId, userId])
+  @@index([pollId, userId])
   @@index([userId])
 }
 
@@ -511,6 +555,9 @@ model Project {
   clientUid         String?
   clientUsername    String?
   clientEmail       String?
+
+  // Last ticket number issued in this project; tickets are numbered 1, 2, 3… per project
+  ticketCounter     Int             @default(0)
 
   workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   creator     User            @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: Cascade)
