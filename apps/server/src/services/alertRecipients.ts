@@ -45,7 +45,8 @@ export async function getAlertRecipientIds(
 /**
  * Who is alerted about a thread reply: the people "in" the thread (the parent's author and everyone who has replied)
  * who are still in the channel and set to ALL, plus any channel member the reply @mentions (see getAlertRecipientIds).
- * Never the reply's own author. Other members of the channel are not alerted, like Slack.
+ * Never the reply's own author. Other members of the channel are not alerted, like Slack. In a DM everyone in it is
+ * part of every thread (there is no one else it could be for), so all its members set to ALL are alerted.
  */
 export async function getThreadAlertRecipientIds(
   parentMessageId: string,
@@ -53,11 +54,15 @@ export async function getThreadAlertRecipientIds(
   excludeUserId: string | null,
   content: string,
 ): Promise<string[]> {
-  const thread = await prisma.message.findMany({
-    where: { OR: [{ id: parentMessageId }, { parentMessageId }], userId: { not: null } },
-    select: { userId: true },
-    distinct: ['userId'],
-  });
+  const [channel, thread] = await Promise.all([
+    prisma.channel.findUnique({ where: { id: channelId }, select: { type: true } }),
+    prisma.message.findMany({
+      where: { OR: [{ id: parentMessageId }, { parentMessageId }], userId: { not: null } },
+      select: { userId: true },
+      distinct: ['userId'],
+    }),
+  ]);
+  if (channel?.type === 'DIRECT') return getAlertRecipientIds(channelId, content, excludeUserId);
   return getAlertRecipientIds(
     channelId,
     content,

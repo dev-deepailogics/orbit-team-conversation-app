@@ -1028,14 +1028,10 @@ export const channelRoutes: FastifyPluginAsync = async (
             .to(`workspace:${channel.workspaceId}`)
             .emit(SOCKET_EVENTS.MESSAGE_NEW, broadcastPayload);
         } else {
-          // Emit only to members of this private / direct channel
-          for (const m of channel.members) {
-            fastify.io
-              .to(`user:${m.userId}`)
-              .emit(SOCKET_EVENTS.MESSAGE_NEW, broadcastPayload);
-          }
+          // Members of this private / direct channel only. One emit to all the rooms, so a socket that is in several
+          // (its user room and the open channel's room) still gets the message once, not once per room
           fastify.io
-            .to(`channel:${channel.id}`)
+            .to([...channel.members.map((m: { userId: string }) => `user:${m.userId}`), `channel:${channel.id}`])
             .emit(SOCKET_EVENTS.MESSAGE_NEW, broadcastPayload);
         }
       }

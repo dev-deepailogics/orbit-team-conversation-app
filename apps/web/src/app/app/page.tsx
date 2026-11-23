@@ -899,7 +899,14 @@ export default function AppDashboard() {
 
       // Alert for channel messages from another user or bot. Thread replies reach everyone in the channel (to keep
       // reply counts and open threads current), but only the people in the thread are alerted, via thread:reply_notify.
-      if (isFromOther && !msg.parentMessageId) {
+      // Same rule as push: only conversations set to "All messages". Muted ones stay silent, and "Mentions" ones hear
+      // about mentions through Orbit Bot's note instead.
+      const myPreference =
+        useChatStore
+          .getState()
+          .channels.find((c) => c.id === msg.channelId)
+          ?.members?.find((m) => m.userId === user.id)?.notificationPreference ?? "ALL";
+      if (isFromOther && !msg.parentMessageId && myPreference === "ALL") {
         alertForMessage(msg);
       }
 
