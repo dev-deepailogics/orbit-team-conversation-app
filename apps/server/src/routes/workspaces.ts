@@ -4,6 +4,8 @@ import { prisma } from '@orbit/db';
 import { z } from 'zod';
 import { ACTIVITY_CHANNEL, ACTIVITY_CHANNEL_TOPIC, sendSystemNotification } from '../services/systemBot.js';
 import { isForeignDemoUser } from '../services/demoWorkspace.js';
+import { availabilityViewersRoom, getWorkspaceAccess, hasWorkspacePermission } from '../services/permissions.js';
+import { ASSIGNABLE_WORKSPACE_ROLES } from '@orbit/types';
 
 const createWorkspaceSchema = z.object({
   name: z.string().min(2).max(50),
@@ -17,7 +19,11 @@ const joinWorkspaceSchema = z.object({
 
 const addWorkspaceMemberSchema = z.object({
   emailOrUsername: z.string().trim().min(1),
-  role: z.enum(['ADMIN', 'MEMBER']).default('MEMBER'),
+  role: z.enum(ASSIGNABLE_WORKSPACE_ROLES).default('MEMBER'),
+});
+
+const updateMemberRoleSchema = z.object({
+  role: z.enum(ASSIGNABLE_WORKSPACE_ROLES),
 });
 
 export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
@@ -422,7 +428,66 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       }
     }
 
+    // Already-connected viewers start receiving full availability updates right away.
+    if (hasWorkspacePermission(role, 'viewTeamAvailability')) {
+      fastify.io?.in(`user:${targetUser.id}`).socketsJoin(availabilityViewersRoom(workspaceId));
+    }
+
     return reply.status(201).send(member);
+  });
+
+  // Change a member's role (OWNER/ADMIN of the workspace, or SUPER_ADMIN)
+  fastify.patch('/:workspaceId/members/:memberUserId/role', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const { workspaceId, memberUserId } = request.params as { workspaceId: string; memberUserId: string };
+    const callerId = (request.user as { id: string }).id;
+
+    const access = await getWorkspaceAccess(callerId, workspaceId);
+    if (!access.can('manageMembers')) {
+      return reply.status(403).send({ error: 'Only workspace administrators can change member roles' });
+    }
+
+    const parseResult = updateMemberRoleSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: `role must be one of: ${ASSIGNABLE_WORKSPACE_ROLES.join(', ')}` });
+    }
+    const { role } = parseResult.data;
+
+    if (memberUserId === callerId && access.systemRole !== 'SUPER_ADMIN') {
+      return reply.status(400).send({ error: 'You cannot change your own role' });
+    }
+
+    const [workspace, target] = await Promise.all([
+      prisma.workspace.findUnique({ where: { id: workspaceId }, select: { ownerId: true } }),
+      prisma.workspaceMember.findUnique({ where: { workspaceId_userId: { workspaceId, userId: memberUserId } } }),
+    ]);
+    if (!target) {
+      return reply.status(404).send({ error: 'Member not found in this workspace' });
+    }
+    if (workspace?.ownerId === memberUserId || target.role === 'OWNER') {
+      return reply.status(400).send({ error: "The workspace owner's role can't be changed" });
+    }
+
+    const member = await prisma.workspaceMember.update({
+      where: { id: target.id },
+      data: { role },
+      include: {
+        user: { select: { id: true, username: true, displayName: true, avatarUrl: true, status: true, systemRole: true } },
+      },
+    });
+
+    if (fastify.io) {
+      const room = availabilityViewersRoom(workspaceId);
+      const sockets = fastify.io.in(`user:${memberUserId}`);
+      if (hasWorkspacePermission(role, 'viewTeamAvailability')) sockets.socketsJoin(room);
+      else sockets.socketsLeave(room);
+      fastify.io.to(`workspace:${workspaceId}`).emit('workspace:member_role_updated', {
+        workspaceId,
+        userId: memberUserId,
+        role,
+      });
+    }
+
+    return reply.send(member);
   });
 
   // Remove member from workspace
@@ -478,6 +543,7 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
     });
 
     if (fastify.io) {
+      fastify.io.in(`user:${memberUserId}`).socketsLeave(availabilityViewersRoom(workspaceId));
       // Notify the removed member so their client redirects or clears the workspace
       fastify.io.to(`user:${memberUserId}`).emit('workspace:kicked', {
         workspaceId,

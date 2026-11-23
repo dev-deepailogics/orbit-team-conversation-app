@@ -158,6 +158,7 @@ export async function sendTicketBotNotification({
   ticketTitle,
   projectName,
   actionText,
+  channelActionText = actionText,
   targetUserIds = [],
   channelId,
   io,
@@ -167,7 +168,10 @@ export async function sendTicketBotNotification({
   actorName: string;
   ticketTitle: string;
   projectName: string;
+  /** Wording for the people being notified ("assigned you to ticket"). */
   actionText: string;
+  /** Wording for the shared channel, which everyone reads, so it must not say "you" ("assigned Sara to ticket"). */
+  channelActionText?: string;
   targetUserIds?: string[];
   channelId?: string | null;
   io?: any;
@@ -212,7 +216,7 @@ export async function sendTicketBotNotification({
     }
 
     if (targetChannelId) {
-      const content = `🤖 **Orbit Bot** 📋 *${projectName}* • ${actorName} ${actionText} **"${ticketTitle}"**`;
+      const content = `🤖 **Orbit Bot** 📋 *${projectName}* • ${actorName} ${channelActionText} **"${ticketTitle}"**`;
       await sendSystemNotification({
         workspaceId,
         channelId: targetChannelId,

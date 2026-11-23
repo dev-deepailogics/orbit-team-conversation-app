@@ -8,6 +8,11 @@ import {
   UserAvailabilityRecord,
   Workspace,
   UserProfile,
+  WorkspaceRole,
+  ASSIGNABLE_WORKSPACE_ROLES,
+  WORKSPACE_ROLE_LABELS,
+  WORKSPACE_ROLE_DESCRIPTIONS,
+  hasWorkspacePermission,
 } from "@orbit/types";
 import {
   Building2,
@@ -180,6 +185,20 @@ export const OrganizationControlView: React.FC<
   // Team tracking state
   const [teamMembers, setTeamMembers] = useState<TeamMemberAvailability[]>([]);
   const [isLoadingTeam, setIsLoadingTeam] = useState<boolean>(false);
+  // Role-based access, decided by the server in /availability/team
+  const [canViewTeam, setCanViewTeam] = useState<boolean>(false);
+  const [myRole, setMyRole] = useState<WorkspaceRole | null>(null);
+  const [roleError, setRoleError] = useState<string | null>(null);
+  const [savingRoleFor, setSavingRoleFor] = useState<string | null>(null);
+  const canManageMembers = hasWorkspacePermission(
+    myRole,
+    "manageMembers",
+    currentUser?.systemRole,
+  );
+  // Employees only see their own row; viewers (Owner/Admin/Manager/HR) see everyone.
+  const visibleTeam = canViewTeam
+    ? teamMembers
+    : teamMembers.filter((m) => m.user.id === currentUser?.id);
 
   const actionLockTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -214,6 +233,8 @@ export const OrganizationControlView: React.FC<
       setIsLoadingTeam(true);
       const res = await api.get(`/api/availability/team/${workspace.id}`);
       setTeamMembers(res.data.team || []);
+      setCanViewTeam(!!res.data.permissions?.viewTeamAvailability);
+      setMyRole(res.data.myRole ?? null);
     } catch (err) {
       console.error("Failed to load team availability:", err);
     } finally {
@@ -252,6 +273,24 @@ export const OrganizationControlView: React.FC<
       }
     };
   }, [workspace?.id, currentUser?.id]);
+
+  const changeMemberRole = async (userId: string, role: WorkspaceRole) => {
+    setRoleError(null);
+    setSavingRoleFor(userId);
+    try {
+      await api.patch(
+        `/api/workspaces/${workspace.id}/members/${userId}/role`,
+        { role },
+      );
+      setTeamMembers((prev) =>
+        prev.map((m) => (m.user.id === userId ? { ...m, role } : m)),
+      );
+    } catch (err: any) {
+      setRoleError(err.response?.data?.error || "Failed to change role");
+    } finally {
+      setSavingRoleFor(null);
+    }
+  };
 
   // Live stopwatch calculation
   useEffect(() => {
@@ -683,7 +722,7 @@ export const OrganizationControlView: React.FC<
                         Roles & Permissions
                       </h3>
                       <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 inline-block mt-0.5">
-                        4 Custom Roles
+                        {ASSIGNABLE_WORKSPACE_ROLES.length + 1} Roles
                       </span>
                     </div>
                   </div>
@@ -748,7 +787,8 @@ export const OrganizationControlView: React.FC<
               </div>
             </div>
 
-            {/* 4. Employee Status Dashboard */}
+            {/* 4. Employee Status Dashboard (Owner/Admin/Manager/HR only) */}
+            {canViewTeam && (
             <div
               onClick={() => {
                 setShowEmployeeStatusPage(true);
@@ -789,6 +829,7 @@ export const OrganizationControlView: React.FC<
                 </p>
               </div>
             </div>
+            )}
 
             {/* 5. View Projects Portfolio */}
             <div
@@ -1028,8 +1069,14 @@ export const OrganizationControlView: React.FC<
                     className="text-xs mt-0.5"
                     style={{ color: "var(--theme-text-muted)" }}
                   >
-                    Real-time status of all employees in {workspace.name}. (
-                    {onlineCount} Working, {onBreakCount} on Break)
+                    {canViewTeam ? (
+                      <>
+                        Real-time status of all employees in {workspace.name}. (
+                        {onlineCount} Working, {onBreakCount} on Break)
+                      </>
+                    ) : (
+                      <>Your own shift status in {workspace.name}.</>
+                    )}
                   </p>
                 </div>
 
@@ -1083,7 +1130,7 @@ export const OrganizationControlView: React.FC<
                       className="divide-y"
                       style={{ borderColor: "var(--theme-border)" }}
                     >
-                      {teamMembers.map((item) => {
+                      {visibleTeam.map((item) => {
                         const avail = item.availability;
                         const isOnlineWorking =
                           avail?.isAvailable && !avail?.isOnBreak;
@@ -1117,7 +1164,7 @@ export const OrganizationControlView: React.FC<
                             </td>
                             <td className="py-3 px-4">
                               <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[var(--theme-bg-surface-hover)] text-[var(--theme-text)]">
-                                {item.role}
+                                {WORKSPACE_ROLE_LABELS[item.role as WorkspaceRole] ?? item.role}
                               </span>
                             </td>
                             <td className="py-3 px-4">
@@ -1179,48 +1226,119 @@ export const OrganizationControlView: React.FC<
               className="text-xs mb-4"
               style={{ color: "var(--theme-text-muted)" }}
             >
-              Configure administrative boundaries for Super Admins, Workspace
-              Admins, Managers, and Employees.
+              What each role can do in {workspace.name}. Your role:{" "}
+              <span className="font-semibold">
+                {myRole ? WORKSPACE_ROLE_LABELS[myRole] : "—"}
+              </span>
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {[
-                {
-                  name: "SUPER_ADMIN",
-                  desc: "Full root access to system consoles, workspaces, and user directories",
-                },
-                {
-                  name: "WORKSPACE_ADMIN",
-                  desc: "Can manage channels, bots, organization controls, and members",
-                },
-                {
-                  name: "MANAGER",
-                  desc: "Can supervise team attendance, create project boards, and assign tickets",
-                },
-                {
-                  name: "EMPLOYEE",
-                  desc: "Can chat, join calls, take breaks, and manage personal shift availability",
-                },
-              ].map((r) => (
-                <div
-                  key={r.name}
-                  className="p-4 rounded-xl border flex flex-col justify-between"
-                  style={{
-                    backgroundColor: "var(--theme-bg-app)",
-                    borderColor: "var(--theme-border)",
-                  }}
-                >
-                  <span className="font-bold text-xs text-blue-700 dark:text-blue-400 mb-1">
-                    {r.name}
-                  </span>
-                  <p
-                    className="text-[11px] leading-relaxed"
-                    style={{ color: "var(--theme-text-muted)" }}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {(["OWNER", ...ASSIGNABLE_WORKSPACE_ROLES] as WorkspaceRole[]).map(
+                (r) => (
+                  <div
+                    key={r}
+                    className="p-4 rounded-xl border flex flex-col justify-between"
+                    style={{
+                      backgroundColor: "var(--theme-bg-app)",
+                      borderColor:
+                        r === myRole ? "#0091FF" : "var(--theme-border)",
+                    }}
                   >
-                    {r.desc}
-                  </p>
-                </div>
-              ))}
+                    <span className="font-bold text-xs text-blue-700 dark:text-blue-400 mb-1">
+                      {WORKSPACE_ROLE_LABELS[r]}
+                    </span>
+                    <p
+                      className="text-[11px] leading-relaxed"
+                      style={{ color: "var(--theme-text-muted)" }}
+                    >
+                      {WORKSPACE_ROLE_DESCRIPTIONS[r]}
+                    </p>
+                  </div>
+                ),
+              )}
             </div>
+
+            {canManageMembers && (
+              <div className="mt-6">
+                <h5 className="text-sm font-bold text-[var(--theme-text)] mb-1">
+                  Member roles
+                </h5>
+                <p
+                  className="text-xs mb-3"
+                  style={{ color: "var(--theme-text-muted)" }}
+                >
+                  Change what each member can access. The owner&apos;s role and
+                  your own role can&apos;t be changed here.
+                </p>
+                {roleError && (
+                  <p className="text-xs font-semibold text-red-600 mb-2">
+                    {roleError}
+                  </p>
+                )}
+                <div
+                  className="border rounded-xl divide-y"
+                  style={{ borderColor: "var(--theme-border)" }}
+                >
+                  {teamMembers.map((m) => {
+                    const locked =
+                      m.role === "OWNER" ||
+                      m.user.id === workspace.ownerId ||
+                      (m.user.id === currentUser?.id &&
+                        currentUser?.systemRole !== "SUPER_ADMIN");
+                    return (
+                      <div
+                        key={m.user.id}
+                        className="flex items-center justify-between gap-3 px-4 py-2.5"
+                        style={{ borderColor: "var(--theme-border)" }}
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold truncate">
+                            {m.user.displayName}
+                          </p>
+                          <p
+                            className="text-[11px] truncate"
+                            style={{ color: "var(--theme-text-muted)" }}
+                          >
+                            @{m.user.username}
+                          </p>
+                        </div>
+                        {locked ? (
+                          <span
+                            className="text-xs font-semibold"
+                            style={{ color: "var(--theme-text-muted)" }}
+                          >
+                            {WORKSPACE_ROLE_LABELS[m.role as WorkspaceRole] ??
+                              m.role}
+                          </span>
+                        ) : (
+                          <select
+                            value={m.role}
+                            disabled={savingRoleFor === m.user.id}
+                            onChange={(e) =>
+                              changeMemberRole(
+                                m.user.id,
+                                e.target.value as WorkspaceRole,
+                              )
+                            }
+                            className="text-xs rounded-lg border px-2 py-1.5 outline-none"
+                            style={{
+                              backgroundColor: "var(--theme-bg-app)",
+                              borderColor: "var(--theme-border)",
+                              color: "var(--theme-text)",
+                            }}
+                          >
+                            {ASSIGNABLE_WORKSPACE_ROLES.map((r) => (
+                              <option key={r} value={r}>
+                                {WORKSPACE_ROLE_LABELS[r]}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

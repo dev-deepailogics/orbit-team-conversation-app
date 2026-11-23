@@ -1,10 +1,59 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { prisma } from '@orbit/db';
 import { SOCKET_EVENTS } from '@orbit/types';
+import { availabilityViewersRoom, canViewUserAvailability, getWorkspaceAccess } from '../services/permissions.js';
 
 // Helper: Get today's local date YYYY-MM-DD in PKT (UTC+5)
 function getTodayString(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date());
+}
+
+type AvailabilityWithBreaks = {
+  id: string;
+  userId: string;
+  date: string;
+  isAvailable: boolean;
+  isOnBreak: boolean;
+  breaks?: { id: string; breakReason: string; availableAfterBreak: Date | null }[];
+};
+
+/**
+ * What any workspace member may see about someone else: working / on break / offline, plus the
+ * reason of the open break (shown on presence dots). No times, durations or break history.
+ */
+export function toPresence(a: AvailabilityWithBreaks | null | undefined) {
+  if (!a) return null;
+  const openBreak = a.isOnBreak ? a.breaks?.find((b) => !b.availableAfterBreak) : undefined;
+  return {
+    id: a.id,
+    userId: a.userId,
+    date: a.date,
+    isAvailable: a.isAvailable,
+    isOnBreak: a.isOnBreak,
+    breaks: openBreak ? [{ id: openBreak.id, breakReason: openBreak.breakReason, availableAfterBreak: null }] : [],
+  };
+}
+
+/**
+ * Sends AVAILABILITY_UPDATE so each socket gets exactly one copy: the full record for the user
+ * themselves and for availability viewers (OWNER/ADMIN/MANAGER/HR/SUPER_ADMIN) of their workspaces,
+ * presence-only for everyone else.
+ */
+export async function broadcastAvailability(
+  fastify: FastifyInstance | undefined,
+  userId: string,
+  availability: AvailabilityWithBreaks,
+) {
+  const io = fastify?.io;
+  if (!io) return;
+  try {
+    const memberships = await prisma.workspaceMember.findMany({ where: { userId }, select: { workspaceId: true } });
+    const fullRooms = [`user:${userId}`, ...memberships.map((m) => availabilityViewersRoom(m.workspaceId))];
+    io.to(fullRooms).emit(SOCKET_EVENTS.AVAILABILITY_UPDATE, { userId, availability });
+    io.except(fullRooms).emit(SOCKET_EVENTS.AVAILABILITY_UPDATE, { userId, availability: toPresence(availability) });
+  } catch (err) {
+    console.error('Failed to broadcast availability update:', err);
+  }
 }
 
 // Scheduled / on-demand Auto Checkout for any employee who forgot to check out (equivalent to 4:00 AM PKT Firebase Cloud Function)
@@ -43,10 +92,7 @@ export async function performAutoCheckoutBackfill(fastify?: FastifyInstance) {
         include: { breaks: true },
       });
 
-      fastify?.io?.emit(SOCKET_EVENTS.AVAILABILITY_UPDATE, {
-        userId: rec.userId,
-        availability: updated,
-      });
+      await broadcastAvailability(fastify, rec.userId, updated);
     }
   } catch (err) {
     console.error('Error running performAutoCheckoutBackfill:', err);
@@ -138,10 +184,7 @@ export const availabilityRoutes: FastifyPluginAsync = async (fastify: FastifyIns
       });
     }
 
-    fastify.io?.emit(SOCKET_EVENTS.AVAILABILITY_UPDATE, {
-      userId: userPayload.id,
-      availability: record,
-    });
+    await broadcastAvailability(fastify, userPayload.id, record);
 
     return reply.send({ success: true, availability: record, serverTime: now.toISOString() });
   });
@@ -186,10 +229,7 @@ export const availabilityRoutes: FastifyPluginAsync = async (fastify: FastifyIns
       include: { breaks: true },
     });
 
-    fastify.io?.emit(SOCKET_EVENTS.AVAILABILITY_UPDATE, {
-      userId: userPayload.id,
-      availability: updated,
-    });
+    await broadcastAvailability(fastify, userPayload.id, updated);
 
     return reply.send({ success: true, availability: updated, serverTime: now.toISOString() });
   });
@@ -242,10 +282,7 @@ export const availabilityRoutes: FastifyPluginAsync = async (fastify: FastifyIns
       include: { breaks: true },
     });
 
-    fastify.io?.emit(SOCKET_EVENTS.AVAILABILITY_UPDATE, {
-      userId: userPayload.id,
-      availability: updated,
-    });
+    await broadcastAvailability(fastify, userPayload.id, updated);
 
     return reply.send({ success: true, availability: updated, serverTime: now.toISOString() });
   });
@@ -305,10 +342,7 @@ export const availabilityRoutes: FastifyPluginAsync = async (fastify: FastifyIns
       include: { breaks: true },
     });
 
-    fastify.io?.emit(SOCKET_EVENTS.AVAILABILITY_UPDATE, {
-      userId: userPayload.id,
-      availability: updated,
-    });
+    await broadcastAvailability(fastify, userPayload.id, updated);
 
     return reply.send({ success: true, availability: updated, serverTime: now.toISOString() });
   });
@@ -316,7 +350,16 @@ export const availabilityRoutes: FastifyPluginAsync = async (fastify: FastifyIns
   // 6. Get Workspace Team Availability (for Organization Control panel)
   fastify.get('/team/:workspaceId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
     const { workspaceId } = request.params as { workspaceId: string };
+    const callerId = (request.user as { id: string }).id;
     const today = getTodayString();
+
+    const access = await getWorkspaceAccess(callerId, workspaceId);
+    if (!access.isMember && access.systemRole !== 'SUPER_ADMIN') {
+      return reply.status(403).send({ error: 'You are not a member of this workspace' });
+    }
+    // Viewers get everyone's full records; others get presence only (their own record stays full).
+    const canViewTeam = access.can('viewTeamAvailability');
+    const canSeeDetails = (userId: string) => canViewTeam || userId === callerId;
 
     const members = await prisma.workspaceMember.findMany({
       where: { workspaceId },
@@ -352,34 +395,35 @@ export const availabilityRoutes: FastifyPluginAsync = async (fastify: FastifyIns
       orderBy: { createdAt: 'desc' },
     });
 
-    const availabilityMap = new Map();
+    const availabilityMap = new Map<string, (typeof todayAvailabilities)[number]>();
     for (const rec of todayAvailabilities) {
       if (!availabilityMap.has(rec.userId)) {
         availabilityMap.set(rec.userId, rec);
       }
     }
 
-    // For any member who hasn't checked in yet today, fetch their most recent past session as latestSession (not today's availability)
-    const latestPastMap = new Map();
-    for (const userId of userIds) {
-      if (!availabilityMap.has(userId)) {
-        const latest = await prisma.userAvailability.findFirst({
-          where: { userId },
+    // Members not checked in today: their most recent past session as latestSession.
+    // One query for all of them (was one query per member), and only for members whose details the caller may see.
+    const needPast = userIds.filter((id) => !availabilityMap.has(id) && canSeeDetails(id));
+    const pastRecords = needPast.length
+      ? await prisma.userAvailability.findMany({
+          where: { userId: { in: needPast } },
           include: {
             breaks: {
               orderBy: { breakStartTime: 'asc' },
             },
           },
-          orderBy: { date: 'desc' },
-        });
-        if (latest) {
-          latestPastMap.set(userId, latest);
-        }
-      }
-    }
+          orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+          distinct: ['userId'],
+        })
+      : [];
+    const latestPastMap = new Map(pastRecords.map((r) => [r.userId, r]));
 
     const teamList = members.map((m) => {
       const todayRec = availabilityMap.get(m.userId);
+      if (!canSeeDetails(m.userId)) {
+        return { user: m.user, role: m.role, availability: toPresence(todayRec), latestSession: null };
+      }
       const pastRec = latestPastMap.get(m.userId);
       return {
         user: m.user,
@@ -393,6 +437,8 @@ export const availabilityRoutes: FastifyPluginAsync = async (fastify: FastifyIns
       date: today,
       serverTime: new Date().toISOString(),
       team: teamList,
+      myRole: access.role,
+      permissions: { viewTeamAvailability: canViewTeam },
     });
   });
 
@@ -400,6 +446,11 @@ export const availabilityRoutes: FastifyPluginAsync = async (fastify: FastifyIns
   fastify.get('/history/:userId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
     const { userId } = request.params as { userId: string };
     const { year, month } = request.query as { year?: string; month?: string };
+
+    const callerId = (request.user as { id: string }).id;
+    if (!(await canViewUserAvailability(callerId, userId))) {
+      return reply.status(403).send({ error: 'You can only view your own availability' });
+    }
 
     const currentYear = year ? parseInt(year, 10) : new Date().getFullYear();
     const currentMonth = month ? parseInt(month, 10) : new Date().getMonth() + 1;
@@ -473,6 +524,11 @@ export const availabilityRoutes: FastifyPluginAsync = async (fastify: FastifyIns
 
     if (!record) {
       return reply.status(404).send({ error: 'Availability record not found' });
+    }
+
+    const callerId = (request.user as { id: string }).id;
+    if (!(await canViewUserAvailability(callerId, record.userId))) {
+      return reply.status(403).send({ error: 'You can only view your own availability' });
     }
 
     return reply.send({ record });

@@ -8,6 +8,13 @@ import {
   canUserAccessChannel,
   canUserAccessCanvas,
 } from "../utils/security.js";
+import { availabilityViewersRoom, getWorkspaceAccess } from "../services/permissions.js";
+
+/** Viewers (OWNER/ADMIN/MANAGER/HR/SUPER_ADMIN) also get full availability updates for the workspace. */
+async function joinAvailabilityViewersRoom(socket: Socket, userId: string, workspaceId: string) {
+  const access = await getWorkspaceAccess(userId, workspaceId);
+  if (access.can("viewTeamAvailability")) socket.join(availabilityViewersRoom(workspaceId));
+}
 
 export function setupSocketServer(
   fastify: FastifyInstance,
@@ -87,6 +94,7 @@ export function setupSocketServer(
       );
       if (hasWsAccess) {
         socket.join(`workspace:${requestedWorkspaceId}`);
+        await joinAvailabilityViewersRoom(socket, userId, requestedWorkspaceId);
         io.to(`workspace:${requestedWorkspaceId}`).emit(
           SOCKET_EVENTS.USER_STATUS_CHANGE,
           {
@@ -109,6 +117,7 @@ export function setupSocketServer(
       const hasAccess = await canUserAccessWorkspace(userId, wId);
       if (hasAccess) {
         socket.join(`workspace:${wId}`);
+        await joinAvailabilityViewersRoom(socket, userId, wId);
       }
     });
 

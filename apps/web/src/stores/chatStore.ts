@@ -23,6 +23,8 @@ interface ChatState {
   // Who is typing per channel, keyed by user id (typing:stop only carries the id, not the name)
   typingUsers: { [channelId: string]: TypingUser[] };
   unreadCounts: { [channelId: string]: number };
+  /** When each conversation last had a top-level message (epoch ms); drives "recent" sidebar sorting. */
+  lastActivity: { [channelId: string]: number };
 
   setCurrentWorkspace: (workspace: Workspace | null) => void;
   setChannels: (channels: Channel[]) => void;
@@ -43,6 +45,9 @@ interface ChatState {
   clearUnread: (channelId: string) => void;
   /** Replace all counts with the server's (the open channel stays at 0). */
   setUnreadCounts: (counts: { [channelId: string]: number }) => void;
+  setLastActivity: (activity: { [channelId: string]: number }) => void;
+  /** Record a new message's time; never moves a conversation's time backwards (messages arrive twice, out of order). */
+  bumpActivity: (channelId: string, at: number) => void;
   removeAttachment: (fileId: string) => void;
   reset: () => void;
 }
@@ -61,6 +66,7 @@ export const useChatStore = create<ChatState>((set) => ({
   threadNextCursor: null,
   typingUsers: {},
   unreadCounts: {},
+  lastActivity: {},
 
   reset: () =>
     set({
@@ -74,6 +80,7 @@ export const useChatStore = create<ChatState>((set) => ({
       threadNextCursor: null,
       typingUsers: {},
       unreadCounts: {},
+      lastActivity: {},
     }),
 
   setCurrentWorkspace: (workspace) => set({ currentWorkspace: workspace }),
@@ -95,6 +102,11 @@ export const useChatStore = create<ChatState>((set) => ({
     set((state) => ({
       unreadCounts: state.currentChannel ? { ...counts, [state.currentChannel.id]: 0 } : counts,
     })),
+  setLastActivity: (activity) => set({ lastActivity: activity }),
+  bumpActivity: (channelId, at) =>
+    set((state) =>
+      (state.lastActivity[channelId] ?? 0) >= at ? state : { lastActivity: { ...state.lastActivity, [channelId]: at } },
+    ),
   setMessages: (messages) => set({ messages }),
   
   prependMessages: (olderMessages) =>
