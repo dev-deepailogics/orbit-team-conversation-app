@@ -504,6 +504,12 @@ export const SOCKET_EVENTS = {
 
   // Employee Availability & Time Tracking
   AVAILABILITY_UPDATE: "availability:update",
+
+  // Webmail
+  MAIL_NEW: "mail:new",
+  MAIL_SYNC_STATUS: "mail:sync_status",
+  MAIL_MESSAGE_UPDATE: "mail:message_update",
+  MAIL_MESSAGE_DELETE: "mail:message_delete",
 } as const;
 
 // ==========================================
@@ -530,3 +536,160 @@ export interface UserAvailabilityRecord {
   isAutoCheckedOut: boolean;
   breaks: AvailabilityBreakItem[];
 }
+
+// ==========================================
+// 11. Webmail Types
+// ==========================================
+export type MailProvider = "GMAIL" | "OUTLOOK" | "YAHOO" | "CUSTOM";
+export type MailAuthType = "PASSWORD" | "OAUTH2";
+export type MailAccountStatus = "ACTIVE" | "SYNCING" | "ERROR" | "DISABLED";
+export type MailFolderSpecialUse =
+  | "INBOX"
+  | "SENT"
+  | "DRAFTS"
+  | "TRASH"
+  | "SPAM"
+  | "ARCHIVE"
+  | "STARRED"
+  | "CUSTOM";
+
+export interface EmailAddress {
+  name?: string;
+  address: string;
+}
+
+export interface MailAccount {
+  id: string;
+  userId: string;
+  email: string;
+  displayName: string | null;
+  provider: MailProvider;
+  authType: MailAuthType;
+  imapHost: string | null;
+  imapPort: number | null;
+  imapSecurity: string | null;
+  smtpHost: string | null;
+  smtpPort: number | null;
+  smtpSecurity: string | null;
+  status: MailAccountStatus;
+  lastSyncedAt: string | null;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+  unreadCount?: number;
+}
+
+export interface MailFolder {
+  id: string;
+  accountId: string;
+  name: string;
+  path: string;
+  specialUse: MailFolderSpecialUse;
+  uidValidity?: string | null;
+  lastUid?: number | null;
+  unreadCount?: number;
+  totalCount?: number;
+}
+
+export interface MailAttachment {
+  id: string;
+  messageId: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  storagePath?: string;
+  contentId?: string | null;
+  createdAt: string;
+}
+
+export interface MailMessage {
+  id: string;
+  accountId: string;
+  folderId: string;
+  uid?: number | null;
+  messageId: string;
+  threadId?: string | null;
+  inReplyTo?: string | null;
+  references?: string | null;
+  from: string;
+  to: EmailAddress[];
+  cc?: EmailAddress[] | null;
+  bcc?: EmailAddress[] | null;
+  subject: string;
+  snippet?: string | null;
+  bodyText?: string | null;
+  bodyHtml?: string | null;
+  date: string;
+  isRead: boolean;
+  isStarred: boolean;
+  isDraft: boolean;
+  hasAttachments: boolean;
+  rawHeaders?: Record<string, any> | null;
+  createdAt: string;
+  updatedAt: string;
+  attachments?: MailAttachment[];
+  accountEmail?: string;
+}
+
+export interface CreateMailAccountInput {
+  email: string;
+  displayName?: string;
+  provider: MailProvider;
+  authType: MailAuthType;
+  password?: string;
+  oauthTokens?: {
+    accessToken: string;
+    refreshToken?: string;
+    expiresAt?: number;
+  };
+  imapHost?: string;
+  imapPort?: number;
+  imapSecurity?: "SSL" | "STARTTLS" | "NONE";
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpSecurity?: "SSL" | "STARTTLS" | "NONE";
+}
+
+export interface UpdateMailAccountInput {
+  displayName?: string;
+  status?: MailAccountStatus;
+  imapHost?: string;
+  imapPort?: number;
+  imapSecurity?: "SSL" | "STARTTLS" | "NONE";
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpSecurity?: "SSL" | "STARTTLS" | "NONE";
+  password?: string;
+}
+
+export interface TestMailConnectionInput {
+  email: string;
+  provider: MailProvider;
+  authType: MailAuthType;
+  password?: string;
+  oauthTokens?: {
+    accessToken: string;
+    refreshToken?: string;
+  };
+  imapHost?: string;
+  imapPort?: number;
+  imapSecurity?: "SSL" | "STARTTLS" | "NONE";
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpSecurity?: "SSL" | "STARTTLS" | "NONE";
+}
+
+export interface SendMailInput {
+  accountId: string;
+  to: EmailAddress[] | string[];
+  cc?: EmailAddress[] | string[];
+  bcc?: EmailAddress[] | string[];
+  subject: string;
+  bodyText?: string;
+  bodyHtml?: string;
+  inReplyTo?: string;
+  references?: string;
+  replyToMessageId?: string;
+  draftId?: string;
+}
+

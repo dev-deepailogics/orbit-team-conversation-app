@@ -205,3 +205,60 @@ npx @tauri-apps/cli init
 npx @tauri-apps/cli build
 ```
 This generates native `.deb` / `.AppImage` (Ubuntu/Linux), `.msi` / `.exe` (Windows), and `.dmg` (macOS) binaries.
+
+---
+
+## ✉️ Webmail Module
+
+Orbit includes an integrated Webmail module that allows logged-in users to connect multiple email accounts, sync and read mail, send messages, manage folders, and view attachments.
+
+### 1. Key Features
+- **Multi-Account Support**: Connect multiple email accounts (Gmail, Outlook/Office365, Yahoo, Zoho, or custom IMAP/SMTP).
+- **Auto-Detection**: Auto-detects server settings and ports for common email providers.
+- **Connection Verification**: Built-in "Test connection" button verifies IMAP receiving and SMTP sending before saving.
+- **Incremental Sync Engine**: Tracks UIDs and `UIDVALIDITY` safely, fetches folder hierarchies, and syncs batches with BullMQ background workers.
+- **Sandboxed Reading**: Renders HTML emails in a sandboxed `<iframe>` (`sandbox="allow-popups"`), sanitizes with DOMPurify, and blocks remote tracking images with a "Load Images" toggle.
+- **Rich Composer**: Compose messages with To/Cc/Bcc, subject, rich formatting, auto-saving drafts every 15 seconds, and RFC-compliant threading (`In-Reply-To`, `References`).
+- **Security**: AES-256-GCM encryption for stored credentials, SSRF protection against internal/private host ranges, and rate limiting on send endpoints.
+
+### 2. Environment Variables
+Add to your `.env`:
+```env
+# 32-byte hex key for AES-256-GCM encryption of stored IMAP/SMTP passwords and tokens:
+MAIL_ENCRYPTION_KEY="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+```
+Generate a key in terminal:
+```bash
+openssl rand -hex 32
+```
+
+### 3. Email Provider Setup Guide
+- **Gmail / Google Workspace**:
+  1. Ensure 2-Step Verification is enabled on your Google Account.
+  2. Navigate to [Google Account Security → 2-Step Verification → App passwords](https://myaccount.google.com/apppasswords).
+  3. Create an app password named "Orbit Webmail".
+  4. In Orbit Webmail, enter your Gmail address and paste the 16-character app password.
+- **Outlook / Microsoft 365**:
+  1. Supports IMAP `outlook.office365.com:993` (SSL) and SMTP `smtp.office365.com:587` (STARTTLS).
+  2. Use your Microsoft account password or app password.
+- **Yahoo Mail**:
+  1. Go to Yahoo Account Security → Generate App Password.
+  2. Use the generated password with auto-detected settings.
+
+### 4. REST API Endpoints
+All endpoints require JWT Bearer authentication (`/api/mail/*`):
+- `GET /api/mail/accounts`: List connected accounts with sync status and unread counts.
+- `POST /api/mail/accounts/test`: Test IMAP and SMTP connections before saving.
+- `POST /api/mail/accounts`: Connect a new account (validates SSRF + tests connection).
+- `PATCH /api/mail/accounts/:id`: Update account settings or toggle status.
+- `DELETE /api/mail/accounts/:id`: Remove connected account and cascade delete mail data.
+- `POST /api/mail/accounts/:id/sync`: Trigger background sync job.
+- `GET /api/mail/folders`: List folders per account with unread count.
+- `GET /api/mail/messages`: Query and filter messages (search, starred, unread, attachments, paged).
+- `GET /api/mail/messages/:id`: Fetch message body, attachments, and headers.
+- `PATCH /api/mail/messages/:id`: Mark read/unread, star, move folder.
+- `POST /api/mail/messages/bulk`: Perform bulk read/unread/star/delete/move actions.
+- `POST /api/mail/send`: Queue email for SMTP dispatch.
+- `POST /api/mail/drafts`: Save or autosave draft message.
+- `GET /api/mail/attachments/:id/download`: Securely download message attachment file.
+

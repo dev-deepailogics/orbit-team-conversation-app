@@ -99,6 +99,7 @@ model User {
   refreshTokens     RefreshToken[]
   todos             Todo[]
   createdCanvases   Canvas[]          @relation("CanvasCreator")
+  mailAccounts      MailAccount[]
 
   @@index([email])
   @@index([username])
@@ -721,4 +722,142 @@ model Canvas {
   @@index([workspaceId])
   @@index([channelId])
   @@index([projectId])
+}
+
+// ==========================================
+// Webmail Models
+// ==========================================
+
+enum MailProvider {
+  GMAIL
+  OUTLOOK
+  YAHOO
+  CUSTOM
+}
+
+enum MailAuthType {
+  PASSWORD
+  OAUTH2
+}
+
+enum MailAccountStatus {
+  ACTIVE
+  SYNCING
+  ERROR
+  DISABLED
+}
+
+enum MailFolderSpecialUse {
+  INBOX
+  SENT
+  DRAFTS
+  TRASH
+  SPAM
+  ARCHIVE
+  STARRED
+  CUSTOM
+}
+
+model MailAccount {
+  id                   String            @id @default(uuid())
+  userId               String            @map("user_id")
+  email                String
+  displayName          String?           @map("display_name")
+  provider             MailProvider      @default(CUSTOM)
+  authType             MailAuthType      @default(PASSWORD) @map("auth_type")
+  imapHost             String?           @map("imap_host")
+  imapPort             Int?              @map("imap_port")
+  imapSecurity         String?           @default("SSL") @map("imap_security")
+  smtpHost             String?           @map("smtp_host")
+  smtpPort             Int?              @map("smtp_port")
+  smtpSecurity         String?           @default("SSL") @map("smtp_security")
+  encryptedCredentials String            @map("encrypted_credentials")
+  status               MailAccountStatus @default(ACTIVE)
+  lastSyncedAt         DateTime?         @map("last_synced_at")
+  lastError            String?           @map("last_error")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+
+  user                 User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folders              MailFolder[]
+  messages             MailMessage[]
+
+  @@index([userId])
+  @@index([userId, email])
+  @@map("mail_accounts")
+}
+
+model MailFolder {
+  id          String               @id @default(uuid())
+  accountId   String               @map("account_id")
+  name        String
+  path        String
+  specialUse  MailFolderSpecialUse @default(CUSTOM) @map("special_use")
+  uidValidity BigInt?              @map("uid_validity")
+  lastUid     Int?                 @default(0) @map("last_uid")
+  createdAt   DateTime             @default(now()) @map("created_at")
+  updatedAt   DateTime             @updatedAt @map("updated_at")
+
+  account     MailAccount          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  messages    MailMessage[]
+
+  @@unique([accountId, path])
+  @@index([accountId])
+  @@map("mail_folders")
+}
+
+model MailMessage {
+  id             String           @id @default(uuid())
+  accountId      String           @map("account_id")
+  folderId       String           @map("folder_id")
+  uid            Int?
+  messageId      String           @map("message_id")
+  threadId       String?          @map("thread_id")
+  inReplyTo      String?          @map("in_reply_to")
+  references     String?
+  from           String
+  to             Json
+  cc             Json?
+  bcc            Json?
+  subject        String           @default("")
+  snippet        String?
+  bodyText       String?          @map("body_text")
+  bodyHtml       String?          @map("body_html")
+  date           DateTime         @default(now())
+  isRead         Boolean          @default(false) @map("is_read")
+  isStarred      Boolean          @default(false) @map("is_starred")
+  isDraft        Boolean          @default(false) @map("is_draft")
+  hasAttachments Boolean          @default(false) @map("has_attachments")
+  rawHeaders     Json?            @map("raw_headers")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  account        MailAccount      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  folder         MailFolder       @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  attachments    MailAttachment[]
+
+  @@unique([accountId, folderId, messageId])
+  @@index([accountId, folderId, date(sort: Desc)])
+  @@index([accountId, date(sort: Desc)])
+  @@index([messageId])
+  @@index([threadId])
+  @@index([accountId, isRead])
+  @@index([accountId, isStarred])
+  @@map("mail_messages")
+}
+
+model MailAttachment {
+  id          String      @id @default(uuid())
+  messageId   String      @map("message_id")
+  filename    String
+  mimeType    String      @map("mime_type")
+  size        Int
+  storagePath String      @map("storage_path")
+  contentId   String?     @map("content_id")
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  message     MailMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@map("mail_attachments")
 }

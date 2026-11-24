@@ -39,6 +39,7 @@ import { CreateTicketFromMessageDialog } from "@/components/project/CreateTicket
 import { OrganizationControlView } from "@/components/availability/OrganizationControlView";
 import { CanvasView } from "@/components/whiteboard/CanvasView";
 import { ProjectDocsView } from "@/components/project/ProjectDocsView";
+import { WebmailView } from "@/components/mail/WebmailView";
 import { ShareDocumentModal } from "@/components/project/ShareDocumentModal";
 import { useTeamPresence } from "@/components/availability/useTeamPresence";
 import { useLiveUserStatus } from "@/components/channel/useLiveUserStatus";
@@ -128,6 +129,7 @@ export default function AppDashboard() {
   const [showOrgControl, setShowOrgControl] = useState(false);
   const [showCanvasHub, setShowCanvasHub] = useState(false);
   const [showDocsHub, setShowDocsHub] = useState(false);
+  const [showMailHub, setShowMailHub] = useState(false);
   const [showProjectsPanel, setShowProjectsPanel] = useState(false);
   const [canvases, setCanvases] = useState<any[]>([]);
   const [newCanvasSignal, setNewCanvasSignal] = useState(0);
@@ -323,6 +325,7 @@ export default function AppDashboard() {
       let targetIsOrgControl = false;
       let targetDocs: { docId: string | null } | null = null;
       let targetProfile = false;
+      let targetMail = false;
       if (typeof window !== "undefined") {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get("search") === "1") setShowSearchModal(true);
@@ -333,6 +336,9 @@ export default function AppDashboard() {
 
         if (urlView === "org-control" || urlView === "organization-control") {
           targetIsOrgControl = true;
+        }
+        if (urlView === "mail" || urlView === "webmail") {
+          targetMail = true;
         }
         if (urlView === "docs") targetDocs = { docId: urlParams.get("docId") };
         if (urlChId && res.data.channels) {
@@ -356,6 +362,7 @@ export default function AppDashboard() {
       }
       // Docs open on top of the default channel so Home has somewhere to go back to
       if (targetDocs && !targetIsOrgControl) handleOpenDocs(targetDocs.docId);
+      if (targetMail && !targetIsOrgControl) handleOpenMail();
       if (targetProfile) openProfilePage();
     } catch (err) {
       console.error("Failed to load workspace details", err);
@@ -404,6 +411,7 @@ export default function AppDashboard() {
     setShowOrgControl(false);
     setShowCanvasHub(false);
     setShowDocsHub(false);
+    setShowMailHub(false);
     setShowProjectsPanel(false);
     setCurrentProject(null);
     setCurrentChannel(channel);
@@ -442,6 +450,7 @@ export default function AppDashboard() {
     setShowOrgControl(false);
     setShowCanvasHub(false);
     setShowDocsHub(false);
+    setShowMailHub(false);
     // A board is always shown with the Projects list beside it, however it was opened
     // (sidebar, search, URL, Organization Control).
     setShowProjectsPanel(true);
@@ -458,6 +467,7 @@ export default function AppDashboard() {
     setShowOrgControl(true);
     setShowCanvasHub(false);
     setShowDocsHub(false);
+    setShowMailHub(false);
     setShowProjectsPanel(false);
     setCurrentProject(null);
     setOrgControlResetKey((prev) => prev + 1);
@@ -601,12 +611,26 @@ export default function AppDashboard() {
   const handleOpenDocs = (docId: string | null = null) => {
     setShowProfilePage(false);
     setShowCanvasHub(false);
+    setShowMailHub(false);
     setShowOrgControl(false);
     setShowProjectsPanel(false);
     setCurrentProject(null);
     setDocsInitialId(docId);
     setShowDocsHub(true);
     setDocsUrl(docId);
+  };
+
+  const handleOpenMail = () => {
+    setShowProfilePage(false);
+    setShowCanvasHub(false);
+    setShowDocsHub(false);
+    setShowOrgControl(false);
+    setShowProjectsPanel(false);
+    setCurrentProject(null);
+    setShowMailHub(true);
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", "?view=mail");
+    }
   };
 
   const handleCloseOrgControl = () => {
@@ -620,6 +644,7 @@ export default function AppDashboard() {
     setShowProfilePage(false);
     setShowCanvasHub(false);
     setShowDocsHub(false);
+    setShowMailHub(false);
     setShowOrgControl(false);
     setShowProjectsPanel(false);
     setCurrentProject(null);
@@ -649,6 +674,7 @@ export default function AppDashboard() {
     setShowProfilePage(false);
     setShowCanvasHub(false);
     setShowDocsHub(false);
+    setShowMailHub(false);
     setShowOrgControl(false);
     setShowProjectsPanel(true);
   };
@@ -697,6 +723,7 @@ export default function AppDashboard() {
   const openProfilePage = () => {
     setShowCanvasHub(false);
     setShowDocsHub(false);
+    setShowMailHub(false);
     setShowOrgControl(false);
     setIsMobileSidebarOpen(false);
     setShowProfilePage(true);
@@ -1209,15 +1236,20 @@ export default function AppDashboard() {
     onOpenProfile: openProfilePage,
     activeFeature: showProfilePage
       ? null
-      : canvasActive
-        ? ("canvas" as const)
-        : docsActive
-          ? ("docs" as const)
-          : showProjectsPanel
-            ? ("projects" as const)
-            : ("home" as const),
+      : showMailHub
+        ? ("mail" as const)
+        : canvasActive
+          ? ("canvas" as const)
+          : docsActive
+            ? ("docs" as const)
+            : showProjectsPanel
+              ? ("projects" as const)
+              : ("home" as const),
     // Every rail item switches sidebar AND main area together; clicking the active one goes Home.
     onGoHome: currentWorkspace ? goHome : undefined,
+    onOpenMail: currentWorkspace
+      ? () => (showMailHub ? goHome() : handleOpenMail())
+      : undefined,
     onOpenCanvas: currentWorkspace
       ? () => {
           if (canvasActive) return goHome();
@@ -1271,7 +1303,7 @@ export default function AppDashboard() {
               }}
             />
             {/* Show Channels & DMs / Projects / Canvas / Docs sidebar */}
-            {currentWorkspace && !showOrgControl && (
+            {currentWorkspace && !showOrgControl && !showMailHub && (
               <ChannelSidebar
                 workspace={currentWorkspace}
                 channels={channels}
@@ -1384,7 +1416,7 @@ export default function AppDashboard() {
       </div>
 
       {/* 2. Channels & Members / Projects / Canvas / Docs Sidebar (Desktop) */}
-      {currentWorkspace && !showOrgControl && (
+      {currentWorkspace && !showOrgControl && !showMailHub && (
         <div className="hidden md:flex shrink-0 h-full">
           <ChannelSidebar
             workspace={currentWorkspace}
@@ -1586,6 +1618,8 @@ export default function AppDashboard() {
             </div>
           </div>
         </div>
+      ) : showMailHub && currentWorkspace ? (
+        <WebmailView />
       ) : docsActive && currentWorkspace ? (
         <ProjectDocsView
           workspaceId={currentWorkspace.id}

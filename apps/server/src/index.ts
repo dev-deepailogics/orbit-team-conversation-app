@@ -35,7 +35,9 @@ import { canvasRoutes } from "./routes/canvases.js";
 import { documentRoutes } from "./routes/documents.js";
 import { avatarRoutes } from "./routes/avatar.js";
 import { todoRoutes } from "./routes/todos.js";
+import { mailRoutes } from "./routes/mail.js";
 import { registerPushMiddleware } from "./services/pushService.js";
+import { initMailQueues } from "./services/mailQueue.js";
 
 import { setupSocketServer } from "./socket/index.js";
 
@@ -168,6 +170,7 @@ async function bootstrap() {
   fastify.decorate("io", io);
   setupSocketServer(fastify, io);
   registerPushMiddleware(io);
+  initMailQueues(io);
 
   // Health Check
   fastify.get("/api/health", async () => {
@@ -195,6 +198,7 @@ async function bootstrap() {
   await fastify.register(documentRoutes, { prefix: "/api/documents" });
   await fastify.register(avatarRoutes, { prefix: "/api/avatar" });
   await fastify.register(todoRoutes, { prefix: "/api/todos" });
+  await fastify.register(mailRoutes, { prefix: "/api/mail" });
 
   // Start Server
 
