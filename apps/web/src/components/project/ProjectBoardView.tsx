@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 
 import { TicketTypeIcon } from "./TicketTypeIcon";
 import { TICKET_TYPES } from "../../lib/ticketTypes";
@@ -260,6 +260,91 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
   const [draggedTicketId, setDraggedTicketId] = useState<string | null>(null);
   const [draggedColId, setDraggedColId] = useState<string | null>(null);
   const [dragOverColId, setDragOverColId] = useState<string | null>(null);
+
+  // Auto-scroll board horizontally when dragging a ticket or column near the edge
+  const boardScrollRef = useRef<HTMLDivElement | null>(null);
+  const autoScrollSpeedRef = useRef<number>(0);
+  const scrollAnimFrameRef = useRef<number | null>(null);
+
+  const stopAutoScroll = useCallback(() => {
+    if (scrollAnimFrameRef.current !== null) {
+      cancelAnimationFrame(scrollAnimFrameRef.current);
+      scrollAnimFrameRef.current = null;
+    }
+    autoScrollSpeedRef.current = 0;
+  }, []);
+
+  const startAutoScroll = useCallback(() => {
+    if (scrollAnimFrameRef.current !== null) return;
+    const step = () => {
+      if (boardScrollRef.current && autoScrollSpeedRef.current !== 0) {
+        boardScrollRef.current.scrollLeft += autoScrollSpeedRef.current;
+        scrollAnimFrameRef.current = requestAnimationFrame(step);
+      } else {
+        scrollAnimFrameRef.current = null;
+      }
+    };
+    scrollAnimFrameRef.current = requestAnimationFrame(step);
+  }, []);
+
+  const handleDragEdgeScroll = useCallback((clientX: number, clientY: number) => {
+    const el = boardScrollRef.current;
+    if (!el) return;
+
+    const rect = el.getBoundingClientRect();
+    // Allow vertical margin beyond container so dragging slightly above/below still scrolls
+    if (clientY < rect.top - 80 || clientY > rect.bottom + 80) {
+      stopAutoScroll();
+      return;
+    }
+
+    const EDGE_ZONE = 140; // distance from edge in px to trigger auto-scroll
+    const MAX_SPEED = 24;  // max pixels per frame
+
+    if (clientX >= rect.right - EDGE_ZONE) {
+      // Near right edge -> scroll right
+      const distanceIntoEdge = clientX - (rect.right - EDGE_ZONE);
+      const intensity = Math.min(2.0, Math.max(0.1, distanceIntoEdge / EDGE_ZONE));
+      autoScrollSpeedRef.current = Math.max(4, Math.round(intensity * MAX_SPEED));
+      startAutoScroll();
+    } else if (clientX <= rect.left + EDGE_ZONE) {
+      // Near left edge -> scroll left
+      const distanceIntoEdge = (rect.left + EDGE_ZONE) - clientX;
+      const intensity = Math.min(2.0, Math.max(0.1, distanceIntoEdge / EDGE_ZONE));
+      autoScrollSpeedRef.current = -Math.max(4, Math.round(intensity * MAX_SPEED));
+      startAutoScroll();
+    } else {
+      stopAutoScroll();
+    }
+  }, [startAutoScroll, stopAutoScroll]);
+
+  // Window drag listeners when actively dragging
+  useEffect(() => {
+    const isDragging = !!(draggedTicketId || draggedColId);
+    if (!isDragging) {
+      stopAutoScroll();
+      return;
+    }
+
+    const onWindowDragOver = (e: DragEvent) => {
+      handleDragEdgeScroll(e.clientX, e.clientY);
+    };
+
+    const onWindowDragEnd = () => {
+      stopAutoScroll();
+    };
+
+    window.addEventListener("dragover", onWindowDragOver);
+    window.addEventListener("dragend", onWindowDragEnd);
+    window.addEventListener("drop", onWindowDragEnd);
+
+    return () => {
+      window.removeEventListener("dragover", onWindowDragOver);
+      window.removeEventListener("dragend", onWindowDragEnd);
+      window.removeEventListener("drop", onWindowDragEnd);
+      stopAutoScroll();
+    };
+  }, [draggedTicketId, draggedColId, handleDragEdgeScroll, stopAutoScroll]);
 
   // Column reordering helper (button click: left/right)
   const handleMoveColumn = async (
@@ -546,6 +631,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
 
   const handleDrop = async (e: React.DragEvent, toColumnId: string) => {
     e.preventDefault();
+    stopAutoScroll();
     setDragOverColId(null);
     setDraggedTicketId(null);
     setDraggedColId(null);
@@ -1087,7 +1173,14 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
             }
           />
         ) : (
-          <div className="flex-1 min-h-0 overflow-x-auto px-3 sm:px-6 py-4 flex items-stretch gap-4">
+          <div
+            ref={boardScrollRef}
+            onDragOver={(e) => {
+              e.preventDefault();
+              handleDragEdgeScroll(e.clientX, e.clientY);
+            }}
+            className="flex-1 min-h-0 overflow-x-auto px-3 sm:px-6 py-4 flex items-stretch gap-4"
+          >
             {columns.map((column, colIndex) => {
               const colTickets = (column.tickets || []).filter(filterTicket);
               const isDragTarget = dragOverColId === column.id;
@@ -1121,7 +1214,10 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                       e.dataTransfer.setData("text/plain", JSON.stringify({ type: "column", columnId: column.id }));
                       e.dataTransfer.effectAllowed = "move";
                     }}
-                    onDragEnd={() => setDraggedColId(null)}
+                    onDragEnd={() => {
+                      setDraggedColId(null);
+                      stopAutoScroll();
+                    }}
                     className="h-8 px-2 flex items-center justify-between gap-2 shrink-0 cursor-grab active:cursor-grabbing"
                   >
                     <div className="flex items-center gap-2 min-w-0">
@@ -1261,6 +1357,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                           onDragEnd={() => {
                             setDraggedTicketId(null);
                             setDragOverColId(null);
+                            stopAutoScroll();
                           }}
                           onClick={() => {
                             setEditingTicket(ticket);
