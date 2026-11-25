@@ -39,7 +39,8 @@ import {
   Forward,
   Video,
 } from "@/components/ui/icons";
-import { EyeOff } from "lucide-react";
+import { EyeOff, ListChecks } from "lucide-react";
+import { addTodoFromMessage } from "../../lib/todos";
 import { useAnonStore } from "../../stores/anonStore";
 import { Avatar, tint, relativeTime } from "../project/projectViewUtils";
 import { AnonAvatar } from "./AnonAvatar";
@@ -2314,6 +2315,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                                     <CheckSquare size={14} />
                                   </button>
                                 )}
+                                <button
+                                  onClick={() => addTodoFromMessage(msg)}
+                                  title="Add to to-dos"
+                                  className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded transition"
+                                >
+                                  <ListChecks size={14} />
+                                </button>
                                 {canEdit && (
                                   <button
                                     onClick={() => {

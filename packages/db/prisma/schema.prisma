@@ -118,6 +118,8 @@ model Todo {
   text      String
   done      Boolean   @default(false)
   doneAt    DateTime? @map("done_at")
+  /// Set when created from a message: message://<channelId>/<messageId>[/<parentMessageId>], to jump back to it
+  messageLink String?  @map("message_link")
   createdAt DateTime  @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

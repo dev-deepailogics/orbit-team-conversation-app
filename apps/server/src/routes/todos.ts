@@ -3,6 +3,8 @@ import { prisma } from '@orbit/db';
 
 const MAX_TEXT = 500;
 const MAX_OPEN = 200;
+// The web app's in-app message link: message://<channelId>/<messageId>[/<parentMessageId>]
+const MESSAGE_LINK = /^message:\/\/[\w-]+\/[\w-]+(?:\/[\w-]+)?$/;
 
 // Personal quick to-dos: every route is scoped to the signed-in user.
 export async function todoRoutes(fastify: FastifyInstance) {
@@ -18,13 +20,16 @@ export async function todoRoutes(fastify: FastifyInstance) {
 
   fastify.post('/', { preHandler: [fastify.authenticate] }, async (request, reply) => {
     const userId = uid(request);
-    const text = String((request.body as any)?.text ?? '').trim();
+    const body = (request.body ?? {}) as { text?: string; messageLink?: string };
+    const text = String(body.text ?? '').trim();
     if (!text) return reply.status(400).send({ error: 'text is required' });
     if (text.length > MAX_TEXT) return reply.status(400).send({ error: `text must be at most ${MAX_TEXT} characters` });
+    const messageLink = body.messageLink || null;
+    if (messageLink && !MESSAGE_LINK.test(messageLink)) return reply.status(400).send({ error: 'Invalid messageLink' });
     if ((await prisma.todo.count({ where: { userId, done: false } })) >= MAX_OPEN) {
       return reply.status(400).send({ error: 'Too many open to-dos. Complete or delete some first.' });
     }
-    return reply.status(201).send(await prisma.todo.create({ data: { userId, text } }));
+    return reply.status(201).send(await prisma.todo.create({ data: { userId, text, messageLink } }));
   });
 
   fastify.patch('/:id', { preHandler: [fastify.authenticate] }, async (request, reply) => {
