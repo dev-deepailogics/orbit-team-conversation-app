@@ -8,6 +8,7 @@ import {
   sendSystemNotification,
 } from "../services/systemBot.js";
 import { handleMessageMentions } from "../services/mentionService.js";
+import { unreadMessageSql } from "../services/unread.js";
 import {
   generateRandomPersona,
   getOrCreateAnonProfile,
@@ -377,7 +378,8 @@ export const channelRoutes: FastifyPluginAsync = async (
     },
   );
 
-  // Unread message counts per channel for the signed-in user (top-level messages from others since lastReadAt).
+  // Unread message counts per channel for the signed-in user: messages from others since lastReadAt, including thread
+  // replies in threads they're part of (see unreadMessageSql).
   fastify.get(
     "/workspaces/:workspaceId/unread",
     { preHandler: [fastify.authenticate] },
@@ -391,8 +393,7 @@ export const channelRoutes: FastifyPluginAsync = async (
       FROM "Message" m
       JOIN "ChannelMember" cm ON cm."channelId" = m."channelId" AND cm."userId" = ${userId}
       JOIN "Channel" ch ON ch.id = m."channelId" AND ch."workspaceId" = ${workspaceId}
-      WHERE m."parentMessageId" IS NULL AND m."isDeleted" = false
-        AND m."userId" IS DISTINCT FROM ${userId} AND m."createdAt" > cm."lastReadAt"
+      WHERE ${unreadMessageSql(userId)}
       GROUP BY m."channelId"`;
       return Object.fromEntries(rows.map((r) => [r.channelId, r.count]));
     },

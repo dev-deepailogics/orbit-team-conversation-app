@@ -3,6 +3,7 @@ import { SOCKET_EVENTS } from '@orbit/types';
 import { getOrCreateSystemBot } from './systemBot.js';
 import { extractMentionTokens, matchMentionedUserIds, mentionsChannel } from './mentionParser.js';
 import { withPushOverride } from './pushService.js';
+import { unreadMessageSql } from './unread.js';
 
 export async function handleMessageMentions({
   workspaceId,
@@ -194,14 +195,13 @@ export async function handleMessageMentions({
 
         // The author never sees the note arrive, so it mustn't come back as unread for them on their next load. Only
         // when they had nothing unread in this DM already: moving lastReadAt would otherwise hide real unread messages.
-        // Mirrors the unread count query in routes/channels.ts.
+        // Uses the same rule as the unread counts.
         await prisma.$executeRaw`
           UPDATE "ChannelMember" cm SET "lastReadAt" = ${dmMessage.createdAt}
           WHERE cm."channelId" = ${dmChannel.id} AND cm."userId" = ${authorId}
             AND NOT EXISTS (
               SELECT 1 FROM "Message" m
-              WHERE m."channelId" = cm."channelId" AND m."parentMessageId" IS NULL AND m."isDeleted" = false
-                AND m."userId" IS DISTINCT FROM ${authorId} AND m."createdAt" > cm."lastReadAt" AND m.id <> ${dmMessage.id}
+              WHERE m."channelId" = cm."channelId" AND m.id <> ${dmMessage.id} AND ${unreadMessageSql(authorId)}
             )`;
 
         // Only the mentioned person is told live; the author's open DM picks the note up on its next load.

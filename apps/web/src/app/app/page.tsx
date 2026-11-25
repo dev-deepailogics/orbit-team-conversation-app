@@ -930,6 +930,14 @@ export default function AppDashboard() {
       }
     };
 
+    // A reply in a thread this user is part of: alert, and count it as unread on its conversation like a normal
+    // message so the sidebar shows where it came from (the open channel shows the new reply count instead).
+    const onThreadReplyNotify = (msg: any) => {
+      alertForMessage(msg);
+      if (msg.channelId === currentChannelRef.current?.id) markChannelReadSoon(msg.channelId);
+      else incrementUnread(msg.id, msg.channelId);
+    };
+
     const onReaction = (data: any) => {
       const activeChannel = currentChannelRef.current;
       if (activeChannel) {
@@ -1120,7 +1128,7 @@ export default function AppDashboard() {
 
     socket.on("account:deactivated", onAccountDeactivated);
     socket.on("message:new", onNewMessage);
-    socket.on("thread:reply_notify", alertForMessage);
+    socket.on("thread:reply_notify", onThreadReplyNotify);
     socket.on("message:reaction", onReaction);
     socket.on(SOCKET_EVENTS.POLL_UPDATED, onPollUpdated);
     socket.on("message:updated", onMessageUpdated);
@@ -1155,7 +1163,7 @@ export default function AppDashboard() {
     return () => {
       socket.off("account:deactivated", onAccountDeactivated);
       socket.off("message:new", onNewMessage);
-      socket.off("thread:reply_notify", alertForMessage);
+      socket.off("thread:reply_notify", onThreadReplyNotify);
       socket.off("message:reaction", onReaction);
       socket.off(SOCKET_EVENTS.POLL_UPDATED, onPollUpdated);
       socket.off("message:updated", onMessageUpdated);
