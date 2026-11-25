@@ -14,6 +14,13 @@ export function extractMentionTokens(content: string): string[] {
   return tokens;
 }
 
+/** `@channel` notifies every member of the channel the message was posted in. */
+export const CHANNEL_MENTION = 'channel';
+
+export function mentionsChannel(content: string): boolean {
+  return extractMentionTokens(content).includes(CHANNEL_MENTION);
+}
+
 /** Returns the ids of candidates whose username or display name is @mentioned in content. */
 export function matchMentionedUserIds(
   content: string,

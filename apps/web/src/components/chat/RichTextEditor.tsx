@@ -15,7 +15,15 @@ import {
   FileCode,
   Link as LinkIcon,
   AtSign,
+  Users,
 } from '@/components/ui/icons';
+
+/** `@channel` notifies everyone in the channel; offered first in the autocomplete wherever members can be mentioned. */
+const CHANNEL_MENTION: MentionUser = {
+  id: '__channel__',
+  username: 'channel',
+  displayName: 'Notify everyone in this channel',
+};
 
 export interface MentionUser {
   id: string;
@@ -374,7 +382,8 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
     const filteredMentionUsers = React.useMemo(() => {
       if (!mentionUsers || !mentionState.isOpen) return [];
       const q = mentionState.query.toLowerCase();
-      return mentionUsers
+      const options = mentionUsers.length > 0 ? [CHANNEL_MENTION, ...mentionUsers] : mentionUsers;
+      return options
         .filter(
           (u) =>
             u.username.toLowerCase().includes(q) ||
@@ -1180,14 +1189,20 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
                         : 'text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)]'
                     }`}
                   >
-                    <div className="relative shrink-0">
-                      <Avatar name={u.displayName || u.username} src={u.avatarUrl} size={20} />
-                      <span
-                        className={`absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full ring-1 ring-[var(--theme-bg-surface)] ${
-                          u.status === 'ONLINE' ? 'bg-slack-green' : 'bg-gray-500'
-                        }`}
-                      />
-                    </div>
+                    {u === CHANNEL_MENTION ? (
+                      <span className="shrink-0 w-5 h-5 rounded flex items-center justify-center bg-[var(--theme-bg-surface-hover)]">
+                        <Users size={12} />
+                      </span>
+                    ) : (
+                      <div className="relative shrink-0">
+                        <Avatar name={u.displayName || u.username} src={u.avatarUrl} size={20} />
+                        <span
+                          className={`absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full ring-1 ring-[var(--theme-bg-surface)] ${
+                            u.status === 'ONLINE' ? 'bg-slack-green' : 'bg-gray-500'
+                          }`}
+                        />
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0 flex items-center gap-1.5">
                       <span className="truncate font-medium">{u.displayName}</span>
                       <span

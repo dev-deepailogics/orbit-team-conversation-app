@@ -1,7 +1,7 @@
 import { prisma } from '@orbit/db';
 import { SOCKET_EVENTS } from '@orbit/types';
 import { getOrCreateSystemBot } from './systemBot.js';
-import { extractMentionTokens, matchMentionedUserIds } from './mentionParser.js';
+import { extractMentionTokens, matchMentionedUserIds, mentionsChannel } from './mentionParser.js';
 import { withPushOverride } from './pushService.js';
 
 export async function handleMessageMentions({
@@ -61,6 +61,31 @@ export async function handleMessageMentions({
     const candidates = members.map((m) => m.user).filter((u): u is NonNullable<typeof u> => !!u);
     const mentionedIds = new Set(matchMentionedUserIds(content, candidates, authorId));
     const uniqueTargets = candidates.filter((u) => mentionedIds.has(u.id));
+    const cleanSnippet = content.length > 250 ? `${content.slice(0, 247)}...` : content;
+
+    // 5b. @channel: one in-app notification per channel member, even if muted (not the author, not anyone personally
+    // mentioned — they get the fuller notice below). No bot DM per member: that would flood everyone's DMs.
+    if (mentionsChannel(content)) {
+      const channelMembers = await prisma.channelMember.findMany({
+        where: { channelId, userId: { notIn: [authorId, ...mentionedIds] } },
+        select: { userId: true },
+      });
+      if (channelMembers.length > 0) {
+        const notifs = await prisma.notification.createManyAndReturn({
+          data: channelMembers.map((m) => ({
+            userId: m.userId,
+            workspaceId,
+            type: 'MENTION' as const,
+            title: `${authorName} mentioned @channel in #${channel.name}`,
+            body: cleanSnippet,
+            channelId: channel.id,
+            messageId,
+          })),
+        });
+        for (const n of notifs) io?.to(`user:${n.userId}`).emit(SOCKET_EVENTS.NOTIFICATION_NEW, n);
+      }
+    }
+
     if (uniqueTargets.length === 0) return;
 
     const locationText = parentMessageId
@@ -68,7 +93,6 @@ export async function handleMessageMentions({
       : `in [#${channel.name}](channel://${channel.id})`;
     // In-app link the web app opens at that exact message (and its thread): message://<channel>/<message>[/<parent>]
     const messageLink = `message://${channel.id}/${messageId}${parentMessageId ? `/${parentMessageId}` : ''}`;
-    const cleanSnippet = content.length > 250 ? `${content.slice(0, 247)}...` : content;
 
     // 6. Notify each mentioned user
     for (const targetUser of uniqueTargets) {
