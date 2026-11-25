@@ -938,17 +938,9 @@ export default function AppDashboard() {
       else incrementUnread(msg.id, msg.channelId);
     };
 
-    const onReaction = (data: any) => {
-      const activeChannel = currentChannelRef.current;
-      if (activeChannel) {
-        setMessages(
-          useChatStore
-            .getState()
-            .messages.map((m) =>
-              m.id === data.messageId ? { ...m, reactions: data.reactions } : m,
-            ),
-        );
-      }
+    // Reactions on a channel message, a thread reply or the thread's parent all update wherever that message is shown
+    const onReaction = (data: { messageId: string; reactions: Message["reactions"] }) => {
+      useChatStore.getState().applyReactions(data.messageId, data.reactions);
     };
 
     // Someone voted: new totals for everyone viewing the channel (each client keeps its own choice)

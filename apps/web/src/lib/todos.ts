@@ -1,5 +1,5 @@
 // Any message view can turn a message into a personal to-do by calling addTodoFromMessage. QuickTodos (always mounted
-// in the app page) listens for the event, saves it and opens the panel, so no handlers are threaded through the views.
+// in the app page) listens for the event and saves it, so no handlers are threaded through the views.
 
 export const ADD_TODO_EVENT = 'orbit:add-todo';
 const MAX_TEXT = 500;

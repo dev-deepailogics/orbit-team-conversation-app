@@ -38,6 +38,8 @@ interface ChatState {
   updateMessage: (message: Message) => void;
   /** New poll results (from a vote response or a poll:updated broadcast). */
   applyPollUpdate: (messageId: string, poll: MessagePoll) => void;
+  /** New reactions for a message, wherever it's shown: the channel, a thread's replies, or the open thread's parent. */
+  applyReactions: (messageId: string, reactions: Message['reactions']) => void;
   setActiveThread: (message: Message | null) => void;
   // threadId: the thread these replies were fetched for; ignored if the open thread has changed since.
   // page: whether older replies exist and where to continue from (replies load newest-first, like channel messages)
@@ -151,6 +153,16 @@ export const useChatStore = create<ChatState>((set) => ({
       return {
         messages: state.messages.map((m) => (isTarget(m) ? withPoll(m) : m)),
         activeThread: isTarget(state.activeThread) ? withPoll(state.activeThread) : state.activeThread,
+      };
+    }),
+
+  applyReactions: (messageId, reactions) =>
+    set((state) => {
+      const apply = (m: Message) => (m.id === messageId ? { ...m, reactions } : m);
+      return {
+        messages: state.messages.map(apply),
+        threadReplies: state.threadReplies.map(apply),
+        activeThread: state.activeThread && apply(state.activeThread),
       };
     }),
 

@@ -160,15 +160,15 @@ export const QuickTodos: React.FC = () => {
     if (!(await create({ text: value }))) setText(value);
   };
 
-  // "Add to to-dos" on a message: save it and open the panel so it's visible (and editable) right away. A message that
-  // already has an open to-do isn't added twice (e.g. a double click); the panel just shows the existing one.
+  // "Add to to-dos" on a message: saved quietly (the button's count goes up); the panel only opens if it fails, to show
+  // why. A message that already has an open to-do isn't added twice (e.g. a double click).
   const todosRef = useRef(todos);
   todosRef.current = todos;
   useEffect(() => {
-    const onAdd = (e: Event) => {
+    const onAdd = async (e: Event) => {
       const todo = (e as CustomEvent<NewTodo>).detail;
-      setOpen(true);
-      if (!todosRef.current.some((t) => !t.done && t.messageLink === todo.messageLink)) create(todo);
+      if (todosRef.current.some((t) => !t.done && t.messageLink === todo.messageLink)) return;
+      if (!(await create(todo))) setOpen(true);
     };
     window.addEventListener(ADD_TODO_EVENT, onAdd);
     return () => window.removeEventListener(ADD_TODO_EVENT, onAdd);
