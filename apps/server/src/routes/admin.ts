@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { ACTIVITY_CHANNEL, ACTIVITY_CHANNEL_TOPIC } from '../services/systemBot.js';
 import { revokeAllForUser } from '../services/tokens.js';
-import { createDemoWorkspace, demoEmailDomain } from '../services/demoWorkspace.js';
+import { createDemoWorkspace, demoEmailDomain, DEMO_REGIONS } from '../services/demoWorkspace.js';
 
 const updateRoleSchema = z.object({
   systemRole: z.enum(['SUPER_ADMIN', 'WORKSPACE_ADMIN', 'USER']),
@@ -364,11 +364,13 @@ export const adminRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
 
   // 7b. Create a seeded demo workspace with its own isolated users (one per role)
   fastify.post('/workspaces/demo', { preHandler: [ensureSuperAdmin] }, async (request, reply) => {
-    const parseResult = z.object({ name: z.string().trim().min(2).max(50) }).safeParse(request.body);
+    const parseResult = z
+      .object({ name: z.string().trim().min(2).max(50), region: z.enum(DEMO_REGIONS).default('international') })
+      .safeParse(request.body);
     if (!parseResult.success) {
-      return reply.status(400).send({ error: 'Workspace name must be 2-50 characters' });
+      return reply.status(400).send({ error: 'Workspace name must be 2-50 characters and region local or international' });
     }
-    return reply.status(201).send(await createDemoWorkspace(parseResult.data.name));
+    return reply.status(201).send(await createDemoWorkspace(parseResult.data.name, parseResult.data.region));
   });
 
   // 8. Delete Workspace (demo workspaces also take their demo users with them)
