@@ -285,11 +285,11 @@ export const HuddleModal: React.FC = () => {
           <div
             onDoubleClick={toggleFullscreen}
             title="Double-click header to toggle Full Screen"
-            className="h-16 border-b border-white/[0.08] px-5 sm:px-8 flex items-center justify-between bg-white/[0.02] backdrop-blur-md select-none shrink-0"
+            className="h-14 sm:h-16 border-b border-white/[0.08] px-3 sm:px-8 gap-2 flex items-center justify-between bg-white/[0.02] backdrop-blur-md select-none shrink-0"
           >
-            <div className="flex items-center gap-3.5">
-              <div className="relative">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+            <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+              <div className="relative shrink-0">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
                   <PhoneCall size={19} />
                 </div>
                 <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
@@ -297,25 +297,30 @@ export const HuddleModal: React.FC = () => {
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                 </span>
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-sm sm:text-base font-bold text-white tracking-tight leading-tight">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <h2
+                    title={`#${channelName}`}
+                    className="text-sm sm:text-base font-bold text-white tracking-tight leading-tight truncate"
+                  >
                     #{channelName}
                   </h2>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+                  <span className="hidden md:inline-block shrink-0 whitespace-nowrap px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
                     Encrypted HD
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 font-medium">Ultra-low latency audio, video & screen share</p>
+                <p className="hidden sm:block truncate text-xs text-slate-400 font-medium">
+                  Ultra-low latency audio, video & screen share
+                </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
               {/* Toggle Chat Button */}
               <button
                 onClick={() => setIsChatOpen((prev) => !prev)}
                 title={isChatOpen ? 'Hide in-call chat' : 'Open in-call chat'}
-                className={`p-2.5 rounded-xl transition-all active:scale-95 border flex items-center gap-1.5 text-xs font-semibold ${
+                className={`p-2 sm:p-2.5 rounded-xl transition-all active:scale-95 border flex items-center gap-1.5 text-xs font-semibold ${
                   isChatOpen
                     ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.25)]'
                     : 'hover:bg-white/[0.08] text-slate-300 hover:text-white border-transparent hover:border-white/10'
@@ -329,7 +334,7 @@ export const HuddleModal: React.FC = () => {
               <button
                 onClick={handleMinimize}
                 title="Minimize to floating widget"
-                className="p-2.5 hover:bg-white/[0.08] rounded-xl text-slate-400 hover:text-white transition-all active:scale-95 border border-transparent hover:border-white/10"
+                className="p-2 sm:p-2.5 hover:bg-white/[0.08] rounded-xl text-slate-400 hover:text-white transition-all active:scale-95 border border-transparent hover:border-white/10"
               >
                 <Minus size={18} />
               </button>
@@ -338,7 +343,7 @@ export const HuddleModal: React.FC = () => {
               <button
                 onClick={toggleFullscreen}
                 title={isFullscreen ? 'Exit Full Screen (F or Esc)' : 'Full Screen (F)'}
-                className="p-2.5 hover:bg-white/[0.08] rounded-xl text-slate-400 hover:text-white transition-all active:scale-95 border border-transparent hover:border-white/10"
+                className="p-2 sm:p-2.5 hover:bg-white/[0.08] rounded-xl text-slate-400 hover:text-white transition-all active:scale-95 border border-transparent hover:border-white/10"
               >
                 {isFullscreen ? <Shrink size={18} /> : <Expand size={18} />}
               </button>
@@ -347,10 +352,10 @@ export const HuddleModal: React.FC = () => {
               <button
                 onClick={handleLeave}
                 title="Leave Call"
-                className="px-3.5 py-1.5 ml-1 bg-gradient-to-r from-red-500/20 to-red-600/30 hover:from-red-500/30 hover:to-red-600/40 border border-red-500/30 text-red-300 hover:text-white text-xs font-semibold rounded-xl transition-all shadow-sm active:scale-95 flex items-center gap-1.5"
+                className="px-2.5 sm:px-3.5 py-1.5 ml-0.5 sm:ml-1 bg-gradient-to-r from-red-500/20 to-red-600/30 hover:from-red-500/30 hover:to-red-600/40 border border-red-500/30 text-red-300 hover:text-white text-xs font-semibold rounded-xl transition-all shadow-sm active:scale-95 flex items-center gap-1.5"
               >
                 <X size={15} />
-                <span>Leave</span>
+                <span className="hidden sm:inline">Leave</span>
               </button>
             </div>
           </div>
