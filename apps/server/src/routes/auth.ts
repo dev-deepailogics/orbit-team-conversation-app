@@ -4,6 +4,7 @@ import { prisma } from '@orbit/db';
 import { z } from 'zod';
 import { randomBytes } from 'crypto';
 import { isDemoEmail } from '../services/demoWorkspace.js';
+import { audit } from '../services/audit.js';
 import { clearFileSessionCookie, fileSessionCookie } from '../services/fileAccess.js';
 import { ACCESS_TOKEN_TTL, issueRefreshToken, revokeAllForUser, revokeByToken, rotateRefreshToken } from '../services/tokens.js';
 import {
@@ -158,6 +159,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     });
 
     reply.header('set-cookie', fileSessionCookie(user.id));
+    audit(request, { action: 'auth.register', actorId: user.id, actorLabel: user.email, targetType: 'user', targetId: user.id });
     return reply.status(201).send({ ...(await startSession(user)), user: publicUser(user) });
   });
 
@@ -177,15 +179,18 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
 
     // No passwordHash = Microsoft-only account; it can't sign in with a password.
     if (!user || !user.passwordHash) {
+      audit(request, { action: 'auth.login', outcome: 'failure', actorId: user?.id, actorLabel: email, metadata: { reason: user ? 'no_password' : 'unknown_user' } });
       return reply.status(401).send({ error: 'Invalid email or password' });
     }
 
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
+      audit(request, { action: 'auth.login', outcome: 'failure', actorId: user.id, actorLabel: email, metadata: { reason: 'bad_password' } });
       return reply.status(401).send({ error: 'Invalid email or password' });
     }
 
     if (user.disabled) {
+      audit(request, { action: 'auth.login', outcome: 'failure', actorId: user.id, actorLabel: email, metadata: { reason: 'account_disabled' } });
       return reply.status(403).send({ error: 'Account is deactivated' });
     }
 
@@ -204,6 +209,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     }
 
     reply.header('set-cookie', fileSessionCookie(user.id));
+    audit(request, { action: 'auth.login', actorId: user.id, actorLabel: user.email, metadata: { method: 'password' } });
     return reply.send({ ...(await startSession(user)), user: publicUser(user) });
   });
 
@@ -231,6 +237,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
 
     const pending = openCookie<PendingLogin>(config, 'login', readCookie(request.headers.cookie, MS_COOKIE));
     if (!pending || !query.code || query.state !== pending.state) {
+      audit(request, { action: 'auth.login', outcome: 'failure', metadata: { method: 'microsoft', reason: 'invalid_state' } });
       return reply.redirect(loginError('microsoft_invalid_state'));
     }
 
@@ -239,6 +246,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       profile = await exchangeCodeForProfile(config, query.code, pending.codeVerifier, pending.nonce);
     } catch (err) {
       request.log.warn({ reason: (err as Error).message }, 'Microsoft sign-in failed');
+      audit(request, { action: 'auth.login', outcome: 'failure', metadata: { method: 'microsoft', reason: 'token_exchange_failed' } });
       return reply.redirect(loginError('microsoft_failed'));
     }
 
@@ -262,6 +270,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         // ownership of the existing account with its password, and the login route links it then.
         const link: PendingLink = { providerUid: profile.providerUid, email };
         reply.header('set-cookie', linkCookie(sealCookie(config, 'link', link), 600));
+        audit(request, { action: 'auth.login', outcome: 'failure', actorLabel: email, metadata: { method: 'microsoft', reason: 'account_exists_unlinked' } });
         return reply.redirect(loginError('microsoft_account_exists'));
       }
 
@@ -279,14 +288,19 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       } catch (err) {
         // e.g. a concurrent callback for the same user won the unique constraint
         request.log.warn({ reason: (err as Error).message }, 'Microsoft sign-in: user creation failed');
+        audit(request, { action: 'auth.login', outcome: 'failure', metadata: { method: 'microsoft', reason: 'user_creation_failed' } });
         return reply.redirect(loginError('microsoft_failed'));
       }
     }
 
-    if (user.disabled) return reply.redirect(loginError('account_deactivated'));
+    if (user.disabled) {
+      audit(request, { action: 'auth.login', outcome: 'failure', actorId: user.id, actorLabel: user.email, metadata: { method: 'microsoft', reason: 'account_disabled' } });
+      return reply.redirect(loginError('account_deactivated'));
+    }
 
     const session = await startSession(user, 'microsoft');
     reply.header('set-cookie', fileSessionCookie(user.id));
+    audit(request, { action: 'auth.login', actorId: user.id, actorLabel: user.email, metadata: { method: 'microsoft' } });
     // URL fragment: never sent to any server or logged; the login page stores it and strips it.
     return reply.redirect(
       `${clientUrl()}/login#token=${encodeURIComponent(session.accessToken)}&refreshToken=${encodeURIComponent(session.refreshToken)}`,
@@ -305,6 +319,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     if (!user) return reply.status(401).send({ error: 'Invalid or expired refresh token' });
     if (user.disabled) {
       await revokeAllForUser(user.id);
+      audit(request, { action: 'auth.refresh', outcome: 'failure', actorId: user.id, actorLabel: user.email, metadata: { reason: 'account_disabled' } });
       return reply.status(403).send({ error: 'Account is deactivated' });
     }
 
@@ -319,7 +334,8 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
   // Revoke this session's refresh token family. Always succeeds so clients can log out while offline-ish.
   fastify.post('/logout', async (request, reply) => {
     const parsed = refreshSchema.safeParse(request.body);
-    if (parsed.success) await revokeByToken(parsed.data.refreshToken).catch(() => {});
+    const loggedOutUserId = parsed.success ? await revokeByToken(parsed.data.refreshToken).catch(() => null) : null;
+    if (loggedOutUserId) audit(request, { action: 'auth.logout', actorId: loggedOutUserId });
     reply.header('set-cookie', clearFileSessionCookie());
     return reply.send({ success: true });
   });
@@ -378,10 +394,12 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       return reply.status(403).send({ error: 'Your password is managed by your sign-in provider' });
     }
     if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+      audit(request, { action: 'auth.password_change', outcome: 'failure', actorId: id, targetType: 'user', targetId: id, metadata: { reason: 'wrong_current_password' } });
       return reply.status(400).send({ error: 'Current password is incorrect' });
     }
 
     await prisma.user.update({ where: { id }, data: { passwordHash: await bcrypt.hash(newPassword, 10) } });
+    audit(request, { action: 'auth.password_change', actorId: id, targetType: 'user', targetId: id });
     // Sign out every other device, then hand this one a fresh session.
     await revokeAllForUser(id);
     const fresh = await prisma.user.findUniqueOrThrow({ where: { id } });

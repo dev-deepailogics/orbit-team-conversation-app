@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { ACTIVITY_CHANNEL, ACTIVITY_CHANNEL_TOPIC } from '../services/systemBot.js';
 import { revokeAllForUser } from '../services/tokens.js';
+import { audit } from '../services/audit.js';
 import { createDemoWorkspace, demoEmailDomain } from '../services/demoWorkspace.js';
 
 const updateRoleSchema = z.object({
@@ -155,6 +156,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       },
     });
 
+    audit(request, { action: 'admin.user_role_change', actorId: callerId, targetType: 'user', targetId: userId, metadata: { newSystemRole: systemRole } });
     return reply.send({ success: true, user: updatedUser });
   });
 
@@ -195,6 +197,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
     });
 
     if (disabled) await revokeAllForUser(userId);
+    audit(request, { action: disabled ? 'admin.user_disable' : 'admin.user_enable', actorId: callerId, targetType: 'user', targetId: userId });
 
     if (disabled && fastify.io) {
       // Notify the deactivated user's sockets to immediately log out
@@ -225,6 +228,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       data: { passwordHash },
     });
     await revokeAllForUser(userId);
+    audit(request, { action: 'admin.user_password_reset', actorId: (request.user as { id: string }).id, targetType: 'user', targetId: userId });
 
     return reply.send({ success: true, message: 'Password has been reset successfully' });
   });
@@ -241,6 +245,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
     await prisma.user.delete({
       where: { id: userId },
     });
+    audit(request, { action: 'admin.user_delete', actorId: callerId, targetType: 'user', targetId: userId });
 
     return reply.send({ success: true, deletedUserId: userId });
   });
@@ -359,6 +364,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       },
     });
 
+    audit(request, { action: 'admin.workspace_create', actorId: (request.user as { id: string }).id, workspaceId: workspace.id, targetType: 'workspace', targetId: workspace.id, metadata: { ownerId: owner.id } });
     return reply.status(201).send(workspace);
   });
 
@@ -368,7 +374,9 @@ export const adminRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
     if (!parseResult.success) {
       return reply.status(400).send({ error: 'Workspace name must be 2-50 characters' });
     }
-    return reply.status(201).send(await createDemoWorkspace(parseResult.data.name));
+    const demo = await createDemoWorkspace(parseResult.data.name);
+    audit(request, { action: 'admin.demo_workspace_create', actorId: (request.user as { id: string }).id, metadata: { name: parseResult.data.name } });
+    return reply.status(201).send(demo);
   });
 
   // 8. Delete Workspace (demo workspaces also take their demo users with them)
@@ -391,6 +399,68 @@ export const adminRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
         : []),
     ]);
 
+    audit(request, { action: 'admin.workspace_delete', actorId: (request.user as { id: string }).id, workspaceId, targetType: 'workspace', targetId: workspaceId, metadata: { slug: workspace.slug, isDemo } });
     return reply.send({ success: true, deletedWorkspaceId: workspaceId });
+  });
+
+  // 9. Audit trail: search and export. Filters: action (prefix match, e.g. "auth."), outcome, actorId, workspaceId,
+  // from/to (ISO dates). ?format=csv downloads the matching rows (capped at 10,000); JSON is paged with ?cursor=<id>.
+  fastify.get('/audit-logs', { preHandler: [ensureSuperAdmin] }, async (request, reply) => {
+    const q = z
+      .object({
+        action: z.string().max(100).optional(),
+        outcome: z.enum(['success', 'failure']).optional(),
+        actorId: z.string().max(100).optional(),
+        workspaceId: z.string().max(100).optional(),
+        from: z.string().datetime({ offset: true }).optional().or(z.string().date().optional()),
+        to: z.string().datetime({ offset: true }).optional().or(z.string().date().optional()),
+        limit: z.coerce.number().int().min(1).max(500).default(100),
+        cursor: z.string().max(100).optional(),
+        format: z.enum(['json', 'csv']).default('json'),
+      })
+      .safeParse(request.query);
+    if (!q.success) return reply.status(400).send({ error: q.error.errors[0].message });
+    const f = q.data;
+
+    const where = {
+      ...(f.action ? { action: { startsWith: f.action } } : {}),
+      ...(f.outcome ? { outcome: f.outcome } : {}),
+      ...(f.actorId ? { actorId: f.actorId } : {}),
+      ...(f.workspaceId ? { workspaceId: f.workspaceId } : {}),
+      ...(f.from || f.to
+        ? { createdAt: { ...(f.from ? { gte: new Date(f.from) } : {}), ...(f.to ? { lte: new Date(f.to) } : {}) } }
+        : {}),
+    };
+
+    audit(request, { action: 'admin.audit_log_view', actorId: (request.user as { id: string }).id, metadata: { format: f.format, filters: { action: f.action, outcome: f.outcome, actorId: f.actorId, workspaceId: f.workspaceId } } });
+
+    if (f.format === 'csv') {
+      const rows = await prisma.auditLog.findMany({ where, orderBy: { createdAt: 'desc' }, take: 10000 });
+      const cell = (v: unknown) => {
+        let t = v == null ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v);
+        // Stop spreadsheet formula injection from user-controlled values (emails, user agents).
+        if (/^[=+\-@\t\r]/.test(t)) t = `'${t}`;
+        return `"${t.replace(/"/g, '""')}"`;
+      };
+      const head = ['time', 'action', 'outcome', 'actorId', 'actorLabel', 'workspaceId', 'targetType', 'targetId', 'ip', 'forwardedFor', 'userAgent', 'metadata'];
+      const lines = [head.join(',')].concat(
+        rows.map((r) =>
+          [r.createdAt.toISOString(), r.action, r.outcome, r.actorId, r.actorLabel, r.workspaceId, r.targetType, r.targetId, r.ip, r.forwardedFor, r.userAgent, r.metadata].map(cell).join(','),
+        ),
+      );
+      reply.header('Content-Type', 'text/csv; charset=utf-8');
+      reply.header('Content-Disposition', 'attachment; filename="orbit-audit-log.csv"');
+      return reply.send(lines.join('\r\n'));
+    }
+
+    const rows = await prisma.auditLog.findMany({
+      where,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: f.limit + 1,
+      ...(f.cursor ? { cursor: { id: f.cursor }, skip: 1 } : {}),
+    });
+    const hasMore = rows.length > f.limit;
+    const page = hasMore ? rows.slice(0, f.limit) : rows;
+    return reply.send({ entries: page, nextCursor: hasMore ? page[page.length - 1].id : null });
   });
 };

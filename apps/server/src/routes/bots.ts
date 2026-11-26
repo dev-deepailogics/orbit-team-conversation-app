@@ -4,6 +4,7 @@ import { SOCKET_EVENTS } from '@orbit/types';
 import crypto from 'crypto';
 import { z } from 'zod';
 import { verifyWorkspaceMember } from '../utils/security.js';
+import { audit } from '../services/audit.js';
 
 // Our own uploads only (same rule as profile pictures). No avatar = the client shows the Orbit logo.
 const botAvatarUrlSchema = z
@@ -84,6 +85,7 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
       },
     });
 
+    audit(request, { action: 'bot.create', actorId: userId, workspaceId, targetType: 'bot', targetId: bot.id, metadata: { name: bot.name } });
     return reply.status(201).send(bot);
   });
 
@@ -123,6 +125,7 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
         ...(avatarUrl !== undefined && { avatarUrl }),
       },
     });
+    audit(request, { action: 'bot.update', actorId: userId, workspaceId, targetType: 'bot', targetId: bot.id });
     return reply.send(bot);
   });
 
@@ -256,6 +259,7 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
       },
     });
 
+    audit(request, { action: 'webhook.create', actorId: userId, workspaceId, targetType: 'webhook', targetId: webhook.id, metadata: { channelId } });
     return reply.status(201).send({
       id: webhook.id,
       name: webhook.name,

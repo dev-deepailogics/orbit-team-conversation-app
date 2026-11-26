@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import { prisma } from '@orbit/db';
+import { audit } from './audit.js';
 
 // Short-lived access JWT + long-lived, rotating, server-side refresh token.
 export const ACCESS_TOKEN_TTL = process.env.JWT_EXPIRES_IN || '15m';
@@ -42,6 +43,7 @@ export async function rotateRefreshToken(raw: string): Promise<RotateResult> {
     if (Date.now() - row.revokedAt.getTime() > REUSE_GRACE_MS) {
       // An old token came back: assume it leaked and kill every session derived from it.
       await revokeFamily(row.familyId);
+      audit(null, { action: 'auth.refresh_token_reuse', outcome: 'failure', actorId: row.userId, metadata: { familyId: row.familyId } });
     }
     return { ok: false };
   }
@@ -62,9 +64,10 @@ export async function revokeFamily(familyId: string) {
 }
 
 /** Logout: revoke the session (family) a refresh token belongs to. Unknown tokens are ignored. */
-export async function revokeByToken(raw: string) {
-  const row = await prisma.refreshToken.findUnique({ where: { tokenHash: hash(raw) }, select: { familyId: true } });
+export async function revokeByToken(raw: string): Promise<string | null> {
+  const row = await prisma.refreshToken.findUnique({ where: { tokenHash: hash(raw) }, select: { familyId: true, userId: true } });
   if (row) await revokeFamily(row.familyId);
+  return row?.userId ?? null;
 }
 
 /** Password change/reset, deactivation: sign the user out everywhere. */

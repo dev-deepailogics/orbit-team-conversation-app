@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
+import { audit } from '../services/audit.js';
 import { sanitizeChannelForViewer } from '../services/anonymousService.js';
 import { prisma } from '@orbit/db';
 import { z } from 'zod';
@@ -319,6 +320,7 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       }
     }
 
+    audit(request, { action: 'workspace.join', actorId: userId, workspaceId: workspace.id, targetType: 'workspace', targetId: workspace.id });
     return reply.send({ success: true, workspaceId: workspace.id });
   });
 
@@ -433,6 +435,7 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       fastify.io?.in(`user:${targetUser.id}`).socketsJoin(availabilityViewersRoom(workspaceId));
     }
 
+    audit(request, { action: 'workspace.member_add', actorId: callerId, workspaceId, targetType: 'user', targetId: targetUser.id, metadata: { role } });
     return reply.status(201).send(member);
   });
 
@@ -487,6 +490,7 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       });
     }
 
+    audit(request, { action: 'workspace.member_role_change', actorId: callerId, workspaceId, targetType: 'user', targetId: memberUserId, metadata: { previousRole: target.role, newRole: role } });
     return reply.send(member);
   });
 
@@ -556,6 +560,7 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       });
     }
 
+    audit(request, { action: 'workspace.member_remove', actorId: callerId, workspaceId, targetType: 'user', targetId: memberUserId });
     return reply.send({ success: true, removedUserId: memberUserId });
   });
 
@@ -597,6 +602,7 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       data: parseResult.data,
     });
 
+    audit(request, { action: 'workspace.update', actorId: callerId, workspaceId, targetType: 'workspace', targetId: workspaceId, metadata: { fields: Object.keys(parseResult.data) } });
     return reply.send(updated);
   });
 
@@ -806,6 +812,7 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       data: { settings: mergedSettings },
     });
 
+    audit(request, { action: 'workspace.settings_update', actorId: userId, workspaceId, targetType: 'workspace', targetId: workspaceId, metadata: { keys: Object.keys(parseResult.data) } });
     return reply.send({
       success: true,
       settings: updated.settings,

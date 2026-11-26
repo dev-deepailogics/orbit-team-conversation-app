@@ -828,3 +828,27 @@ model Canvas {
   @@index([channelId])
   @@index([projectId])
 }
+
+// Security audit trail: who did what, to what, from where, and whether it worked. Deliberately no foreign keys, so
+// entries outlive the users and workspaces they describe. Every row is also written to stdout for the SIEM.
+model AuditLog {
+  id           String   @id @default(uuid())
+  createdAt    DateTime @default(now()) @map("created_at")
+  action       String   // e.g. auth.login, workspace.member_role_change, file.download
+  outcome      String   @default("success") // success | failure
+  actorId      String?  @map("actor_id")
+  actorLabel   String?  @map("actor_label") // email/username at the time (also set for failed sign-ins with no user)
+  workspaceId  String?  @map("workspace_id")
+  targetType   String?  @map("target_type")
+  targetId     String?  @map("target_id")
+  ip           String?
+  forwardedFor String?  @map("forwarded_for")
+  userAgent    String?  @map("user_agent")
+  metadata     Json?
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+  @@index([workspaceId, createdAt])
+  @@map("audit_logs")
+}

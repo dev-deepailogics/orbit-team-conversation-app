@@ -9,6 +9,7 @@ import {
   GOOGLE_DRIVE_RECONNECT_MESSAGE,
 } from '../services/driveAuth.js';
 import { resolveRequesterId } from '../services/fileAccess.js';
+import { audit } from '../services/audit.js';
 import { projectAccessError } from './projects.js';
 
 function escapeDriveQueryValue(value: string) {
@@ -836,6 +837,7 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
 
       const { drive } = authResult;
       if (!(await requireFileAccess(callerId(request), fileId, drive, reply))) return;
+      audit(request, { action: 'drive.file_share_change', actorId: callerId(request), targetType: 'drive_file', targetId: fileId, metadata: { action } });
 
       const permsRes = await drive.permissions.list({
         fileId,

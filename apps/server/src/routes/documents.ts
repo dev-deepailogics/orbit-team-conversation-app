@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyReply } from "fastify";
+import { audit } from '../services/audit.js';
 import { prisma } from "@orbit/db";
 import { SOCKET_EVENTS } from "@orbit/types";
 import { z } from "zod";
@@ -142,6 +143,9 @@ export async function documentRoutes(fastify: FastifyInstance) {
       return reply.status(403).send({ error: "Only the document creator or admin can change sharing settings" });
     }
     if (projectId !== undefined && !(await checkProject(doc.workspaceId, projectId, reply))) return;
+    if (isPublicInProject !== undefined || isPublicLinkEnabled !== undefined) {
+      audit(request, { action: 'document.sharing_settings_change', actorId: userId, workspaceId: doc.workspaceId, targetType: 'document', targetId: documentId, metadata: { isPublicInProject, isPublicLinkEnabled } });
+    }
 
     const data: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(rest)) if (v !== undefined) data[k] = v;
@@ -193,6 +197,7 @@ export async function documentRoutes(fastify: FastifyInstance) {
       update: { permission },
       create: { documentId, userId: targetUserId, permission },
     });
+    audit(request, { action: 'document.share_add', actorId: userId, workspaceId: doc.workspaceId, targetType: 'document', targetId: documentId, metadata: { sharedWith: targetUserId, permission } });
     const updated = await prisma.projectDocument.findUnique({ where: { id: documentId }, include: DOC_INCLUDE });
     emit(doc.workspaceId, SOCKET_EVENTS.DOCUMENT_UPDATE, updated);
     return updated;
@@ -209,6 +214,7 @@ export async function documentRoutes(fastify: FastifyInstance) {
       return reply.status(403).send({ error: "Unauthorized to remove this share" });
     }
     await prisma.projectDocumentShare.deleteMany({ where: { documentId, userId: targetUserId } });
+    audit(request, { action: 'document.share_remove', actorId: userId, workspaceId: doc.workspaceId, targetType: 'document', targetId: documentId, metadata: { removedUser: targetUserId } });
     const updated = await prisma.projectDocument.findUnique({ where: { id: documentId }, include: DOC_INCLUDE });
     emit(doc.workspaceId, SOCKET_EVENTS.DOCUMENT_UPDATE, updated);
     return updated;

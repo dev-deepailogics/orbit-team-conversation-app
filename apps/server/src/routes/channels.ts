@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { prisma } from "@orbit/db";
 import { SOCKET_EVENTS } from "@orbit/types";
 import { z } from "zod";
+import { audit } from "../services/audit.js";
 import {
   ACTIVITY_CHANNEL,
   postActivity,
@@ -1169,6 +1170,7 @@ export const channelRoutes: FastifyPluginAsync = async (
       await prisma.channel.delete({
         where: { id: channelId },
       });
+      audit(request, { action: 'channel.delete', actorId: userId, workspaceId: channel.workspaceId, targetType: 'channel', targetId: channelId, metadata: { name: channel.name, type: channel.type } });
 
       if (fastify.io) {
         fastify.io

@@ -38,6 +38,7 @@ import { avatarRoutes } from "./routes/avatar.js";
 import { todoRoutes } from "./routes/todos.js";
 import { registerPushMiddleware } from "./services/pushService.js";
 import { initFileSession } from "./services/fileAccess.js";
+import { pruneAuditLogs } from "./services/audit.js";
 
 import { setupSocketServer } from "./socket/index.js";
 
@@ -220,6 +221,10 @@ async function bootstrap() {
       },
       15 * 60 * 1000,
     );
+
+    // Audit log retention (only when AUDIT_RETENTION_DAYS is set): prune now and once a day.
+    pruneAuditLogs();
+    setInterval(() => void pruneAuditLogs(), 24 * 60 * 60 * 1000);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

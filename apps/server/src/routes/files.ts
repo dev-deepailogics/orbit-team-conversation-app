@@ -4,6 +4,7 @@ import { SOCKET_EVENTS } from '@orbit/types';
 import path from 'path';
 import { storageDriver, classifyFileType, formatBytes } from '../services/storage.js';
 import { verifyChannelAccess } from '../utils/security.js';
+import { audit } from '../services/audit.js';
 import { canReadAttachment, isSharedRecordingFile, resolveRequesterId } from '../services/fileAccess.js';
 
 export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
@@ -115,6 +116,7 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
             },
           },
         });
+        audit(request, { action: 'file.upload', actorId: userId, workspaceId, targetType: 'file', targetId: attachment.id, metadata: { fileName: originalFileName, fileType: mimeType, fileSize: uploadResult.fileSize, channelId: channelId || null } });
         return reply.status(201).send(attachment);
       }
 
@@ -129,6 +131,7 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         },
       });
 
+      audit(request, { action: 'file.upload', actorId: userId, workspaceId, targetType: 'file', metadata: { fileName: originalFileName, fileType: mimeType, fileSize: uploadResult.fileSize, channelId: channelId || null, staged: true } });
       return reply.status(200).send({
         workspaceId,
         channelId: channelId || undefined,
@@ -168,14 +171,23 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     if (!attachment) {
       return reply.status(404).send({ error: 'File not found' });
     }
+    let downloaderId: string | null = null;
     if (!(await isSharedRecordingFile(attachment))) {
       const requesterId = await resolveRequesterId(fastify, request);
       if (!requesterId) {
         return reply.status(401).send({ error: 'Authentication required' });
       }
       if (!(await canReadAttachment(requesterId, attachment))) {
+        audit(request, { action: 'file.download', outcome: 'failure', actorId: requesterId, workspaceId: attachment.workspaceId, targetType: 'file', targetId: attachment.id, metadata: { reason: 'no_access' } });
         return reply.status(403).send({ error: 'You do not have access to this file' });
       }
+      downloaderId = requesterId;
+    }
+
+    // One entry per download: skip the follow-up range requests a video player makes while seeking/buffering.
+    const firstRange = request.headers.range;
+    if (!firstRange || /^bytes=0-/.test(firstRange)) {
+      audit(request, { action: 'file.download', actorId: downloaderId, workspaceId: attachment.workspaceId, targetType: 'file', targetId: attachment.id, metadata: { fileName: attachment.fileName, fileSize: attachment.fileSize, ...(downloaderId ? {} : { anonymous: true }) } });
     }
 
     const fileData = await storageDriver.getFileStream(rawKey);
@@ -311,6 +323,7 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
 
     // 1. Delete from physical storage
     await storageDriver.deleteFile(attachment.fileKey);
+    audit(request, { action: 'file.delete', actorId: userId, workspaceId: attachment.workspaceId, targetType: 'file', targetId: attachment.id, metadata: { fileName: attachment.fileName } });
 
     // 2. Mark deleted in database
     await prisma.attachment.update({

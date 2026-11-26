@@ -3,6 +3,7 @@ import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { prisma } from '@orbit/db';
 import { POLL_LIMITS, SOCKET_EVENTS } from '@orbit/types';
 import { z } from 'zod';
+import { audit } from '../services/audit.js';
 import { quotedMessageInclude, verifyMessageAccess, verifyQuotable, verifyWorkspaceMember } from '../utils/security.js';
 import { handleMessageMentions } from '../services/mentionService.js';
 import { emitPerViewer, getOrCreateAnonProfile, sanitizeMessageForViewer } from '../services/anonymousService.js';
@@ -674,6 +675,8 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       const admin = await prisma.user.findUnique({ where: { id: userId }, select: { displayName: true, username: true } });
       deletedBy = { deletedById: userId, deletedByName: admin?.displayName || admin?.username || 'an admin' };
     }
+
+    audit(request, { action: 'message.delete', actorId: userId, workspaceId: access.channel.workspaceId, targetType: 'message', targetId: messageId, metadata: { channelId: access.channel.id, byAuthor: isAuthor } });
 
     // Soft delete: set isDeleted to true, clear content, and unpin
     const updated = await prisma.message.update({

@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
+import { audit } from '../services/audit.js';
 import { prisma, Prisma } from '@orbit/db';
 import { RECORDING_LIMITS, RecordingViewedEvent, RecordingViewers, SOCKET_EVENTS } from '@orbit/types';
 import { Readable } from 'stream';
@@ -482,6 +483,7 @@ export const recordingRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       callerUser?.systemRole === 'SUPER_ADMIN';
     if (!allowed) return reply.status(403).send({ error: 'You do not have permission to delete this recording' });
 
+    audit(request, { action: 'recording.delete', actorId: userId, workspaceId: recording.workspaceId, targetType: 'recording', targetId: recordingId });
     // Soft-delete first so the clip disappears immediately even if file cleanup is slow or fails.
     await prisma.$transaction([
       prisma.recording.update({ where: { id: recordingId }, data: { isDeleted: true } }),
