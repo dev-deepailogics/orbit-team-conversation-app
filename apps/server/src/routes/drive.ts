@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyPluginAsync } from 'fastify';
+import { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '@orbit/db';
 import {
   getOAuthClient,
@@ -8,10 +8,79 @@ import {
   getGoogleApiErrorMessage,
   GOOGLE_DRIVE_RECONNECT_MESSAGE,
 } from '../services/driveAuth.js';
+import { resolveRequesterId } from '../services/fileAccess.js';
+import { projectAccessError } from './projects.js';
 
 function escapeDriveQueryValue(value: string) {
   return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
+
+// Project media lives in one shared Google Drive, so every route must check that the caller may see the project the
+// folder/file belongs to (same rule as viewing the project itself). Unknown folders/files are refused outright.
+type Reply = FastifyReply;
+
+async function requireProjectAccess(userId: string, projectId: string, reply: Reply): Promise<boolean> {
+  const project = projectId
+    ? await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { workspaceId: true, createdById: true, assignedEmployees: true, selectedManagers: true },
+      })
+    : null;
+  if (!project) {
+    reply.status(404).send({ error: 'Project not found' });
+    return false;
+  }
+  const caller = await prisma.user.findUnique({ where: { id: userId }, select: { systemRole: true } });
+  if (caller?.systemRole === 'SUPER_ADMIN') return true;
+  const denied = await projectAccessError(project, userId);
+  if (denied) {
+    reply.status(denied.status).send({ error: denied.error });
+    return false;
+  }
+  return true;
+}
+
+/** The folder must be one we track, belong to the given project, and the caller must be able to see that project. */
+async function requireFolderInProject(userId: string, folderId: string, projectId: string, reply: Reply): Promise<boolean> {
+  if (!(await requireProjectAccess(userId, projectId, reply))) return false;
+  const folder = await prisma.mediaFolder.findUnique({ where: { folderId }, select: { projectId: true } });
+  if (!folder || folder.projectId !== projectId) {
+    reply.status(403).send({ error: 'That folder does not belong to this project' });
+    return false;
+  }
+  return true;
+}
+
+/** Folder identified only by its Drive id: find its project, then check access. */
+async function requireFolderAccess(userId: string, folderId: string, reply: Reply): Promise<boolean> {
+  const folder = await prisma.mediaFolder.findUnique({ where: { folderId }, select: { projectId: true } });
+  if (!folder) {
+    reply.status(404).send({ error: 'Folder not found' });
+    return false;
+  }
+  return requireProjectAccess(userId, folder.projectId, reply);
+}
+
+/** File identified only by its Drive id: our record first, otherwise the folder it sits in on Drive. */
+async function requireFileAccess(userId: string, fileId: string, drive: any, reply: Reply): Promise<boolean> {
+  const file = await prisma.mediaFile.findUnique({ where: { id: fileId }, select: { projectId: true } });
+  let projectId = file?.projectId ?? null;
+  if (!projectId) {
+    const meta = await drive.files.get({ fileId, fields: 'parents', supportsAllDrives: true }).catch(() => null);
+    const parents: string[] = meta?.data?.parents ?? [];
+    const folder = parents.length
+      ? await prisma.mediaFolder.findFirst({ where: { folderId: { in: parents } }, select: { projectId: true } })
+      : null;
+    projectId = folder?.projectId ?? null;
+  }
+  if (!projectId) {
+    reply.status(404).send({ error: 'File not found' });
+    return false;
+  }
+  return requireProjectAccess(userId, projectId, reply);
+}
+
+const callerId = (request: FastifyRequest) => (request.user as { id: string }).id;
 
 export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   // -------------------------------------------------------------
@@ -117,7 +186,7 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
   });
 
   // GET /api/google/status - Connection status check
-  fastify.get('/google/status', async (request, reply) => {
+  fastify.get('/google/status', { preHandler: [fastify.authenticate] }, async (request, reply) => {
     try {
       const authResult = await getAuthenticatedDrive();
 
@@ -198,6 +267,15 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
 
       if (!Number.isFinite(size) || size <= 0) {
         return reply.status(400).send({ error: 'File size missing' });
+      }
+
+      if (!projectId) {
+        return reply.status(400).send({ error: 'Project ID missing' });
+      }
+      if (requestedFolderId) {
+        if (!(await requireFolderInProject(callerId(request), requestedFolderId, projectId, reply))) return;
+      } else if (!(await requireProjectAccess(callerId(request), projectId, reply))) {
+        return;
       }
 
       const folderId = requestedFolderId || getConfiguredRootFolderIds()[0] || '';
@@ -329,6 +407,8 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
 
       if (!fileId) return reply.status(400).send({ error: 'File ID missing' });
       if (!folderId) return reply.status(400).send({ error: 'Folder ID missing' });
+      if (!projectId) return reply.status(400).send({ error: 'Project ID missing' });
+      if (!(await requireFolderInProject(callerId(request), folderId, projectId, reply))) return;
 
       const authResult = await getAuthenticatedDrive();
       if ('error' in authResult) {
@@ -406,6 +486,11 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
 
       if (!projectId) {
         return reply.status(400).send({ error: 'Project ID missing' });
+      }
+      if (parentId) {
+        if (!(await requireFolderInProject(callerId(request), parentId, projectId, reply))) return;
+      } else if (!(await requireProjectAccess(callerId(request), projectId, reply))) {
+        return;
       }
 
       const authResult = await getAuthenticatedDrive();
@@ -512,6 +597,8 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
 
       if (!name) return reply.status(400).send({ error: 'Folder name is required' });
       if (!parentId) return reply.status(400).send({ error: 'Parent folder ID missing' });
+      if (!projectId) return reply.status(400).send({ error: 'Project ID missing' });
+      if (!(await requireFolderInProject(callerId(request), parentId, projectId, reply))) return;
 
       const authResult = await getAuthenticatedDrive();
       if ('error' in authResult) return reply.status(authResult.status).send({ error: authResult.error });
@@ -563,6 +650,7 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       const name = (body?.name || '').trim().replace(/\s+/g, ' ');
 
       if (!folderId || !name) return reply.status(400).send({ error: 'folderId and name required' });
+      if (!(await requireFolderAccess(callerId(request), folderId, reply))) return;
 
       const authResult = await getAuthenticatedDrive();
       if ('error' in authResult) return reply.status(authResult.status).send({ error: authResult.error });
@@ -593,6 +681,7 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       const folderId = (query?.folderId || '').trim();
 
       if (!folderId) return reply.status(400).send({ error: 'folderId required' });
+      if (!(await requireFolderAccess(callerId(request), folderId, reply))) return;
 
       const authResult = await getAuthenticatedDrive();
       if ('error' in authResult) return reply.status(authResult.status).send({ error: authResult.error });
@@ -625,6 +714,7 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       const folderId = (query?.folderId || '').trim();
 
       if (!folderId) return reply.send({ files: [] });
+      if (!(await requireFolderAccess(callerId(request), folderId, reply))) return;
 
       const authResult = await getAuthenticatedDrive();
       if ('error' in authResult) return reply.status(authResult.status).send({ error: authResult.error });
@@ -682,6 +772,7 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
 
       const authResult = await getAuthenticatedDrive();
       if ('error' in authResult) return reply.status(authResult.status).send({ error: authResult.error });
+      if (!(await requireFileAccess(callerId(request), fileId, authResult.drive, reply))) return;
 
       await authResult.drive.files.update({
         fileId,
@@ -712,6 +803,7 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
 
       const authResult = await getAuthenticatedDrive();
       if ('error' in authResult) return reply.status(authResult.status).send({ error: authResult.error });
+      if (!(await requireFileAccess(callerId(request), fileId, authResult.drive, reply))) return;
 
       await authResult.drive.files.delete({
         fileId,
@@ -743,6 +835,7 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       if ('error' in authResult) return reply.status(authResult.status).send({ error: authResult.error });
 
       const { drive } = authResult;
+      if (!(await requireFileAccess(callerId(request), fileId, drive, reply))) return;
 
       const permsRes = await drive.permissions.list({
         fileId,
@@ -810,8 +903,13 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
 
       if (!fileId) return reply.status(400).send({ error: 'fileId missing' });
 
+      // Media tags can't send a header, so this accepts the signed-in file-session cookie as well as a Bearer token.
+      const requesterId = await resolveRequesterId(fastify, request);
+      if (!requesterId) return reply.status(401).send({ error: 'Authentication required' });
+
       const authResult = await getAuthenticatedDrive();
       if ('error' in authResult) return reply.status(authResult.status).send({ error: authResult.error });
+      if (!(await requireFileAccess(requesterId, fileId, authResult.drive, reply))) return;
 
       const metadata = await authResult.drive.files.get({
         fileId,
@@ -851,6 +949,7 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       const projectId = (query?.projectId || '').trim();
 
       if (!projectId) return reply.status(400).send({ error: 'Project ID missing' });
+      if (!(await requireProjectAccess(callerId(request), projectId, reply))) return;
 
       const files = await prisma.mediaFile.findMany({
         where: { projectId },

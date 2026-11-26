@@ -230,6 +230,23 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
     const userId = (request.user as { id: string }).id;
     const body = request.body as { name?: string };
 
+    // Same rule as bot apps: only workspace Owners/Admins (or a Super Admin) mint credentials that can post as the workspace.
+    const access = await verifyWorkspaceMember(userId, workspaceId, reply);
+    if (!access) return;
+    const isWsAdmin =
+      access.isSuperAdmin ||
+      access.workspaceMember?.role === 'OWNER' ||
+      access.workspaceMember?.role === 'ADMIN';
+    if (!isWsAdmin) {
+      return reply.status(403).send({ error: 'Only workspace administrators can create incoming webhooks' });
+    }
+
+    // The channel must exist in this workspace (the URL's workspace and channel were never cross-checked before).
+    const channel = await prisma.channel.findFirst({ where: { id: channelId, workspaceId }, select: { id: true } });
+    if (!channel) {
+      return reply.status(404).send({ error: 'Channel not found in this workspace' });
+    }
+
     const webhook = await prisma.webhook.create({
       data: {
         workspaceId,

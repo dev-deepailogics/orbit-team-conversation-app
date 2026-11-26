@@ -187,7 +187,7 @@ const recentTicketOrder: Array<
 > = [{ orderIndex: "desc" }, { createdAt: "desc" }, { id: "desc" }];
 
 // Returns the error to send, or null when the user may view the project.
-async function projectAccessError(
+export async function projectAccessError(
   project: {
     workspaceId: string;
     createdById: string;

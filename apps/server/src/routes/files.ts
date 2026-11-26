@@ -2,9 +2,9 @@ import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { prisma } from '@orbit/db';
 import { SOCKET_EVENTS } from '@orbit/types';
 import path from 'path';
-import fs from 'fs';
 import { storageDriver, classifyFileType, formatBytes } from '../services/storage.js';
 import { verifyChannelAccess } from '../utils/security.js';
+import { canReadAttachment, isSharedRecordingFile, resolveRequesterId } from '../services/fileAccess.js';
 
 export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   // 1. Upload File with rich metadata
@@ -164,13 +164,27 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       },
     });
 
+    // Only files we have a record of are served, and only to people allowed to see them.
+    if (!attachment) {
+      return reply.status(404).send({ error: 'File not found' });
+    }
+    if (!(await isSharedRecordingFile(attachment))) {
+      const requesterId = await resolveRequesterId(fastify, request);
+      if (!requesterId) {
+        return reply.status(401).send({ error: 'Authentication required' });
+      }
+      if (!(await canReadAttachment(requesterId, attachment))) {
+        return reply.status(403).send({ error: 'You do not have access to this file' });
+      }
+    }
+
     const fileData = await storageDriver.getFileStream(rawKey);
     if (!fileData) {
       return reply.status(404).send({ error: 'File not found on storage server' });
     }
 
-    const mimeType = attachment?.fileType || 'application/octet-stream';
-    const originalName = attachment?.fileName || fileData.fileName || 'file';
+    const mimeType = attachment.fileType || 'application/octet-stream';
+    const originalName = attachment.fileName || fileData.fileName || 'file';
 
     const dispositionType = downloadQuery ? 'attachment' : 'inline';
     // Clean ASCII fallback for `filename="..."` (HTTP headers forbid non-ASCII characters such as Unicode narrow no-break space U+8239 from macOS screenshots)
@@ -183,7 +197,8 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       'Content-Disposition',
       `${dispositionType}; filename="${asciiSafeName}"; filename*=UTF-8''${encodedName}`
     );
-    reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+    // Private: shared caches and CDNs must not serve a protected file to someone who never authenticated.
+    reply.header('Cache-Control', 'private, max-age=31536000, immutable');
 
     // Handle HTTP Range requests (crucial for video playback like MP4, WebM, MOV in browsers)
     const rangeHeader = request.headers.range;
@@ -223,39 +238,39 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     return reply.send(fileData.stream);
   });
 
-  // Legacy route support for /api/files/:filename
+  // Legacy route support for /api/files/:filename. Same rules as the main download route: only recorded files, only
+  // for people allowed to see them. (Loose files on disk with no database record are no longer served.)
   fastify.get('/:filename', async (request, reply) => {
     const { filename } = request.params as { filename: string };
-    const uploadDir = process.env.UPLOAD_DIR || path.resolve(process.cwd(), 'uploads');
     const safeFilename = path.basename(filename);
-    const directPath = path.resolve(uploadDir, safeFilename);
 
-    if (!directPath.startsWith(uploadDir)) {
-      return reply.status(403).send({ error: 'Access denied' });
-    }
-
-    if (fs.existsSync(directPath)) {
-      const stream = fs.createReadStream(directPath);
-      return reply.send(stream);
-    }
-
-    // Try finding by fileKey ending with safeFilename
     const attachment = await prisma.attachment.findFirst({
       where: {
         fileKey: { endsWith: safeFilename },
         isDeleted: false,
       },
     });
+    if (!attachment) {
+      return reply.status(404).send({ error: 'File not found' });
+    }
 
-    if (attachment) {
-      const fileData = await storageDriver.getFileStream(attachment.fileKey);
-      if (fileData) {
-        reply.header('Content-Type', attachment.fileType);
-        return reply.send(fileData.stream);
+    if (!(await isSharedRecordingFile(attachment))) {
+      const requesterId = await resolveRequesterId(fastify, request);
+      if (!requesterId) {
+        return reply.status(401).send({ error: 'Authentication required' });
+      }
+      if (!(await canReadAttachment(requesterId, attachment))) {
+        return reply.status(403).send({ error: 'You do not have access to this file' });
       }
     }
 
-    return reply.status(404).send({ error: 'File not found' });
+    const fileData = await storageDriver.getFileStream(attachment.fileKey);
+    if (!fileData) {
+      return reply.status(404).send({ error: 'File not found' });
+    }
+    reply.header('Content-Type', attachment.fileType);
+    reply.header('Cache-Control', 'private, max-age=31536000, immutable');
+    return reply.send(fileData.stream);
   });
 
   // 3. Delete File from server & database

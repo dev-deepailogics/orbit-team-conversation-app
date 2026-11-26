@@ -37,6 +37,7 @@ import { documentRoutes } from "./routes/documents.js";
 import { avatarRoutes } from "./routes/avatar.js";
 import { todoRoutes } from "./routes/todos.js";
 import { registerPushMiddleware } from "./services/pushService.js";
+import { initFileSession } from "./services/fileAccess.js";
 
 import { setupSocketServer } from "./socket/index.js";
 
@@ -83,6 +84,7 @@ function resolveJwtSecret(): string {
 }
 
 const JWT_SECRET = resolveJwtSecret();
+initFileSession(JWT_SECRET);
 const REDIS_URL =
   process.env.REDIS_URL || "redis://:orbit_redis_password@localhost:6379";
 

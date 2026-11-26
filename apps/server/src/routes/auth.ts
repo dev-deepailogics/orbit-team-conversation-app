@@ -4,6 +4,7 @@ import { prisma } from '@orbit/db';
 import { z } from 'zod';
 import { randomBytes } from 'crypto';
 import { isDemoEmail } from '../services/demoWorkspace.js';
+import { clearFileSessionCookie, fileSessionCookie } from '../services/fileAccess.js';
 import { ACCESS_TOKEN_TTL, issueRefreshToken, revokeAllForUser, revokeByToken, rotateRefreshToken } from '../services/tokens.js';
 import {
   createAuthorizeRequest,
@@ -150,6 +151,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       },
     });
 
+    reply.header('set-cookie', fileSessionCookie(user.id));
     return reply.status(201).send({ ...(await startSession(user)), user: publicUser(user) });
   });
 
@@ -194,6 +196,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       }
     }
 
+    reply.header('set-cookie', fileSessionCookie(user.id));
     return reply.send({ ...(await startSession(user)), user: publicUser(user) });
   });
 
@@ -276,6 +279,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     if (user.disabled) return reply.redirect(loginError('account_deactivated'));
 
     const session = await startSession(user, 'microsoft');
+    reply.header('set-cookie', fileSessionCookie(user.id));
     // URL fragment: never sent to any server or logged; the login page stores it and strips it.
     return reply.redirect(
       `${clientUrl()}/login#token=${encodeURIComponent(session.accessToken)}&refreshToken=${encodeURIComponent(session.refreshToken)}`,
@@ -297,6 +301,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       return reply.status(403).send({ error: 'Account is deactivated' });
     }
 
+    reply.header('set-cookie', fileSessionCookie(user.id));
     return reply.send({
       accessToken: signAccessToken(user, rotated.provider),
       refreshToken: rotated.refreshToken,
@@ -308,6 +313,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
   fastify.post('/logout', async (request, reply) => {
     const parsed = refreshSchema.safeParse(request.body);
     if (parsed.success) await revokeByToken(parsed.data.refreshToken).catch(() => {});
+    reply.header('set-cookie', clearFileSessionCookie());
     return reply.send({ success: true });
   });
 
@@ -372,6 +378,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     // Sign out every other device, then hand this one a fresh session.
     await revokeAllForUser(id);
     const fresh = await prisma.user.findUniqueOrThrow({ where: { id } });
+    reply.header('set-cookie', fileSessionCookie(fresh.id));
     return reply.send({ success: true, ...(await startSession(fresh)) });
   });
 };

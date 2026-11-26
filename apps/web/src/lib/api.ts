@@ -8,6 +8,9 @@ export const TOKEN_REFRESHED_EVENT = 'orbit:token-refreshed';
 
 export const api = axios.create({
   baseURL: SERVER_URL,
+  // Lets the browser keep the HttpOnly file-session cookie the API sets at sign-in (needed when the API is on another
+  // port in development). Files and images are only served to signed-in users with access.
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
