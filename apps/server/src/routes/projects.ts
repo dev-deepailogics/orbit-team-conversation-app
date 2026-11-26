@@ -1506,6 +1506,7 @@ export const projectRoutes: FastifyPluginAsync = async (
             color: true,
           },
         },
+        attachment: { select: { id: true, fileName: true, fileUrl: true, fileType: true, fileSize: true } },
       },
     });
 

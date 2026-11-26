@@ -8,6 +8,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { NotionEditor } from './NotionEditor';
 import { ShareDocumentModal } from './ShareDocumentModal';
 import { NewDocumentModal } from './NewDocumentModal';
+import { UploadedDocViewer } from './UploadedDocViewer';
 import { Avatar, relativeTime } from './projectViewUtils';
 import {
   AvatarStack,
@@ -334,6 +335,28 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
         .map((s) => ({ id: s.userId, name: s.user!.displayName, avatarUrl: s.user!.avatarUrl })),
     ];
 
+    const pageHeader = (
+      <div className="flex flex-col gap-3.5">
+        {docCover && <div className="h-28 rounded-[10px]" style={{ background: docCover }} />}
+        {docIcon !== '📄' && <span className="text-[34px] leading-none">{docIcon}</span>}
+        <input
+          type="text"
+          value={docTitle}
+          onChange={(e) => handleTitleChange(e.target.value)}
+          placeholder="Untitled Document"
+          aria-label="Document title"
+          className="w-full text-[30px] leading-[38px] font-bold bg-transparent outline-none placeholder:text-[var(--theme-text-muted)] placeholder:opacity-60"
+          style={{ color: 'var(--theme-text)' }}
+        />
+        <p className="text-[13px]" style={{ color: 'var(--theme-text-muted)' }}>
+          Created by {currentDocument.creator?.displayName || 'Team member'} ·{' '}
+          {editedLabel(currentDocument.updatedAt)}
+          {project && ` · ${project.name} board`}
+        </p>
+        <div className="h-1.5" />
+      </div>
+    );
+
     return (
       <div className="flex-1 flex flex-col h-full overflow-hidden" style={{ backgroundColor: 'var(--theme-bg-surface)' }}>
         <div
@@ -471,33 +494,18 @@ export const ProjectDocsView: React.FC<ProjectDocsViewProps> = ({
           </Popover>
         </div>
 
-        <NotionEditor
-          variant="page"
-          value={docContent}
-          onChange={handleContentChange}
-          placeholder="Type '/' for blocks, headings, tables, pictures, checklists..."
-          pageHeader={
-            <div className="flex flex-col gap-3.5">
-              {docCover && <div className="h-28 rounded-[10px]" style={{ background: docCover }} />}
-              {docIcon !== '📄' && <span className="text-[34px] leading-none">{docIcon}</span>}
-              <input
-                type="text"
-                value={docTitle}
-                onChange={(e) => handleTitleChange(e.target.value)}
-                placeholder="Untitled Document"
-                aria-label="Document title"
-                className="w-full text-[30px] leading-[38px] font-bold bg-transparent outline-none placeholder:text-[var(--theme-text-muted)] placeholder:opacity-60"
-                style={{ color: 'var(--theme-text)' }}
-              />
-              <p className="text-[13px]" style={{ color: 'var(--theme-text-muted)' }}>
-                Created by {currentDocument.creator?.displayName || 'Team member'} ·{' '}
-                {editedLabel(currentDocument.updatedAt)}
-                {project && ` · ${project.name} board`}
-              </p>
-              <div className="h-1.5" />
-            </div>
-          }
-        />
+        {currentDocument.attachment ? (
+          // Uploaded PDF / Word file: show the file instead of the text editor
+          <UploadedDocViewer file={currentDocument.attachment} header={pageHeader} />
+        ) : (
+          <NotionEditor
+            variant="page"
+            value={docContent}
+            onChange={handleContentChange}
+            placeholder="Type '/' for blocks, headings, tables, pictures, checklists..."
+            pageHeader={pageHeader}
+          />
+        )}
 
         <ShareDocumentModal
           document={currentDocument}

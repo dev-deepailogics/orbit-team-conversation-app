@@ -576,6 +576,17 @@ export interface ProjectDocument {
   creator?: UserProfile;
   shares?: ProjectDocumentShare[];
   project?: Project;
+  /** Set when the doc is an uploaded PDF / Word file instead of typed text. */
+  attachmentId?: string | null;
+  attachment?: ProjectDocumentFile | null;
+}
+
+export interface ProjectDocumentFile {
+  id: string;
+  fileName: string;
+  fileUrl: string;
+  fileType: string;
+  fileSize: number;
 }
 
 // ==========================================

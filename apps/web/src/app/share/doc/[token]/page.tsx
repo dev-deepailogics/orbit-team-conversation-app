@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import axios from 'axios';
 import { FileText, Lock, CheckCircle2 } from '@/components/ui/icons';
 import { NotionEditor } from '../../../../components/project/NotionEditor';
+import { UploadedDocViewer } from '../../../../components/project/UploadedDocViewer';
 
 export default function PublicDocumentSharePage() {
   const params = useParams();
@@ -81,6 +82,19 @@ export default function PublicDocumentSharePage() {
     );
   }
 
+  const pageHeader = (
+    <div className="flex flex-col gap-3.5">
+      {document.coverImage && <div className="h-28 rounded-[10px]" style={{ background: document.coverImage }} />}
+      {document.icon && document.icon !== '📄' && <span className="text-[34px] leading-none">{document.icon}</span>}
+      <h1 className="text-[30px] leading-[38px] font-bold">{document.title || 'Untitled Document'}</h1>
+      <p className="text-[13px]" style={{ color: 'var(--theme-text-muted)' }}>
+        By {document.creator?.displayName || 'Orbit user'} · Last updated{' '}
+        {new Date(document.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+      </p>
+      <div className="h-1.5" />
+    </div>
+  );
+
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--theme-bg-surface)', color: 'var(--theme-text)' }}>
       <header
@@ -111,24 +125,17 @@ export default function PublicDocumentSharePage() {
         </span>
       </header>
 
-      <NotionEditor
-        variant="page"
-        readOnly
-        value={document.content || ''}
-        onChange={() => {}}
-        pageHeader={
-          <div className="flex flex-col gap-3.5">
-            {document.coverImage && <div className="h-28 rounded-[10px]" style={{ background: document.coverImage }} />}
-            {document.icon && document.icon !== '📄' && <span className="text-[34px] leading-none">{document.icon}</span>}
-            <h1 className="text-[30px] leading-[38px] font-bold">{document.title || 'Untitled Document'}</h1>
-            <p className="text-[13px]" style={{ color: 'var(--theme-text-muted)' }}>
-              By {document.creator?.displayName || 'Orbit user'} · Last updated{' '}
-              {new Date(document.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-            </p>
-            <div className="h-1.5" />
-          </div>
-        }
-      />
+      {document.attachment ? (
+        <UploadedDocViewer file={document.attachment} header={pageHeader} />
+      ) : (
+        <NotionEditor
+          variant="page"
+          readOnly
+          value={document.content || ''}
+          onChange={() => {}}
+          pageHeader={pageHeader}
+        />
+      )}
 
       <footer
         className="py-5 text-center text-xs border-t"
