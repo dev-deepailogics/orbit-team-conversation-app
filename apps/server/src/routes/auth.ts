@@ -33,6 +33,11 @@ const readCookie = (header: string | undefined, name: string) =>
     .find((c) => c.startsWith(`${name}=`))
     ?.slice(name.length + 1);
 
+// Production switch: when true, only enterprise single sign-on (Microsoft Entra ID) is accepted; email/password sign-in and
+// self-registration are refused. Off by default so local and demo setups keep working.
+const localAuthDisabled = () => process.env.DISABLE_LOCAL_AUTH === 'true';
+const LOCAL_AUTH_DISABLED_MESSAGE = 'Password sign-in is disabled. Sign in with your organisation account.';
+
 const clientUrl = () => process.env.CLIENT_URL || 'http://localhost:3000';
 // The web login page maps these codes to friendly messages.
 const loginError = (code: string) => `${clientUrl()}/login?error=${code}`;
@@ -118,6 +123,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
 
   // Register
   fastify.post('/register', async (request, reply) => {
+    if (localAuthDisabled()) return reply.status(403).send({ error: LOCAL_AUTH_DISABLED_MESSAGE });
     const parseResult = registerSchema.safeParse(request.body);
     if (!parseResult.success) {
       return reply.status(400).send({ error: parseResult.error.errors[0].message });
@@ -157,6 +163,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
 
   // Login
   fastify.post('/login', async (request, reply) => {
+    if (localAuthDisabled()) return reply.status(403).send({ error: LOCAL_AUTH_DISABLED_MESSAGE });
     const parseResult = loginSchema.safeParse(request.body);
     if (!parseResult.success) {
       return reply.status(400).send({ error: parseResult.error.errors[0].message });
