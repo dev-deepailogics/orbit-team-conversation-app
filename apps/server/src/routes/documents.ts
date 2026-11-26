@@ -3,16 +3,38 @@ import { prisma } from "@orbit/db";
 import { SOCKET_EVENTS } from "@orbit/types";
 import { z } from "zod";
 import { verifyWorkspaceMember } from "../utils/security.js";
+import { storageDriver } from "../services/storage.js";
 
 const userIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
 
 // Docs are workspace-level. A doc may optionally be linked to a project (projectId), nothing more.
+// A doc is either typed in the editor (content) or an uploaded PDF / Word file (attachmentId).
 
 const userSelect = { id: true, username: true, displayName: true, avatarUrl: true } as const;
 const DOC_INCLUDE = {
   creator: { select: userSelect },
   shares: { include: { user: { select: userSelect } } },
+  attachment: { select: { id: true, fileName: true, fileUrl: true, fileType: true, fileSize: true } },
 } as const;
+
+// Files that can be uploaded as a doc, by extension, with the MIME type the file is served with.
+const UPLOADABLE_DOC_TYPES: Record<string, string> = {
+  ".pdf": "application/pdf",
+  ".doc": "application/msword",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+};
+
+const uploadFieldsSchema = z.object({
+  workspaceId: z.string({ required_error: "workspaceId is required" }).min(1),
+  projectId: z.string().min(1).optional().nullable(),
+  title: z.string().trim().min(1).max(255).optional(),
+  isPublicInProject: z.boolean().default(false),
+});
+
+const fileExtension = (fileName: string) => {
+  const dot = fileName.lastIndexOf(".");
+  return dot === -1 ? "" : fileName.slice(dot).toLowerCase();
+};
 
 const createDocumentSchema = z.object({
   workspaceId: z.string().min(1),
@@ -110,6 +132,93 @@ export async function documentRoutes(fastify: FastifyInstance) {
     return reply.status(201).send(doc);
   });
 
+  // Upload a PDF / Word file as a doc (multipart). Send the workspaceId/projectId/title fields BEFORE the file.
+  fastify.post("/upload", { preHandler: [fastify.authenticate] }, async (request, reply) => {
+    const userId = (request.user as { id: string }).id;
+
+    let file;
+    try {
+      file = await request.file();
+    } catch {
+      return reply.status(400).send({ error: "Invalid upload" });
+    }
+    if (!file) return reply.status(400).send({ error: "No file provided" });
+
+    const fieldValue = (name: string) => {
+      const field = (file.fields as Record<string, any>)[name];
+      return field && typeof field === "object" && "value" in field ? field.value || undefined : undefined;
+    };
+    const parsed = uploadFieldsSchema.safeParse({
+      workspaceId: fieldValue("workspaceId"),
+      projectId: fieldValue("projectId"),
+      title: fieldValue("title"),
+      isPublicInProject: fieldValue("isPublicInProject") === "true",
+    });
+    if (!parsed.success) {
+      file.file.resume(); // drain the stream so the request can finish
+      return reply.status(400).send({ error: parsed.error.errors[0].message });
+    }
+    const { workspaceId, projectId, isPublicInProject } = parsed.data;
+
+    const fileName = file.filename || "document";
+    const mimeType = UPLOADABLE_DOC_TYPES[fileExtension(fileName)];
+    if (!mimeType) {
+      file.file.resume();
+      return reply.status(400).send({ error: "Only PDF and Word (.doc, .docx) files can be uploaded" });
+    }
+
+    if (!(await verifyWorkspaceMember(userId, workspaceId, reply))) {
+      file.file.resume();
+      return;
+    }
+    if (!(await checkProject(workspaceId, projectId, reply))) {
+      file.file.resume();
+      return;
+    }
+
+    let uploaded;
+    try {
+      uploaded = await storageDriver.uploadFile({ stream: file.file, fileName, mimeType, workspaceId });
+    } catch (err: any) {
+      if (err?.code === "FST_REQ_FILE_TOO_LARGE") {
+        return reply.status(413).send({ error: "File is too large (max 50 MB)" });
+      }
+      fastify.log.error(err, "Failed to upload document file");
+      return reply.status(500).send({ error: "Failed to upload file" });
+    }
+
+    const title = parsed.data.title || fileName.replace(/\.[^.]+$/, "") || "Untitled Document";
+    const doc = await prisma.$transaction(async (tx) => {
+      const attachment = await tx.attachment.create({
+        data: {
+          workspaceId,
+          uploaderId: userId,
+          fileName,
+          fileKey: uploaded.fileKey,
+          fileUrl: uploaded.fileUrl,
+          fileType: mimeType,
+          fileSize: uploaded.fileSize,
+          storageProvider: uploaded.storageProvider,
+        },
+      });
+      return tx.projectDocument.create({
+        data: {
+          workspaceId,
+          projectId: projectId || null,
+          title: title.slice(0, 255),
+          content: "",
+          icon: mimeType === "application/pdf" ? "📕" : "📘",
+          isPublicInProject,
+          createdById: userId,
+          attachmentId: attachment.id,
+        },
+        include: DOC_INCLUDE,
+      });
+    });
+    emit(workspaceId, SOCKET_EVENTS.DOCUMENT_NEW, doc);
+    return reply.status(201).send(doc);
+  });
+
   fastify.get("/:documentId", { preHandler: [fastify.authenticate] }, async (request, reply) => {
     const userId = (request.user as { id: string }).id;
     const { documentId } = request.params as { documentId: string };
@@ -164,6 +273,15 @@ export async function documentRoutes(fastify: FastifyInstance) {
       return reply.status(403).send({ error: "Only the creator or workspace admin can delete this document" });
     }
     await prisma.projectDocument.delete({ where: { id: documentId } });
+    // An uploaded doc owns its file: remove the attachment and the stored file with it.
+    if (doc.attachmentId) {
+      const attachment = await prisma.attachment.update({
+        where: { id: doc.attachmentId },
+        data: { isDeleted: true },
+        select: { fileKey: true },
+      });
+      storageDriver.deleteFile(attachment.fileKey).catch(() => {});
+    }
     emit(doc.workspaceId, SOCKET_EVENTS.DOCUMENT_DELETE, { documentId, workspaceId: doc.workspaceId });
     return { success: true, message: "Document deleted" };
   });

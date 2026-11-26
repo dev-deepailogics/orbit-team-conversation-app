@@ -314,6 +314,7 @@ model Attachment {
   message         Message?  @relation(fields: [messageId], references: [id], onDelete: Cascade)
   uploader        User?     @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
   recording       Recording?
+  documents       ProjectDocument[]
 
   @@index([workspaceId, isDeleted])
   @@index([channelId, isDeleted])
@@ -639,7 +640,8 @@ model ProjectDocument {
   projectId           String?                // optional link; docs are workspace-level
   workspaceId         String
   title               String                 @default("Untitled")
-  content             String                 @db.Text
+  content             String                 @default("") @db.Text // empty for uploaded files
+  attachmentId        String?                // set when the doc is an uploaded file (PDF / Word)
   icon                String?                @default("📄")
   coverImage          String?
   isPublicInProject   Boolean                @default(false)
@@ -651,6 +653,7 @@ model ProjectDocument {
 
   project             Project?               @relation(fields: [projectId], references: [id], onDelete: SetNull)
   workspace           Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  attachment          Attachment?            @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
   creator             User                   @relation("DocumentCreator", fields: [createdById], references: [id], onDelete: Cascade)
   shares              ProjectDocumentShare[]
 
@@ -658,6 +661,7 @@ model ProjectDocument {
   @@index([workspaceId])
   @@index([createdById])
   @@index([shareToken])
+  @@index([attachmentId])
 }
 
 model ProjectDocumentShare {

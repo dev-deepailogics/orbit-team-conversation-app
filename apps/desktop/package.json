@@ -1,0 +1,54 @@
+{
+  "name": "@orbit/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/main.js",
+  "description": "Orbit Desktop application powered by Electron",
+  "author": "Orbit Team",
+  "scripts": {
+    "build:main": "tsc -p tsconfig.json",
+    "dev": "npm run build:main && electron dist/main.js",
+    "start": "npm run build:main && electron dist/main.js",
+    "package": "node scripts/build-mac.js",
+    "build:mac": "node scripts/build-mac.js",
+    "build:linux": "node scripts/build-linux.js",
+    "build:win": "node scripts/build-win.js"
+  },
+  "dependencies": {
+    "electron-serve": "^2.1.1",
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "@types/node": "^22.8.1",
+    "electron": "33.4.11",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.6.3"
+  },
+  "build": {
+    "appId": "chat.orbit.desktop",
+    "productName": "Orbit",
+    "electronVersion": "33.4.11",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "resources/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "resources/icon.icns",
+      "target": ["dmg", "zip"]
+    },
+    "win": {
+      "target": ["nsis", "portable"],
+      "icon": "resources/icon.ico"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Office",
+      "icon": "resources/icon.png"
+    }
+  }
+}

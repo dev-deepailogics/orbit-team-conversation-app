@@ -1025,6 +1025,8 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                   label="Assignee"
                   value={filterAssignee}
                   onChange={setFilterAssignee}
+                  searchable
+                  searchPlaceholder="Search people…"
                   options={[
                     { value: "ALL", label: "Anyone" },
                     { value: "ME", label: "Assigned to me" },

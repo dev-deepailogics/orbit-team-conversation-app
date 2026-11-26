@@ -1,6 +1,6 @@
 import React from "react";
 import { Project, ProjectColumn, Ticket, TicketPriority, UserProfile, WorkspaceMember } from "@orbit/types";
-import { PriorityUp, PriorityMedium, PriorityDown, AlertTriangle, ChevronDown, Check } from "@/components/ui/icons";
+import { PriorityUp, PriorityMedium, PriorityDown, AlertTriangle, ChevronDown, Check, Search } from "@/components/ui/icons";
 
 // Statuses are user-defined board columns, so their role is inferred from the column name.
 export type ColumnKind = "done" | "review" | "progress" | "todo";
@@ -281,11 +281,18 @@ export const FilterMenu: React.FC<{
   icon?: React.ReactNode;
   // Always show the selected option without the "filter active" tint (e.g. a date range)
   plain?: boolean;
-}> = ({ label, value, options, onChange, icon, plain }) => {
+  // Show a search box at the top of the menu (useful for long lists such as people)
+  searchable?: boolean;
+  searchPlaceholder?: string;
+}> = ({ label, value, options, onChange, icon, plain, searchable, searchPlaceholder }) => {
   const [open, setOpen] = React.useState(false);
+  const [query, setQuery] = React.useState("");
   const ref = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setQuery("");
+      return;
+    }
     const close = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
@@ -294,6 +301,12 @@ export const FilterMenu: React.FC<{
   }, [open]);
   const selected = options.find((o) => o.value === value);
   const isSet = value !== "ALL";
+  const q = query.trim().toLowerCase();
+  const visibleOptions = q ? options.filter((o) => o.label.toLowerCase().includes(q)) : options;
+  const choose = (v: string) => {
+    onChange(v);
+    setOpen(false);
+  };
   return (
     <div ref={ref} className="relative shrink-0">
       <ToolbarPill onClick={() => setOpen((v) => !v)} active={isSet && !plain}>
@@ -303,17 +316,49 @@ export const FilterMenu: React.FC<{
       </ToolbarPill>
       {open && (
         <div
-          className="absolute right-0 top-full mt-1.5 z-50 w-52 max-h-72 overflow-y-auto rounded-xl border p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-100"
+          className={`absolute right-0 top-full mt-1.5 z-50 ${searchable ? "w-60" : "w-52"} max-h-72 overflow-y-auto rounded-xl border p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-100`}
           style={{ backgroundColor: "var(--theme-bg-app)", borderColor: "var(--theme-border)" }}
         >
-          {options.map((o) => (
+          {searchable && (
+            <div
+              className="sticky -top-1.5 -mx-1.5 -mt-1.5 mb-1 p-1.5 border-b z-10"
+              style={{ backgroundColor: "var(--theme-bg-app)", borderColor: "var(--theme-border)" }}
+            >
+              <div
+                className="h-8 px-2.5 rounded-lg flex items-center gap-2 border"
+                style={{ borderColor: "var(--theme-border)", backgroundColor: "var(--theme-bg-surface)" }}
+              >
+                <Search size={13} style={{ color: "var(--theme-text-muted)" }} />
+                <input
+                  autoFocus
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && visibleOptions[0]) {
+                      e.preventDefault();
+                      choose(visibleOptions[0].value);
+                    } else if (e.key === "Escape") {
+                      setOpen(false);
+                    }
+                  }}
+                  placeholder={searchPlaceholder || "Search…"}
+                  aria-label={searchPlaceholder || `Search ${label.toLowerCase()}`}
+                  className="flex-1 min-w-0 bg-transparent outline-none text-[13px] placeholder:text-[var(--theme-text-muted)]"
+                  style={{ color: "var(--theme-text)" }}
+                />
+              </div>
+            </div>
+          )}
+          {visibleOptions.length === 0 && (
+            <p className="px-2.5 py-2 text-[13px]" style={{ color: "var(--theme-text-muted)" }}>
+              No matches
+            </p>
+          )}
+          {visibleOptions.map((o) => (
             <button
               type="button"
               key={o.value}
-              onClick={() => {
-                onChange(o.value);
-                setOpen(false);
-              }}
+              onClick={() => choose(o.value)}
               className="w-full h-8 px-2.5 rounded-lg flex items-center justify-between gap-2 text-[13px] text-left transition hover:bg-[var(--theme-fill-hover)]"
               style={{ color: "var(--theme-text)" }}
             >

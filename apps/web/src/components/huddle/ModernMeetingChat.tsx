@@ -122,7 +122,7 @@ export const ModernMeetingChat: React.FC<{
   };
 
   return (
-    <div className="w-80 sm:w-96 h-full bg-[#111418]/95 border-l border-white/[0.08] backdrop-blur-2xl flex flex-col z-30 shadow-2xl animate-fade-in select-none">
+    <div className="absolute inset-0 w-full md:static md:w-96 md:shrink-0 h-full bg-[#111418]/95 border-l border-white/[0.08] backdrop-blur-2xl flex flex-col z-30 shadow-2xl animate-fade-in select-none">
       {/* 1. Header with Meeting Chat Title & Total Participants */}
       <div className="h-16 px-5 border-b border-white/[0.08] flex items-center justify-between shrink-0 bg-white/[0.02]">
         <div className="flex items-center gap-2.5">
