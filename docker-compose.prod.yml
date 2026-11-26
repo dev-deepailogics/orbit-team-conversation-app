@@ -60,6 +60,9 @@ services:
       UPLOAD_DIR: /data/uploads
     volumes:
       - orbit_uploads:/data/uploads
+    networks:
+      - default
+      - backend
     depends_on:
       postgres:
         condition: service_healthy
@@ -76,6 +79,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-orbit_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
     healthcheck:
       test:
         [
@@ -93,6 +98,8 @@ services:
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
     volumes:
       - redis_data:/data
+    networks:
+      - backend
     healthcheck:
       test:
         [
@@ -118,6 +125,9 @@ services:
     ports:
       - "7881:7881"
       - "40000-40050:40000-40050/udp"
+    networks:
+      - default
+      - backend
     depends_on:
       - redis
     labels:
@@ -131,6 +141,14 @@ services:
       - traefik.http.middlewares.orbit-livekit-strip.stripprefix.prefixes=/livekit
       - traefik.http.routers.orbit-livekit.middlewares=orbit-livekit-strip
       - traefik.http.services.orbit-livekit.loadbalancer.server.port=7880
+
+# Network segmentation:
+#   default  - the proxy-facing network: web, server and livekit (the only services reachable from outside).
+#   backend  - internal data network with no outside route: postgres and redis live here only, so the web
+#              container has no path to the database or cache. Only server and livekit are attached to both.
+networks:
+  backend:
+    internal: true
 
 volumes:
   postgres_data:
