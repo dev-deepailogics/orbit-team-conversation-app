@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, ipcMain, Notification } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, Notification, session, desktopCapturer } from 'electron';
 import * as path from 'path';
 
 // Explicitly set the application name so macOS Dock, Menu Bar, and taskbar show "Orbit"
@@ -89,7 +89,34 @@ ipcMain.on('orbit:badge', (_event, count: number) => {
   }
 });
 
+/**
+ * Screen sharing: Chrome shows its own "choose what to share" dialog for
+ * navigator.mediaDevices.getDisplayMedia(), but Electron has none, so without
+ * this handler every screen-share request from a call is rejected.
+ * macOS 15+ shows the native system picker; elsewhere we share the primary screen.
+ */
+function setupScreenShare() {
+  session.defaultSession.setDisplayMediaRequestHandler(
+    (_request, callback) => {
+      desktopCapturer
+        .getSources({ types: ['screen', 'window'] })
+        .then((sources) => {
+          const screen = sources.find((s) => s.id.startsWith('screen:')) ?? sources[0];
+          if (!screen) {
+            callback({});
+            return;
+          }
+          // Windows can also capture system audio along with the screen.
+          callback(process.platform === 'win32' ? { video: screen, audio: 'loopback' } : { video: screen });
+        })
+        .catch(() => callback({}));
+    },
+    { useSystemPicker: true },
+  );
+}
+
 app.whenReady().then(() => {
+  setupScreenShare();
   createWindow();
 
   app.on('activate', () => {
