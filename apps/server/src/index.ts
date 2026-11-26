@@ -4,6 +4,8 @@ import Fastify, {
   FastifyReply,
 } from "fastify";
 import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
+import rateLimit from "@fastify/rate-limit";
 import jwt from "@fastify/jwt";
 import multipart from "@fastify/multipart";
 import { Server as SocketIOServer } from "socket.io";
@@ -38,7 +40,7 @@ import { avatarRoutes } from "./routes/avatar.js";
 import { todoRoutes } from "./routes/todos.js";
 import { registerPushMiddleware } from "./services/pushService.js";
 import { initFileSession } from "./services/fileAccess.js";
-import { pruneAuditLogs } from "./services/audit.js";
+import { audit, pruneAuditLogs } from "./services/audit.js";
 
 import { setupSocketServer } from "./socket/index.js";
 
@@ -86,21 +88,101 @@ function resolveJwtSecret(): string {
 
 const JWT_SECRET = resolveJwtSecret();
 initFileSession(JWT_SECRET);
-const REDIS_URL =
-  process.env.REDIS_URL || "redis://:orbit_redis_password@localhost:6379";
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+
+// No default Redis credentials in production: the URL must be supplied. The local-development default matches
+// docker-compose.yml and is never used when NODE_ENV=production.
+function resolveRedisUrl(): string {
+  const url = process.env.REDIS_URL?.trim();
+  if (url) return url;
+  if (IS_PRODUCTION) throw new Error("REDIS_URL is required in production.");
+  return "redis://:orbit_redis_password@localhost:6379";
+}
+const REDIS_URL = resolveRedisUrl();
+
+// Browsers may call the API only from the configured web origin(s). Production requires CLIENT_URL (plus any extra
+// origins in CORS_ORIGINS, comma separated). Native apps and server-to-server calls send no Origin and are unaffected.
+// Development stays open so localhost setups just work.
+function resolveAllowedOrigins(): true | string[] {
+  if (!IS_PRODUCTION) return true;
+  const origins = [process.env.CLIENT_URL, ...(process.env.CORS_ORIGINS || "").split(",")]
+    .map((o) => o?.trim().replace(/\/+$/, ""))
+    .filter((o): o is string => !!o);
+  if (origins.length === 0) throw new Error("CLIENT_URL is required in production (CORS allow-list).");
+  return origins;
+}
+const ALLOWED_ORIGINS = resolveAllowedOrigins();
+
+// Behind a reverse proxy / load balancer the client address comes from X-Forwarded-For. TRUST_PROXY: "true", "false",
+// a hop count, or a comma-separated list of proxy addresses/CIDRs. Defaults to true in production (the app is never
+// exposed directly there); rate limiting and audit entries depend on this to see the real client address.
+function resolveTrustProxy(): boolean | number | string | string[] {
+  const raw = process.env.TRUST_PROXY?.trim();
+  if (!raw) return IS_PRODUCTION;
+  if (raw === "true") return true;
+  if (raw === "false") return false;
+  if (/^\d+$/.test(raw)) return parseInt(raw, 10);
+  return raw.includes(",") ? raw.split(",").map((x) => x.trim()) : raw;
+}
+
+const intFromEnv = (name: string, fallback: number) => {
+  const n = parseInt(process.env[name] || "", 10);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+};
 
 async function bootstrap() {
   const fastify: FastifyInstance = Fastify({
     logger: {
       level: process.env.NODE_ENV === "production" ? "info" : "debug",
     },
+    trustProxy: resolveTrustProxy(),
   });
 
   // CORS
   await fastify.register(cors, {
-    origin: true,
+    origin: ALLOWED_ORIGINS,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  });
+
+  // Security headers (nosniff, frame protection, HSTS, referrer policy). The API serves JSON and user files, not HTML
+  // pages, so a page-level CSP is left to the web app; files must stay embeddable by the web app on another origin.
+  await fastify.register(helmet, {
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginEmbedderPolicy: false,
+  });
+
+  // Rate limiting per client address (shared across instances through Redis). Sensitive routes (sign-in, registration,
+  // token refresh, password change, webhook/bot posting) set tighter limits in their own route options.
+  const limiterRedis = new Redis(REDIS_URL, { connectTimeout: 500, maxRetriesPerRequest: 1, enableOfflineQueue: false });
+  limiterRedis.on("error", () => {}); // a Redis outage must not take the API down: limiting is skipped (skipOnError)
+  const lastRateLimitAudit = new Map<string, number>();
+  await fastify.register(rateLimit, {
+    global: true,
+    max: intFromEnv("RATE_LIMIT_MAX", 1200),
+    timeWindow: "1 minute",
+    redis: limiterRedis,
+    nameSpace: "orbit-rl:",
+    skipOnError: true,
+    allowList: (req) => req.url === "/api/health" || req.url.startsWith("/socket.io"),
+    errorResponseBuilder: (_req, context) => ({
+      statusCode: 429,
+      error: "Too many requests. Please wait a moment and try again.",
+      retryAfterSeconds: Math.ceil(context.ttl / 1000),
+    }),
+    onExceeded: (req, key) => {
+      // Only sign-in related abuse is audited, and at most once a minute per client, so a flood of rejected requests
+      // can't also flood the audit table.
+      if (!req.url.startsWith("/api/auth")) return;
+      const now = Date.now();
+      if (now - (lastRateLimitAudit.get(key) ?? 0) < 60_000) return;
+      lastRateLimitAudit.set(key, now);
+      if (lastRateLimitAudit.size > 5000) {
+        for (const [k, t] of lastRateLimitAudit) if (now - t > 60_000) lastRateLimitAudit.delete(k);
+      }
+      audit(req, { action: "security.rate_limited", outcome: "failure", metadata: { route: req.routeOptions?.url } });
+    },
   });
 
   // JWT
@@ -152,7 +234,7 @@ async function bootstrap() {
   // Socket.IO Setup with Redis Adapter
   const io = new SocketIOServer(fastify.server, {
     cors: {
-      origin: "*",
+      origin: ALLOWED_ORIGINS,
       methods: ["GET", "POST"],
     },
     transports: ["websocket", "polling"],

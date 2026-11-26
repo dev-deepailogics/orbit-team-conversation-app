@@ -1,0 +1,10 @@
+**/node_modules
+**/.next
+**/dist
+.git
+apps/mobile
+apps/server/uploads
+*.png
+.env
+.env.*
+!.env.example

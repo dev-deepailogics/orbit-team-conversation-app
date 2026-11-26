@@ -1,7 +1,14 @@
 import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
 
-const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || 'API_KEY_ORBIT';
-const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || 'orbit_livekit_secret_key_change_in_production';
+// No default credentials in production. The development fallbacks match docker/livekit.yaml and docker-compose.yml.
+const requireInProduction = (name: string, devFallback: string) => {
+  const value = process.env[name]?.trim();
+  if (value) return value;
+  if (process.env.NODE_ENV === 'production') throw new Error(`${name} is required in production.`);
+  return devFallback;
+};
+const LIVEKIT_API_KEY = requireInProduction('LIVEKIT_API_KEY', 'API_KEY_ORBIT');
+const LIVEKIT_API_SECRET = requireInProduction('LIVEKIT_API_SECRET', 'orbit_livekit_secret_key_change_in_production');
 const LIVEKIT_URL = process.env.LIVEKIT_URL || 'http://localhost:7880';
 
 export class LiveKitService {

@@ -145,7 +145,7 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
   });
 
   // Bot API: chat.postMessage (Slack-compatible Bearer Token authentication)
-  fastify.post('/chat.postMessage', async (request, reply) => {
+  fastify.post('/chat.postMessage', { config: { rateLimit: { max: 300, timeWindow: '1 minute' } } }, async (request, reply) => {
     const authHeader = request.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return reply.status(401).send({ ok: false, error: 'invalid_auth' });
@@ -270,7 +270,7 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
   });
 
   // Trigger Incoming Webhook (Public POST)
-  fastify.post('/webhooks/:token', async (request, reply) => {
+  fastify.post('/webhooks/:token', { config: { rateLimit: { max: 300, timeWindow: '1 minute' } } }, async (request, reply) => {
     const { token } = request.params as { token: string };
     const parseResult = incomingWebhookSchema.safeParse(request.body);
 

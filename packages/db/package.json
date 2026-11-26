@@ -7,7 +7,7 @@
     "build": "tsc",
     "generate": "prisma generate",
     "migrate:dev": "prisma migrate dev",
-    "push": "prisma db push",
+    "push": "prisma db push --skip-generate",
     "studio": "prisma studio",
     "seed": "ts-node src/seed.ts"
   },

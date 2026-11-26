@@ -1,4 +1,4 @@
-FROM node:22-alpine AS builder
+FROM node:22.22-alpine3.24 AS builder
 
 WORKDIR /app
 
@@ -25,12 +25,14 @@ ENV NODE_ENV=production
 RUN npm run build --workspace=@orbit/types
 RUN npm run build --workspace=@orbit/web
 
-FROM node:22-alpine AS runner
+FROM node:22.22-alpine3.24 AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-COPY --from=builder /app ./
+# Runs as the unprivileged "node" user; Next.js writes its runtime cache under .next
+COPY --from=builder --chown=node:node /app ./
+USER node
 
 EXPOSE 3000
 CMD ["npm", "run", "start", "--workspace=@orbit/web"]

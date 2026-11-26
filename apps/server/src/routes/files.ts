@@ -198,7 +198,10 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     const mimeType = attachment.fileType || 'application/octet-stream';
     const originalName = attachment.fileName || fileData.fileName || 'file';
 
-    const dispositionType = downloadQuery ? 'attachment' : 'inline';
+    // Active content (HTML, SVG, XML, scripts) is never shown inline: served from our own origin it could run script
+    // with the signed-in user's access. Browsers download it instead; images, video, audio, PDF and text still preview.
+    const isActiveContent = /^(text\/html|application\/xhtml\+xml|image\/svg\+xml|text\/xml|application\/xml|text\/javascript|application\/javascript)\b/i.test(mimeType);
+    const dispositionType = downloadQuery || isActiveContent ? 'attachment' : 'inline';
     // Clean ASCII fallback for `filename="..."` (HTTP headers forbid non-ASCII characters such as Unicode narrow no-break space U+8239 from macOS screenshots)
     const asciiSafeName = originalName.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '');
     const encodedName = encodeURIComponent(originalName);

@@ -34,6 +34,9 @@ const readCookie = (header: string | undefined, name: string) =>
     .find((c) => c.startsWith(`${name}=`))
     ?.slice(name.length + 1);
 
+// Per-client limits (per minute) on the routes attackers hit: password guessing, mass registration, token churn.
+const AUTH_LIMIT = (max: number) => ({ config: { rateLimit: { max, timeWindow: '1 minute' } } });
+
 // Production switch: when true, only enterprise single sign-on (Microsoft Entra ID) is accepted; email/password sign-in and
 // self-registration are refused. Off by default so local and demo setups keep working.
 const localAuthDisabled = () => process.env.DISABLE_LOCAL_AUTH === 'true';
@@ -123,7 +126,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
   });
 
   // Register
-  fastify.post('/register', async (request, reply) => {
+  fastify.post('/register', AUTH_LIMIT(5), async (request, reply) => {
     if (localAuthDisabled()) return reply.status(403).send({ error: LOCAL_AUTH_DISABLED_MESSAGE });
     const parseResult = registerSchema.safeParse(request.body);
     if (!parseResult.success) {
@@ -164,7 +167,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
   });
 
   // Login
-  fastify.post('/login', async (request, reply) => {
+  fastify.post('/login', AUTH_LIMIT(10), async (request, reply) => {
     if (localAuthDisabled()) return reply.status(403).send({ error: LOCAL_AUTH_DISABLED_MESSAGE });
     const parseResult = loginSchema.safeParse(request.body);
     if (!parseResult.success) {
@@ -308,7 +311,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
   });
 
   // Swap a refresh token for a new access token + rotated refresh token.
-  fastify.post('/refresh', async (request, reply) => {
+  fastify.post('/refresh', AUTH_LIMIT(60), async (request, reply) => {
     const parsed = refreshSchema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: 'refreshToken is required' });
 
@@ -373,7 +376,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
   });
 
   // Change own password. Not available to provider (Microsoft) sessions, accounts without a password, or demo accounts.
-  fastify.post('/me/password', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+  fastify.post('/me/password', { preHandler: [fastify.authenticate], ...AUTH_LIMIT(5) }, async (request, reply) => {
     const { id, provider } = request.user as SessionUser;
     if (provider) {
       return reply.status(403).send({ error: 'Your password is managed by your sign-in provider' });
