@@ -4,6 +4,7 @@ import {
   canUserAccessCanvas,
   canUserAccessChannel,
   verifyWorkspaceMember,
+  visibleChannelsWhere,
 } from '../utils/security.js';
 
 // List payload omits the (potentially large) drawing data.
@@ -76,11 +77,7 @@ export async function canvasRoutes(fastify: FastifyInstance) {
         ...(projectId && { projectId }),
         // Hide canvases linked to private channels / DMs the user isn't in
         ...(!access.isSuperAdmin && {
-          OR: [
-            { channelId: null },
-            { channel: { type: 'PUBLIC' } },
-            { channel: { members: { some: { userId } } } },
-          ],
+          OR: [{ channelId: null }, { channel: visibleChannelsWhere(userId) }],
         }),
       },
       select: LIST_SELECT,

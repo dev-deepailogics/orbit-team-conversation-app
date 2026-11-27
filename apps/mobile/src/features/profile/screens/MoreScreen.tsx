@@ -35,7 +35,7 @@ export function MoreScreen({ navigation }: TabScreenProps<'More'>) {
 
   if (!user) return null;
   const isSuperAdmin = user.systemRole === 'SUPER_ADMIN';
-  const canCreateWorkspace = isSuperAdmin || user.systemRole === 'WORKSPACE_ADMIN';
+  const canCreateWorkspace = isSuperAdmin;
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>

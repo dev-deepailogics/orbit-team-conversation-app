@@ -48,7 +48,6 @@ enum NotificationType {
 
 enum SystemRole {
   SUPER_ADMIN
-  WORKSPACE_ADMIN
   USER
 }
 

@@ -1,10 +1,35 @@
 import { prisma } from '@orbit/db';
+import type { Server } from 'socket.io';
 import { hasWorkspacePermission, WorkspacePermission, WorkspaceRole } from '@orbit/types';
 
 export { hasWorkspacePermission };
 
 /** Socket room for members allowed to see full availability records of a workspace. */
 export const availabilityViewersRoom = (workspaceId: string) => `workspace:${workspaceId}:availability`;
+
+/** Socket room holding a workspace's GUEST sockets, so public-channel broadcasts can skip them. */
+export const workspaceGuestsRoom = (workspaceId: string) => `workspace:${workspaceId}:guests`;
+
+/**
+ * Broadcast a public channel's event: the whole workspace room except guests, then the guests who are in the channel.
+ * Guests only ever hear channels they've been added to.
+ */
+export async function emitToPublicChannel(
+  io: Server,
+  channel: { id: string; workspaceId: string },
+  event: string,
+  payload: unknown,
+) {
+  io.to(`workspace:${channel.workspaceId}`).except(workspaceGuestsRoom(channel.workspaceId)).emit(event, payload);
+  const guests = await prisma.channelMember.findMany({
+    where: {
+      channelId: channel.id,
+      user: { memberships: { some: { workspaceId: channel.workspaceId, role: 'GUEST' } } },
+    },
+    select: { userId: true },
+  });
+  if (guests.length) io.to(guests.map((g) => `user:${g.userId}`)).emit(event, payload);
+}
 
 export interface WorkspaceAccess {
   /** null when the caller is not a member (they may still be a SUPER_ADMIN). */

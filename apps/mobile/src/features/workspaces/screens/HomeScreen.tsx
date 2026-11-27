@@ -37,9 +37,7 @@ export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
   const me = useAuthStore(s => s.user);
   const myId = me?.id;
   const canCreateWorkspace = useAuthStore(
-    s =>
-      s.user?.systemRole === 'SUPER_ADMIN' ||
-      s.user?.systemRole === 'WORKSPACE_ADMIN',
+    s => s.user?.systemRole === 'SUPER_ADMIN',
   );
   const current = useWorkspaceStore(s => s.current);
   const unread = useWorkspaceStore(s => s.unread);

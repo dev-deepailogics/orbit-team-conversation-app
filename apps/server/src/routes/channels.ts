@@ -3,6 +3,7 @@ import { prisma } from "@orbit/db";
 import { SOCKET_EVENTS } from "@orbit/types";
 import { z } from "zod";
 import { audit } from "../services/audit.js";
+import { emitToPublicChannel, workspaceGuestsRoom } from "../services/permissions.js";
 import { applyAttachments, prepareAttachments } from "../services/attachments.js";
 import {
   ACTIVITY_CHANNEL,
@@ -85,12 +86,12 @@ export const channelRoutes: FastifyPluginAsync = async (
 ) => {
   // Sends a channel object to a room. Anonymous channels are sent per viewer so the roster carries no personas
   // while each person still keeps their own membership fields.
-  const emitChannel = async (room: string, event: string, channel: any) => {
+  const emitChannel = async (room: string, event: string, channel: any, except?: string) => {
     if (!fastify.io) return;
     if (channel?.isAnonymous) {
-      await emitPerViewer(fastify.io as any, room, event, (viewerId) => sanitizeChannelForViewer(channel, viewerId));
+      await emitPerViewer(fastify.io as any, room, event, (viewerId) => sanitizeChannelForViewer(channel, viewerId), except);
     } else {
-      fastify.io.to(room).emit(event, channel);
+      (except ? fastify.io.to(room).except(except) : fastify.io.to(room)).emit(event, channel);
     }
   };
 
@@ -146,7 +147,7 @@ export const channelRoutes: FastifyPluginAsync = async (
 
       const initialPersona = isAnonymous ? generateRandomPersona() : null;
 
-      // Public channels include every current workspace member by default;
+      // Public channels include every current workspace member (except guests) by default;
       // new members are auto-joined to them later (see workspace member-add route).
       const memberIds =
         type === "PUBLIC"
@@ -155,7 +156,7 @@ export const channelRoutes: FastifyPluginAsync = async (
                 userId,
                 ...(
                   await prisma.workspaceMember.findMany({
-                    where: { workspaceId },
+                    where: { workspaceId, role: { not: "GUEST" } },
                     select: { userId: true },
                   })
                 ).map((m) => m.userId),
@@ -203,7 +204,8 @@ export const channelRoutes: FastifyPluginAsync = async (
 
       if (fastify.io) {
         if (type === "PUBLIC") {
-          await emitChannel(`workspace:${workspaceId}`, SOCKET_EVENTS.CHANNEL_NEW, channel);
+          // Guests aren't auto-joined to public channels, so they don't hear about new ones
+          await emitChannel(`workspace:${workspaceId}`, SOCKET_EVENTS.CHANNEL_NEW, channel, workspaceGuestsRoom(workspaceId));
         } else {
           fastify.io
             .to(`user:${userId}`)
@@ -420,9 +422,12 @@ export const channelRoutes: FastifyPluginAsync = async (
       WHERE ch."workspaceId" = ${workspaceId}
         -- Outsiders get nothing, not even public channels' timestamps
         AND EXISTS (SELECT 1 FROM "WorkspaceMember" wm WHERE wm."workspaceId" = ${workspaceId} AND wm."userId" = ${userId})
-        AND (ch.type = 'PUBLIC' OR EXISTS (
+        -- Channels they're in, plus public ones unless they're a guest
+        AND (EXISTS (
           SELECT 1 FROM "ChannelMember" cm WHERE cm."channelId" = ch.id AND cm."userId" = ${userId}
-        ))`;
+        ) OR (ch.type = 'PUBLIC' AND NOT EXISTS (
+          SELECT 1 FROM "WorkspaceMember" g WHERE g."workspaceId" = ${workspaceId} AND g."userId" = ${userId} AND g.role = 'GUEST'
+        )))`;
       return Object.fromEntries(rows.map((r) => [r.channelId, r.at.getTime()]));
     },
   );
@@ -1013,9 +1018,7 @@ export const channelRoutes: FastifyPluginAsync = async (
             .to(`user:${userId}`)
             .emit(SOCKET_EVENTS.MESSAGE_NEW, selfPayload);
         } else if (channel.type === "PUBLIC") {
-          fastify.io
-            .to(`workspace:${channel.workspaceId}`)
-            .emit(SOCKET_EVENTS.MESSAGE_NEW, broadcastPayload);
+          await emitToPublicChannel(fastify.io, channel, SOCKET_EVENTS.MESSAGE_NEW, broadcastPayload);
         } else {
           // Members of this private / direct channel only. One emit to all the rooms, so a socket that is in several
           // (its user room and the open channel's room) still gets the message once, not once per room

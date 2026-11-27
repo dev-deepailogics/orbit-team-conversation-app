@@ -15,7 +15,7 @@ import {
 } from "../services/demoWorkspace.js";
 
 const updateRoleSchema = z.object({
-  systemRole: z.enum(["SUPER_ADMIN", "WORKSPACE_ADMIN", "USER"]),
+  systemRole: z.enum(["SUPER_ADMIN", "USER"]),
 });
 
 const resetPasswordSchema = z.object({
@@ -394,14 +394,6 @@ export const adminRoutes: FastifyPluginAsync = async (
         return reply
           .status(404)
           .send({ error: `Owner user "${ownerEmailOrId}" not found` });
-      }
-
-      // Promote owner to WORKSPACE_ADMIN if they are a regular USER
-      if (owner.systemRole === "USER") {
-        await prisma.user.update({
-          where: { id: owner.id },
-          data: { systemRole: "WORKSPACE_ADMIN" },
-        });
       }
 
       const workspace = await prisma.workspace.create({

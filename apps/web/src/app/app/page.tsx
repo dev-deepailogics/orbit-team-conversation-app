@@ -1568,29 +1568,6 @@ export default function AppDashboard() {
                   </button>
                 </div>
               </>
-            ) : user?.systemRole === "WORKSPACE_ADMIN" ? (
-              <>
-                <div className="w-16 h-16 rounded-2xl bg-slack-activeChannel/20 border border-slack-activeChannel/40 flex items-center justify-center mb-6 shadow-xl text-slack-activeChannel">
-                  <Building2 size={36} />
-                </div>
-                <h1 className="text-2xl font-bold text-[var(--theme-text)] mb-2">
-                  Welcome, {user?.displayName || "Admin"}!
-                </h1>
-                <p className="text-sm text-[var(--theme-text-muted)] mb-6 leading-relaxed">
-                  You have been designated as a Company Administrator. Create
-                  your organization workspace to start adding channels and
-                  inviting your team members.
-                </p>
-                <div className="w-full mb-6">
-                  <button
-                    onClick={() => setShowCreateWsModal(true)}
-                    className="w-full px-5 py-3 bg-slack-green hover:bg-[#008a65] text-white text-sm font-semibold rounded-xl shadow-lg flex items-center justify-center gap-2 transition"
-                  >
-                    <Plus size={18} />
-                    Create Company Workspace
-                  </button>
-                </div>
-              </>
             ) : (
               <>
                 <div className="w-16 h-16 rounded-2xl bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] flex items-center justify-center mb-6 shadow-xl text-[var(--theme-text-muted)]">

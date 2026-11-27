@@ -241,8 +241,8 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           <EmployeeAvailabilityHeader currentUserId={currentUser?.id} />
         )}
 
-        {/* Add Workspace (Super Admin and Workspace Admins) */}
-        {(currentUser?.systemRole === 'SUPER_ADMIN' || currentUser?.systemRole === 'WORKSPACE_ADMIN') && (
+        {/* Add Workspace (Super Admin only) */}
+        {currentUser?.systemRole === 'SUPER_ADMIN' && (
           <button
             onClick={() => setShowCreateModal(true)}
             title="Create a Workspace"

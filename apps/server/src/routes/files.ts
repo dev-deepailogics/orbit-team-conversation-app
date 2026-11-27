@@ -3,7 +3,7 @@ import { prisma } from '@orbit/db';
 import { SOCKET_EVENTS } from '@orbit/types';
 import path from 'path';
 import { storageDriver, classifyFileType, formatBytes } from '../services/storage.js';
-import { verifyChannelAccess } from '../utils/security.js';
+import { verifyChannelAccess, visibleChannelsWhere } from '../utils/security.js';
 import { audit } from '../services/audit.js';
 import { canReadAttachment, canReadUntrackedFile, isSharedRecordingKey, resolveRequesterId } from '../services/fileAccess.js';
 
@@ -407,7 +407,7 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         isDeleted: false,
         // Files sent in messages, in channels this member can see (not private channels they are not in, not unsent uploads)
         messageId: { not: null },
-        OR: [{ channelId: null }, { channel: { type: 'PUBLIC' } }, { channel: { members: { some: { userId } } } }],
+        OR: [{ channelId: null }, { channel: visibleChannelsWhere(userId) }],
       },
       include: {
         uploader: {

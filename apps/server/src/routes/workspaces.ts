@@ -5,8 +5,9 @@ import { prisma } from '@orbit/db';
 import { z } from 'zod';
 import { ACTIVITY_CHANNEL, ACTIVITY_CHANNEL_TOPIC, sendSystemNotification } from '../services/systemBot.js';
 import { isForeignDemoUser } from '../services/demoWorkspace.js';
-import { availabilityViewersRoom, getWorkspaceAccess, hasWorkspacePermission } from '../services/permissions.js';
+import { availabilityViewersRoom, getWorkspaceAccess, hasWorkspacePermission, workspaceGuestsRoom } from '../services/permissions.js';
 import { ASSIGNABLE_WORKSPACE_ROLES } from '@orbit/types';
+import { visibleChannelsWhere } from '../utils/security.js';
 
 const createWorkspaceSchema = z.object({
   name: z.string().min(2).max(50),
@@ -58,9 +59,9 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       select: { systemRole: true },
     });
 
-    if (caller?.systemRole !== 'SUPER_ADMIN' && caller?.systemRole !== 'WORKSPACE_ADMIN') {
+    if (caller?.systemRole !== 'SUPER_ADMIN') {
       return reply.status(403).send({
-        error: 'Only workspace administrators or super admins can create workspaces. Please contact the administrator.',
+        error: 'Only super admins can create workspaces. Please contact the administrator.',
       });
     }
 
@@ -174,12 +175,7 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       where: { id: workspaceId },
       include: {
         channels: {
-          where: {
-            OR: [
-              { type: 'PUBLIC' },
-              { members: { some: { userId } } },
-            ],
-          },
+          where: visibleChannelsWhere(userId),
           include: {
             members: {
               include: {
@@ -303,12 +299,12 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       },
     });
 
-    // Auto-join public channels
+    // Auto-join public channels (guests only get the channels they're explicitly added to)
     const publicChannels = await prisma.channel.findMany({
       where: { workspaceId, type: 'PUBLIC' },
     });
 
-    for (const ch of publicChannels) {
+    for (const ch of role === 'GUEST' ? [] : publicChannels) {
       await prisma.channelMember.upsert({
         where: { channelId_userId: { channelId: ch.id, userId: targetUser.id } },
         create: { channelId: ch.id, userId: targetUser.id },
@@ -372,6 +368,13 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       return reply.status(400).send({ error: "The workspace owner's role can't be changed" });
     }
 
+    // Demoted to guest: drop the public channels they were auto-joined to; an admin re-adds the ones they should keep.
+    if (role === 'GUEST' && target.role !== 'GUEST') {
+      await prisma.channelMember.deleteMany({
+        where: { userId: memberUserId, channel: { workspaceId, type: 'PUBLIC' } },
+      });
+    }
+
     const member = await prisma.workspaceMember.update({
       where: { id: target.id },
       data: { role },
@@ -385,6 +388,8 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       const sockets = fastify.io.in(`user:${memberUserId}`);
       if (hasWorkspacePermission(role, 'viewTeamAvailability')) sockets.socketsJoin(room);
       else sockets.socketsLeave(room);
+      if (role === 'GUEST') sockets.socketsJoin(workspaceGuestsRoom(workspaceId));
+      else sockets.socketsLeave(workspaceGuestsRoom(workspaceId));
       fastify.io.to(`workspace:${workspaceId}`).emit('workspace:member_role_updated', {
         workspaceId,
         userId: memberUserId,

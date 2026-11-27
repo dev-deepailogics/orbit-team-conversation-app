@@ -1,5 +1,6 @@
 import { prisma } from '@orbit/db';
 import { SOCKET_EVENTS } from '@orbit/types';
+import { emitToPublicChannel, workspaceGuestsRoom } from './permissions.js';
 
 export async function getOrCreateSystemBot(workspaceId: string) {
   let bot = await prisma.botApp.findFirst({
@@ -47,7 +48,7 @@ export async function sendSystemNotification({
   try {
     const channel = await prisma.channel.findUnique({
       where: { id: channelId },
-      select: { isAnonymous: true },
+      select: { isAnonymous: true, type: true, members: { select: { userId: true } } },
     });
     if (channel?.isAnonymous) {
       // Do not post bot notifications into anonymous channels to preserve privacy
@@ -95,9 +96,13 @@ export async function sendSystemNotification({
       workspaceId,
     };
 
-    if (io) {
-      io.to(`channel:${channelId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
-      io.to(`workspace:${workspaceId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+    if (io && channel) {
+      if (channel.type === 'PUBLIC') {
+        await emitToPublicChannel(io, { id: channelId, workspaceId }, SOCKET_EVENTS.MESSAGE_NEW, payload);
+      } else {
+        // Private channels / DMs: members only (this used to go to the whole workspace)
+        io.to([...channel.members.map((m) => `user:${m.userId}`), `channel:${channelId}`]).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+      }
     }
 
     return payload;
@@ -122,7 +127,7 @@ export async function getOrCreateActivityChannel(workspaceId: string, io?: any) 
 
   const ws = await prisma.workspace.findUnique({
     where: { id: workspaceId },
-    select: { ownerId: true, members: { select: { userId: true } } },
+    select: { ownerId: true, members: { where: { role: { not: 'GUEST' } }, select: { userId: true } } },
   });
   if (!ws) return null;
 
@@ -136,7 +141,7 @@ export async function getOrCreateActivityChannel(workspaceId: string, io?: any) 
       members: { create: ws.members.map((m) => ({ userId: m.userId })) },
     },
   });
-  io?.to(`workspace:${workspaceId}`).emit(SOCKET_EVENTS.CHANNEL_NEW, channel);
+  io?.to(`workspace:${workspaceId}`).except(workspaceGuestsRoom(workspaceId)).emit(SOCKET_EVENTS.CHANNEL_NEW, channel);
   return channel;
 }
 

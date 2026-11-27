@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { z } from 'zod';
 import { verifyWorkspaceMember } from '../utils/security.js';
 import { audit } from '../services/audit.js';
+import { emitToPublicChannel } from '../services/permissions.js';
 
 // Our own uploads only (same rule as profile pictures). No avatar = the client shows the Orbit logo.
 const botAvatarUrlSchema = z
@@ -217,7 +218,7 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
 
     if (fastify.io) {
       if (channel.type === 'PUBLIC') {
-        fastify.io.to(`workspace:${channel.workspaceId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+        await emitToPublicChannel(fastify.io, channel, SOCKET_EVENTS.MESSAGE_NEW, payload);
       } else {
         for (const m of channel.members) {
           fastify.io.to(`user:${m.userId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
@@ -320,7 +321,7 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
 
     if (fastify.io) {
       if (webhook.channel.type === 'PUBLIC') {
-        fastify.io.to(`workspace:${webhook.channel.workspaceId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+        await emitToPublicChannel(fastify.io, webhook.channel, SOCKET_EVENTS.MESSAGE_NEW, payload);
       } else {
         for (const m of webhook.channel.members) {
           fastify.io.to(`user:${m.userId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
@@ -372,7 +373,7 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
 
       if (fastify.io) {
         if (channel.type === 'PUBLIC') {
-          fastify.io.to(`workspace:${channel.workspaceId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+          await emitToPublicChannel(fastify.io, channel, SOCKET_EVENTS.MESSAGE_NEW, payload);
         } else {
           for (const m of channel.members) {
             fastify.io.to(`user:${m.userId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
@@ -401,7 +402,7 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
 
       if (fastify.io) {
         if (channel.type === 'PUBLIC') {
-          fastify.io.to(`workspace:${channel.workspaceId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+          await emitToPublicChannel(fastify.io, channel, SOCKET_EVENTS.MESSAGE_NEW, payload);
         } else {
           for (const m of channel.members) {
             fastify.io.to(`user:${m.userId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
@@ -472,7 +473,7 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
 
       if (fastify.io) {
         if (channel.type === 'PUBLIC') {
-          fastify.io.to(`workspace:${channel.workspaceId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+          await emitToPublicChannel(fastify.io, channel, SOCKET_EVENTS.MESSAGE_NEW, payload);
         } else {
           for (const m of channel.members) {
             fastify.io.to(`user:${m.userId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);

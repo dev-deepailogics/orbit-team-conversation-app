@@ -51,7 +51,7 @@ interface AdminUser {
   username: string;
   displayName: string;
   avatarUrl: string | null;
-  systemRole: 'SUPER_ADMIN' | 'WORKSPACE_ADMIN' | 'USER';
+  systemRole: 'SUPER_ADMIN' | 'USER';
   status: string;
   disabled?: boolean;
   createdAt: string;
@@ -104,7 +104,7 @@ export default function AdminDashboardPage() {
 
   // Modals
   const [selectedUserForRole, setSelectedUserForRole] = useState<AdminUser | null>(null);
-  const [newRole, setNewRole] = useState<'SUPER_ADMIN' | 'WORKSPACE_ADMIN' | 'USER'>('USER');
+  const [newRole, setNewRole] = useState<'SUPER_ADMIN' | 'USER'>('USER');
   const [isUpdatingRole, setIsUpdatingRole] = useState(false);
 
   const [selectedUserForPassword, setSelectedUserForPassword] = useState<AdminUser | null>(null);
@@ -512,7 +512,7 @@ export default function AdminDashboardPage() {
 
               {/* Role Filter Pills */}
               <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto">
-                {['ALL', 'SUPER_ADMIN', 'WORKSPACE_ADMIN', 'USER'].map((r) => (
+                {['ALL', 'SUPER_ADMIN', 'USER'].map((r) => (
                   <button
                     key={r}
                     onClick={() => setRoleFilter(r)}
@@ -552,7 +552,6 @@ export default function AdminDashboardPage() {
                   ) : (
                     filteredUsers.map((u) => {
                       const isSuper = u.systemRole === 'SUPER_ADMIN';
-                      const isWsAdmin = u.systemRole === 'WORKSPACE_ADMIN';
 
                       return (
                         <tr key={u.id} className="hover:bg-white/[0.02] transition">
@@ -573,8 +572,6 @@ export default function AdminDashboardPage() {
                               className={`px-2 py-0.5 rounded-full font-mono text-[10px] font-bold uppercase inline-block border ${
                                 isSuper
                                   ? 'bg-purple-900/30 text-purple-300 border-purple-500/50'
-                                  : isWsAdmin
-                                  ? 'bg-blue-900/30 text-blue-300 border-blue-500/50'
                                   : 'bg-gray-800 text-gray-300 border-gray-700'
                               }`}
                             >
@@ -847,30 +844,7 @@ export default function AdminDashboardPage() {
                   <div>
                     <span className="text-xs font-bold text-white block">Standard User</span>
                     <span className="text-[11px] text-gray-400 leading-tight">
-                      Cannot create workspaces. Can only join workspaces when added by an admin.
-                    </span>
-                  </div>
-                </label>
-
-                <label
-                  onClick={() => setNewRole('WORKSPACE_ADMIN')}
-                  className={`p-3 rounded-xl border flex items-start gap-3 cursor-pointer transition ${
-                    newRole === 'WORKSPACE_ADMIN'
-                      ? 'bg-blue-900/20 border-blue-500 text-white'
-                      : 'bg-[#222529] border-gray-700/80 text-gray-400 hover:text-gray-200'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="role"
-                    checked={newRole === 'WORKSPACE_ADMIN'}
-                    onChange={() => setNewRole('WORKSPACE_ADMIN')}
-                    className="mt-0.5"
-                  />
-                  <div>
-                    <span className="text-xs font-bold text-white block">Workspace Admin / CEO</span>
-                    <span className="text-[11px] text-gray-400 leading-tight">
-                      Authorized to create company workspaces and invite members.
+                      Cannot create workspaces. Workspace roles (Owner, Admin, Member, Guest...) are set per workspace.
                     </span>
                   </div>
                 </label>

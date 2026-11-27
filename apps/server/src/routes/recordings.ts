@@ -1,10 +1,11 @@
 import { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { audit } from '../services/audit.js';
+import { emitToPublicChannel } from '../services/permissions.js';
 import { prisma, Prisma } from '@orbit/db';
 import { RECORDING_LIMITS, RecordingViewedEvent, RecordingViewers, SOCKET_EVENTS } from '@orbit/types';
 import { Readable } from 'stream';
 import { storageDriver } from '../services/storage.js';
-import { verifyWorkspaceMember, verifyChannelAccess, canUserAccessChannel } from '../utils/security.js';
+import { verifyWorkspaceMember, verifyChannelAccess, canUserAccessChannel, visibleChannelsWhere } from '../utils/security.js';
 
 const RECORDING_INCLUDE = {
   attachment: true,
@@ -50,13 +51,9 @@ async function optionalUserId(request: FastifyRequest): Promise<string | null> {
   }
 }
 
-/** A recording is visible to a user if it is workspace-wide, in a public channel, or in a channel they belong to. */
+/** A recording is visible to a user if it is workspace-wide or in a channel they can see. */
 const visibleTo = (userId: string): Prisma.RecordingWhereInput => ({
-  OR: [
-    { channelId: null },
-    { channel: { type: 'PUBLIC' } },
-    { channel: { members: { some: { userId } } } },
-  ],
+  OR: [{ channelId: null }, { channel: visibleChannelsWhere(userId) }],
 });
 
 const baseMimeType = (mime?: string | null) => (mime || '').split(';')[0].trim().toLowerCase();
@@ -71,8 +68,12 @@ export const recordingRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
   const broadcast = (event: string, recording: RecordingWithChannel) => {
     if (!fastify.io) return;
     if (recording.channelId) fastify.io.to(`channel:${recording.channelId}`).emit(event, recording);
-    if (!recording.channel || recording.channel.type === 'PUBLIC') {
+    if (!recording.channelId) {
       fastify.io.to(`workspace:${recording.workspaceId}`).emit(event, recording);
+    } else if (recording.channel?.type === 'PUBLIC') {
+      emitToPublicChannel(fastify.io, { id: recording.channelId, workspaceId: recording.workspaceId }, event, recording).catch(
+        (err) => fastify.log.error(err, 'recording broadcast failed'),
+      );
     }
   };
 
