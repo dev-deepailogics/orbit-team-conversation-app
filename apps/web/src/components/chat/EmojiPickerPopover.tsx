@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import EmojiPicker, { Theme, EmojiClickData, EmojiStyle } from 'emoji-picker-react';
 import { Search, Sparkles, X, Grid } from '@/components/ui/icons';
 import { getTopEmojis, recordEmojiUsage, POPULAR_REACTION_EMOJIS } from '../../lib/emojiStore';
@@ -10,8 +11,14 @@ interface EmojiPickerPopoverProps {
   onClose: () => void;
   onSelectEmoji: (emoji: string) => void;
   title?: string;
+  /** Placement hint: a `bottom-*` class opens it above the anchor, otherwise below; `left-*` aligns it left. */
   positionClass?: string;
 }
+
+const MARGIN = 8;
+const MAX_HEIGHT = 500;
+// Below a message row, the picker opens just under its hover toolbar rather than under the whole (maybe tall) row
+const BELOW_OFFSET = 36;
 
 export const EmojiPickerPopover: React.FC<EmojiPickerPopoverProps> = ({
   isOpen,
@@ -23,8 +30,12 @@ export const EmojiPickerPopover: React.FC<EmojiPickerPopoverProps> = ({
   const [topEmojis, setTopEmojis] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showFullPicker, setShowFullPicker] = useState(false);
-  const [adjustedStyle, setAdjustedStyle] = useState<React.CSSProperties>({});
+  const [pos, setPos] = useState<{ top: number; left: number; maxHeight: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Marks where the picker was opened; its parent (a message row, a composer) is what the picker is placed against
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  const preferAbove = /(^|\s)bottom-/.test(positionClass);
+  const alignLeft = /(^|\s)left-/.test(positionClass);
 
   useEffect(() => {
     if (isOpen) {
@@ -34,50 +45,49 @@ export const EmojiPickerPopover: React.FC<EmojiPickerPopoverProps> = ({
     }
   }, [isOpen]);
 
-  // Viewport Boundary Detection: Prevent popover from clipping at bottom or top of viewport
-  useEffect(() => {
+  // The picker is portalled to <body> and placed in viewport coordinates, so a scrolling list (a thread, the channel)
+  // can never clip it. It opens on the preferred side when it fits, otherwise on the roomier side (scrolling inside if
+  // even that is short), stays on screen, and follows its anchor while the page or a list scrolls.
+  useLayoutEffect(() => {
     if (!isOpen) {
-      setAdjustedStyle({});
+      setPos(null);
       return;
     }
-
-    const checkPosition = () => {
-      if (!containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const viewportHeight = window.innerHeight;
-      const viewportWidth = window.innerWidth;
-      const styles: React.CSSProperties = {};
-
-      // If bottom edge extends too close to or past bottom of viewport
-      if (rect.bottom > viewportHeight - 16) {
-        styles.bottom = '100%';
-        styles.top = 'auto';
-        styles.marginBottom = '8px';
-      }
-
-      // If top edge extends past top of viewport
-      if (rect.top < 60) {
-        styles.top = '100%';
-        styles.bottom = 'auto';
-        styles.marginTop = '8px';
-      }
-
-      // If right edge extends past viewport
-      if (rect.right > viewportWidth - 10) {
-        styles.right = '8px';
-        styles.left = 'auto';
-      }
-
-      setAdjustedStyle(styles);
+    const place = () => {
+      const anchor = anchorRef.current?.parentElement;
+      const el = containerRef.current;
+      if (!anchor || !el) return;
+      const a = anchor.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const height = Math.min(el.scrollHeight, MAX_HEIGHT);
+      const belowTop = a.top + Math.min(a.height, BELOW_OFFSET);
+      const spaceAbove = a.top - MARGIN * 2;
+      const spaceBelow = vh - belowTop - MARGIN * 2;
+      const above = preferAbove
+        ? spaceAbove >= height || spaceAbove >= spaceBelow
+        : spaceBelow < height && spaceAbove > spaceBelow;
+      const maxHeight = Math.max(120, Math.min(height, above ? spaceAbove : spaceBelow));
+      const top = above ? a.top - MARGIN - maxHeight : belowTop + MARGIN;
+      const left = alignLeft ? a.left : a.right - el.offsetWidth - MARGIN;
+      setPos({
+        top: Math.min(Math.max(top, MARGIN), vh - maxHeight - MARGIN),
+        left: Math.min(Math.max(left, MARGIN), vw - el.offsetWidth - MARGIN),
+        maxHeight,
+      });
     };
-
-    const timer = setTimeout(checkPosition, 0);
-    window.addEventListener('resize', checkPosition);
+    place();
+    const onScroll = (e: Event) => {
+      // Scrolling inside the picker itself (its emoji grid) doesn't move it
+      if (!containerRef.current?.contains(e.target as Node)) place();
+    };
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', onScroll, true);
     return () => {
-      clearTimeout(timer);
-      window.removeEventListener('resize', checkPosition);
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', onScroll, true);
     };
-  }, [isOpen, showFullPicker]);
+  }, [isOpen, showFullPicker, preferAbove, alignLeft]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -116,10 +126,14 @@ export const EmojiPickerPopover: React.FC<EmojiPickerPopoverProps> = ({
     : POPULAR_REACTION_EMOJIS;
 
   return (
+    <>
+    <span ref={anchorRef} hidden />
+    {createPortal(
     <div
       ref={containerRef}
-      style={adjustedStyle}
-      className={`absolute z-50 bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-2xl shadow-2xl overflow-hidden w-80 max-w-[calc(100vw-2rem)] max-h-[min(500px,calc(100vh-100px))] overflow-y-auto animate-in fade-in zoom-in-95 duration-150 ${positionClass}`}
+      // Hidden for the first layout pass, until it has been measured and placed (before the browser paints)
+      style={pos ? { top: pos.top, left: pos.left, maxHeight: pos.maxHeight } : { top: 0, left: 0, visibility: 'hidden' }}
+      className="fixed z-[100] bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] rounded-2xl shadow-2xl w-80 max-w-[calc(100vw-2rem)] overflow-y-auto animate-in fade-in zoom-in-95 duration-150"
     >
       {/* Header */}
       <div className="sticky top-0 z-10 flex items-center justify-between px-3.5 py-2.5 border-b border-[var(--theme-border)] bg-[var(--theme-bg-app)]">
@@ -221,6 +235,9 @@ export const EmojiPickerPopover: React.FC<EmojiPickerPopoverProps> = ({
           </button>
         </div>
       )}
-    </div>
+    </div>,
+    document.body,
+    )}
+    </>
   );
 };

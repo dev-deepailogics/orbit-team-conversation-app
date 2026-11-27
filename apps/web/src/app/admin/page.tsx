@@ -74,7 +74,7 @@ interface AdminWorkspace {
   inviteCode: string;
   ownerId: string;
   createdAt: string;
-  settings?: { isDemo?: boolean } | null;
+  settings?: { isDemo?: boolean; demoRegion?: 'local' | 'international' } | null;
   owner?: {
     id: string;
     email: string;
@@ -125,6 +125,7 @@ export default function AdminDashboardPage() {
 
   const [showDemoModal, setShowDemoModal] = useState(false);
   const [demoName, setDemoName] = useState('');
+  const [demoRegion, setDemoRegion] = useState<'local' | 'international'>('local');
   const [isCreatingDemo, setIsCreatingDemo] = useState(false);
   const [demoResult, setDemoResult] = useState<{
     workspace: { name: string; slug: string };
@@ -270,7 +271,7 @@ export default function AdminDashboardPage() {
     e.preventDefault();
     setIsCreatingDemo(true);
     try {
-      const res = await api.post('/api/admin/workspaces/demo', { name: demoName });
+      const res = await api.post('/api/admin/workspaces/demo', { name: demoName, region: demoRegion });
       setDemoResult(res.data);
       setDemoName('');
       fetchAdminData();
@@ -740,7 +741,7 @@ export default function AdminDashboardPage() {
                           <span>{ws.name}</span>
                           {ws.settings?.isDemo && (
                             <span className="px-1.5 py-0.5 rounded-md bg-purple-600/20 border border-purple-500/40 text-purple-300 text-[10px] font-bold uppercase">
-                              Demo
+                              Demo{ws.settings.demoRegion && ` · ${ws.settings.demoRegion}`}
                             </span>
                           )}
                         </td>
@@ -1140,9 +1141,38 @@ export default function AdminDashboardPage() {
                     className="w-full bg-[#222529] border border-gray-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
                   />
                   <p className="text-[11px] text-gray-400 mt-1.5 leading-relaxed">
-                    Creates an isolated workspace with its own users (Owner, Admin, 2 Members, Guest), channels with a
-                    guided feature tour, DMs, 3 projects with tickets &amp; docs, and availability history. Deleting it
+                    Creates an isolated workspace with 12 users (Owner, Admin, 9 Members, Guest), channels with a
+                    guided feature tour, DMs, 5 projects with tickets &amp; docs, and availability history. Deleting it
                     later also deletes its demo users.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1">
+                    Client Type
+                  </label>
+                  <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Client type">
+                    {(['local', 'international'] as const).map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        role="radio"
+                        aria-checked={demoRegion === r}
+                        onClick={() => setDemoRegion(r)}
+                        className={`px-3 py-2 rounded-xl border text-xs font-semibold transition ${
+                          demoRegion === r
+                            ? 'bg-purple-600/20 border-purple-500 text-white'
+                            : 'bg-[#222529] border-gray-700 text-gray-400 hover:text-gray-200'
+                        }`}
+                      >
+                        {r === 'local' ? '🇵🇰 Local' : '🌍 International'}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-1.5">
+                    {demoRegion === 'local'
+                      ? 'Users get local names (e.g. Ahmed Raza, Ayesha Khan).'
+                      : 'Users get international names (e.g. Olivia Bennett, Marcus Reid).'}
                   </p>
                 </div>
 

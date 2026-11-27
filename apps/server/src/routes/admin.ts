@@ -1,14 +1,21 @@
-import { FastifyInstance, FastifyPluginAsync } from 'fastify';
-import { prisma } from '@orbit/db';
-import bcrypt from 'bcryptjs';
-import { z } from 'zod';
-import { ACTIVITY_CHANNEL, ACTIVITY_CHANNEL_TOPIC } from '../services/systemBot.js';
-import { revokeAllForUser } from '../services/tokens.js';
-import { audit } from '../services/audit.js';
-import { createDemoWorkspace, demoEmailDomain } from '../services/demoWorkspace.js';
+import { FastifyInstance, FastifyPluginAsync } from "fastify";
+import { prisma } from "@orbit/db";
+import bcrypt from "bcryptjs";
+import { z } from "zod";
+import {
+  ACTIVITY_CHANNEL,
+  ACTIVITY_CHANNEL_TOPIC,
+} from "../services/systemBot.js";
+import { revokeAllForUser } from "../services/tokens.js";
+import { audit } from "../services/audit.js";
+import {
+  createDemoWorkspace,
+  demoEmailDomain,
+  DEMO_REGIONS,
+} from "../services/demoWorkspace.js";
 
 const updateRoleSchema = z.object({
-  systemRole: z.enum(['SUPER_ADMIN', 'WORKSPACE_ADMIN', 'USER']),
+  systemRole: z.enum(["SUPER_ADMIN", "WORKSPACE_ADMIN", "USER"]),
 });
 
 const resetPasswordSchema = z.object({
@@ -17,20 +24,26 @@ const resetPasswordSchema = z.object({
 
 const adminCreateWorkspaceSchema = z.object({
   name: z.string().min(2).max(50),
-  slug: z.string().min(2).max(50).regex(/^[a-z0-9-]+$/),
+  slug: z
+    .string()
+    .min(2)
+    .max(50)
+    .regex(/^[a-z0-9-]+$/),
   ownerEmailOrId: z.string().min(1),
   iconUrl: z.string().optional(),
 });
 
 function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
+  if (bytes === 0) return "0 B";
   const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const sizes = ["B", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
-export const adminRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
+export const adminRoutes: FastifyPluginAsync = async (
+  fastify: FastifyInstance,
+) => {
   // Middleware to ensure caller is SUPER_ADMIN
   const ensureSuperAdmin = async (request: any, reply: any) => {
     await fastify.authenticate(request, reply);
@@ -40,427 +53,628 @@ export const adminRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       select: { systemRole: true },
     });
 
-    if (user?.systemRole !== 'SUPER_ADMIN') {
-      return reply.status(403).send({ error: 'Access denied: Super Admin privileges required.' });
+    if (user?.systemRole !== "SUPER_ADMIN") {
+      return reply
+        .status(403)
+        .send({ error: "Access denied: Super Admin privileges required." });
     }
   };
 
   // 1. System Platform Overview Stats
-  fastify.get('/stats', { preHandler: [ensureSuperAdmin] }, async (_request, reply) => {
-    const [
-      totalUsers,
-      totalWorkspaces,
-      totalChannels,
-      totalMessages,
-      totalAttachments,
-      storageAggregate,
-      onlineUsers,
-      roleCounts,
-    ] = await Promise.all([
-      prisma.user.count(),
-      prisma.workspace.count(),
-      prisma.channel.count(),
-      prisma.message.count(),
-      prisma.attachment.count(),
-      prisma.attachment.aggregate({ _sum: { fileSize: true } }),
-      prisma.user.count({ where: { status: 'ONLINE' } }),
-      prisma.user.groupBy({
-        by: ['systemRole'],
-        _count: { id: true },
-      }),
-    ]);
+  fastify.get(
+    "/stats",
+    { preHandler: [ensureSuperAdmin] },
+    async (_request, reply) => {
+      const [
+        totalUsers,
+        totalWorkspaces,
+        totalChannels,
+        totalMessages,
+        totalAttachments,
+        storageAggregate,
+        onlineUsers,
+        roleCounts,
+      ] = await Promise.all([
+        prisma.user.count(),
+        prisma.workspace.count(),
+        prisma.channel.count(),
+        prisma.message.count(),
+        prisma.attachment.count(),
+        prisma.attachment.aggregate({ _sum: { fileSize: true } }),
+        prisma.user.count({ where: { status: "ONLINE" } }),
+        prisma.user.groupBy({
+          by: ["systemRole"],
+          _count: { id: true },
+        }),
+      ]);
 
-    const totalStorageBytes = storageAggregate._sum.fileSize || 0;
+      const totalStorageBytes = storageAggregate._sum.fileSize || 0;
 
-    return reply.send({
-      totalUsers,
-      totalWorkspaces,
-      totalChannels,
-      totalMessages,
-      totalAttachments,
-      totalStorageBytes,
-      formattedStorage: formatBytes(totalStorageBytes),
-      onlineUsers,
-      roles: roleCounts.reduce((acc: Record<string, number>, r) => {
-        acc[r.systemRole] = r._count.id;
-        return acc;
-      }, {}),
-    });
-  });
+      return reply.send({
+        totalUsers,
+        totalWorkspaces,
+        totalChannels,
+        totalMessages,
+        totalAttachments,
+        totalStorageBytes,
+        formattedStorage: formatBytes(totalStorageBytes),
+        onlineUsers,
+        roles: roleCounts.reduce((acc: Record<string, number>, r) => {
+          acc[r.systemRole] = r._count.id;
+          return acc;
+        }, {}),
+      });
+    },
+  );
 
   // 2. List All Users Across Platform
-  fastify.get('/users', { preHandler: [ensureSuperAdmin] }, async (_request, reply) => {
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        displayName: true,
-        avatarUrl: true,
-        systemRole: true,
-        status: true,
-        disabled: true,
-        createdAt: true,
-        updatedAt: true,
-        memberships: {
-          select: {
-            role: true,
-            workspace: {
-              select: {
-                id: true,
-                name: true,
-                slug: true,
+  fastify.get(
+    "/users",
+    { preHandler: [ensureSuperAdmin] },
+    async (_request, reply) => {
+      const users = await prisma.user.findMany({
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          displayName: true,
+          avatarUrl: true,
+          systemRole: true,
+          status: true,
+          disabled: true,
+          createdAt: true,
+          updatedAt: true,
+          memberships: {
+            select: {
+              role: true,
+              workspace: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                },
               },
             },
           },
-        },
-        _count: {
-          select: {
-            memberships: true,
-            ownedWorkspaces: true,
-            messages: true,
+          _count: {
+            select: {
+              memberships: true,
+              ownedWorkspaces: true,
+              messages: true,
+            },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: "desc" },
+      });
 
-    return reply.send(users);
-  });
+      return reply.send(users);
+    },
+  );
 
   // 3. Update User System Role
-  fastify.patch('/users/:userId/role', { preHandler: [ensureSuperAdmin] }, async (request, reply) => {
-    const { userId } = request.params as { userId: string };
-    const callerId = (request.user as { id: string }).id;
+  fastify.patch(
+    "/users/:userId/role",
+    { preHandler: [ensureSuperAdmin] },
+    async (request, reply) => {
+      const { userId } = request.params as { userId: string };
+      const callerId = (request.user as { id: string }).id;
 
-    const parseResult = updateRoleSchema.safeParse(request.body);
-    if (!parseResult.success) {
-      return reply.status(400).send({ error: 'Valid systemRole is required' });
-    }
+      const parseResult = updateRoleSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply
+          .status(400)
+          .send({ error: "Valid systemRole is required" });
+      }
 
-    const { systemRole } = parseResult.data;
+      const { systemRole } = parseResult.data;
 
-    if (callerId === userId && systemRole !== 'SUPER_ADMIN') {
-      return reply.status(400).send({ error: 'You cannot demote your own Super Admin account' });
-    }
+      if (callerId === userId && systemRole !== "SUPER_ADMIN") {
+        return reply
+          .status(400)
+          .send({ error: "You cannot demote your own Super Admin account" });
+      }
 
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: { systemRole },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        displayName: true,
-        systemRole: true,
-      },
-    });
+      const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: { systemRole },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          displayName: true,
+          systemRole: true,
+        },
+      });
 
-    audit(request, { action: 'admin.user_role_change', actorId: callerId, targetType: 'user', targetId: userId, metadata: { newSystemRole: systemRole } });
-    return reply.send({ success: true, user: updatedUser });
-  });
+      audit(request, {
+        action: "admin.user_role_change",
+        actorId: callerId,
+        targetType: "user",
+        targetId: userId,
+        metadata: { newSystemRole: systemRole },
+      });
+      return reply.send({ success: true, user: updatedUser });
+    },
+  );
 
   // 4. Toggle User Disabled / Active Status
-  fastify.patch('/users/:userId/status', { preHandler: [ensureSuperAdmin] }, async (request, reply) => {
-    const { userId } = request.params as { userId: string };
-    const callerId = (request.user as { id: string }).id;
+  fastify.patch(
+    "/users/:userId/status",
+    { preHandler: [ensureSuperAdmin] },
+    async (request, reply) => {
+      const { userId } = request.params as { userId: string };
+      const callerId = (request.user as { id: string }).id;
 
-    const bodySchema = z.object({
-      disabled: z.boolean(),
-    });
-
-    const parseResult = bodySchema.safeParse(request.body);
-    if (!parseResult.success) {
-      return reply.status(400).send({ error: 'disabled boolean value is required' });
-    }
-
-    const { disabled } = parseResult.data;
-
-    if (callerId === userId && disabled) {
-      return reply.status(400).send({ error: 'You cannot disable your own Super Admin account' });
-    }
-
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: { 
-        disabled,
-        ...(disabled ? { status: 'OFFLINE' } : {}),
-      },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        displayName: true,
-        systemRole: true,
-        disabled: true,
-      },
-    });
-
-    if (disabled) await revokeAllForUser(userId);
-    audit(request, { action: disabled ? 'admin.user_disable' : 'admin.user_enable', actorId: callerId, targetType: 'user', targetId: userId });
-
-    if (disabled && fastify.io) {
-      // Notify the deactivated user's sockets to immediately log out
-      fastify.io.to(`user:${userId}`).emit('account:deactivated', {
-        message: 'Your account has been deactivated by an administrator.',
+      const bodySchema = z.object({
+        disabled: z.boolean(),
       });
-      // Disconnect all sockets belonging to this user
-      const userSockets = await fastify.io.in(`user:${userId}`).fetchSockets();
-      userSockets.forEach((s) => s.disconnect(true));
-    }
 
-    return reply.send({ success: true, user: updatedUser });
-  });
+      const parseResult = bodySchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply
+          .status(400)
+          .send({ error: "disabled boolean value is required" });
+      }
+
+      const { disabled } = parseResult.data;
+
+      if (callerId === userId && disabled) {
+        return reply
+          .status(400)
+          .send({ error: "You cannot disable your own Super Admin account" });
+      }
+
+      const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: {
+          disabled,
+          ...(disabled ? { status: "OFFLINE" } : {}),
+        },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          displayName: true,
+          systemRole: true,
+          disabled: true,
+        },
+      });
+
+      if (disabled) await revokeAllForUser(userId);
+      audit(request, {
+        action: disabled ? "admin.user_disable" : "admin.user_enable",
+        actorId: callerId,
+        targetType: "user",
+        targetId: userId,
+      });
+
+      if (disabled && fastify.io) {
+        // Notify the deactivated user's sockets to immediately log out
+        fastify.io.to(`user:${userId}`).emit("account:deactivated", {
+          message: "Your account has been deactivated by an administrator.",
+        });
+        // Disconnect all sockets belonging to this user
+        const userSockets = await fastify.io
+          .in(`user:${userId}`)
+          .fetchSockets();
+        userSockets.forEach((s) => s.disconnect(true));
+      }
+
+      return reply.send({ success: true, user: updatedUser });
+    },
+  );
 
   // 5. Reset User Password
-  fastify.post('/users/:userId/reset-password', { preHandler: [ensureSuperAdmin] }, async (request, reply) => {
-    const { userId } = request.params as { userId: string };
-    const parseResult = resetPasswordSchema.safeParse(request.body);
-    if (!parseResult.success) {
-      return reply.status(400).send({ error: 'Password must be at least 6 characters' });
-    }
+  fastify.post(
+    "/users/:userId/reset-password",
+    { preHandler: [ensureSuperAdmin] },
+    async (request, reply) => {
+      const { userId } = request.params as { userId: string };
+      const parseResult = resetPasswordSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply
+          .status(400)
+          .send({ error: "Password must be at least 6 characters" });
+      }
 
-    const { newPassword } = parseResult.data;
-    const passwordHash = await bcrypt.hash(newPassword, 10);
+      const { newPassword } = parseResult.data;
+      const passwordHash = await bcrypt.hash(newPassword, 10);
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: { passwordHash },
-    });
-    await revokeAllForUser(userId);
-    audit(request, { action: 'admin.user_password_reset', actorId: (request.user as { id: string }).id, targetType: 'user', targetId: userId });
+      await prisma.user.update({
+        where: { id: userId },
+        data: { passwordHash },
+      });
+      await revokeAllForUser(userId);
+      audit(request, {
+        action: "admin.user_password_reset",
+        actorId: (request.user as { id: string }).id,
+        targetType: "user",
+        targetId: userId,
+      });
 
-    return reply.send({ success: true, message: 'Password has been reset successfully' });
-  });
+      return reply.send({
+        success: true,
+        message: "Password has been reset successfully",
+      });
+    },
+  );
 
   // 5. Delete User
-  fastify.delete('/users/:userId', { preHandler: [ensureSuperAdmin] }, async (request, reply) => {
-    const { userId } = request.params as { userId: string };
-    const callerId = (request.user as { id: string }).id;
+  fastify.delete(
+    "/users/:userId",
+    { preHandler: [ensureSuperAdmin] },
+    async (request, reply) => {
+      const { userId } = request.params as { userId: string };
+      const callerId = (request.user as { id: string }).id;
 
-    if (callerId === userId) {
-      return reply.status(400).send({ error: 'Cannot delete your own account' });
-    }
+      if (callerId === userId) {
+        return reply
+          .status(400)
+          .send({ error: "Cannot delete your own account" });
+      }
 
-    await prisma.user.delete({
-      where: { id: userId },
-    });
-    audit(request, { action: 'admin.user_delete', actorId: callerId, targetType: 'user', targetId: userId });
+      await prisma.user.delete({
+        where: { id: userId },
+      });
+      audit(request, {
+        action: "admin.user_delete",
+        actorId: callerId,
+        targetType: "user",
+        targetId: userId,
+      });
 
-    return reply.send({ success: true, deletedUserId: userId });
-  });
+      return reply.send({ success: true, deletedUserId: userId });
+    },
+  );
 
   // 6. List All Workspaces Across Platform
-  fastify.get('/workspaces', { preHandler: [ensureSuperAdmin] }, async (_request, reply) => {
-    const workspaces = await prisma.workspace.findMany({
-      include: {
-        owner: {
-          select: {
-            id: true,
-            email: true,
-            username: true,
-            displayName: true,
+  fastify.get(
+    "/workspaces",
+    { preHandler: [ensureSuperAdmin] },
+    async (_request, reply) => {
+      const workspaces = await prisma.workspace.findMany({
+        include: {
+          owner: {
+            select: {
+              id: true,
+              email: true,
+              username: true,
+              displayName: true,
+            },
+          },
+          _count: {
+            select: {
+              members: true,
+              channels: true,
+              attachments: true,
+            },
           },
         },
-        _count: {
-          select: {
-            members: true,
-            channels: true,
-            attachments: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: "desc" },
+      });
 
-    return reply.send(workspaces);
-  });
+      return reply.send(workspaces);
+    },
+  );
 
   // 7. Create Workspace on behalf of User
-  fastify.post('/workspaces', { preHandler: [ensureSuperAdmin] }, async (request, reply) => {
-    const parseResult = adminCreateWorkspaceSchema.safeParse(request.body);
-    if (!parseResult.success) {
-      return reply.status(400).send({ error: parseResult.error.errors[0].message });
-    }
+  fastify.post(
+    "/workspaces",
+    { preHandler: [ensureSuperAdmin] },
+    async (request, reply) => {
+      const parseResult = adminCreateWorkspaceSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply
+          .status(400)
+          .send({ error: parseResult.error.errors[0].message });
+      }
 
-    const { name, slug, ownerEmailOrId, iconUrl } = parseResult.data;
+      const { name, slug, ownerEmailOrId, iconUrl } = parseResult.data;
 
-    const existingSlug = await prisma.workspace.findUnique({
-      where: { slug },
-    });
-    if (existingSlug) {
-      return reply.status(409).send({ error: 'Workspace slug already taken' });
-    }
-
-    const owner = await prisma.user.findFirst({
-      where: {
-        OR: [{ email: ownerEmailOrId }, { username: ownerEmailOrId }, { id: ownerEmailOrId }],
-      },
-    });
-
-    if (!owner) {
-      return reply.status(404).send({ error: `Owner user "${ownerEmailOrId}" not found` });
-    }
-
-    // Promote owner to WORKSPACE_ADMIN if they are a regular USER
-    if (owner.systemRole === 'USER') {
-      await prisma.user.update({
-        where: { id: owner.id },
-        data: { systemRole: 'WORKSPACE_ADMIN' },
+      const existingSlug = await prisma.workspace.findUnique({
+        where: { slug },
       });
-    }
+      if (existingSlug) {
+        return reply
+          .status(409)
+          .send({ error: "Workspace slug already taken" });
+      }
 
-    const workspace = await prisma.workspace.create({
-      data: {
-        name,
-        slug,
-        iconUrl: iconUrl || `/api/avatar/identicon/svg?seed=${slug}`,
-        ownerId: owner.id,
-        members: {
-          create: {
-            userId: owner.id,
-            role: 'OWNER',
-          },
-        },
-        channels: {
-          create: [
-            {
-              name: 'general',
-              topic: 'Company-wide announcements and work-based matters',
-              type: 'PUBLIC',
-              createdById: owner.id,
-              members: {
-                create: { userId: owner.id },
-              },
-            },
-            {
-              name: 'random',
-              topic: 'Non-work banter and water cooler chat',
-              type: 'PUBLIC',
-              createdById: owner.id,
-              members: {
-                create: { userId: owner.id },
-              },
-            },
-            {
-              name: ACTIVITY_CHANNEL,
-              topic: ACTIVITY_CHANNEL_TOPIC,
-              type: 'PUBLIC',
-              createdById: owner.id,
-              members: {
-                create: { userId: owner.id },
-              },
-            },
+      const owner = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { email: ownerEmailOrId },
+            { username: ownerEmailOrId },
+            { id: ownerEmailOrId },
           ],
         },
-      },
-      include: {
-        owner: {
-          select: { id: true, email: true, displayName: true },
-        },
-        _count: {
-          select: { members: true, channels: true },
-        },
-      },
-    });
+      });
 
-    audit(request, { action: 'admin.workspace_create', actorId: (request.user as { id: string }).id, workspaceId: workspace.id, targetType: 'workspace', targetId: workspace.id, metadata: { ownerId: owner.id } });
-    return reply.status(201).send(workspace);
-  });
+      if (!owner) {
+        return reply
+          .status(404)
+          .send({ error: `Owner user "${ownerEmailOrId}" not found` });
+      }
+
+      // Promote owner to WORKSPACE_ADMIN if they are a regular USER
+      if (owner.systemRole === "USER") {
+        await prisma.user.update({
+          where: { id: owner.id },
+          data: { systemRole: "WORKSPACE_ADMIN" },
+        });
+      }
+
+      const workspace = await prisma.workspace.create({
+        data: {
+          name,
+          slug,
+          iconUrl: iconUrl || `/api/avatar/identicon/svg?seed=${slug}`,
+          ownerId: owner.id,
+          members: {
+            create: {
+              userId: owner.id,
+              role: "OWNER",
+            },
+          },
+          channels: {
+            create: [
+              {
+                name: "general",
+                topic: "Company-wide announcements and work-based matters",
+                type: "PUBLIC",
+                createdById: owner.id,
+                members: {
+                  create: { userId: owner.id },
+                },
+              },
+              {
+                name: "random",
+                topic: "Non-work banter and water cooler chat",
+                type: "PUBLIC",
+                createdById: owner.id,
+                members: {
+                  create: { userId: owner.id },
+                },
+              },
+              {
+                name: ACTIVITY_CHANNEL,
+                topic: ACTIVITY_CHANNEL_TOPIC,
+                type: "PUBLIC",
+                createdById: owner.id,
+                members: {
+                  create: { userId: owner.id },
+                },
+              },
+            ],
+          },
+        },
+        include: {
+          owner: {
+            select: { id: true, email: true, displayName: true },
+          },
+          _count: {
+            select: { members: true, channels: true },
+          },
+        },
+      });
+
+      audit(request, {
+        action: "admin.workspace_create",
+        actorId: (request.user as { id: string }).id,
+        workspaceId: workspace.id,
+        targetType: "workspace",
+        targetId: workspace.id,
+        metadata: { ownerId: owner.id },
+      });
+      return reply.status(201).send(workspace);
+    },
+  );
 
   // 7b. Create a seeded demo workspace with its own isolated users (one per role)
-  fastify.post('/workspaces/demo', { preHandler: [ensureSuperAdmin] }, async (request, reply) => {
-    const parseResult = z.object({ name: z.string().trim().min(2).max(50) }).safeParse(request.body);
-    if (!parseResult.success) {
-      return reply.status(400).send({ error: 'Workspace name must be 2-50 characters' });
-    }
-    const demo = await createDemoWorkspace(parseResult.data.name);
-    audit(request, { action: 'admin.demo_workspace_create', actorId: (request.user as { id: string }).id, metadata: { name: parseResult.data.name } });
-    return reply.status(201).send(demo);
-  });
+  fastify.post(
+    "/workspaces/demo",
+    { preHandler: [ensureSuperAdmin] },
+    async (request, reply) => {
+      const parseResult = z
+        .object({
+          name: z.string().trim().min(2).max(50),
+          region: z.enum(DEMO_REGIONS).default("international"),
+        })
+        .safeParse(request.body);
+      if (!parseResult.success) {
+        return reply
+          .status(400)
+          .send({
+            error:
+              "Workspace name must be 2-50 characters and region local or international",
+          });
+      }
+      const demo = await createDemoWorkspace(
+        parseResult.data.name,
+        parseResult.data.region,
+      );
+      audit(request, {
+        action: "admin.demo_workspace_create",
+        actorId: (request.user as { id: string }).id,
+        metadata: { name: parseResult.data.name },
+      });
+      return reply.status(201).send(demo);
+    },
+  );
 
   // 8. Delete Workspace (demo workspaces also take their demo users with them)
-  fastify.delete('/workspaces/:workspaceId', { preHandler: [ensureSuperAdmin] }, async (request, reply) => {
-    const { workspaceId } = request.params as { workspaceId: string };
+  fastify.delete(
+    "/workspaces/:workspaceId",
+    { preHandler: [ensureSuperAdmin] },
+    async (request, reply) => {
+      const { workspaceId } = request.params as { workspaceId: string };
 
-    const workspace = await prisma.workspace.findUnique({
-      where: { id: workspaceId },
-      select: { slug: true, settings: true },
-    });
-    if (!workspace) {
-      return reply.status(404).send({ error: 'Workspace not found' });
-    }
+      const workspace = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { slug: true, settings: true },
+      });
+      if (!workspace) {
+        return reply.status(404).send({ error: "Workspace not found" });
+      }
 
-    const isDemo = (workspace.settings as { isDemo?: boolean } | null)?.isDemo === true;
-    await prisma.$transaction([
-      prisma.workspace.delete({ where: { id: workspaceId } }),
-      ...(isDemo
-        ? [prisma.user.deleteMany({ where: { email: { endsWith: `@${demoEmailDomain(workspace.slug)}` } } })]
-        : []),
-    ]);
+      const isDemo =
+        (workspace.settings as { isDemo?: boolean } | null)?.isDemo === true;
+      await prisma.$transaction([
+        prisma.workspace.delete({ where: { id: workspaceId } }),
+        ...(isDemo
+          ? [
+              prisma.user.deleteMany({
+                where: {
+                  email: { endsWith: `@${demoEmailDomain(workspace.slug)}` },
+                },
+              }),
+            ]
+          : []),
+      ]);
 
-    audit(request, { action: 'admin.workspace_delete', actorId: (request.user as { id: string }).id, workspaceId, targetType: 'workspace', targetId: workspaceId, metadata: { slug: workspace.slug, isDemo } });
-    return reply.send({ success: true, deletedWorkspaceId: workspaceId });
-  });
+      audit(request, {
+        action: "admin.workspace_delete",
+        actorId: (request.user as { id: string }).id,
+        workspaceId,
+        targetType: "workspace",
+        targetId: workspaceId,
+        metadata: { slug: workspace.slug, isDemo },
+      });
+      return reply.send({ success: true, deletedWorkspaceId: workspaceId });
+    },
+  );
 
   // 9. Audit trail: search and export. Filters: action (prefix match, e.g. "auth."), outcome, actorId, workspaceId,
   // from/to (ISO dates). ?format=csv downloads the matching rows (capped at 10,000); JSON is paged with ?cursor=<id>.
-  fastify.get('/audit-logs', { preHandler: [ensureSuperAdmin] }, async (request, reply) => {
-    const q = z
-      .object({
-        action: z.string().max(100).optional(),
-        outcome: z.enum(['success', 'failure']).optional(),
-        actorId: z.string().max(100).optional(),
-        workspaceId: z.string().max(100).optional(),
-        from: z.string().datetime({ offset: true }).optional().or(z.string().date().optional()),
-        to: z.string().datetime({ offset: true }).optional().or(z.string().date().optional()),
-        limit: z.coerce.number().int().min(1).max(500).default(100),
-        cursor: z.string().max(100).optional(),
-        format: z.enum(['json', 'csv']).default('json'),
-      })
-      .safeParse(request.query);
-    if (!q.success) return reply.status(400).send({ error: q.error.errors[0].message });
-    const f = q.data;
+  fastify.get(
+    "/audit-logs",
+    { preHandler: [ensureSuperAdmin] },
+    async (request, reply) => {
+      const q = z
+        .object({
+          action: z.string().max(100).optional(),
+          outcome: z.enum(["success", "failure"]).optional(),
+          actorId: z.string().max(100).optional(),
+          workspaceId: z.string().max(100).optional(),
+          from: z
+            .string()
+            .datetime({ offset: true })
+            .optional()
+            .or(z.string().date().optional()),
+          to: z
+            .string()
+            .datetime({ offset: true })
+            .optional()
+            .or(z.string().date().optional()),
+          limit: z.coerce.number().int().min(1).max(500).default(100),
+          cursor: z.string().max(100).optional(),
+          format: z.enum(["json", "csv"]).default("json"),
+        })
+        .safeParse(request.query);
+      if (!q.success)
+        return reply.status(400).send({ error: q.error.errors[0].message });
+      const f = q.data;
 
-    const where = {
-      ...(f.action ? { action: { startsWith: f.action } } : {}),
-      ...(f.outcome ? { outcome: f.outcome } : {}),
-      ...(f.actorId ? { actorId: f.actorId } : {}),
-      ...(f.workspaceId ? { workspaceId: f.workspaceId } : {}),
-      ...(f.from || f.to
-        ? { createdAt: { ...(f.from ? { gte: new Date(f.from) } : {}), ...(f.to ? { lte: new Date(f.to) } : {}) } }
-        : {}),
-    };
-
-    audit(request, { action: 'admin.audit_log_view', actorId: (request.user as { id: string }).id, metadata: { format: f.format, filters: { action: f.action, outcome: f.outcome, actorId: f.actorId, workspaceId: f.workspaceId } } });
-
-    if (f.format === 'csv') {
-      const rows = await prisma.auditLog.findMany({ where, orderBy: { createdAt: 'desc' }, take: 10000 });
-      const cell = (v: unknown) => {
-        let t = v == null ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v);
-        // Stop spreadsheet formula injection from user-controlled values (emails, user agents).
-        if (/^[=+\-@\t\r]/.test(t)) t = `'${t}`;
-        return `"${t.replace(/"/g, '""')}"`;
+      const where = {
+        ...(f.action ? { action: { startsWith: f.action } } : {}),
+        ...(f.outcome ? { outcome: f.outcome } : {}),
+        ...(f.actorId ? { actorId: f.actorId } : {}),
+        ...(f.workspaceId ? { workspaceId: f.workspaceId } : {}),
+        ...(f.from || f.to
+          ? {
+              createdAt: {
+                ...(f.from ? { gte: new Date(f.from) } : {}),
+                ...(f.to ? { lte: new Date(f.to) } : {}),
+              },
+            }
+          : {}),
       };
-      const head = ['time', 'action', 'outcome', 'actorId', 'actorLabel', 'workspaceId', 'targetType', 'targetId', 'ip', 'forwardedFor', 'userAgent', 'metadata'];
-      const lines = [head.join(',')].concat(
-        rows.map((r) =>
-          [r.createdAt.toISOString(), r.action, r.outcome, r.actorId, r.actorLabel, r.workspaceId, r.targetType, r.targetId, r.ip, r.forwardedFor, r.userAgent, r.metadata].map(cell).join(','),
-        ),
-      );
-      reply.header('Content-Type', 'text/csv; charset=utf-8');
-      reply.header('Content-Disposition', 'attachment; filename="orbit-audit-log.csv"');
-      return reply.send(lines.join('\r\n'));
-    }
 
-    const rows = await prisma.auditLog.findMany({
-      where,
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: f.limit + 1,
-      ...(f.cursor ? { cursor: { id: f.cursor }, skip: 1 } : {}),
-    });
-    const hasMore = rows.length > f.limit;
-    const page = hasMore ? rows.slice(0, f.limit) : rows;
-    return reply.send({ entries: page, nextCursor: hasMore ? page[page.length - 1].id : null });
-  });
+      audit(request, {
+        action: "admin.audit_log_view",
+        actorId: (request.user as { id: string }).id,
+        metadata: {
+          format: f.format,
+          filters: {
+            action: f.action,
+            outcome: f.outcome,
+            actorId: f.actorId,
+            workspaceId: f.workspaceId,
+          },
+        },
+      });
+
+      if (f.format === "csv") {
+        const rows = await prisma.auditLog.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          take: 10000,
+        });
+        const cell = (v: unknown) => {
+          let t =
+            v == null
+              ? ""
+              : typeof v === "object"
+                ? JSON.stringify(v)
+                : String(v);
+          // Stop spreadsheet formula injection from user-controlled values (emails, user agents).
+          if (/^[=+\-@\t\r]/.test(t)) t = `'${t}`;
+          return `"${t.replace(/"/g, '""')}"`;
+        };
+        const head = [
+          "time",
+          "action",
+          "outcome",
+          "actorId",
+          "actorLabel",
+          "workspaceId",
+          "targetType",
+          "targetId",
+          "ip",
+          "forwardedFor",
+          "userAgent",
+          "metadata",
+        ];
+        const lines = [head.join(",")].concat(
+          rows.map((r) =>
+            [
+              r.createdAt.toISOString(),
+              r.action,
+              r.outcome,
+              r.actorId,
+              r.actorLabel,
+              r.workspaceId,
+              r.targetType,
+              r.targetId,
+              r.ip,
+              r.forwardedFor,
+              r.userAgent,
+              r.metadata,
+            ]
+              .map(cell)
+              .join(","),
+          ),
+        );
+        reply.header("Content-Type", "text/csv; charset=utf-8");
+        reply.header(
+          "Content-Disposition",
+          'attachment; filename="orbit-audit-log.csv"',
+        );
+        return reply.send(lines.join("\r\n"));
+      }
+
+      const rows = await prisma.auditLog.findMany({
+        where,
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: f.limit + 1,
+        ...(f.cursor ? { cursor: { id: f.cursor }, skip: 1 } : {}),
+      });
+      const hasMore = rows.length > f.limit;
+      const page = hasMore ? rows.slice(0, f.limit) : rows;
+      return reply.send({
+        entries: page,
+        nextCursor: hasMore ? page[page.length - 1].id : null,
+      });
+    },
+  );
 };

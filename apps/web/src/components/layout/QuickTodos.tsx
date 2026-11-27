@@ -1,26 +1,32 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ListChecks, Trash2, X } from 'lucide-react';
+import { ListChecks, MessageSquare, Pencil, Trash2, X } from 'lucide-react';
 import { api } from '../../lib/api';
+import { openMessage, parseMessageLink } from '../../lib/messageLinks';
+import { ADD_TODO_EVENT, NewTodo } from '../../lib/todos';
 import { usePrefsStore, hydratePrefs } from '../../stores/prefsStore';
 
 interface Todo {
   id: string;
   text: string;
   done: boolean;
+  messageLink?: string | null;
 }
 
 const BTN = 44;
 const PANEL_W = 340;
 const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), Math.max(lo, hi));
+let tempSeq = 0;
 
 // Personal quick to-dos. Ctrl+Shift+Space / Alt+T (or the draggable floating button) opens the panel with the input focused:
-// type, Enter, and the next one is ready. Click a row to tick it off.
+// type, Enter, and the next one is ready. Click a row to tick it off, double-click its text (or the pencil) to edit it.
+// Messages can be added from their hover toolbar (see lib/todos); those keep a button that jumps back to the message.
 export const QuickTodos: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [text, setText] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [loaded, setLoaded] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -91,12 +97,20 @@ export const QuickTodos: React.FC = () => {
     load();
   }, [load]);
 
+  // Blur whatever is focused in the panel before it unmounts, so a to-do being edited is saved (its blur commits it)
+  // rather than silently dropped.
+  const releaseFocus = () => {
+    const el = document.activeElement;
+    if (el instanceof HTMLElement && panelRef.current?.contains(el)) el.blur();
+  };
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const altT = e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyT';
       const chord = (e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'Space';
       if (altT || chord) {
         e.preventDefault();
+        releaseFocus();
         setOpen((o) => !o);
       } else if (e.key === 'Escape') {
         setOpen(false);
@@ -113,28 +127,81 @@ export const QuickTodos: React.FC = () => {
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) setOpen(false);
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        releaseFocus();
+        setOpen(false);
+      }
     };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [open]);
+
+  // Optimistic: shows at once, swapped for the saved row (or removed again, with the error) when the server answers.
+  const create = useCallback(async (todo: NewTodo) => {
+    setError('');
+    const tempId = `tmp-${++tempSeq}`; // unique even for two adds in the same millisecond
+    setTodos((t) => [{ id: tempId, done: false, ...todo }, ...t]);
+    try {
+      const res = await api.post('/api/todos', todo);
+      setTodos((t) => t.map((x) => (x.id === tempId ? res.data : x)));
+      return true;
+    } catch (err: any) {
+      setTodos((t) => t.filter((x) => x.id !== tempId));
+      setError(err.response?.data?.error || 'Could not add to-do');
+      return false;
+    }
+  }, []);
 
   const add = async (e: React.FormEvent) => {
     e.preventDefault();
     const value = text.trim();
     if (!value) return;
     setText('');
-    setError('');
-    const tempId = `tmp-${Date.now()}`;
-    setTodos((t) => [{ id: tempId, text: value, done: false }, ...t]);
+    if (!(await create({ text: value }))) setText(value);
+  };
+
+  // "Add to to-dos" on a message: saved quietly (the button's count goes up); the panel only opens if it fails, to show
+  // why. A message that already has an open to-do isn't added twice (e.g. a double click).
+  const todosRef = useRef(todos);
+  todosRef.current = todos;
+  useEffect(() => {
+    const onAdd = async (e: Event) => {
+      const todo = (e as CustomEvent<NewTodo>).detail;
+      if (todosRef.current.some((t) => !t.done && t.messageLink === todo.messageLink)) return;
+      if (!(await create(todo))) setOpen(true);
+    };
+    window.addEventListener(ADD_TODO_EVENT, onAdd);
+    return () => window.removeEventListener(ADD_TODO_EVENT, onAdd);
+  }, [create]);
+
+  // Editing: Enter or blur saves, Escape cancels. The ref makes sure each edit finishes exactly once, even when the
+  // input's blur fires after Enter/Escape already handled it.
+  const editingIdRef = useRef<string | null>(null);
+  const startEdit = (todo: Todo) => {
+    if (todo.id.startsWith('tmp-')) return;
+    editingIdRef.current = todo.id;
+    setEditingId(todo.id);
+  };
+  const finishEdit = async (todo: Todo, newText: string | null) => {
+    if (editingIdRef.current !== todo.id) return;
+    editingIdRef.current = null;
+    setEditingId(null);
+    const value = newText?.trim();
+    if (!value || value === todo.text) return; // cancelled, emptied or unchanged
+    setTodos((t) => t.map((x) => (x.id === todo.id ? { ...x, text: value } : x)));
     try {
-      const res = await api.post('/api/todos', { text: value });
-      setTodos((t) => t.map((x) => (x.id === tempId ? res.data : x)));
+      await api.patch(`/api/todos/${todo.id}`, { text: value });
     } catch (err: any) {
-      setTodos((t) => t.filter((x) => x.id !== tempId));
-      setText(value);
-      setError(err.response?.data?.error || 'Could not add to-do');
+      setTodos((t) => t.map((x) => (x.id === todo.id ? { ...x, text: todo.text } : x)));
+      setError(err.response?.data?.error || 'Could not save to-do');
     }
+  };
+
+  const goToMessage = (todo: Todo) => {
+    const target = parseMessageLink(todo.messageLink);
+    if (!target) return;
+    setOpen(false);
+    openMessage(target);
   };
 
   const toggle = async (todo: Todo) => {
@@ -238,12 +305,56 @@ export const QuickTodos: React.FC = () => {
                   className="mt-0.5 w-4 h-4 shrink-0 cursor-pointer accent-[var(--theme-primary)]"
                   aria-label={todo.done ? 'Mark as not done' : 'Mark as done'}
                 />
-                <span
-                  className={`flex-1 text-sm leading-5 break-words min-w-0 ${todo.done ? 'line-through opacity-60' : ''}`}
-                  style={{ color: 'var(--theme-text)' }}
-                >
-                  {todo.text}
-                </span>
+                {editingId === todo.id ? (
+                  <input
+                    autoFocus
+                    defaultValue={todo.text}
+                    maxLength={500}
+                    onBlur={(e) => finishEdit(todo, e.currentTarget.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') finishEdit(todo, e.currentTarget.value);
+                      if (e.key === 'Escape') {
+                        e.stopPropagation(); // cancel the edit, keep the panel open
+                        finishEdit(todo, null);
+                      }
+                    }}
+                    aria-label="Edit to-do"
+                    className="flex-1 min-w-0 -my-0.5 px-1.5 h-6 rounded border text-sm outline-none border-[var(--theme-primary)]"
+                    style={{ backgroundColor: 'var(--theme-bg-app)', color: 'var(--theme-text)' }}
+                  />
+                ) : (
+                  <span
+                    onDoubleClick={() => startEdit(todo)}
+                    className={`flex-1 text-sm leading-5 break-words min-w-0 ${todo.done ? 'line-through opacity-60' : ''}`}
+                    style={{ color: 'var(--theme-text)' }}
+                  >
+                    {todo.text}
+                  </span>
+                )}
+                {todo.messageLink && (
+                  <button
+                    type="button"
+                    aria-label="Go to message"
+                    title="Go to message"
+                    onClick={() => goToMessage(todo)}
+                    className="shrink-0 w-6 h-6 rounded flex items-center justify-center"
+                    style={{ color: 'var(--theme-text-muted)' }}
+                  >
+                    <MessageSquare size={13} />
+                  </button>
+                )}
+                {editingId !== todo.id && (
+                  <button
+                    type="button"
+                    aria-label="Edit to-do"
+                    title="Edit"
+                    onClick={() => startEdit(todo)}
+                    className="opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0 w-6 h-6 rounded flex items-center justify-center"
+                    style={{ color: 'var(--theme-text-muted)' }}
+                  >
+                    <Pencil size={13} />
+                  </button>
+                )}
                 <button
                   type="button"
                   aria-label="Delete to-do"
