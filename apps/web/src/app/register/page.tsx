@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight } from "@/components/ui/icons";
 import { api } from "../../lib/api";
-import { useAuthStore, postAuthPath } from "../../stores/authStore";
+import { useAuthStore } from "../../stores/authStore";
 import {
   AuthShell,
   AuthError,
@@ -40,7 +40,7 @@ export default function RegisterPage() {
         password,
       });
       setAuth(res.data.user, res.data.accessToken, res.data.refreshToken);
-      router.push(postAuthPath());
+      router.push("/app");
     } catch (err: any) {
       setError(err.response?.data?.error || "Registration failed");
     } finally {

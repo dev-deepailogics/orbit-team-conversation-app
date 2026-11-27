@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ThemeConfig, UserProfile, Workspace } from '@orbit/types';
-import { ArrowUpDown, Bot, ChevronLeft, HardDrive, Keyboard, Link2, LogOut, Palette, User } from '@/components/ui/icons';
+import { ArrowUpDown, Bot, ChevronLeft, HardDrive, Keyboard, LogOut, UserPlus, Palette, User } from '@/components/ui/icons';
 import { DEFAULT_THEME, applyTheme } from '../../lib/theme';
 import { useThemeStore } from '../../stores/themeStore';
 import { useAuthStore } from '../../stores/authStore';
@@ -186,7 +186,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                 <GroupLabel label="WORKSPACE" />
                 <NavItem icon={<Bot size={18} />} label="Bot & app integrations" active={section === 'bots'} onClick={() => setSection('bots')} />
                 <NavItem icon={<HardDrive size={18} />} label="Workspace storage" active={section === 'storage'} onClick={() => setSection('storage')} />
-                <NavItem icon={<Link2 size={18} />} label="Invite link" active={section === 'invite'} onClick={() => setSection('invite')} />
+                <NavItem icon={<UserPlus size={18} />} label="Add people" active={section === 'invite'} onClick={() => setSection('invite')} />
               </>
             )}
             <div className="mt-auto pt-3">
@@ -207,7 +207,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                 ['general', 'Shortcuts'],
                 ['theme-presets', 'Templates'],
                 ['theme-custom', 'Custom'],
-                ...(workspace ? ([['sidebar', 'Sidebar'], ['bots', 'Bots'], ['storage', 'Storage'], ['invite', 'Invite']] as const) : []),
+                ...(workspace ? ([['sidebar', 'Sidebar'], ['bots', 'Bots'], ['storage', 'Storage'], ['invite', 'Add people']] as const) : []),
               ] as [SettingsSection, string][]
             ).map(([id, label]) => (
               <button

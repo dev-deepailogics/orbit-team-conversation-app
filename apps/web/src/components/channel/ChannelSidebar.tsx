@@ -257,7 +257,6 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   const [showThemeModal, setShowThemeModal] = useState(false);
   const [showOrgControlModal, setShowOrgControlModal] = useState(false);
   const [showNewDm, setShowNewDm] = useState(false);
-  const [copiedInvite, setCopiedInvite] = useState(false);
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
   const workspaceMenuRef = useRef<HTMLDivElement>(null);
   const [isChannelsCollapsed, setIsChannelsCollapsed] = useState(false);
@@ -731,13 +730,6 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
   const archivedCount =
     channelGroups.archived.length + dmGroups.archived.length;
 
-  const copyInviteLink = () => {
-    const inviteLink = `${window.location.origin}/join/${(workspace as any).inviteCode || workspace.id}`;
-    navigator.clipboard.writeText(inviteLink);
-    setCopiedInvite(true);
-    setTimeout(() => setCopiedInvite(false), 2500);
-  };
-
   return (
     <div
       className="relative w-64 md:w-[var(--sidebar-w)] shrink-0 flex flex-col h-full select-none"
@@ -994,29 +986,9 @@ export const ChannelSidebar: React.FC<ChannelSidebarProps> = ({
                 className="w-full px-3.5 py-2 text-left text-xs flex items-center gap-2.5 transition hover:bg-[var(--theme-fill-hover)]"
               >
                 <UserPlus size={15} style={{ color: "var(--theme-primary)" }} />
-                <span>Invite & Add Members</span>
+                <span>Add Members</span>
               </button>
 
-              {/* Copy Invite Link */}
-              <button
-                onClick={() => {
-                  copyInviteLink();
-                }}
-                className="w-full px-3.5 py-2 text-left text-xs flex items-center justify-between transition hover:bg-black/5 dark:hover:bg-white/10"
-              >
-                <span className="flex items-center gap-2.5">
-                  <UserPlus
-                    size={15}
-                    style={{ color: "var(--theme-primary)" }}
-                  />
-                  <span>
-                    {copiedInvite
-                      ? "Invite Link Copied!"
-                      : "Copy Workspace Invite Link"}
-                  </span>
-                </span>
-                {copiedInvite && <Check size={13} className="text-green-500" />}
-              </button>
             </div>
           </div>
         )}

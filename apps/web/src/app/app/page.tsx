@@ -1651,7 +1651,7 @@ export default function AppDashboard() {
                   size={14}
                   className={isRefreshing ? "animate-spin" : ""}
                 />
-                Check for Invites
+                Check again
               </button>
               <button
                 onClick={logout}

@@ -22,11 +22,6 @@ export async function markChannelRead(channelId: string): Promise<void> {
   await api.post(`/api/channels/${channelId}/read`);
 }
 
-export async function joinWorkspace(inviteCode: string): Promise<string> {
-  const res = await api.post<{ workspaceId: string }>('/api/workspaces/join', { inviteCode });
-  return res.data.workspaceId;
-}
-
 // Returns the existing DM if there is one (server dedupes), including a self-DM.
 export async function openDirectMessage(workspaceId: string, targetUserId: string): Promise<Channel> {
   const res = await api.post<Channel>(`/api/channels/workspaces/${workspaceId}/dm`, { targetUserId });

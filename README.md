@@ -8,7 +8,7 @@ Designed for seamless deployment on your own VPS with Docker and ready for cross
 
 ## 🚀 Key Features
 
-- 🏢 **Multi-Tenant Workspaces & Organizations**: Switch between workspaces with unique custom slugs and invite links.
+- 🏢 **Multi-Tenant Workspaces & Organizations**: Switch between workspaces with unique custom slugs; admins add members directly.
 - 💬 **Channels & Direct Messages**: Public & private channels, 1:1 and group direct messaging.
 - ⚡ **Real-Time Engine**: WebSocket-powered instant message delivery, live typing indicators, and user online/offline presence status.
 - 🧵 **Message Threads**: Reply in threaded discussions without cluttering the main channel feed.

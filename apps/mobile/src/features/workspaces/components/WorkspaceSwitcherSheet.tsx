@@ -6,7 +6,6 @@ import { Text } from '@/components/ui/text';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import { useWorkspaceStore } from '../store';
-import { JoinWorkspaceForm } from './JoinWorkspaceForm';
 
 export function WorkspaceSwitcherSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { colors } = useTheme();
@@ -42,7 +41,6 @@ export function WorkspaceSwitcherSheet({ visible, onClose }: { visible: boolean;
           </Pressable>
         ))}
       </View>
-      <JoinWorkspaceForm onJoined={onClose} />
     </Sheet>
   );
 }

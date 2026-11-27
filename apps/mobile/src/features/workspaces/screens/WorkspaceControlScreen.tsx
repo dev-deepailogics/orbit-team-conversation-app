@@ -29,9 +29,7 @@ export function WorkspaceControlScreen() {
           <Text className="text-xl font-black" numberOfLines={1}>
             {current.name}
           </Text>
-          <Text className="text-sm text-muted-foreground" selectable>
-            Invite code: {current.inviteCode}
-          </Text>
+          <Text className="text-sm text-muted-foreground">/{current.slug}</Text>
         </View>
       </View>
 

@@ -71,7 +71,6 @@ interface AdminWorkspace {
   id: string;
   name: string;
   slug: string;
-  inviteCode: string;
   ownerId: string;
   createdAt: string;
   settings?: { isDemo?: boolean; demoRegion?: 'local' | 'international' } | null;

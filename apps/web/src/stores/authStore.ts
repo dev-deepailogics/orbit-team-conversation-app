@@ -57,16 +57,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 }));
 
-// Invite code saved by /join when the visitor must sign in first. Stored (not a ?redirect param)
-// so it survives the Microsoft OAuth round-trip and hopping from /login to /register.
-export const PENDING_INVITE_KEY = 'orbit_pending_invite';
-
-/** Where to land after sign-in/sign-up: back to a pending /join invite, else the app. */
-export function postAuthPath() {
-  const code = typeof window !== 'undefined' ? localStorage.getItem(PENDING_INVITE_KEY) : null;
-  return code ? `/join/${code}` : '/app';
-}
-
 // Keep the store's token in step with silent refreshes done by the api client / socket.
 if (typeof window !== 'undefined') {
   window.addEventListener(TOKEN_REFRESHED_EVENT, (e) => {

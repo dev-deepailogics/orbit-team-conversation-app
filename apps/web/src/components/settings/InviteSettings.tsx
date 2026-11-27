@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { AssignableWorkspaceRole, UserProfile, Workspace } from '@orbit/types';
-import { Briefcase, Check, Contact, Copy, Link2, Loader2, Mail, Shield, UserPlus, Users } from '@/components/ui/icons';
+import { Briefcase, Check, Contact, Loader2, Mail, Shield, UserPlus, Users } from '@/components/ui/icons';
 import { api } from '../../lib/api';
 import { Card, CardTitle, PageHeader, PrimaryButton, SUCCESS, DANGER, onTint, tint } from './ui';
 
@@ -11,21 +11,11 @@ export const InviteSettings: React.FC<{
   currentUser: UserProfile | null;
   onMemberAdded?: () => void;
 }> = ({ workspace, onMemberAdded }) => {
-  const [copied, setCopied] = useState(false);
   const [emailOrUsername, setEmailOrUsername] = useState('');
   const [role, setRole] = useState<AssignableWorkspaceRole>('MEMBER');
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-
-  const inviteLink =
-    typeof window !== 'undefined' ? `${window.location.origin}/join/${(workspace as any).inviteCode || workspace.id}` : '';
-
-  const copy = () => {
-    navigator.clipboard.writeText(inviteLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
-  };
 
   const addMember = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,43 +37,8 @@ export const InviteSettings: React.FC<{
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
-      <PageHeader title="Workspace invite link" subtitle={`Share this link to let people join ${workspace.name}.`} />
+      <PageHeader title="Add people" subtitle={`Add teammates to ${workspace.name}.`} />
       <div className="flex-1 min-h-0 overflow-y-auto px-8 py-6 flex flex-col gap-4" style={{ backgroundColor: 'var(--theme-bg-surface)' }}>
-        <Card>
-          <CardTitle title="Invite link" subtitle="Anyone with the link can join this workspace" />
-          <div className="flex items-center gap-2.5">
-            <div
-              className="flex-1 min-w-0 h-11 px-3.5 rounded-xl border flex items-center gap-2.5"
-              style={{ backgroundColor: 'var(--theme-bg-surface-hover)', borderColor: 'var(--theme-border)' }}
-            >
-              <Link2 size={18} style={{ color: 'var(--theme-text-muted)' }} />
-              <span className="flex-1 min-w-0 truncate text-sm font-medium select-all" style={{ color: 'var(--theme-text)' }}>
-                {inviteLink}
-              </span>
-            </div>
-            <button
-              onClick={copy}
-              className="h-11 px-4 rounded-[22px] flex items-center gap-1.5 text-sm font-semibold shrink-0 transition hover:brightness-95"
-              style={{
-                backgroundColor: copied ? SUCCESS : 'var(--theme-primary)',
-                color: copied ? '#FFFFFF' : 'var(--theme-primary-text)',
-              }}
-            >
-              {copied ? <Check size={16} /> : <Copy size={16} />}
-              {copied ? 'Copied' : 'Copy link'}
-            </button>
-          </div>
-          {copied && (
-            <span
-              className="self-start h-[34px] px-3 rounded-[10px] flex items-center gap-2 text-[13px] font-semibold"
-              style={{ backgroundColor: tint(SUCCESS), color: onTint(SUCCESS) }}
-            >
-              <Check size={15} />
-              Link copied to clipboard
-            </span>
-          )}
-        </Card>
-
         <Card>
           <CardTitle title="Add people directly" subtitle="Add someone who already has an Orbit account" />
           <form onSubmit={addMember} className="flex flex-col gap-3">

@@ -167,7 +167,6 @@ model Workspace {
   name        String
   slug        String   @unique
   iconUrl     String?
-  inviteCode  String   @unique @default(uuid())
   ownerId     String
   settings    Json?
   createdAt   DateTime @default(now())

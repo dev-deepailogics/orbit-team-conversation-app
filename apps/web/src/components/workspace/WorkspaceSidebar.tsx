@@ -18,11 +18,9 @@ import {
   Palette,
   Bot,
   HardDrive,
-  Link2,
   LogOut,
   ChevronRight,
   ChevronDown,
-  Check,
   Video,
 } from '@/components/ui/icons';
 import { api } from '../../lib/api';
@@ -75,7 +73,6 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   const [themeExpanded, setThemeExpanded] = useState(false);
   const [themeModalTab, setThemeModalTab] = useState<'presets' | 'custom' | 'general' | 'profile' | null>(null);
   const [showStorage, setShowStorage] = useState(false);
-  const [copiedInvite, setCopiedInvite] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
 
@@ -119,15 +116,6 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const copyInviteLink = () => {
-    if (!currentWorkspace) return;
-    navigator.clipboard.writeText(
-      `${window.location.origin}/join/${(currentWorkspace as any).inviteCode || currentWorkspace.id}`,
-    );
-    setCopiedInvite(true);
-    setTimeout(() => setCopiedInvite(false), 2500);
   };
 
   const closeMenuThen = (fn: () => void) => () => {

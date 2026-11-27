@@ -14,10 +14,6 @@ const createWorkspaceSchema = z.object({
   iconUrl: z.string().optional(),
 });
 
-const joinWorkspaceSchema = z.object({
-  inviteCode: z.string().min(1),
-});
-
 const addWorkspaceMemberSchema = z.object({
   emailOrUsername: z.string().trim().min(1),
   role: z.enum(ASSIGNABLE_WORKSPACE_ROLES).default('MEMBER'),
@@ -228,100 +224,6 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       ...workspace,
       channels: workspace.channels.map((c) => sanitizeChannelForViewer(c, userId)),
     });
-  });
-
-  // Join workspace using inviteCode
-  fastify.post('/join', { preHandler: [fastify.authenticate] }, async (request, reply) => {
-    const userId = (request.user as { id: string }).id;
-    const parseResult = joinWorkspaceSchema.safeParse(request.body);
-
-    if (!parseResult.success) {
-      return reply.status(400).send({ error: 'Invite code is required' });
-    }
-
-    const { inviteCode } = parseResult.data;
-
-    const workspace = await prisma.workspace.findUnique({
-      where: { inviteCode },
-      include: {
-        channels: {
-          where: { type: 'PUBLIC' },
-        },
-      },
-    });
-
-    if (!workspace) {
-      return reply.status(404).send({ error: 'Invalid invite code' });
-    }
-
-    const joiner = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
-    if (joiner && isForeignDemoUser(joiner.email, workspace.slug)) {
-      return reply.status(403).send({ error: 'Demo accounts can only access their own demo workspace' });
-    }
-
-    // Check if already a member
-    const existingMember = await prisma.workspaceMember.findUnique({
-      where: {
-        workspaceId_userId: {
-          workspaceId: workspace.id,
-          userId,
-        },
-      },
-    });
-
-    if (!existingMember) {
-      await prisma.workspaceMember.create({
-        data: {
-          workspaceId: workspace.id,
-          userId,
-          role: 'MEMBER',
-        },
-      });
-
-      // Auto-join public channels
-      for (const ch of workspace.channels) {
-        await prisma.channelMember.upsert({
-          where: {
-            channelId_userId: {
-              channelId: ch.id,
-              userId,
-            },
-          },
-          create: {
-            channelId: ch.id,
-            userId,
-          },
-          update: {},
-        });
-      }
-
-      // Send welcome notification to default public channel
-      try {
-        const joinedUser = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { displayName: true, username: true },
-        });
-        const targetChannel =
-          workspace.channels.find((c) => c.name === 'general' && c.type === 'PUBLIC') ||
-          workspace.channels.find((c) => c.type === 'PUBLIC') ||
-          workspace.channels[0];
-
-        if (targetChannel) {
-          const uName = joinedUser?.displayName || joinedUser?.username || 'A new teammate';
-          await sendSystemNotification({
-            workspaceId: workspace.id,
-            channelId: targetChannel.id,
-            content: `👋 **${uName}** joined the workspace! Welcome aboard! 🚀`,
-            io: fastify.io,
-          });
-        }
-      } catch (botErr) {
-        fastify.log.error(botErr, 'Failed to send workspace join notification');
-      }
-    }
-
-    audit(request, { action: 'workspace.join', actorId: userId, workspaceId: workspace.id, targetType: 'workspace', targetId: workspace.id });
-    return reply.send({ success: true, workspaceId: workspace.id });
   });
 
   // Add member to workspace by email or username

@@ -52,10 +52,3 @@ export function splitChannels(channels: Channel[], myId: string | undefined, mem
     dms: [...dms, ...pendingDMs(dms, members, myId)].sort(byLabel),
   };
 }
-
-// Accepts a bare code or a web invite link (https://<host>/join/<code>, see apps/web/src/app/join).
-export function parseInviteCode(input: string): string {
-  const text = input.trim();
-  const match = text.match(/\/join\/([^/?#\s]+)/);
-  return match ? match[1] : text;
-}

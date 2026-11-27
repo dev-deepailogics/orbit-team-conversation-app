@@ -13,7 +13,7 @@ const STEPS = [
     description:
       'Set up your organization workspace in seconds. Group initiatives into dedicated projects with custom color accents, notification channels, and team permissions.',
     codeSnippet: 'Project created: Design Sprint • 12 active members',
-    highlights: ['Multi-project portfolio overview', 'Custom workspace vanity URLs', 'One-click member invite links'],
+    highlights: ['Multi-project portfolio overview', 'Custom workspace vanity URLs', 'Admin-managed member access'],
   },
   {
     step: '02',
