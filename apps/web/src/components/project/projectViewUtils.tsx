@@ -1,6 +1,7 @@
 import React from "react";
 import { Project, ProjectColumn, Ticket, TicketPriority, UserProfile, WorkspaceMember } from "@orbit/types";
-import { PriorityUp, PriorityMedium, PriorityDown, AlertTriangle, ChevronDown, Check, Search } from "@/components/ui/icons";
+import { PriorityUp, PriorityMedium, PriorityDown, AlertTriangle, ChevronDown, Check } from "@/components/ui/icons";
+import { DropdownSearch, NoMatches, matchesSearch } from "@/components/ui/DropdownSearch";
 
 // Statuses are user-defined board columns, so their role is inferred from the column name.
 export type ColumnKind = "done" | "review" | "progress" | "todo";
@@ -301,8 +302,7 @@ export const FilterMenu: React.FC<{
   }, [open]);
   const selected = options.find((o) => o.value === value);
   const isSet = value !== "ALL";
-  const q = query.trim().toLowerCase();
-  const visibleOptions = q ? options.filter((o) => o.label.toLowerCase().includes(q)) : options;
+  const visibleOptions = options.filter((o) => matchesSearch(o.label, query));
   const choose = (v: string) => {
     onChange(v);
     setOpen(false);
@@ -320,40 +320,15 @@ export const FilterMenu: React.FC<{
           style={{ backgroundColor: "var(--theme-bg-app)", borderColor: "var(--theme-border)" }}
         >
           {searchable && (
-            <div
-              className="sticky -top-1.5 -mx-1.5 -mt-1.5 mb-1 p-1.5 border-b z-10"
-              style={{ backgroundColor: "var(--theme-bg-app)", borderColor: "var(--theme-border)" }}
-            >
-              <div
-                className="h-8 px-2.5 rounded-lg flex items-center gap-2 border"
-                style={{ borderColor: "var(--theme-border)", backgroundColor: "var(--theme-bg-surface)" }}
-              >
-                <Search size={13} style={{ color: "var(--theme-text-muted)" }} />
-                <input
-                  autoFocus
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && visibleOptions[0]) {
-                      e.preventDefault();
-                      choose(visibleOptions[0].value);
-                    } else if (e.key === "Escape") {
-                      setOpen(false);
-                    }
-                  }}
-                  placeholder={searchPlaceholder || "Search…"}
-                  aria-label={searchPlaceholder || `Search ${label.toLowerCase()}`}
-                  className="flex-1 min-w-0 bg-transparent outline-none text-[13px] placeholder:text-[var(--theme-text-muted)]"
-                  style={{ color: "var(--theme-text)" }}
-                />
-              </div>
-            </div>
+            <DropdownSearch
+              value={query}
+              onChange={setQuery}
+              placeholder={searchPlaceholder || `Search ${label.toLowerCase()}…`}
+              onEnter={() => visibleOptions[0] && choose(visibleOptions[0].value)}
+              onEscape={() => setOpen(false)}
+            />
           )}
-          {visibleOptions.length === 0 && (
-            <p className="px-2.5 py-2 text-[13px]" style={{ color: "var(--theme-text-muted)" }}>
-              No matches
-            </p>
-          )}
+          {visibleOptions.length === 0 && <NoMatches />}
           {visibleOptions.map((o) => (
             <button
               type="button"

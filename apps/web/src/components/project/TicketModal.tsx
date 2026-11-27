@@ -168,6 +168,8 @@ export const TicketFields: React.FC<{
         </Field>
         <Field label="Assignee">
           <SelectField
+            searchable
+            searchPlaceholder="Search people…"
             value={draft.assigneeId ?? ''}
             options={assigneeOptions}
             onChange={(v) => onChange({ assigneeId: v || null })}

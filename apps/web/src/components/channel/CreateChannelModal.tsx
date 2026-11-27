@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Channel } from '@orbit/types';
 import { Hash, Lock, Mask, Search } from '@/components/ui/icons';
 import { api } from '../../lib/api';
@@ -42,6 +42,18 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<any[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  // Close the people list when clicking anywhere outside the field + list.
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const close = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setPickerOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [pickerOpen]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -51,12 +63,11 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
   );
 
   const matches = useMemo(() => {
+    // Empty search lists everyone not picked yet; typing narrows it down.
     const q = query.trim().toLowerCase();
-    if (!q) return [];
     return people
       .filter((u) => !picked.some((p) => p.id === u.id))
-      .filter((u) => `${u.displayName} ${u.username} ${u.email || ''}`.toLowerCase().includes(q))
-      .slice(0, 5);
+      .filter((u) => !q || `${u.displayName} ${u.username} ${u.email || ''}`.toLowerCase().includes(q));
   }, [people, picked, query]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -188,16 +199,24 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
 
       <Field label="Add members" optional>
         <div className="flex flex-col gap-2">
-          <div className="relative">
+          <div ref={pickerRef} className="relative">
             <div className={inputShellClass}>
               <Search size={16} style={{ color: 'var(--theme-text-muted)' }} />
               <input
                 type="text"
                 placeholder="Search for people"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onFocus={() => setPickerOpen(true)}
+                onClick={() => setPickerOpen(true)}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setPickerOpen(true);
+                }}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
+                  if (e.key === 'Escape' && pickerOpen) {
+                    e.stopPropagation();
+                    setPickerOpen(false);
+                  } else if (e.key === 'Enter') {
                     e.preventDefault();
                     if (matches[0]) {
                       setPicked((p) => [...p, matches[0]]);
@@ -208,11 +227,20 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
                 className={bareInputClass}
               />
             </div>
-            {matches.length > 0 && (
+            {pickerOpen && (
               <div
-                className="absolute left-0 right-0 top-full mt-1 z-[60] rounded-xl border p-1 shadow-xl"
+                className="absolute left-0 right-0 top-full mt-1 z-[60] max-h-60 overflow-y-auto rounded-xl border p-1 shadow-xl"
                 style={{ backgroundColor: 'var(--theme-bg-app)', borderColor: 'var(--theme-border)' }}
               >
+                {matches.length === 0 && (
+                  <p className="px-2.5 py-2 text-[13px]" style={{ color: 'var(--theme-text-muted)' }}>
+                    {people.length === 0
+                      ? 'No one else is in this workspace yet'
+                      : picked.length === people.length && !query.trim()
+                        ? 'Everyone has been added'
+                        : 'No matching people'}
+                  </p>
+                )}
                 {matches.map((u) => (
                   <button
                     key={u.id}

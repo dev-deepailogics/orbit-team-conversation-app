@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { NoMatches, matchesSearch } from '@/components/ui/DropdownSearch';
 import { api } from '../../lib/api';
 import { useClickOutside } from '../../lib/useClickOutside';
 import { Workspace, UserProfile, Channel } from '@orbit/types';
@@ -81,9 +82,23 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<'active' | 'inactive' | 'delivered'>('active');
   const [assignedEmployees, setAssignedEmployees] = useState<Array<{ name: string; uid?: string }>>([]);
+  const [employeeQuery, setEmployeeQuery] = useState('');
+  const employeeInputRef = useRef<HTMLInputElement>(null);
   const [employeeDropdownOpen, setEmployeeDropdownOpen] = useState<boolean>(false);
   const employeeFieldRef = useRef<HTMLDivElement>(null);
   useClickOutside(employeeFieldRef, employeeDropdownOpen, () => setEmployeeDropdownOpen(false));
+  useEffect(() => {
+    if (!employeeDropdownOpen) setEmployeeQuery('');
+  }, [employeeDropdownOpen]);
+  const memberName = (member: any): string =>
+    member.user?.displayName || member.user?.name || member.displayName || member.name || 'Member';
+  const memberUid = (member: any): string | undefined => member.userId || member.user?.id || member.id;
+  // Picking a person clears the typed search and keeps the cursor in the box for the next one.
+  const pickEmployee = (member: any) => {
+    handleToggleEmployee(memberName(member), memberUid(member));
+    setEmployeeQuery('');
+    employeeInputRef.current?.focus();
+  };
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Envs Modal State
@@ -545,15 +560,13 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
                 </label>
                 {/* Chip Box */}
                 <div
-                  onClick={() => setEmployeeDropdownOpen((prev) => !prev)}
-                  className="min-h-[46px] w-full px-2.5 py-2 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] flex flex-wrap items-center gap-1.5 cursor-pointer hover:border-[var(--theme-border)] transition pr-8 relative"
+                  onClick={() => {
+                    setEmployeeDropdownOpen(true);
+                    employeeInputRef.current?.focus();
+                  }}
+                  className="min-h-[46px] w-full px-2.5 py-2 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] flex flex-wrap items-center gap-1.5 cursor-text transition pr-8 relative focus-within:border-[var(--theme-primary)]"
                 >
-                  {assignedEmployees.length === 0 ? (
-                    <span className="text-[var(--theme-text-muted)] text-xs px-1 select-none">
-                      Select employees to assign...
-                    </span>
-                  ) : (
-                    assignedEmployees.map((emp) => (
+                  {assignedEmployees.map((emp) => (
                       <span
                         key={emp.name}
                         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[var(--theme-bg-surface)] text-[var(--theme-text)] border border-[var(--theme-border)] shadow-xs"
@@ -568,12 +581,43 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
                           <X size={12} />
                         </button>
                       </span>
-                    ))
-                  )}
-                  <ChevronDown
-                    size={16}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--theme-text-muted)]"
+                    ))}
+                  <input
+                    ref={employeeInputRef}
+                    value={employeeQuery}
+                    onChange={(e) => {
+                      setEmployeeQuery(e.target.value);
+                      setEmployeeDropdownOpen(true);
+                    }}
+                    onFocus={() => setEmployeeDropdownOpen(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const first = (members || []).find((m: any) => matchesSearch(memberName(m), employeeQuery));
+                        if (first) pickEmployee(first);
+                      } else if (e.key === 'Escape' && employeeDropdownOpen) {
+                        e.stopPropagation();
+                        setEmployeeDropdownOpen(false);
+                      } else if (e.key === 'Backspace' && !employeeQuery && assignedEmployees.length > 0) {
+                        handleRemoveEmployee(assignedEmployees[assignedEmployees.length - 1].name);
+                      }
+                    }}
+                    placeholder={assignedEmployees.length === 0 ? 'Search and select employees...' : ''}
+                    aria-label='Search employees'
+                    className="flex-1 min-w-[80px] bg-transparent outline-none text-xs px-1 py-0.5 text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)]"
                   />
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-label={employeeDropdownOpen ? 'Close list' : 'Open list'}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEmployeeDropdownOpen((prev) => !prev);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--theme-text-muted)]"
+                  >
+                    <ChevronDown size={16} />
+                  </button>
                 </div>
 
                 {/* Dropdown Menu of Available Workspace Members */}
@@ -586,14 +630,18 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
                     }}
                   >
                     {members && members.length > 0 ? (
-                      members.map((member: any) => {
+                      members
+                        .filter((member: any) =>
+                          matchesSearch(memberName(member), employeeQuery),
+                        )
+                        .map((member: any) => {
                         const mName = member.user?.displayName || member.user?.name || member.displayName || member.name || 'Member';
                         const mUid = member.userId || member.user?.id || member.id;
                         const isAssigned = assignedEmployees.some((e) => e.name === mName);
                         return (
                           <div
                             key={mUid || mName}
-                            onClick={() => handleToggleEmployee(mName, mUid)}
+                            onClick={() => pickEmployee(member)}
                             className={`flex items-center justify-between px-3 py-1.5 rounded-lg cursor-pointer text-xs transition ${
                               isAssigned
                                 ? 'bg-blue-600/20 text-blue-700 dark:text-blue-300 font-semibold'
@@ -610,6 +658,8 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
                         No team members found in workspace
                       </div>
                     )}
+                    {members?.length > 0 &&
+                      members.every((m: any) => !matchesSearch(memberName(m), employeeQuery)) && <NoMatches />}
                   </div>
                 )}
               </div>

@@ -86,6 +86,7 @@ import { useTimeFormat, formatMessageTime } from "../../lib/timeFormat";
 import { UserAvailabilityView } from "./UserAvailabilityView";
 import { EmployeeStatusView } from "./EmployeeStatusView";
 import { ProjectPortfolioView } from "../project/ProjectPortfolioView";
+import { NoMatches, matchesSearch } from "../ui/DropdownSearch";
 import { MediaManagementView } from "../media/MediaManagementView";
 
 export const OrganizationControlView: React.FC<
@@ -189,6 +190,7 @@ export const OrganizationControlView: React.FC<
   const [canViewTeam, setCanViewTeam] = useState<boolean>(false);
   const [myRole, setMyRole] = useState<WorkspaceRole | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
+  const [roleSearch, setRoleSearch] = useState("");
   const [savingRoleFor, setSavingRoleFor] = useState<string | null>(null);
   const canManageMembers = hasWorkspacePermission(
     myRole,
@@ -1275,10 +1277,29 @@ export const OrganizationControlView: React.FC<
                   </p>
                 )}
                 <div
+                  className="h-9 mb-2 px-3 rounded-xl flex items-center gap-2 border"
+                  style={{ borderColor: "var(--theme-border)", backgroundColor: "var(--theme-bg-app)" }}
+                >
+                  <Search size={14} style={{ color: "var(--theme-text-muted)" }} />
+                  <input
+                    value={roleSearch}
+                    onChange={(e) => setRoleSearch(e.target.value)}
+                    placeholder="Search members by name or username…"
+                    aria-label="Search members"
+                    className="flex-1 min-w-0 bg-transparent outline-none text-xs placeholder:text-[var(--theme-text-muted)]"
+                    style={{ color: "var(--theme-text)" }}
+                  />
+                </div>
+                <div
                   className="border rounded-xl divide-y"
                   style={{ borderColor: "var(--theme-border)" }}
                 >
-                  {teamMembers.map((m) => {
+                  {teamMembers.every(
+                    (m) => !matchesSearch(`${m.user.displayName} ${m.user.username}`, roleSearch),
+                  ) && <NoMatches />}
+                  {teamMembers
+                    .filter((m) => matchesSearch(`${m.user.displayName} ${m.user.username}`, roleSearch))
+                    .map((m) => {
                     const locked =
                       m.role === "OWNER" ||
                       m.user.id === workspace.ownerId ||

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { NoMatches, matchesSearch } from "@/components/ui/DropdownSearch";
 
 import { TicketTypeIcon } from "./TicketTypeIcon";
 import { TICKET_TYPES } from "../../lib/ticketTypes";
@@ -174,12 +175,26 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
   const [editAssignedEmployees, setEditAssignedEmployees] = useState<
     Array<{ name: string; uid?: string }>
   >([]);
+  const [editEmployeeQuery, setEditEmployeeQuery] = useState("");
+  const editEmployeeInputRef = useRef<HTMLInputElement>(null);
   const [editEmployeeDropdownOpen, setEditEmployeeDropdownOpen] =
     useState(false);
   const editEmployeeFieldRef = useRef<HTMLDivElement>(null);
   useClickOutside(editEmployeeFieldRef, editEmployeeDropdownOpen, () =>
     setEditEmployeeDropdownOpen(false),
   );
+  useEffect(() => {
+    if (!editEmployeeDropdownOpen) setEditEmployeeQuery("");
+  }, [editEmployeeDropdownOpen]);
+  const memberName = (member: any): string =>
+    member.user?.displayName || member.user?.name || member.displayName || member.name || "Member";
+  const memberUid = (member: any): string | undefined => member.userId || member.user?.id || member.id;
+  // Picking a person clears the typed search and keeps the cursor in the box for the next one.
+  const pickEmployee = (member: any) => {
+    handleToggleEditEmployee(memberName(member), memberUid(member));
+    setEditEmployeeQuery("");
+    editEmployeeInputRef.current?.focus();
+  };
   const [isUpdatingProject, setIsUpdatingProject] = useState(false);
 
   const handleOpenEditProject = () => {
@@ -1059,6 +1074,8 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                   label="Label"
                   value={filterLabel}
                   onChange={setFilterLabel}
+                  searchable
+                  searchPlaceholder="Search labels…"
                   options={[{ value: "ALL", label: "Any label" }, ...allLabels.map((l) => ({ value: l, label: l }))]}
                 />
               </>
@@ -1657,15 +1674,13 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                   Assign Employees
                 </label>
                 <div
-                  onClick={() => setEditEmployeeDropdownOpen((prev) => !prev)}
-                  className="min-h-[46px] w-full px-2.5 py-2 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] flex flex-wrap items-center gap-1.5 cursor-pointer hover:border-[var(--theme-border)] transition pr-8 relative"
+                  onClick={() => {
+                    setEditEmployeeDropdownOpen(true);
+                    editEmployeeInputRef.current?.focus();
+                  }}
+                  className="min-h-[46px] w-full px-2.5 py-2 rounded-xl bg-[var(--theme-bg-app)] border border-[var(--theme-border)] flex flex-wrap items-center gap-1.5 cursor-text transition pr-8 relative focus-within:border-[var(--theme-primary)]"
                 >
-                  {editAssignedEmployees.length === 0 ? (
-                    <span className="text-[var(--theme-text-muted)] text-xs px-1 select-none">
-                      Select employees to assign...
-                    </span>
-                  ) : (
-                    editAssignedEmployees.map((emp) => (
+                  {editAssignedEmployees.map((emp) => (
                       <span
                         key={emp.name}
                         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[var(--theme-bg-surface)] text-[var(--theme-text)] border border-[var(--theme-border)] shadow-xs"
@@ -1684,12 +1699,43 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                           <X size={12} />
                         </button>
                       </span>
-                    ))
-                  )}
-                  <ChevronDown
-                    size={16}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--theme-text-muted)]"
+                    ))}
+                  <input
+                    ref={editEmployeeInputRef}
+                    value={editEmployeeQuery}
+                    onChange={(e) => {
+                      setEditEmployeeQuery(e.target.value);
+                      setEditEmployeeDropdownOpen(true);
+                    }}
+                    onFocus={() => setEditEmployeeDropdownOpen(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        const first = (members || []).find((m: any) => matchesSearch(memberName(m), editEmployeeQuery));
+                        if (first) pickEmployee(first);
+                      } else if (e.key === "Escape" && editEmployeeDropdownOpen) {
+                        e.stopPropagation();
+                        setEditEmployeeDropdownOpen(false);
+                      } else if (e.key === "Backspace" && !editEmployeeQuery && editAssignedEmployees.length > 0) {
+                        setEditAssignedEmployees((prev) => prev.filter((e) => e.name !== editAssignedEmployees[editAssignedEmployees.length - 1].name));
+                      }
+                    }}
+                    placeholder={editAssignedEmployees.length === 0 ? "Search and select employees..." : ""}
+                    aria-label="Search employees"
+                    className="flex-1 min-w-[80px] bg-transparent outline-none text-xs px-1 py-0.5 text-[var(--theme-text)] placeholder:text-[var(--theme-text-muted)]"
                   />
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-label={editEmployeeDropdownOpen ? "Close list" : "Open list"}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditEmployeeDropdownOpen((prev) => !prev);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--theme-text-muted)]"
+                  >
+                    <ChevronDown size={16} />
+                  </button>
                 </div>
 
                 {editEmployeeDropdownOpen && (
@@ -1701,7 +1747,11 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                     }}
                   >
                     {members && members.length > 0 ? (
-                      members.map((member: any) => {
+                      members
+                        .filter((member: any) =>
+                          matchesSearch(memberName(member), editEmployeeQuery),
+                        )
+                        .map((member: any) => {
                         const mName =
                           member.user?.displayName ||
                           member.user?.name ||
@@ -1716,9 +1766,7 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                         return (
                           <div
                             key={mUid || mName}
-                            onClick={() =>
-                              handleToggleEditEmployee(mName, mUid)
-                            }
+                            onClick={() => pickEmployee(member)}
                             className={`flex items-center justify-between px-3 py-1.5 rounded-lg cursor-pointer text-xs transition ${
                               isAssigned
                                 ? "bg-blue-600/20 text-blue-700 dark:text-blue-300 font-semibold"
@@ -1740,6 +1788,8 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                         No team members found in workspace
                       </div>
                     )}
+                    {members?.length > 0 &&
+                      members.every((m: any) => !matchesSearch(memberName(m), editEmployeeQuery)) && <NoMatches />}
                   </div>
                 )}
               </div>

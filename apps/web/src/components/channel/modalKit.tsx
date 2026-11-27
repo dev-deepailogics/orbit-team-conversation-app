@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { X, ChevronDown, Check } from '@/components/ui/icons';
+import { DropdownSearch, NoMatches, matchesSearch } from '@/components/ui/DropdownSearch';
 import { Avatar } from '../project/projectViewUtils';
 import { Presence } from '../availability/useTeamPresence';
 
@@ -265,22 +266,36 @@ export function SelectField<T extends string>({
   onChange,
   placeholder = 'Select',
   disabled,
+  searchable,
+  searchPlaceholder,
 }: {
   value: T | '';
   options: SelectOption<T>[];
   onChange: (v: T) => void;
   placeholder?: string;
   disabled?: boolean;
+  /** Show a search box at the top of the list (for long lists such as people or projects). */
+  searchable?: boolean;
+  searchPlaceholder?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setQuery('');
+      return;
+    }
     const close = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false);
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [open]);
   const current = options.find((o) => o.value === value);
+  const visibleOptions = searchable ? options.filter((o) => matchesSearch(o.label, query)) : options;
+  const choose = (v: T) => {
+    onChange(v);
+    setOpen(false);
+  };
   return (
     <div ref={ref} className="relative">
       <button
@@ -311,14 +326,22 @@ export function SelectField<T extends string>({
           className="absolute left-0 right-0 top-full mt-1 z-[60] max-h-60 overflow-y-auto rounded-xl border p-1 shadow-xl"
           style={{ backgroundColor: 'var(--theme-bg-app)', borderColor: 'var(--theme-border)' }}
         >
-          {options.map((o) => (
+          {searchable && (
+            <DropdownSearch
+              inset={1}
+              value={query}
+              onChange={setQuery}
+              placeholder={searchPlaceholder}
+              onEnter={() => visibleOptions[0] && choose(visibleOptions[0].value)}
+              onEscape={() => setOpen(false)}
+            />
+          )}
+          {searchable && visibleOptions.length === 0 && <NoMatches />}
+          {visibleOptions.map((o) => (
             <button
               key={o.value}
               type="button"
-              onClick={() => {
-                onChange(o.value);
-                setOpen(false);
-              }}
+              onClick={() => choose(o.value)}
               className="w-full h-9 px-2.5 rounded-lg flex items-center gap-2 text-left text-sm transition hover:bg-[var(--theme-fill-hover)]"
               style={{ color: 'var(--theme-text)' }}
             >

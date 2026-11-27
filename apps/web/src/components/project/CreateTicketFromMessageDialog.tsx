@@ -221,6 +221,8 @@ export const CreateTicketFromMessageDialog: React.FC<CreateTicketFromMessageDial
         attachmentsField={<TicketAttachmentsField upload={upload} />}
         projectField={
           <SelectField
+            searchable
+            searchPlaceholder="Search projects…"
             value={selectedProjectId}
             options={projects.map((p) => ({ value: p.id, label: p.name, leading: <ProjectTile /> }))}
             onChange={(id) => {
