@@ -5,7 +5,7 @@ import path from 'path';
 import { storageDriver, classifyFileType, formatBytes } from '../services/storage.js';
 import { verifyChannelAccess } from '../utils/security.js';
 import { audit } from '../services/audit.js';
-import { canReadAttachment, isSharedRecordingFile, resolveRequesterId } from '../services/fileAccess.js';
+import { canReadAttachment, canReadUntrackedFile, isSharedRecordingKey, resolveRequesterId } from '../services/fileAccess.js';
 
 export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   // 1. Upload File with rich metadata
@@ -76,6 +76,22 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       return reply.status(403).send({ error: 'You are not a member of this workspace' });
     }
 
+    // A channel named for the upload must belong to this workspace and be one the caller can use.
+    if (channelId) {
+      const channelAccess = await verifyChannelAccess(userId, channelId, reply);
+      if (!channelAccess) return;
+      if (channelAccess.channel.workspaceId !== workspaceId) {
+        return reply.status(403).send({ error: 'That channel is not in this workspace' });
+      }
+    }
+    // Uploading straight onto an existing message: the message must be in that channel.
+    if (messageId) {
+      const target = await prisma.message.findUnique({ where: { id: messageId }, select: { channelId: true } });
+      if (!channelId || !target || target.channelId !== channelId) {
+        return reply.status(403).send({ error: 'That message is not in this channel' });
+      }
+    }
+
     try {
       const originalFileName = data.filename || 'attachment';
       const mimeType = data.mimetype || 'application/octet-stream';
@@ -120,7 +136,21 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         return reply.status(201).send(attachment);
       }
 
-      // Staged file payload before message send (NOT saved in DB yet)
+      // Staged upload (the composer attaches it when the message is sent). It is recorded now, owned by the uploader,
+      // so that only the uploader can attach it and access to it can be checked from the first moment.
+      await prisma.attachment.create({
+        data: {
+          workspaceId,
+          channelId: channelId || undefined,
+          uploaderId: userId,
+          fileName: originalFileName,
+          fileKey: uploadResult.fileKey,
+          fileUrl: uploadResult.fileUrl,
+          fileType: mimeType,
+          fileSize: uploadResult.fileSize,
+          storageProvider: uploadResult.storageProvider,
+        },
+      });
       const uploader = await prisma.user.findUnique({
         where: { id: userId },
         select: {
@@ -159,26 +189,25 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
 
     const downloadQuery = (request.query as any)?.download === '1' || (request.query as any)?.download === 'true';
 
-    // Locate Attachment in DB to retrieve original filename & MIME type
-    const attachment = await prisma.attachment.findFirst({
-      where: {
-        fileKey: rawKey,
-        isDeleted: false,
-      },
+    // The same stored file can have several records (e.g. a forwarded copy in another channel): any one that grants
+    // access is enough. Records give the original filename and MIME type.
+    const records = await prisma.attachment.findMany({
+      where: { fileKey: rawKey, isDeleted: false },
+      orderBy: { createdAt: 'asc' },
     });
+    const attachment = records[0] ?? null;
 
-    // Only files we have a record of are served, and only to people allowed to see them.
-    if (!attachment) {
-      return reply.status(404).send({ error: 'File not found' });
-    }
     let downloaderId: string | null = null;
-    if (!(await isSharedRecordingFile(attachment))) {
+    if (!(await isSharedRecordingKey(rawKey))) {
       const requesterId = await resolveRequesterId(fastify, request);
       if (!requesterId) {
         return reply.status(401).send({ error: 'Authentication required' });
       }
-      if (!(await canReadAttachment(requesterId, attachment))) {
-        audit(request, { action: 'file.download', outcome: 'failure', actorId: requesterId, workspaceId: attachment.workspaceId, targetType: 'file', targetId: attachment.id, metadata: { reason: 'no_access' } });
+      const allowed = attachment
+        ? (await Promise.all(records.map((r) => canReadAttachment(requesterId, r)))).some(Boolean)
+        : await canReadUntrackedFile(requesterId, rawKey); // stored before uploads were recorded (see fileAccess.ts)
+      if (!allowed) {
+        audit(request, { action: 'file.download', outcome: 'failure', actorId: requesterId, workspaceId: attachment?.workspaceId, targetType: 'file', targetId: attachment?.id, metadata: { reason: 'no_access' } });
         return reply.status(403).send({ error: 'You do not have access to this file' });
       }
       downloaderId = requesterId;
@@ -187,7 +216,7 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     // One entry per download: skip the follow-up range requests a video player makes while seeking/buffering.
     const firstRange = request.headers.range;
     if (!firstRange || /^bytes=0-/.test(firstRange)) {
-      audit(request, { action: 'file.download', actorId: downloaderId, workspaceId: attachment.workspaceId, targetType: 'file', targetId: attachment.id, metadata: { fileName: attachment.fileName, fileSize: attachment.fileSize, ...(downloaderId ? {} : { anonymous: true }) } });
+      audit(request, { action: 'file.download', actorId: downloaderId, workspaceId: attachment?.workspaceId, targetType: 'file', targetId: attachment?.id, metadata: { fileName: attachment?.fileName ?? rawKey.split('/').pop(), fileSize: attachment?.fileSize, ...(downloaderId ? {} : { anonymous: true }) } });
     }
 
     const fileData = await storageDriver.getFileStream(rawKey);
@@ -195,8 +224,8 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       return reply.status(404).send({ error: 'File not found on storage server' });
     }
 
-    const mimeType = attachment.fileType || 'application/octet-stream';
-    const originalName = attachment.fileName || fileData.fileName || 'file';
+    const mimeType = attachment?.fileType || 'application/octet-stream';
+    const originalName = attachment?.fileName || fileData.fileName || 'file';
 
     // Active content (HTML, SVG, XML, scripts) is never shown inline: served from our own origin it could run script
     // with the signed-in user's access. Browsers download it instead; images, video, audio, PDF and text still preview.
@@ -259,22 +288,24 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     const { filename } = request.params as { filename: string };
     const safeFilename = path.basename(filename);
 
-    const attachment = await prisma.attachment.findFirst({
+    const records = await prisma.attachment.findMany({
       where: {
-        fileKey: { endsWith: safeFilename },
+        fileKey: { endsWith: '/' + safeFilename },
         isDeleted: false,
       },
+      orderBy: { createdAt: 'asc' },
     });
+    const attachment = records[0];
     if (!attachment) {
       return reply.status(404).send({ error: 'File not found' });
     }
 
-    if (!(await isSharedRecordingFile(attachment))) {
+    if (!(await isSharedRecordingKey(attachment.fileKey))) {
       const requesterId = await resolveRequesterId(fastify, request);
       if (!requesterId) {
         return reply.status(401).send({ error: 'Authentication required' });
       }
-      if (!(await canReadAttachment(requesterId, attachment))) {
+      if (!(await Promise.all(records.map((r) => canReadAttachment(requesterId, r)))).some(Boolean)) {
         return reply.status(403).send({ error: 'You do not have access to this file' });
       }
     }
@@ -324,8 +355,13 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       return reply.status(403).send({ error: 'You do not have permission to delete this file' });
     }
 
-    // 1. Delete from physical storage
-    await storageDriver.deleteFile(attachment.fileKey);
+    // 1. Delete from physical storage, unless another live record (a forwarded copy, a reused upload) still uses the file
+    const stillUsed = await prisma.attachment.count({
+      where: { fileKey: attachment.fileKey, isDeleted: false, id: { not: attachment.id } },
+    });
+    if (stillUsed === 0) {
+      await storageDriver.deleteFile(attachment.fileKey);
+    }
     audit(request, { action: 'file.delete', actorId: userId, workspaceId: attachment.workspaceId, targetType: 'file', targetId: attachment.id, metadata: { fileName: attachment.fileName } });
 
     // 2. Mark deleted in database
@@ -369,6 +405,9 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       where: {
         workspaceId,
         isDeleted: false,
+        // Files sent in messages, in channels this member can see (not private channels they are not in, not unsent uploads)
+        messageId: { not: null },
+        OR: [{ channelId: null }, { channel: { type: 'PUBLIC' } }, { channel: { members: { some: { userId } } } }],
       },
       include: {
         uploader: {

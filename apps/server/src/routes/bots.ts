@@ -178,6 +178,12 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
       return reply.status(404).send({ ok: false, error: 'channel_not_found' });
     }
 
+    // Bots attach links to external files only. Files stored by Orbit belong to the people who uploaded them, and a bot
+    // token must not be able to pull one into a channel (or into the workspace at large).
+    if (attachments?.some((att) => att.fileKey || !/^https?:\/\//i.test(att.fileUrl))) {
+      return reply.status(400).send({ ok: false, error: 'invalid_attachment' });
+    }
+
     const message = await prisma.message.create({
       data: {
         channelId,
@@ -189,8 +195,9 @@ export const botRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =>
             fileName: att.fileName,
             fileType: att.fileType,
             fileSize: att.fileSize || 0,
-            fileKey: att.fileKey || att.fileUrl,
+            fileKey: att.fileUrl,
             workspaceId: channel.workspaceId,
+            channelId,
           })),
         } : undefined,
       },

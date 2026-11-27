@@ -10,6 +10,7 @@ Settings added for production deployments. Existing deployments need the first t
 | `TRUST_PROXY` | No (default `true` in production) | Read the client address from `X-Forwarded-For`. Rate limiting and audit entries need this behind a proxy or load balancer. Set `false` if the API is exposed directly, or to a hop count / proxy CIDR list. |
 | `RATE_LIMIT_MAX` | No (default 1200) | Requests per minute per client address. Sign-in 10, registration 5, token refresh 60, password change 5, webhook/bot posting 300. Health checks and sockets are exempt. |
 | `DISABLE_LOCAL_AUTH` | No | `true` accepts only Microsoft Entra ID sign-in. |
+| `STAGED_UPLOAD_RETENTION_DAYS` | No (default 7) | Uploads picked in the message box but never sent are deleted after this many days (file and record), at start-up and every 6 hours. Profile and bot pictures, document and ticket images, and recordings are never touched. |
 | `AUDIT_LOG_FORMAT`, `AUDIT_RETENTION_DAYS` | No | See `docs/audit-logging.md`. |
 
 ## What changed in the containers
@@ -26,3 +27,6 @@ Settings added for production deployments. Existing deployments need the first t
 - API responses carry security headers (nosniff, frame protection, HSTS, referrer policy). Web pages add a
   permissions policy that allows only camera, microphone and screen capture for the app itself.
 - Uploaded HTML, SVG, XML and script files are always downloaded, never displayed in the browser.
+- A stored file can only be attached to a message by the person who uploaded it. Knowing another file's path or id gives
+  no access, ownership or right to delete it. Files uploaded before uploads were recorded stay readable by members of
+  the workspace in their storage path.

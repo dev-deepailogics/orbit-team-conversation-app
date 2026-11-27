@@ -43,7 +43,13 @@ export class LocalStorageDriver implements StorageDriver {
   }
 
   public getFilePath(fileKey: string): string {
-    return path.join(this.baseDir, fileKey);
+    // A storage key is always a path inside the uploads folder. Refuse anything that resolves outside it ("..").
+    const base = path.resolve(this.baseDir);
+    const resolved = path.resolve(base, fileKey);
+    if (resolved !== base && !resolved.startsWith(base + path.sep)) {
+      throw new Error('Invalid file key');
+    }
+    return resolved;
   }
 
   public async uploadFile({
@@ -121,7 +127,12 @@ export class LocalStorageDriver implements StorageDriver {
     size?: number;
     fileName?: string;
   } | null> {
-    const absolutePath = this.getFilePath(fileKey);
+    let absolutePath: string;
+    try {
+      absolutePath = this.getFilePath(fileKey);
+    } catch {
+      return null;
+    }
     if (!fs.existsSync(absolutePath)) {
       return null;
     }

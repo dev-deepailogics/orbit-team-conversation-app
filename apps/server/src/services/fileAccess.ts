@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import { prisma } from '@orbit/db';
 import { canUserAccessChannel, canUserAccessWorkspace } from '../utils/security.js';
+import { INTERNAL_FILE_PREFIX } from './attachments.js';
 
 /**
  * Browsers load <img>, <video> and download links without an Authorization header, so file reads accept a second,
@@ -107,10 +108,34 @@ export async function canReadAttachment(
   return !!(userPicture || botPicture);
 }
 
-/** A recording's video or thumbnail: readable without signing in, since the recording's share link is public by design. */
-export async function isSharedRecordingFile(attachment: { id: string; fileUrl: string }): Promise<boolean> {
+/**
+ * Files stored before uploads were recorded in the database (profile pictures, document and ticket images) have no
+ * record to check. The storage path names the workspace they were uploaded to, so members of that workspace may read
+ * them; a picture that someone uses as their profile or bot image is readable by any signed-in user.
+ */
+export async function canReadUntrackedFile(userId: string, fileKey: string): Promise<boolean> {
+  if (fileKey.split('/').includes('..')) return false;
+  const workspace = /^workspaces\/([^/]+)\//.exec(fileKey);
+  if (workspace && (await canUserAccessWorkspace(userId, workspace[1]))) return true;
+
+  const url = INTERNAL_FILE_PREFIX + fileKey;
+  const [userPicture, botPicture] = await Promise.all([
+    prisma.user.findFirst({ where: { avatarUrl: url }, select: { id: true } }),
+    prisma.botApp.findFirst({ where: { avatarUrl: url }, select: { id: true } }),
+  ]);
+  return !!(userPicture || botPicture);
+}
+
+/**
+ * A recording's video or thumbnail: readable without signing in, since the recording's share link is public by design.
+ * Looked up by storage key because a thumbnail is stored without an attachment record of its own.
+ */
+export async function isSharedRecordingKey(fileKey: string): Promise<boolean> {
   const recording = await prisma.recording.findFirst({
-    where: { isDeleted: false, OR: [{ attachmentId: attachment.id }, { thumbnailUrl: attachment.fileUrl }] },
+    where: {
+      isDeleted: false,
+      OR: [{ attachment: { fileKey } }, { thumbnailUrl: INTERNAL_FILE_PREFIX + fileKey }],
+    },
     select: { id: true },
   });
   return !!recording;

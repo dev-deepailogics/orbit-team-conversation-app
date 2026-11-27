@@ -4,6 +4,7 @@ import { prisma } from '@orbit/db';
 import { POLL_LIMITS, SOCKET_EVENTS } from '@orbit/types';
 import { z } from 'zod';
 import { audit } from '../services/audit.js';
+import { applyAttachments, prepareAttachments } from '../services/attachments.js';
 import { quotedMessageInclude, verifyMessageAccess, verifyQuotable, verifyWorkspaceMember } from '../utils/security.js';
 import { handleMessageMentions } from '../services/mentionService.js';
 import { emitPerViewer, getOrCreateAnonProfile, sanitizeMessageForViewer } from '../services/anonymousService.js';
@@ -310,6 +311,10 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     const { content, attachments, quotedMessageId } = parseResult.data;
     if (quotedMessageId && !(await verifyQuotable(userId, quotedMessageId, parent.channelId, reply))) return;
 
+    // Files the client names must be its own uploads. Checked now, before anything is created.
+    const preparedAttachments = await prepareAttachments(userId, access.channel.workspaceId, attachments);
+    if (!preparedAttachments.ok) return reply.status(400).send({ error: preparedAttachments.error });
+
     let anonName: string | undefined;
     let anonEmoji: string | undefined;
     if (access.channel.isAnonymous) {
@@ -330,34 +335,14 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       },
     });
 
-    // Link or create attachments
-    if (attachments && attachments.length > 0) {
-      for (const att of attachments) {
-        if (att.id) {
-          await prisma.attachment.update({
-            where: { id: att.id },
-            data: {
-              messageId: replyMessage.id,
-              channelId: parent.channelId,
-            },
-          });
-        } else {
-          await prisma.attachment.create({
-            data: {
-              workspaceId: access.channel.workspaceId,
-              channelId: parent.channelId,
-              messageId: replyMessage.id,
-              uploaderId: userId,
-              fileName: att.fileName || 'attachment',
-              fileKey: att.fileKey || att.fileUrl,
-              fileUrl: att.fileUrl,
-              fileType: att.fileType || 'application/octet-stream',
-              fileSize: att.fileSize || 0,
-              storageProvider: att.storageProvider || 'LOCAL',
-            },
-          });
-        }
-      }
+    // Link or create attachments (already verified to be the caller's own uploads)
+    if (preparedAttachments.ok && preparedAttachments.items.length > 0) {
+      await applyAttachments(preparedAttachments.items, {
+        messageId: replyMessage.id,
+        channelId: parent.channelId,
+        workspaceId: access.channel.workspaceId,
+        uploaderId: userId,
+      });
     }
 
     const fullReplyMessage = await prisma.message.findUnique({

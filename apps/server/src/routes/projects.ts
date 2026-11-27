@@ -5,39 +5,9 @@ import { SOCKET_EVENTS } from "@orbit/types";
 import { z } from "zod";
 import { sendTicketBotNotification } from "../services/systemBot.js";
 
-// Freshly uploaded ticket attachments carry a `fileKey` (from /api/files/upload) and have
-// no Attachment DB row yet, so the download route can't resolve their real MIME type.
-// Attachments carried over from an existing message already have one and are skipped.
-async function createMissingTicketAttachments(
-  images: unknown,
-  workspaceId: string,
-  uploaderId: string
-) {
-  if (!Array.isArray(images)) return;
-
-  for (const image of images as Array<Record<string, any>>) {
-    const fileKey = image?.fileKey;
-    if (!fileKey || !image?.fileUrl) continue;
-
-    const existing = await prisma.attachment.findFirst({
-      where: { fileKey, isDeleted: false },
-    });
-    if (existing) continue;
-
-    await prisma.attachment.create({
-      data: {
-        workspaceId,
-        uploaderId,
-        fileName: image.fileName || "attachment",
-        fileKey,
-        fileUrl: image.fileUrl,
-        fileType: image.fileType || "application/octet-stream",
-        fileSize: image.fileSize || 0,
-        storageProvider: image.storageProvider || "LOCAL",
-      },
-    });
-  }
-}
+// Ticket images are files the user uploaded with /api/files/upload, which records each upload when it happens, so
+// there is nothing to create here. (This used to create records for any storage path a client named, which let someone
+// claim another user's file.)
 
 // User ids are UUIDs for new users but Firebase UIDs for migrated ones — accept both.
 const userIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
@@ -1018,7 +988,6 @@ export const projectRoutes: FastifyPluginAsync = async (
         });
       });
 
-      await createMissingTicketAttachments(images, project.workspaceId, userId);
 
       const targetUserIds = [
         ...new Set([
@@ -1211,10 +1180,6 @@ export const projectRoutes: FastifyPluginAsync = async (
           column: true,
         },
       });
-
-      if (images !== undefined) {
-        await createMissingTicketAttachments(images, project.workspaceId, userId);
-      }
 
       // Names for the messages: the actor, plus the new assignees (the shared channel message names them).
       // One query for all of them, and none when there's nothing to announce.
