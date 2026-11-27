@@ -183,9 +183,21 @@ DOMAIN=orbit.yourdomain.com
 POSTGRES_PASSWORD=generate_a_secure_random_string_here
 REDIS_PASSWORD=generate_a_secure_random_string_here
 JWT_SECRET=generate_a_secure_random_string_here
+LIVEKIT_API_KEY=generate_a_key_name_here
 LIVEKIT_API_SECRET=generate_another_secure_random_string_here
+ENV_SUFFIX=-prod           # suffixes container + Traefik router names; must differ per environment
 ```
-(see `.env.example` for the full list). Don't ship the defaults baked into `docker-compose.prod.yml` — they're dev fallbacks only.
+(see `.env.example` for the full list). Startup fails if any of these are missing.
+
+**Second environment on the same server (e.g. dev):** use the same compose file in another Coolify environment and also set
+```env
+DOMAIN=orbit-dev.yourdomain.com
+ENV_SUFFIX=-dev
+LIVEKIT_TCP_PORT=7891      # host ports must not overlap prod's 7881 / 40000-40050
+LIVEKIT_UDP_START=40100
+LIVEKIT_UDP_END=40150
+```
+Use different secrets than prod. Open the extra LiveKit ports in the firewall too.
 
 ### 5. Deploy
 Click **Deploy**. Coolify builds the `web`/`server` images and brings up `postgres`, `redis`, and `livekit`, then provisions a Let's Encrypt certificate for `DOMAIN` automatically.
