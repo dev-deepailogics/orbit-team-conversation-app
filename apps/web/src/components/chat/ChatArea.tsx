@@ -69,7 +69,8 @@ import {
 import { ChannelStorageModal } from "./ChannelStorageModal";
 import { ChannelDetailsModal } from "../channel/ChannelDetailsModal";
 import { CompressFileConfirmModal } from "./CompressFileConfirmModal";
-import { compressFile } from "../../lib/compression";
+import { compressFile, shouldCompress } from "../../lib/compression";
+import { isUploadCancelled, partitionUploadable, uploadErrorMessage, uploadFile } from "../../lib/fileUpload";
 import { PinnedMessagesModal } from "./PinnedMessagesModal";
 import { AnonymousPersonaModal } from "../channel/AnonymousPersonaModal";
 import { UserHoverCard } from "./UserHoverCard";
@@ -303,6 +304,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [pendingCompressFiles, setPendingCompressFiles] = useState<File[]>([]);
   const [showCompressModal, setShowCompressModal] = useState(false);
   const [isCompressing, setIsCompressing] = useState(false);
+  // Which file is uploading and how far along it is (null when idle); the controller cancels it.
+  const [uploadProgress, setUploadProgress] = useState<{ name: string; percent: number; index: number; total: number } | null>(null);
+  const uploadAbortRef = useRef<AbortController | null>(null);
 
   const currentWorkspace = useChatStore((state) => state.currentWorkspace);
   const notificationPreference =
@@ -663,13 +667,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
   };
 
-  // Core file uploading logic with optional compression
+  // Core file uploading logic with optional compression. Large files go up in chunks (lib/fileUpload).
   const processUploadFiles = async (
     filesToUpload: File[],
-    shouldCompress: boolean,
+    shouldCompressFiles: boolean,
   ) => {
+    const controller = new AbortController();
+    uploadAbortRef.current = controller;
     setIsUploading(true);
-    if (shouldCompress) {
+    if (shouldCompressFiles) {
       setIsCompressing(true);
     }
 
@@ -677,28 +683,32 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       for (let i = 0; i < filesToUpload.length; i++) {
         let file = filesToUpload[i];
 
-        if (shouldCompress) {
+        if (shouldCompressFiles && shouldCompress(file)) {
+          setUploadProgress(null); // the chip shows "Compressing..." meanwhile
           try {
             file = await compressFile(file);
           } catch (compErr) {
             console.error("Compression failed for file", file.name, compErr);
           }
         }
+        if (controller.signal.aborted) break;
+        setShowCompressModal(false);
+        setUploadProgress({ name: file.name, percent: 0, index: i, total: filesToUpload.length });
 
-        const formData = new FormData();
-        formData.append("workspaceId", channel.workspaceId);
-        formData.append("channelId", channel.id);
-        formData.append("file", file);
-
-        const url = `/api/files/upload?workspaceId=${encodeURIComponent(channel.workspaceId)}&channelId=${encodeURIComponent(channel.id)}`;
-        const res = await api.post(url, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
+        const uploaded = await uploadFile(file, {
+          workspaceId: channel.workspaceId,
+          channelId: channel.id,
+          signal: controller.signal,
+          onProgress: (percent) =>
+            setUploadProgress((p) => (p ? { ...p, percent } : p)),
         });
-        setAttachments((prev) => [...prev, res.data]);
+        setAttachments((prev) => [...prev, uploaded]);
       }
     } catch (err: any) {
-      alert(err.response?.data?.error || "File upload failed");
+      if (!isUploadCancelled(err)) alert(uploadErrorMessage(err));
     } finally {
+      uploadAbortRef.current = null;
+      setUploadProgress(null);
       setIsUploading(false);
       setIsCompressing(false);
       setShowCompressModal(false);
@@ -712,34 +722,46 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
   };
 
-  // Multiple File Upload Handler (triggers confirmation prompt)
+  const cancelUpload = () => uploadAbortRef.current?.abort();
+
+  // Every way of adding files ends here: blocked or too-large files are refused right away, and the
+  // "compress?" prompt only appears when at least one file can actually be compressed.
+  const handleIncomingFiles = (files: File[], appendToPending = false) => {
+    const { accepted, rejected } = partitionUploadable(files);
+    if (rejected.length > 0) alert(`These files can't be uploaded:\n\n${rejected.join("\n")}`);
+    if (accepted.length === 0) return;
+    if (appendToPending) {
+      setPendingCompressFiles((prev) => [...prev, ...accepted]);
+      return;
+    }
+    if (accepted.some(shouldCompress)) {
+      setPendingCompressFiles(accepted);
+      setShowCompressModal(true);
+    } else {
+      processUploadFiles(accepted, false);
+    }
+  };
+
+  // Multiple File Upload Handler
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files;
     if (!fileList || fileList.length === 0) return;
-
-    const files = Array.from(fileList);
-    setPendingCompressFiles(files);
-    setShowCompressModal(true);
+    handleIncomingFiles(Array.from(fileList));
+    e.target.value = "";
   };
 
-  // Pasted images/files (Ctrl+V) go through the same confirmation and upload as the file picker
+  // Pasted images/files (Ctrl+V) go through the same checks and prompt as the file picker
   const handlePasteFiles = (files: File[]) => {
-    setPendingCompressFiles((prev) =>
-      showCompressModal ? [...prev, ...files] : files,
-    );
-    setShowCompressModal(true);
+    handleIncomingFiles(files, showCompressModal);
   };
 
-  // Drag & Drop File Upload Handler (triggers confirmation prompt)
+  // Drag & Drop File Upload Handler
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
     const fileList = e.dataTransfer.files;
     if (!fileList || fileList.length === 0) return;
-
-    const files = Array.from(fileList);
-    setPendingCompressFiles(files);
-    setShowCompressModal(true);
+    handleIncomingFiles(Array.from(fileList));
   };
 
   // Socket listener for real-time file deletions
@@ -2565,9 +2587,28 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       })}
 
                       {isUploading && (
-                        <div className="flex items-center gap-1.5 bg-[var(--theme-bg-surface-hover)] px-2.5 py-1 rounded-lg text-xs text-[var(--theme-primary)] border border-[var(--theme-border)] animate-pulse">
-                          <Loader2 size={13} className="animate-spin" />
-                          <span>Uploading file...</span>
+                        <div className="flex items-center gap-1.5 bg-[var(--theme-bg-surface-hover)] px-2.5 py-1 rounded-lg text-xs text-[var(--theme-primary)] border border-[var(--theme-border)] max-w-full">
+                          <Loader2 size={13} className="animate-spin shrink-0" />
+                          {uploadProgress ? (
+                            <>
+                              <span className="truncate max-w-[180px]" title={uploadProgress.name}>
+                                {uploadProgress.total > 1 && `${uploadProgress.index + 1}/${uploadProgress.total} · `}
+                                {uploadProgress.name}
+                              </span>
+                              <span className="font-semibold tabular-nums shrink-0">{uploadProgress.percent}%</span>
+                            </>
+                          ) : (
+                            <span>{isCompressing ? "Compressing..." : "Uploading file..."}</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={cancelUpload}
+                            title="Cancel upload"
+                            aria-label="Cancel upload"
+                            className="shrink-0 ml-0.5 text-[var(--theme-text-muted)] hover:text-rose-500 transition"
+                          >
+                            <X size={13} />
+                          </button>
                         </div>
                       )}
                     </div>

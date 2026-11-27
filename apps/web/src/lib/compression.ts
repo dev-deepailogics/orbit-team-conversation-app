@@ -42,6 +42,41 @@ export function isMediaFile(file: File): boolean {
   return isImageFile(file) || isVideoFile(file) || file.type.startsWith('audio/');
 }
 
+const extOf = (file: File) => {
+  const dot = file.name.lastIndexOf('.');
+  return dot > 0 ? file.name.slice(dot).toLowerCase() : '';
+};
+
+// Formats that would break (animation lost) or that canvas can't re-encode well: uploaded as they are.
+const IMAGE_SKIP_EXT = ['.gif', '.heic', '.heif', '.avif', '.ico'];
+const IMAGE_SKIP_MIME = ['image/gif', 'image/heic', 'image/heif', 'image/avif', 'image/x-icon'];
+// Plain-text formats compress well in a ZIP. Everything else (PDF, DOCX/XLSX/PPTX, ZIP/RAR, MP3, ...)
+// is already compressed internally, so zipping it saves ~nothing and only hides the file inside a .zip.
+const TEXT_EXT = [
+  '.txt', '.md', '.csv', '.tsv', '.json', '.log', '.xml', '.yaml', '.yml', '.sql', '.ini', '.conf',
+  '.html', '.htm', '.css', '.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.c', '.cpp', '.cs', '.go', '.rb', '.php',
+];
+const MIN_IMAGE_BYTES = 500 * 1024; // smaller photos are already fine
+const MIN_TEXT_BYTES = 100 * 1024;
+// Zipping runs in the browser's memory; past this the tab can freeze, so big text files go up as they are.
+const MAX_ZIP_BYTES = 50 * 1024 * 1024;
+
+/**
+ * Whether compressing this file is worth it. False for files that are already compressed (PDF, Office,
+ * archives, audio), formats that would break (GIF animation, HEIC), small files, and huge documents.
+ */
+export function shouldCompress(file: File): boolean {
+  if (isImageFile(file)) {
+    return (
+      file.size >= MIN_IMAGE_BYTES &&
+      !IMAGE_SKIP_EXT.includes(extOf(file)) &&
+      !IMAGE_SKIP_MIME.includes(file.type.toLowerCase())
+    );
+  }
+  if (isVideoFile(file)) return true;
+  return TEXT_EXT.includes(extOf(file)) && file.size >= MIN_TEXT_BYTES && file.size <= MAX_ZIP_BYTES;
+}
+
 /**
  * Client-side video compressor using HTML5 Video + Canvas + MediaRecorder.
  * Transcodes 4K/1080p MOV/MP4 down to optimized 720p at ~1.2-1.8 Mbps bitrate.
@@ -245,7 +280,7 @@ export async function compressImage(
             width = maxWidth;
           } else {
             width = Math.round((width * maxHeight) / height);
-            maxHeight = height;
+            height = maxHeight;
           }
         }
 
@@ -303,8 +338,8 @@ export async function compressDocumentToZip(file: File): Promise<File> {
       [file.name]: [u8, { level: 6 }],
     });
 
-    // If zipped is larger (can happen with already compressed files like docx/mp4), return original
-    if (zipped.byteLength >= file.size) {
+    // Only worth turning the file into a .zip when it saves at least 10%
+    if (zipped.byteLength > file.size * 0.9) {
       return file;
     }
 
@@ -328,6 +363,7 @@ export async function compressDocumentToZip(file: File): Promise<File> {
  * - Documents: measured through ZIP deflate (~50-90% reduction for text/docs, ~1-5% for audio)
  */
 export async function getCompressedSize(file: File): Promise<number> {
+  if (!shouldCompress(file)) return file.size;
   try {
     if (isImageFile(file)) {
       const compressed = await compressImage(file);
@@ -357,6 +393,7 @@ export async function getCompressedSize(file: File): Promise<number> {
  * - If other media or doc (pdf, txt, doc, etc.): compresses into .zip archive
  */
 export async function compressFile(file: File): Promise<File> {
+  if (!shouldCompress(file)) return file;
   if (isImageFile(file)) {
     return await compressImage(file);
   }

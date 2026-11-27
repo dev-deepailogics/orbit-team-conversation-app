@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { prisma } from '@orbit/db';
-import { SOCKET_EVENTS } from '@orbit/types';
+import { SOCKET_EVENTS, UPLOAD_LIMITS, uploadRejectionReason } from '@orbit/types';
 import path from 'path';
 import fs from 'fs';
 import { storageDriver, classifyFileType, formatBytes } from '../services/storage.js';
@@ -14,6 +14,13 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     const data = await request.file();
     if (!data) {
       return reply.status(400).send({ error: 'No file provided in multipart request' });
+    }
+
+    // Program files are refused before anything is written (the stream is drained so the request can finish).
+    const blockedReason = uploadRejectionReason(data.filename || '', 0);
+    if (blockedReason) {
+      data.file.resume();
+      return reply.status(415).send({ error: blockedReason });
     }
 
     // Read fields if sent along with multipart or query
@@ -86,6 +93,14 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         workspaceId,
         channelId: channelId || undefined,
       });
+
+      // Over the size limit, multipart cuts the stream short instead of failing: never keep a cut-off file.
+      if (data.file.truncated) {
+        await storageDriver.deleteFile(uploadResult.fileKey);
+        return reply.status(413).send({
+          error: `File is too large (max ${UPLOAD_LIMITS.maxBytes / (1024 * 1024)} MB)`,
+        });
+      }
 
       // If a messageId is explicitly provided, insert Attachment record immediately;
       // otherwise, if the user is just staging/attaching the file in the composer,

@@ -18,7 +18,8 @@ import { PollCard } from './PollCard';
 import { RichTextEditor, RichTextEditorRef } from './RichTextEditor';
 import { FileAttachmentList, formatFileSize, getFileCategory } from './FileAttachmentList';
 import { CompressFileConfirmModal } from './CompressFileConfirmModal';
-import { compressFile } from '../../lib/compression';
+import { compressFile, shouldCompress } from '../../lib/compression';
+import { isUploadCancelled, partitionUploadable, uploadErrorMessage, uploadFile } from '../../lib/fileUpload';
 import { useTimeFormat, formatMessageTime } from '../../lib/timeFormat';
 import { MessageChangeNote } from './MessageChangeNote';
 import { useResizableSidebar, ResizableSidebarOptions } from '../layout/useResizableSidebar';
@@ -142,6 +143,8 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
   // Compression Confirmation State
   const [pendingCompressFiles, setPendingCompressFiles] = useState<File[]>([]);
   const [showCompressModal, setShowCompressModal] = useState(false);
+  const [uploadPercent, setUploadPercent] = useState<number | null>(null);
+  const uploadAbortRef = useRef<AbortController | null>(null);
   const [isCompressing, setIsCompressing] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -331,9 +334,12 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
     }
   };
 
-  const processThreadUploadFiles = async (filesToUpload: File[], shouldCompress: boolean) => {
+  // Large files go up in chunks with progress (lib/fileUpload); the paperclip area shows the percentage.
+  const processThreadUploadFiles = async (filesToUpload: File[], compress: boolean) => {
+    const controller = new AbortController();
+    uploadAbortRef.current = controller;
     setIsUploading(true);
-    if (shouldCompress) {
+    if (compress) {
       setIsCompressing(true);
     }
 
@@ -341,32 +347,33 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
       for (let i = 0; i < filesToUpload.length; i++) {
         let file = filesToUpload[i];
 
-        if (shouldCompress) {
+        if (compress && shouldCompress(file)) {
           try {
             file = await compressFile(file);
           } catch (compErr) {
             console.error('Compression failed for thread file', file.name, compErr);
           }
         }
+        if (controller.signal.aborted) break;
+        setShowCompressModal(false);
+        setUploadPercent(0);
 
-        const formData = new FormData();
-        if (parentMessage.channelId) {
-          formData.append('channelId', parentMessage.channelId);
-        }
-        formData.append('file', file);
-
-        const channelQuery = parentMessage.channelId ? `?channelId=${encodeURIComponent(parentMessage.channelId)}` : '';
-        const res = await api.post(`/api/files/upload${channelQuery}`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
+        const uploaded = await uploadFile(file, {
+          workspaceId: currentWorkspace?.id,
+          channelId: parentMessage.channelId || undefined,
+          signal: controller.signal,
+          onProgress: setUploadPercent,
         });
-
-        if (res.data) {
-          setThreadAttachments((prev) => [...prev, res.data]);
-        }
+        setThreadAttachments((prev) => [...prev, uploaded]);
       }
     } catch (err) {
-      console.error('Failed to upload thread file', err);
+      if (!isUploadCancelled(err)) {
+        console.error('Failed to upload thread file', err);
+        alert(uploadErrorMessage(err));
+      }
     } finally {
+      uploadAbortRef.current = null;
+      setUploadPercent(null);
       setIsUploading(false);
       setIsCompressing(false);
       setShowCompressModal(false);
@@ -378,13 +385,28 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
     }
   };
 
+  // Blocked or too-large files are refused right away; the "compress?" prompt only appears when useful.
+  const handleIncomingFiles = (files: File[], appendToPending = false) => {
+    const { accepted, rejected } = partitionUploadable(files);
+    if (rejected.length > 0) alert(`These files can't be uploaded:\n\n${rejected.join('\n')}`);
+    if (accepted.length === 0) return;
+    if (appendToPending) {
+      setPendingCompressFiles((prev) => [...prev, ...accepted]);
+      return;
+    }
+    if (accepted.some(shouldCompress)) {
+      setPendingCompressFiles(accepted);
+      setShowCompressModal(true);
+    } else {
+      processThreadUploadFiles(accepted, false);
+    }
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files;
     if (!fileList || fileList.length === 0) return;
-
-    const files = Array.from(fileList);
-    setPendingCompressFiles(files);
-    setShowCompressModal(true);
+    handleIncomingFiles(Array.from(fileList));
+    e.target.value = '';
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -392,10 +414,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
     setIsDragOver(false);
     const fileList = e.dataTransfer.files;
     if (!fileList || fileList.length === 0) return;
-
-    const files = Array.from(fileList);
-    setPendingCompressFiles(files);
-    setShowCompressModal(true);
+    handleIncomingFiles(Array.from(fileList));
   };
 
   const handleSendReply = async (e?: React.FormEvent) => {
@@ -1101,10 +1120,7 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
               if (currentUser) saveDraft(currentUser.id, draftScope, editorRef.current?.getMarkdown() ?? text);
             }}
             onSubmit={() => handleSendReply()}
-            onPasteFiles={(files) => {
-              setPendingCompressFiles((prev) => (showCompressModal ? [...prev, ...files] : files));
-              setShowCompressModal(true);
-            }}
+            onPasteFiles={(files) => handleIncomingFiles(files, showCompressModal)}
           />
           <div className="flex items-center justify-between px-2 py-1.5 bg-[var(--theme-bg-app)] border-t border-[var(--theme-border)] rounded-b-lg">
             <div className="flex items-center gap-1">
@@ -1124,6 +1140,22 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
               >
                 {isUploading ? <Loader2 size={14} className="animate-spin text-slack-green" /> : <Paperclip size={14} />}
               </button>
+              {isUploading && (
+                <span className="flex items-center gap-1 text-[11px] text-[var(--theme-text-muted)]">
+                  <span className="tabular-nums">
+                    {uploadPercent === null ? (isCompressing ? 'Compressing…' : 'Uploading…') : `${uploadPercent}%`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => uploadAbortRef.current?.abort()}
+                    title="Cancel upload"
+                    aria-label="Cancel upload"
+                    className="p-0.5 rounded hover:text-rose-500 transition"
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              )}
 
               <button
                 type="button"
