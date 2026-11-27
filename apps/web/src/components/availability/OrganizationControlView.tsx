@@ -104,6 +104,10 @@ export const OrganizationControlView: React.FC<
   const timeFormat = useTimeFormat();
   const fmtTime = (d: string | number | Date) => formatMessageTime(d, timeFormat);
 
+  // Media Management (Google Drive) is switched off for now: its API routes are not registered on the server.
+  // Flip this and re-register driveRoutes in apps/server/src/index.ts to bring it back.
+  const MEDIA_MANAGEMENT_ENABLED = false;
+
   // Navigation: Toggle between Org Control overview, Employee Status page, User Availability page, View Projects page, & Media Management page
   const [showUserAvailabilityPage, setShowUserAvailabilityPage] =
     useState<boolean>(false);
@@ -136,7 +140,7 @@ export const OrganizationControlView: React.FC<
       setShowUserAvailabilityPage(subview === "availability");
       setShowEmployeeStatusPage(subview === "employee-status");
       setShowProjectsPage(subview === "projects");
-      setShowMediaManagementPage(subview === "media");
+      setShowMediaManagementPage(MEDIA_MANAGEMENT_ENABLED && subview === "media");
     }
   };
 
@@ -421,7 +425,7 @@ export const OrganizationControlView: React.FC<
     (m) => m.availability?.isOnBreak,
   ).length;
 
-  if (showMediaManagementPage) {
+  if (MEDIA_MANAGEMENT_ENABLED && showMediaManagementPage) {
     return (
       <MediaManagementView
         workspace={workspace}
@@ -874,6 +878,7 @@ export const OrganizationControlView: React.FC<
             </div>
 
             {/* 6. Media Management (Google Drive) */}
+            {MEDIA_MANAGEMENT_ENABLED && (
             <div
               onClick={() => {
                 setShowMediaManagementPage(true);
@@ -914,6 +919,7 @@ export const OrganizationControlView: React.FC<
                 </p>
               </div>
             </div>
+            )}
           </div>
         </div>
 

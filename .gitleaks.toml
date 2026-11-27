@@ -1,0 +1,31 @@
+# Gitleaks configuration for Orbit (secret scanning, part of SAST).
+# Every allowlist entry below was reviewed by hand; see security/sast/03-Findings-Register.md.
+# Do NOT add entries here without recording the reason in the findings register.
+
+title = "Orbit gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Generated or third-party folders (not our source code)"
+paths = [
+  '''(^|/)node_modules/''',
+  '''(^|/)\.next/''',
+  '''(^|/)dist/''',
+  '''(^|/)build/''',
+  '''(^|/)security/sast/reports/''',
+]
+
+[[allowlists]]
+description = "Mobile app is out of scope for this security testing programme (see security/sast/01-SAST-Plan.md section 3)"
+paths = ['''^apps/mobile/''']
+
+[[allowlists]]
+description = "SAST-FP-03: curl examples in README and the bot settings UI use placeholder tokens, not real ones"
+targetRules = ["curl-auth-header"]
+paths = [
+  '''^README\.md$''',
+  '''apps/web/src/components/bot/BotPortalDialog\.tsx$''',
+  '''apps/web/src/components/settings/BotSettings\.tsx$''',
+]

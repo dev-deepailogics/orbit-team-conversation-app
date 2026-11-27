@@ -1,0 +1,5 @@
+# Individually reviewed Gitleaks findings. Each line needs a reason and a findings-register ID.
+# Register: security/sast/03-Findings-Register.md
+
+# SAST-FP-04: placeholder value (0123...) in an old .env.example; never used in any environment, already removed.
+33ecc863d1d088e72ee1da8ab5ae04218520d95b:.env.example:generic-api-key:62

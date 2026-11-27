@@ -1,0 +1,10 @@
+# Paths Semgrep should not scan (generated, vendored or build output).
+node_modules/
+.next/
+dist/
+build/
+coverage/
+*.min.js
+# Mobile app is out of scope for this security testing programme (see security/sast/01-SAST-Plan.md §3)
+apps/mobile/
+security/sast/reports/

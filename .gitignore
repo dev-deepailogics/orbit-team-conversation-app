@@ -50,3 +50,6 @@ upload/
 
 # TypeScript build info
 *.tsbuildinfo
+
+# Raw security-scan output (may contain partial secret matches). Archive as evidence; do not commit.
+security/sast/reports/raw/

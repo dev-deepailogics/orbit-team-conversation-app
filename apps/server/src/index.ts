@@ -33,7 +33,6 @@ import {
   availabilityRoutes,
   performAutoCheckoutBackfill,
 } from "./routes/availability.js";
-import { driveRoutes } from "./routes/drive.js";
 import { canvasRoutes } from "./routes/canvases.js";
 import { documentRoutes } from "./routes/documents.js";
 import { avatarRoutes } from "./routes/avatar.js";
@@ -74,16 +73,22 @@ function resolveJwtSecret(): string {
   const secret = process.env.JWT_SECRET?.trim();
   if (process.env.NODE_ENV === "production") {
     if (!secret) {
-      throw new Error("JWT_SECRET is required in production. Generate one with: openssl rand -hex 48");
+      throw new Error(
+        "JWT_SECRET is required in production. Generate one with: openssl rand -hex 48",
+      );
     }
     if (secret.length < 32 || KNOWN_INSECURE_JWT_SECRETS.includes(secret)) {
-      throw new Error("JWT_SECRET is too short or a known default. Use at least 32 random characters.");
+      throw new Error(
+        "JWT_SECRET is too short or a known default. Use at least 32 random characters.",
+      );
     }
     return secret;
   }
   if (secret) return secret;
   // Dev only: random per process, so there is never a guessable secret. Sessions survive restarts via refresh tokens.
-  console.warn("JWT_SECRET is not set; using a random one for this process (access tokens reset on restart).");
+  console.warn(
+    "JWT_SECRET is not set; using a random one for this process (access tokens reset on restart).",
+  );
   return randomBytes(48).toString("hex");
 }
 
@@ -106,10 +111,14 @@ const REDIS_URL = resolveRedisUrl();
 // Development stays open so localhost setups just work.
 function resolveAllowedOrigins(): true | string[] {
   if (!IS_PRODUCTION) return true;
-  const origins = [process.env.CLIENT_URL, ...(process.env.CORS_ORIGINS || "").split(",")]
+  const origins = [
+    process.env.CLIENT_URL,
+    ...(process.env.CORS_ORIGINS || "").split(","),
+  ]
     .map((o) => o?.trim().replace(/\/+$/, ""))
     .filter((o): o is string => !!o);
-  if (origins.length === 0) throw new Error("CLIENT_URL is required in production (CORS allow-list).");
+  if (origins.length === 0)
+    throw new Error("CLIENT_URL is required in production (CORS allow-list).");
   return origins;
 }
 const ALLOWED_ORIGINS = resolveAllowedOrigins();
@@ -156,7 +165,11 @@ async function bootstrap() {
 
   // Rate limiting per client address (shared across instances through Redis). Sensitive routes (sign-in, registration,
   // token refresh, password change, webhook/bot posting) set tighter limits in their own route options.
-  const limiterRedis = new Redis(REDIS_URL, { connectTimeout: 500, maxRetriesPerRequest: 1, enableOfflineQueue: false });
+  const limiterRedis = new Redis(REDIS_URL, {
+    connectTimeout: 500,
+    maxRetriesPerRequest: 1,
+    enableOfflineQueue: false,
+  });
   limiterRedis.on("error", () => {}); // a Redis outage must not take the API down: limiting is skipped (skipOnError)
   const lastRateLimitAudit = new Map<string, number>();
   await fastify.register(rateLimit, {
@@ -166,7 +179,8 @@ async function bootstrap() {
     redis: limiterRedis,
     nameSpace: "orbit-rl:",
     skipOnError: true,
-    allowList: (req) => req.url === "/api/health" || req.url.startsWith("/socket.io"),
+    allowList: (req) =>
+      req.url === "/api/health" || req.url.startsWith("/socket.io"),
     errorResponseBuilder: (_req, context) => ({
       statusCode: 429,
       error: "Too many requests. Please wait a moment and try again.",
@@ -180,9 +194,14 @@ async function bootstrap() {
       if (now - (lastRateLimitAudit.get(key) ?? 0) < 60_000) return;
       lastRateLimitAudit.set(key, now);
       if (lastRateLimitAudit.size > 5000) {
-        for (const [k, t] of lastRateLimitAudit) if (now - t > 60_000) lastRateLimitAudit.delete(k);
+        for (const [k, t] of lastRateLimitAudit)
+          if (now - t > 60_000) lastRateLimitAudit.delete(k);
       }
-      audit(req, { action: "security.rate_limited", outcome: "failure", metadata: { route: req.routeOptions?.url } });
+      audit(req, {
+        action: "security.rate_limited",
+        outcome: "failure",
+        metadata: { route: req.routeOptions?.url },
+      });
     },
   });
 
@@ -212,7 +231,9 @@ async function bootstrap() {
           });
           // Valid JWT for a deleted user (e.g. after a DB reset): 401 so clients drop the session and sign in again.
           if (!userRecord) {
-            return reply.status(401).send({ error: "Unauthorized: user no longer exists" });
+            return reply
+              .status(401)
+              .send({ error: "Unauthorized: user no longer exists" });
           }
           if (userRecord.disabled) {
             return reply.status(403).send({ error: "Account is deactivated" });
@@ -227,7 +248,8 @@ async function bootstrap() {
   );
 
   // Create uploads directory if not exists
-  const uploadDir = process.env.UPLOAD_DIR || path.resolve(process.cwd(), "uploads");
+  const uploadDir =
+    process.env.UPLOAD_DIR || path.resolve(process.cwd(), "uploads");
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
@@ -278,7 +300,6 @@ async function bootstrap() {
   await fastify.register(projectRoutes, { prefix: "/api/projects" });
   await fastify.register(pushRoutes, { prefix: "/api/push" });
   await fastify.register(availabilityRoutes, { prefix: "/api/availability" });
-  await fastify.register(driveRoutes, { prefix: "/api" });
   await fastify.register(canvasRoutes, { prefix: "/api/canvases" });
   await fastify.register(documentRoutes, { prefix: "/api/documents" });
   await fastify.register(avatarRoutes, { prefix: "/api/avatar" });

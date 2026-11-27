@@ -6,6 +6,7 @@ import { storageDriver, classifyFileType, formatBytes } from '../services/storag
 import { verifyChannelAccess } from '../utils/security.js';
 import { audit } from '../services/audit.js';
 import { canReadAttachment, canReadUntrackedFile, isSharedRecordingKey, resolveRequesterId } from '../services/fileAccess.js';
+import { setStoredFileHeaders, wantsDownload } from '../services/fileResponse.js';
 
 export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   // 1. Upload File with rich metadata
@@ -187,8 +188,6 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       return reply.status(400).send({ error: 'File path key is required' });
     }
 
-    const downloadQuery = (request.query as any)?.download === '1' || (request.query as any)?.download === 'true';
-
     // The same stored file can have several records (e.g. a forwarded copy in another channel): any one that grants
     // access is enough. Records give the original filename and MIME type.
     const records = await prisma.attachment.findMany({
@@ -224,23 +223,13 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       return reply.status(404).send({ error: 'File not found on storage server' });
     }
 
-    const mimeType = attachment?.fileType || 'application/octet-stream';
-    const originalName = attachment?.fileName || fileData.fileName || 'file';
-
-    // Active content (HTML, SVG, XML, scripts) is never shown inline: served from our own origin it could run script
-    // with the signed-in user's access. Browsers download it instead; images, video, audio, PDF and text still preview.
-    const isActiveContent = /^(text\/html|application\/xhtml\+xml|image\/svg\+xml|text\/xml|application\/xml|text\/javascript|application\/javascript)\b/i.test(mimeType);
-    const dispositionType = downloadQuery || isActiveContent ? 'attachment' : 'inline';
-    // Clean ASCII fallback for `filename="..."` (HTTP headers forbid non-ASCII characters such as Unicode narrow no-break space U+8239 from macOS screenshots)
-    const asciiSafeName = originalName.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '');
-    const encodedName = encodeURIComponent(originalName);
-
-    reply.header('Content-Type', mimeType);
+    // Only passive types (images, video, audio, PDF, plain text) preview inline; everything else downloads, sandboxed.
+    setStoredFileHeaders(reply, {
+      mimeType: attachment?.fileType,
+      fileName: attachment?.fileName || fileData.fileName,
+      forceDownload: wantsDownload(request.query),
+    });
     reply.header('Accept-Ranges', 'bytes');
-    reply.header(
-      'Content-Disposition',
-      `${dispositionType}; filename="${asciiSafeName}"; filename*=UTF-8''${encodedName}`
-    );
     // Private: shared caches and CDNs must not serve a protected file to someone who never authenticated.
     reply.header('Cache-Control', 'private, max-age=31536000, immutable');
 
@@ -314,8 +303,15 @@ export const fileRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     if (!fileData) {
       return reply.status(404).send({ error: 'File not found' });
     }
-    reply.header('Content-Type', attachment.fileType);
+    setStoredFileHeaders(reply, {
+      mimeType: attachment.fileType,
+      fileName: attachment.fileName || fileData.fileName,
+      forceDownload: wantsDownload(request.query),
+    });
     reply.header('Cache-Control', 'private, max-age=31536000, immutable');
+    if (fileData.size) {
+      reply.header('Content-Length', fileData.size);
+    }
     return reply.send(fileData.stream);
   });
 
