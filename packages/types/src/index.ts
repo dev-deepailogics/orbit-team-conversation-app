@@ -217,6 +217,47 @@ export const RECORDING_LIMITS = {
   allowedMimeTypes: ['video/webm', 'video/mp4'],
 } as const;
 
+/**
+ * File-upload limits shared by the browser (checks before uploading) and the server (enforces them).
+ * Files larger than `chunkBytes` are sent in chunks through /api/files/uploads; smaller ones in one request.
+ */
+export const UPLOAD_LIMITS = {
+  maxBytes: 500 * 1024 * 1024,
+  chunkBytes: 8 * 1024 * 1024,
+  /** Chunks of one file sent at the same time by the browser. */
+  parallelChunks: 3,
+  /** Unfinished chunked uploads are deleted after this long. */
+  sessionTtlMs: 24 * 60 * 60 * 1000,
+  /**
+   * Programs and scripts that run on double-click. Rejected so Orbit can't be used to spread malware.
+   * Source-code files (.js, .ts, .py, .sh, ...) are allowed: developers share them as text.
+   */
+  blockedExtensions: [
+    '.exe', '.com', '.msi', '.msp', '.bat', '.cmd', '.scr', '.pif', '.cpl', '.dll', '.sys',
+    '.ps1', '.psm1', '.vbs', '.vbe', '.jse', '.wsf', '.wsh', '.hta', '.lnk', '.reg', '.gadget',
+    '.jar', '.apk', '.dmg', '.pkg', '.app', '.deb', '.rpm',
+  ],
+} as const;
+
+/** Lower-cased extension including the dot ("report.PDF" -> ".pdf"), or "" when there is none. */
+export function fileExtension(fileName: string): string {
+  const base = fileName.split(/[\\/]/).pop() || '';
+  const dot = base.lastIndexOf('.');
+  return dot > 0 ? base.slice(dot).toLowerCase() : '';
+}
+
+/** Why a file can't be uploaded, or null when it can. Same rules on the browser and the server. */
+export function uploadRejectionReason(fileName: string, fileSize: number): string | null {
+  const ext = fileExtension(fileName.trim().replace(/[.\s]+$/, ''));
+  if ((UPLOAD_LIMITS.blockedExtensions as readonly string[]).includes(ext)) {
+    return `"${ext}" files can't be uploaded because they can run programs on a computer`;
+  }
+  if (fileSize > UPLOAD_LIMITS.maxBytes) {
+    return `File is too large (max ${UPLOAD_LIMITS.maxBytes / (1024 * 1024)} MB)`;
+  }
+  return null;
+}
+
 export interface Recording {
   id: string;
   workspaceId: string;

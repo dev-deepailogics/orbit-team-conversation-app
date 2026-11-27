@@ -31,12 +31,15 @@ export interface StorageDriver {
  * Stores files in the server uploads folder or Docker volume.
  * Files are structured by workspace and month: uploads/workspaces/:workspaceId/:year-:month/:fileKey
  */
+/** Root folder for stored files (Docker volume in production). */
+export const UPLOAD_BASE_DIR = process.env.UPLOAD_DIR || path.resolve(process.cwd(), 'uploads');
+
 export class LocalStorageDriver implements StorageDriver {
   public providerName = 'LOCAL';
   private baseDir: string;
 
   constructor(baseDir?: string) {
-    this.baseDir = baseDir || process.env.UPLOAD_DIR || path.resolve(process.cwd(), 'uploads');
+    this.baseDir = baseDir || UPLOAD_BASE_DIR;
     if (!fs.existsSync(this.baseDir)) {
       fs.mkdirSync(this.baseDir, { recursive: true });
     }

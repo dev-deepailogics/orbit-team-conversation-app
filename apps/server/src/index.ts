@@ -16,6 +16,7 @@ import { randomBytes } from "crypto";
 
 // Routes
 import { prisma } from "@orbit/db";
+import { UPLOAD_LIMITS } from "@orbit/types";
 import { authRoutes } from "./routes/auth.js";
 import { workspaceRoutes } from "./routes/workspaces.js";
 import { channelRoutes } from "./routes/channels.js";
@@ -23,6 +24,7 @@ import { messageRoutes } from "./routes/messages.js";
 import { huddleRoutes } from "./routes/huddles.js";
 import { botRoutes } from "./routes/bots.js";
 import { fileRoutes } from "./routes/files.js";
+import { chunkedUploadRoutes } from "./routes/chunkedUploads.js";
 import { recordingRoutes } from "./routes/recordings.js";
 import { adminRoutes } from "./routes/admin.js";
 import { projectRoutes } from "./routes/projects.js";
@@ -105,10 +107,11 @@ async function bootstrap() {
     secret: JWT_SECRET,
   });
 
-  // Multipart uploads
+  // Multipart uploads (single-request path). Large files use the chunked routes in routes/chunkedUploads.ts.
+  // Over the limit the stream is truncated, not rejected, so every route must check `file.truncated`.
   await fastify.register(multipart, {
     limits: {
-      fileSize: 50 * 1024 * 1024, // 50MB max
+      fileSize: UPLOAD_LIMITS.maxBytes, // 500 MB
     },
   });
 
@@ -187,6 +190,7 @@ async function bootstrap() {
   await fastify.register(huddleRoutes, { prefix: "/api/huddles" });
   await fastify.register(botRoutes, { prefix: "/api/bot" });
   await fastify.register(fileRoutes, { prefix: "/api/files" });
+  await fastify.register(chunkedUploadRoutes, { prefix: "/api/files/uploads" });
   await fastify.register(recordingRoutes, { prefix: "/api/recordings" });
   await fastify.register(adminRoutes, { prefix: "/api/admin" });
   await fastify.register(projectRoutes, { prefix: "/api/projects" });

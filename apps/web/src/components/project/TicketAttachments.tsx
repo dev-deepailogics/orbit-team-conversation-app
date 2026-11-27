@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Paperclip, Trash2, X, Download, Loader2 } from '@/components/ui/icons';
-import { api } from '../../lib/api';
+import { partitionUploadable, uploadErrorMessage, uploadFile } from '../../lib/fileUpload';
 
 export interface TicketAttachment {
   id: string;
@@ -37,36 +37,34 @@ export function useTicketAttachmentUpload(
     await onChange?.(next);
   };
 
-  const uploadFiles = async (files: File[]) => {
+  const uploadFiles = async (picked: File[]) => {
+    if (picked.length === 0) return;
+    // Blocked types and files over the limit are refused before anything is sent.
+    const { accepted: files, rejected } = partitionUploadable(picked);
+    setError(rejected.length ? `Can't upload ${rejected.join('; ')}` : null);
     if (files.length === 0) return;
-    setError(null);
     setIsUploading(true);
     try {
       let current = attachments;
       for (const file of files) {
-        const formData = new FormData();
-        formData.append('file', file);
-        const res = await api.post(
-          `/api/files/upload?workspaceId=${encodeURIComponent(workspaceId)}`,
-          formData,
-          { headers: { 'Content-Type': 'multipart/form-data' } }
-        );
+        // Large files are sent in chunks (lib/fileUpload)
+        const uploaded = await uploadFile(file, { workspaceId });
         current = [
           ...current,
           {
             id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-            fileUrl: res.data.fileUrl,
-            fileName: res.data.fileName,
-            fileType: res.data.fileType,
-            fileSize: res.data.fileSize,
-            fileKey: res.data.fileKey,
-            storageProvider: res.data.storageProvider,
+            fileUrl: uploaded.fileUrl,
+            fileName: uploaded.fileName,
+            fileType: uploaded.fileType,
+            fileSize: uploaded.fileSize,
+            fileKey: uploaded.fileKey,
+            storageProvider: uploaded.storageProvider,
           },
         ];
         await update(current);
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to upload attachment');
+      setError(uploadErrorMessage(err, 'Failed to upload attachment'));
     } finally {
       setIsUploading(false);
     }
