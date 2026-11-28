@@ -11,7 +11,7 @@ import {
   showHeader,
   typingLabel,
 } from '../src/features/chat/utils';
-import { channelLabel, dmAvatarUrl, parseInviteCode, pendingDMUserId, splitChannels } from '../src/features/workspaces/utils';
+import { channelLabel, dmAvatarUrl, pendingDMUserId, splitChannels } from '../src/features/workspaces/utils';
 
 const msg = (over: Partial<Message>) =>
   ({ id: 'm1', channelId: 'c1', userId: 'u1', parentMessageId: null, createdAt: '2026-10-26T10:00:00Z', ...over }) as Message;
@@ -46,11 +46,6 @@ test('avatars: photo for real senders and 1:1 DM peers, never for anonymous post
   const peer = { userId: 'u2', user } as any;
   expect(dmAvatarUrl(chan({ type: 'DIRECT', members: [member('me', 'Me'), peer] }), 'me')).toBe('/api/files/download/a.png');
   expect(dmAvatarUrl(chan({ type: 'GROUP_DIRECT', members: [peer] }), 'me')).toBeNull();
-});
-
-test('parseInviteCode accepts links and bare codes', () => {
-  expect(parseInviteCode(' https://orbit.example.com/join/abc-123?x=1 ')).toBe('abc-123');
-  expect(parseInviteCode('abc-123')).toBe('abc-123');
 });
 
 test('showHeader groups same sender within 5 minutes', () => {

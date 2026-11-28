@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Avatar } from '@/components/project/projectViewUtils';
 import { Message, UserProfile, Channel } from '@orbit/types';
-import { X, Send, CornerUpLeft, Smile, SmilePlus, Type, Paperclip, FileText, Loader2, Pencil, Trash2, ChevronDown } from '@/components/ui/icons';
+import { X, Send, CornerUpLeft, Smile, SmilePlus, Type, Paperclip, FileText, Loader2, Pencil, Trash2, ChevronDown, ListChecks } from '@/components/ui/icons';
+import { addTodoFromMessage } from '../../lib/todos';
 import { api } from '../../lib/api';
 import { useAnonStore } from '../../stores/anonStore';
 import { loadDraft, saveDraft, clearDraft } from '../../lib/drafts';
@@ -651,6 +652,13 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
               >
                 <CornerUpLeft size={12} />
               </button>
+              <button
+                onClick={() => addTodoFromMessage(parentMessage)}
+                title="Add to to-dos"
+                className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded transition"
+              >
+                <ListChecks size={12} />
+              </button>
               {canEditParent && (
                 <button
                   onClick={() => {
@@ -946,6 +954,13 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                     className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded transition"
                   >
                     <CornerUpLeft size={12} />
+                  </button>
+                  <button
+                    onClick={() => addTodoFromMessage(reply)}
+                    title="Add to to-dos"
+                    className="p-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-bg-surface-hover)] rounded transition"
+                  >
+                    <ListChecks size={12} />
                   </button>
                   {canEditReply && (
                     <button

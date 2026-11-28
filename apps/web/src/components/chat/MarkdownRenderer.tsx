@@ -69,7 +69,10 @@ const Anchor: Components['a'] = ({ href, children }) => {
 
   if (href?.startsWith('mention://')) {
     const username = href.replace('mention://', '');
-    const isMe = currentUsername && username.toLowerCase() === currentUsername.toLowerCase();
+    // @channel addresses everyone reading, so it's highlighted like a mention of you.
+    const isMe =
+      username.toLowerCase() === 'channel' ||
+      (currentUsername && username.toLowerCase() === currentUsername.toLowerCase());
     return (
       <span
         onClick={(e) => {

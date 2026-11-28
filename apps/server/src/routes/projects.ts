@@ -186,8 +186,7 @@ export async function projectAccessError(
   }
 
   const isAdmin =
-    hasWorkspacePermission(membership.role, "manageAllProjects", membership.user.systemRole) ||
-    membership.user.systemRole === "WORKSPACE_ADMIN";
+    hasWorkspacePermission(membership.role, "manageAllProjects", membership.user.systemRole);
   if (isAdmin || project.createdById === userId) return null;
 
   const userName = (
@@ -262,8 +261,7 @@ export const projectRoutes: FastifyPluginAsync = async (
       }
 
       const isAdmin =
-        hasWorkspacePermission(membership.role, "manageAllProjects", membership.user.systemRole) ||
-        membership.user.systemRole === "WORKSPACE_ADMIN";
+        hasWorkspacePermission(membership.role, "manageAllProjects", membership.user.systemRole);
 
       const projects = await prisma.project.findMany({
         where: whereClause,

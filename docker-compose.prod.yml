@@ -7,6 +7,7 @@ services:
         NEXT_PUBLIC_SERVER_URL: https://${DOMAIN}
         NEXT_PUBLIC_LIVEKIT_URL: wss://${DOMAIN}/livekit
     container_name: orbit-web
+    container_name: orbit-web${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -19,19 +20,19 @@ services:
       - server
     labels:
       - traefik.enable=true
-      - traefik.http.routers.orbit-web.rule=Host(`orbit.wondercraftz.com`)
-      - traefik.http.routers.orbit-web.entrypoints=https
-      - traefik.http.routers.orbit-web.tls=true
-      - traefik.http.routers.orbit-web.tls.certresolver=letsencrypt
-      - traefik.http.routers.orbit-web.priority=1
-      - traefik.http.routers.orbit-web.service=orbit-web
-      - traefik.http.services.orbit-web.loadbalancer.server.port=3000
+      - traefik.http.routers.orbit-web${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}.rule=Host(`${DOMAIN:?DOMAIN must be set}`)
+      - traefik.http.routers.orbit-web${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}.entrypoints=https
+      - traefik.http.routers.orbit-web${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}.tls=true
+      - traefik.http.routers.orbit-web${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}.tls.certresolver=letsencrypt
+      - traefik.http.routers.orbit-web${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}.priority=1
+      - traefik.http.routers.orbit-web${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}.service=orbit-web${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}
+      - traefik.http.services.orbit-web${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}.loadbalancer.server.port=3000
 
   server:
     build:
       context: .
       dockerfile: apps/server/Dockerfile
-    container_name: orbit-server
+    container_name: orbit-server${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -44,13 +45,13 @@ services:
       - SETGID
     labels:
       - traefik.enable=true
-      - traefik.http.routers.orbit-api.rule=Host(`orbit.wondercraftz.com`) && (PathPrefix(`/api`) || PathPrefix(`/socket.io`))
-      - traefik.http.routers.orbit-api.entrypoints=https
-      - traefik.http.routers.orbit-api.tls=true
-      - traefik.http.routers.orbit-api.tls.certresolver=letsencrypt
-      - traefik.http.routers.orbit-api.priority=100
-      - traefik.http.routers.orbit-api.service=orbit-api
-      - traefik.http.services.orbit-api.loadbalancer.server.port=4000
+      - traefik.http.routers.orbit-api${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}.rule=Host(`${DOMAIN:?DOMAIN must be set}`) && (PathPrefix(`/api`) || PathPrefix(`/socket.io`))
+      - traefik.http.routers.orbit-api${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}.entrypoints=https
+      - traefik.http.routers.orbit-api${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}.tls=true
+      - traefik.http.routers.orbit-api${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}.tls.certresolver=letsencrypt
+      - traefik.http.routers.orbit-api${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}.priority=100
+      - traefik.http.routers.orbit-api${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}.service=orbit-api${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}
+      - traefik.http.services.orbit-api${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}.loadbalancer.server.port=4000
     environment:
       NODE_ENV: production
       PORT: 4000
@@ -87,12 +88,21 @@ services:
         condition: service_healthy
 
   postgres:
-    image: postgres:16.16-alpine3.24
-    container_name: orbit-postgres
+    image: postgres:16-alpine
+    container_name: orbit-postgres${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}
     restart: unless-stopped
     # Database-level audit trail for the SIEM: every connection/disconnection and all schema (DDL) changes go to the
     # container log. On Cloud SQL, enable the pgaudit flag instead (see docs/audit-logging.md).
-    command: ["postgres", "-c", "log_connections=on", "-c", "log_disconnections=on", "-c", "log_statement=ddl"]
+    command:
+      [
+        "postgres",
+        "-c",
+        "log_connections=on",
+        "-c",
+        "log_disconnections=on",
+        "-c",
+        "log_statement=ddl",
+      ]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-orbit_admin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
@@ -112,8 +122,8 @@ services:
       retries: 5
 
   redis:
-    image: redis:7.4.12-alpine3.22
-    container_name: orbit-redis
+    image: redis:7-alpine
+    container_name: orbit-redis${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}
     restart: unless-stopped
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
     volumes:
@@ -121,46 +131,37 @@ services:
     networks:
       - backend
     healthcheck:
-      test:
-        [
-          "CMD",
-          "redis-cli",
-          "-a",
-          "${REDIS_PASSWORD}",
-          "ping",
-        ]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   livekit:
-    image: livekit/livekit-server:v1.13.11
-    container_name: orbit-livekit
+    image: livekit/livekit-server:latest
+    container_name: orbit-livekit${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}
     restart: unless-stopped
     # Inline config: Coolify doesn't copy repo files for bind mounts (they appear as empty dirs).
     # Redis password and key/secret must match REDIS_PASSWORD / LIVEKIT_API_KEY / LIVEKIT_API_SECRET.
     command:
       - --config-body
-      - '{port: 7880, rtc: {tcp_port: 7881, port_range_start: 40000, port_range_end: 40050, use_external_ip: true}, redis: {address: "redis:6379", password: ${REDIS_PASSWORD}}, keys: {${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}}, logging: {level: info}}'
+      - '{port: 7880, rtc: {tcp_port: ${LIVEKIT_TCP_PORT:-7881}, port_range_start: ${LIVEKIT_UDP_START:-40000}, port_range_end: ${LIVEKIT_UDP_END:-40050}, use_external_ip: true}, redis: {address: "redis:6379", password: ${REDIS_PASSWORD}}, keys: {${LIVEKIT_API_KEY:-API_KEY_ORBIT}: ${LIVEKIT_API_SECRET}}, logging: {level: info}}'
     ports:
-      - "7881:7881"
-      - "40000-40050:40000-40050/udp"
-    networks:
-      - default
-      - backend
+      # Host and container ports must match: LiveKit advertises these to clients. Give each environment its own range.
+      - "${LIVEKIT_TCP_PORT:-7881}:${LIVEKIT_TCP_PORT:-7881}"
+      - "${LIVEKIT_UDP_START:-40000}-${LIVEKIT_UDP_END:-40050}:${LIVEKIT_UDP_START:-40000}-${LIVEKIT_UDP_END:-40050}/udp"
     depends_on:
       - redis
     labels:
       - traefik.enable=true
-      - traefik.http.routers.orbit-livekit.rule=Host(`orbit.wondercraftz.com`) && PathPrefix(`/livekit`)
-      - traefik.http.routers.orbit-livekit.entrypoints=https
-      - traefik.http.routers.orbit-livekit.tls=true
-      - traefik.http.routers.orbit-livekit.tls.certresolver=letsencrypt
-      - traefik.http.routers.orbit-livekit.priority=100
-      - traefik.http.routers.orbit-livekit.service=orbit-livekit
-      - traefik.http.middlewares.orbit-livekit-strip.stripprefix.prefixes=/livekit
-      - traefik.http.routers.orbit-livekit.middlewares=orbit-livekit-strip
-      - traefik.http.services.orbit-livekit.loadbalancer.server.port=7880
+      - traefik.http.routers.orbit-livekit${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}.rule=Host(`${DOMAIN:?DOMAIN must be set}`) && PathPrefix(`/livekit`)
+      - traefik.http.routers.orbit-livekit${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}.entrypoints=https
+      - traefik.http.routers.orbit-livekit${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}.tls=true
+      - traefik.http.routers.orbit-livekit${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}.tls.certresolver=letsencrypt
+      - traefik.http.routers.orbit-livekit${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}.priority=100
+      - traefik.http.routers.orbit-livekit${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}.service=orbit-livekit${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}
+      - traefik.http.middlewares.orbit-livekit-strip${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}.stripprefix.prefixes=/livekit
+      - traefik.http.routers.orbit-livekit${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}.middlewares=orbit-livekit-strip${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}
+      - traefik.http.services.orbit-livekit${ENV_SUFFIX:?ENV_SUFFIX must be set (-prod or -dev)}.loadbalancer.server.port=7880
 
 # Network segmentation:
 #   default  - the proxy-facing network: web, server and livekit (the only services reachable from outside).

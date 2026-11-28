@@ -5,7 +5,7 @@ Orbit is a self-hostable, Slack-style team collaboration platform. It combines c
 ## 1. Goals and scope
 
 **Functional**
-- Multi-tenant workspaces with roles (Owner, Admin, Member, Guest) and invite/join links
+- Multi-tenant workspaces with roles (Owner, Admin, Member, Guest) and admin-added membership
 - Public, private and anonymous channels, DMs and group DMs
 - Threads, quoted replies, reactions/emojis, pins, mentions, search and file attachments
 - Huddles: audio, video and screen share
@@ -79,7 +79,7 @@ A monorepo using npm workspaces.
 | Component | Responsibility |
 |---|---|
 | Auth | Local email/password (bcrypt), optional Microsoft Entra OIDC, JWT (HS256) issuance |
-| Workspace | Tenancy, membership and roles, invite code, theme and settings |
+| Workspace | Tenancy, membership and roles, theme and settings |
 | Channel/DM | Channel types, membership, unread counts, anonymous personas |
 | Messaging | Messages, threads, quotes, reactions, pins, search, mentions, attachments |
 | Realtime | Fan-out of events to `user:`, `workspace:`, `channel:` and canvas rooms; presence; typing |

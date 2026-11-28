@@ -15,13 +15,15 @@ export function anonId(channelId: string, userId: string): string {
 
 /** Emits to every socket in `room`, building the payload for each socket's own user (so "mine" survives masking). */
 export async function emitPerViewer(
-  io: { in: (room: string) => { fetchSockets: () => Promise<Array<{ id: string; data: any }>> }; to: (room: string) => { emit: (ev: string, p: any) => any } },
+  io: { in: (room: string) => { fetchSockets: () => Promise<Array<{ id: string; data: any; rooms: Set<string> }>> }; to: (room: string) => { emit: (ev: string, p: any) => any } },
   room: string,
   event: string,
   build: (viewerUserId: string) => any,
+  except?: string,
 ) {
   const sockets = await io.in(room).fetchSockets();
   for (const s of sockets) {
+    if (except && s.rooms.has(except)) continue;
     io.to(s.id).emit(event, build(s.data?.userId ?? 'public'));
   }
 }

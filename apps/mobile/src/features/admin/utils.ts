@@ -3,7 +3,6 @@ import type { AdminUser, AdminWorkspace, RoleFilter } from './types';
 
 export const ROLE_LABELS: Record<SystemRole, string> = {
   SUPER_ADMIN: 'Super Admin',
-  WORKSPACE_ADMIN: 'Workspace Admin',
   USER: 'User',
 };
 

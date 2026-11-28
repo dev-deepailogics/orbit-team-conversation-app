@@ -12,12 +12,16 @@ export function channelLabel(channel: Channel, myId: string | undefined): string
   return `${me?.displayName ?? 'You'} (you)`;
 }
 
-// 1:1 DMs (and self-DMs) show the other person's photo; group DMs keep initials.
-export function dmAvatarUrl(channel: Channel, myId: string | undefined): string | null | undefined {
-  if (channel.type !== 'DIRECT') return null;
+// The other person in a 1:1 DM (yourself in a self-DM); undefined for channels and group DMs.
+function dmPeer(channel: Channel, myId: string | undefined) {
+  if (channel.type !== 'DIRECT') return undefined;
   const members = channel.members ?? [];
-  return (members.find(m => m.userId !== myId) ?? members[0])?.user?.avatarUrl;
+  return members.find(m => m.userId !== myId) ?? members[0];
 }
+
+// 1:1 DMs (and self-DMs) show the other person's photo; group DMs keep initials.
+export const dmAvatarUrl = (channel: Channel, myId: string | undefined) => dmPeer(channel, myId)?.user?.avatarUrl ?? null;
+export const dmPeerId = (channel: Channel, myId: string | undefined) => dmPeer(channel, myId)?.userId;
 
 export function channelPrefix(channel: Channel): string {
   if (channel.isAnonymous) return '🎭';
@@ -47,11 +51,4 @@ export function splitChannels(channels: Channel[], myId: string | undefined, mem
     channels: channels.filter(c => !isDirect(c) && !c.isArchived).sort(byLabel),
     dms: [...dms, ...pendingDMs(dms, members, myId)].sort(byLabel),
   };
-}
-
-// Accepts a bare code or a web invite link (https://<host>/join/<code>, see apps/web/src/app/join).
-export function parseInviteCode(input: string): string {
-  const text = input.trim();
-  const match = text.match(/\/join\/([^/?#\s]+)/);
-  return match ? match[1] : text;
 }

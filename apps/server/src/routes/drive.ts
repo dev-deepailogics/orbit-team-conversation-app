@@ -231,7 +231,7 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       select: { systemRole: true, role: true },
     });
 
-    const isAdmin = user?.systemRole === 'SUPER_ADMIN' || user?.systemRole === 'WORKSPACE_ADMIN' || user?.role === 'admin';
+    const isAdmin = user?.systemRole === 'SUPER_ADMIN' || user?.role === 'admin';
     if (!isAdmin) {
       return reply.status(403).send({ error: 'Only admins can disconnect Google Drive' });
     }

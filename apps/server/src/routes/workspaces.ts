@@ -5,17 +5,14 @@ import { prisma } from '@orbit/db';
 import { z } from 'zod';
 import { ACTIVITY_CHANNEL, ACTIVITY_CHANNEL_TOPIC, sendSystemNotification } from '../services/systemBot.js';
 import { isForeignDemoUser } from '../services/demoWorkspace.js';
-import { availabilityViewersRoom, getWorkspaceAccess, hasWorkspacePermission } from '../services/permissions.js';
+import { availabilityViewersRoom, getWorkspaceAccess, hasWorkspacePermission, workspaceGuestsRoom } from '../services/permissions.js';
 import { ASSIGNABLE_WORKSPACE_ROLES } from '@orbit/types';
+import { visibleChannelsWhere } from '../utils/security.js';
 
 const createWorkspaceSchema = z.object({
   name: z.string().min(2).max(50),
   slug: z.string().min(2).max(50).regex(/^[a-z0-9-]+$/),
   iconUrl: z.string().optional(),
-});
-
-const joinWorkspaceSchema = z.object({
-  inviteCode: z.string().min(1),
 });
 
 const addWorkspaceMemberSchema = z.object({
@@ -62,9 +59,9 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       select: { systemRole: true },
     });
 
-    if (caller?.systemRole !== 'SUPER_ADMIN' && caller?.systemRole !== 'WORKSPACE_ADMIN') {
+    if (caller?.systemRole !== 'SUPER_ADMIN') {
       return reply.status(403).send({
-        error: 'Only workspace administrators or super admins can create workspaces. Please contact the administrator.',
+        error: 'Only super admins can create workspaces. Please contact the administrator.',
       });
     }
 
@@ -178,12 +175,7 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       where: { id: workspaceId },
       include: {
         channels: {
-          where: {
-            OR: [
-              { type: 'PUBLIC' },
-              { members: { some: { userId } } },
-            ],
-          },
+          where: visibleChannelsWhere(userId),
           include: {
             members: {
               include: {
@@ -228,100 +220,6 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       ...workspace,
       channels: workspace.channels.map((c) => sanitizeChannelForViewer(c, userId)),
     });
-  });
-
-  // Join workspace using inviteCode
-  fastify.post('/join', { preHandler: [fastify.authenticate] }, async (request, reply) => {
-    const userId = (request.user as { id: string }).id;
-    const parseResult = joinWorkspaceSchema.safeParse(request.body);
-
-    if (!parseResult.success) {
-      return reply.status(400).send({ error: 'Invite code is required' });
-    }
-
-    const { inviteCode } = parseResult.data;
-
-    const workspace = await prisma.workspace.findUnique({
-      where: { inviteCode },
-      include: {
-        channels: {
-          where: { type: 'PUBLIC' },
-        },
-      },
-    });
-
-    if (!workspace) {
-      return reply.status(404).send({ error: 'Invalid invite code' });
-    }
-
-    const joiner = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
-    if (joiner && isForeignDemoUser(joiner.email, workspace.slug)) {
-      return reply.status(403).send({ error: 'Demo accounts can only access their own demo workspace' });
-    }
-
-    // Check if already a member
-    const existingMember = await prisma.workspaceMember.findUnique({
-      where: {
-        workspaceId_userId: {
-          workspaceId: workspace.id,
-          userId,
-        },
-      },
-    });
-
-    if (!existingMember) {
-      await prisma.workspaceMember.create({
-        data: {
-          workspaceId: workspace.id,
-          userId,
-          role: 'MEMBER',
-        },
-      });
-
-      // Auto-join public channels
-      for (const ch of workspace.channels) {
-        await prisma.channelMember.upsert({
-          where: {
-            channelId_userId: {
-              channelId: ch.id,
-              userId,
-            },
-          },
-          create: {
-            channelId: ch.id,
-            userId,
-          },
-          update: {},
-        });
-      }
-
-      // Send welcome notification to default public channel
-      try {
-        const joinedUser = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { displayName: true, username: true },
-        });
-        const targetChannel =
-          workspace.channels.find((c) => c.name === 'general' && c.type === 'PUBLIC') ||
-          workspace.channels.find((c) => c.type === 'PUBLIC') ||
-          workspace.channels[0];
-
-        if (targetChannel) {
-          const uName = joinedUser?.displayName || joinedUser?.username || 'A new teammate';
-          await sendSystemNotification({
-            workspaceId: workspace.id,
-            channelId: targetChannel.id,
-            content: `👋 **${uName}** joined the workspace! Welcome aboard! 🚀`,
-            io: fastify.io,
-          });
-        }
-      } catch (botErr) {
-        fastify.log.error(botErr, 'Failed to send workspace join notification');
-      }
-    }
-
-    audit(request, { action: 'workspace.join', actorId: userId, workspaceId: workspace.id, targetType: 'workspace', targetId: workspace.id });
-    return reply.send({ success: true, workspaceId: workspace.id });
   });
 
   // Add member to workspace by email or username
@@ -401,12 +299,12 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       },
     });
 
-    // Auto-join public channels
+    // Auto-join public channels (guests only get the channels they're explicitly added to)
     const publicChannels = await prisma.channel.findMany({
       where: { workspaceId, type: 'PUBLIC' },
     });
 
-    for (const ch of publicChannels) {
+    for (const ch of role === 'GUEST' ? [] : publicChannels) {
       await prisma.channelMember.upsert({
         where: { channelId_userId: { channelId: ch.id, userId: targetUser.id } },
         create: { channelId: ch.id, userId: targetUser.id },
@@ -470,6 +368,13 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       return reply.status(400).send({ error: "The workspace owner's role can't be changed" });
     }
 
+    // Demoted to guest: drop the public channels they were auto-joined to; an admin re-adds the ones they should keep.
+    if (role === 'GUEST' && target.role !== 'GUEST') {
+      await prisma.channelMember.deleteMany({
+        where: { userId: memberUserId, channel: { workspaceId, type: 'PUBLIC' } },
+      });
+    }
+
     const member = await prisma.workspaceMember.update({
       where: { id: target.id },
       data: { role },
@@ -483,6 +388,8 @@ export const workspaceRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       const sockets = fastify.io.in(`user:${memberUserId}`);
       if (hasWorkspacePermission(role, 'viewTeamAvailability')) sockets.socketsJoin(room);
       else sockets.socketsLeave(room);
+      if (role === 'GUEST') sockets.socketsJoin(workspaceGuestsRoom(workspaceId));
+      else sockets.socketsLeave(workspaceGuestsRoom(workspaceId));
       fastify.io.to(`workspace:${workspaceId}`).emit('workspace:member_role_updated', {
         workspaceId,
         userId: memberUserId,

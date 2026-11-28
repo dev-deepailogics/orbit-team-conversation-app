@@ -18,6 +18,7 @@ import {
 } from "@orbit/types";
 import { api } from "../../lib/api";
 import { getSocket } from "../../lib/socket";
+import { useClickOutside } from "../../lib/useClickOutside";
 import { useProjectStore } from "../../stores/projectStore";
 import { TicketModal } from "./TicketModal";
 import { TicketDetailModal } from "./TicketDetailModal";
@@ -175,6 +176,10 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
   >([]);
   const [editEmployeeDropdownOpen, setEditEmployeeDropdownOpen] =
     useState(false);
+  const editEmployeeFieldRef = useRef<HTMLDivElement>(null);
+  useClickOutside(editEmployeeFieldRef, editEmployeeDropdownOpen, () =>
+    setEditEmployeeDropdownOpen(false),
+  );
   const [isUpdatingProject, setIsUpdatingProject] = useState(false);
 
   const handleOpenEditProject = () => {
@@ -1644,8 +1649,8 @@ export const ProjectBoardView: React.FC<ProjectBoardViewProps> = ({
                 </div>
               </div>
 
-              {/* Field 4: Assign Employees */}
-              <div className="relative">
+              {/* Field 4: Assign Employees (the list closes on any click outside the field) */}
+              <div ref={editEmployeeFieldRef} className="relative">
                 <label className="block text-xs font-semibold mb-1.5 text-[var(--theme-text)]">
                   Assign Employees
                 </label>

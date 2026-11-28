@@ -48,7 +48,6 @@ enum NotificationType {
 
 enum SystemRole {
   SUPER_ADMIN
-  WORKSPACE_ADMIN
   USER
 }
 
@@ -118,6 +117,8 @@ model Todo {
   text      String
   done      Boolean   @default(false)
   doneAt    DateTime? @map("done_at")
+  /// Set when created from a message: message://<channelId>/<messageId>[/<parentMessageId>], to jump back to it
+  messageLink String?  @map("message_link")
   createdAt DateTime  @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -165,7 +166,6 @@ model Workspace {
   name        String
   slug        String   @unique
   iconUrl     String?
-  inviteCode  String   @unique @default(uuid())
   ownerId     String
   settings    Json?
   createdAt   DateTime @default(now())

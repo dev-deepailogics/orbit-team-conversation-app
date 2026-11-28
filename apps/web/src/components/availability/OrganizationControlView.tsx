@@ -785,7 +785,7 @@ export const OrganizationControlView: React.FC<
                   className="text-xs leading-relaxed"
                   style={{ color: "var(--theme-text-muted)" }}
                 >
-                  Provision staff accounts, dispatch magic invite links, monitor
+                  Provision staff accounts, add members, monitor
                   presence, and manage seat licenses.
                 </p>
               </div>

@@ -9,8 +9,8 @@ import { channelRoutes } from './channels.js';
 
 const run = Date.now().toString(36);
 let app: FastifyInstance;
-let me: string, other: string, outsider: string, workspaceId: string;
-let general: string, quiet: string, secret: string, dm: string;
+let me: string, other: string, outsider: string, guest: string, workspaceId: string;
+let general: string, quiet: string, secret: string, dm: string, lobby: string;
 
 const at = (iso: string) => new Date(iso);
 const activity = async (as = me) =>
@@ -26,14 +26,15 @@ before(async () => {
 
   const mk = (n: string) =>
     prisma.user.create({ data: { email: `${n}-${run}@activity.example`, username: `${n}-${run}`, displayName: n, passwordHash: 'x' } });
-  [me, other, outsider] = (await Promise.all([mk('me'), mk('other'), mk('outsider')])).map((u) => u.id);
+  [me, other, outsider, guest] = (await Promise.all([mk('me'), mk('other'), mk('outsider'), mk('guest')])).map((u) => u.id);
   workspaceId = (await prisma.workspace.create({ data: { name: 'Activity', slug: `act-${run}`, ownerId: other } })).id;
   await prisma.workspaceMember.createMany({ data: [me, other].map((userId) => ({ workspaceId, userId, role: 'MEMBER' as const })) });
+  await prisma.workspaceMember.create({ data: { workspaceId, userId: guest, role: 'GUEST' } });
   const ch = (name: string, type: 'PUBLIC' | 'PRIVATE' | 'DIRECT') =>
     prisma.channel.create({ data: { workspaceId, name, type, createdById: other } }).then((c) => c.id);
-  [general, quiet, secret, dm] = await Promise.all([ch('general', 'PUBLIC'), ch('quiet', 'PUBLIC'), ch('secret', 'PRIVATE'), ch('dm', 'DIRECT')]);
+  [general, quiet, secret, dm, lobby] = await Promise.all([ch('general', 'PUBLIC'), ch('quiet', 'PUBLIC'), ch('secret', 'PRIVATE'), ch('dm', 'DIRECT'), ch('lobby', 'PUBLIC')]);
   await prisma.channelMember.createMany({
-    data: [{ channelId: secret, userId: other }, { channelId: dm, userId: me }, { channelId: dm, userId: other }],
+    data: [{ channelId: secret, userId: other }, { channelId: dm, userId: me }, { channelId: dm, userId: other }, { channelId: lobby, userId: guest }],
   });
 
   const msg = (channelId: string, createdAt: string, extra = {}) =>
@@ -44,6 +45,7 @@ before(async () => {
   await msg(dm, '2026-01-02T09:00:00Z');
   await msg(dm, '2026-01-01T08:00:00Z');
   await msg(secret, '2026-01-03T00:00:00Z');
+  await msg(lobby, '2026-01-04T00:00:00Z', { userId: guest });
 });
 
 after(async () => {
@@ -68,5 +70,13 @@ describe('conversation activity', () => {
 
   it('tells someone outside the workspace nothing, not even about public channels', async () => {
     assert.deepEqual(await activity(outsider), {});
+  });
+
+  it('shows a guest only the channels they were added to, public or not', async () => {
+    assert.deepEqual(Object.keys(await activity(guest)), [lobby]);
+    const read = (channelId: string) =>
+      app.inject({ method: 'GET', url: `/api/channels/${channelId}/messages`, headers: { 'x-test-user': guest } });
+    assert.equal((await read(general)).statusCode, 403, 'public channel the guest is not in');
+    assert.equal((await read(lobby)).statusCode, 200, 'public channel the guest was added to');
   });
 });

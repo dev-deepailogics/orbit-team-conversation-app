@@ -5,7 +5,7 @@ import { POLL_LIMITS, SOCKET_EVENTS } from '@orbit/types';
 import { z } from 'zod';
 import { audit } from '../services/audit.js';
 import { applyAttachments, prepareAttachments } from '../services/attachments.js';
-import { quotedMessageInclude, verifyMessageAccess, verifyQuotable, verifyWorkspaceMember } from '../utils/security.js';
+import { quotedMessageInclude, verifyMessageAccess, verifyQuotable, verifyWorkspaceMember, visibleChannelsWhere } from '../utils/security.js';
 import { handleMessageMentions } from '../services/mentionService.js';
 import { emitPerViewer, getOrCreateAnonProfile, sanitizeMessageForViewer } from '../services/anonymousService.js';
 import { ACTIVITY_CHANNEL, postActivity } from '../services/systemBot.js';
@@ -74,14 +74,7 @@ export const messageRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       where: {
         workspaceId,
         isArchived: false,
-        ...(isSuperAdmin
-          ? {}
-          : {
-              OR: [
-                { type: 'PUBLIC' },
-                { members: { some: { userId: currentUserId } } },
-              ],
-            }),
+        ...(isSuperAdmin ? {} : visibleChannelsWhere(currentUserId)),
         ...(channelId ? { id: channelId } : {}),
       },
       select: { id: true },

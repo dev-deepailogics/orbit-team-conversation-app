@@ -37,7 +37,9 @@ export function useRealtime() {
     };
 
     // Channel rooms (typing, reactions, thread replies) are lost on reconnect; rejoin the open one.
+    // Team presence too: refetch on every (re)connect so updates missed while offline don't leave stale dots.
     socket.on('connect', () => {
+      useAvailabilityStore.getState().loadTeam(workspaceId);
       const open = chat().channelId;
       if (open) socket.emit(EVENTS.JOIN_CHANNEL, open);
     });
@@ -100,9 +102,11 @@ export function useRealtime() {
       if (calls().incoming?.channelId === p.channelId) calls().dismiss();
     });
 
-    // The server broadcasts everyone's changes; only ours matter here (set on web, or the 4 AM auto-checkout).
+    // The server broadcasts everyone's changes: all feed the DM dots; ours is also the full record (set on web, or the 4 AM auto-checkout).
     socket.on(EVENTS.AVAILABILITY_UPDATE, (p: { userId: string; availability: UserAvailabilityRecord }) => {
-      if (p.userId === myId) useAvailabilityStore.getState().setRecord(p.availability);
+      const availability = useAvailabilityStore.getState();
+      availability.setPresence(p.userId, p.availability);
+      if (p.userId === myId) availability.setRecord(p.availability);
     });
 
     return () => {

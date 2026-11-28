@@ -50,23 +50,12 @@ export const useAuthStore = create<AuthState>((set) => ({
       // The request may have refreshed the access token along the way.
       set({ user: res.data, token: localStorage.getItem(TOKEN_KEY) ?? token, isLoading: false });
     } catch {
-      if (typeof window !== 'undefined') {
-        clearSession();
-      }
-      set({ user: null, token: null, isLoading: false });
+      // A rejected session (401/403) was already cleared by the api interceptor. Anything else (server down,
+      // offline on reopen) must keep the stored tokens, or every cold start signs the user out.
+      set({ user: null, token: localStorage.getItem(TOKEN_KEY), isLoading: false });
     }
   },
 }));
-
-// Invite code saved by /join when the visitor must sign in first. Stored (not a ?redirect param)
-// so it survives the Microsoft OAuth round-trip and hopping from /login to /register.
-export const PENDING_INVITE_KEY = 'orbit_pending_invite';
-
-/** Where to land after sign-in/sign-up: back to a pending /join invite, else the app. */
-export function postAuthPath() {
-  const code = typeof window !== 'undefined' ? localStorage.getItem(PENDING_INVITE_KEY) : null;
-  return code ? `/join/${code}` : '/app';
-}
 
 // Keep the store's token in step with silent refreshes done by the api client / socket.
 if (typeof window !== 'undefined') {

@@ -2,7 +2,7 @@
 // 1. User & Auth Types
 // ==========================================
 export type UserStatus = "ONLINE" | "OFFLINE" | "AWAY" | "BUSY" | "IN_HUDDLE";
-export type SystemRole = "SUPER_ADMIN" | "WORKSPACE_ADMIN" | "USER";
+export type SystemRole = "SUPER_ADMIN" | "USER";
 
 export interface UserProfile {
   id: string;

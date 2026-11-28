@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "../../lib/api";
-import { useAuthStore, postAuthPath } from "../../stores/authStore";
+import { useAuthStore } from "../../stores/authStore";
 import {
   AuthShell,
   AuthError,
@@ -56,7 +56,7 @@ export default function LoginPage() {
     if (refreshToken) localStorage.setItem("orbit_refresh_token", refreshToken);
     setIsLoading(true);
     fetchMe().then(() => {
-      if (useAuthStore.getState().user) router.push(postAuthPath());
+      if (useAuthStore.getState().user) router.push("/app");
       else {
         setError(MICROSOFT_ERRORS.microsoft_failed);
         setIsLoading(false);
@@ -77,7 +77,7 @@ export default function LoginPage() {
         { withCredentials: true },
       );
       setAuth(res.data.user, res.data.accessToken, res.data.refreshToken);
-      router.push(postAuthPath());
+      router.push("/app");
     } catch (err: any) {
       setError(err.response?.data?.error || "Invalid email or password");
     } finally {

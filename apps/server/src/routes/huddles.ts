@@ -3,6 +3,7 @@ import { prisma } from '@orbit/db';
 import { LiveKitService } from '../services/livekit.js';
 import { SOCKET_EVENTS } from '@orbit/types';
 import { verifyChannelAccess } from '../utils/security.js';
+import { emitToPublicChannel } from '../services/permissions.js';
 import { CALL_JOINED, CALL_LEFT, CALL_STARTED, notifyCallEnded, notifyCallStarted } from '../services/pushService.js';
 import { z } from 'zod';
 
@@ -195,7 +196,7 @@ export const huddleRoutes: FastifyPluginAsync = async (fastify: FastifyInstance)
       };
 
       if (channel.type === 'PUBLIC') {
-        fastify.io.to(`workspace:${channel.workspaceId}`).emit(SOCKET_EVENTS.HUDDLE_STARTED, callData);
+        await emitToPublicChannel(fastify.io, channel, SOCKET_EVENTS.HUDDLE_STARTED, callData);
       } else {
         for (const m of channel.members) {
           fastify.io.to(`user:${m.userId}`).emit(SOCKET_EVENTS.HUDDLE_STARTED, callData);
@@ -227,7 +228,7 @@ export const huddleRoutes: FastifyPluginAsync = async (fastify: FastifyInstance)
         const payload = { ...message, replyCount: 0, workspaceId: channel.workspaceId };
         if (fastify.io) {
           if (channel.type === 'PUBLIC') {
-            fastify.io.to(`workspace:${channel.workspaceId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+            await emitToPublicChannel(fastify.io, channel, SOCKET_EVENTS.MESSAGE_NEW, payload);
           } else {
             for (const m of channel.members) fastify.io.to(`user:${m.userId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
             fastify.io.to(`channel:${channelId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);

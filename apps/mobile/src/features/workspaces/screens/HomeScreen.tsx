@@ -23,7 +23,6 @@ import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import type { TabScreenProps } from '@/navigation/types';
 import { ChannelRow } from '../components/ChannelRow';
-import { JoinWorkspaceForm } from '../components/JoinWorkspaceForm';
 import { useOpenChannel } from '../hooks/useOpenChannel';
 import { WorkspaceSwitcherSheet } from '../components/WorkspaceSwitcherSheet';
 import { useWorkspaceStore } from '../store';
@@ -38,9 +37,7 @@ export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
   const me = useAuthStore(s => s.user);
   const myId = me?.id;
   const canCreateWorkspace = useAuthStore(
-    s =>
-      s.user?.systemRole === 'SUPER_ADMIN' ||
-      s.user?.systemRole === 'WORKSPACE_ADMIN',
+    s => s.user?.systemRole === 'SUPER_ADMIN',
   );
   const current = useWorkspaceStore(s => s.current);
   const unread = useWorkspaceStore(s => s.unread);
@@ -106,7 +103,7 @@ export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
         </View>
       );
     }
-    // Same empty state as web: workspaces are private, so you need an invite (or admin rights to create one).
+    // Same empty state as web: workspaces are private, so an admin must add you (or admin rights to create one).
     return (
       <SafeAreaView className="flex-1 bg-background">
         <ScrollView
@@ -118,11 +115,9 @@ export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
               You're not in a workspace yet
             </Text>
             <Text className="text-center text-muted-foreground">
-              Ask your workspace admin for an invite link, or to add you by
-              email.
+              Ask your workspace admin to add you by email.
             </Text>
           </View>
-          <JoinWorkspaceForm />
           {canCreateWorkspace && (
             <Button variant="outline" onPress={() => setShowCreate(true)}>
               <Text>Create a workspace</Text>

@@ -1,9 +1,10 @@
 import { prisma } from '@orbit/db';
-import { extractMentionTokens, matchMentionedUserIds } from './mentionParser.js';
+import { extractMentionTokens, matchMentionedUserIds, mentionsChannel } from './mentionParser.js';
 
 /**
  * Members of `channelId` who are alerted about a new message:
  *  - anyone the message @mentions, always, even if they muted the channel or are outside `among`;
+ *  - on `@channel`, every member, even those who muted the channel;
  *  - otherwise members set to ALL, limited to `among` when given (e.g. the people in a thread).
  * MENTIONS and MUTED members are therefore only alerted when mentioned. `excludeUserId` is the author (null for bots).
  * Shared by the in-app socket alert and push, so both always agree on who is alerted.
@@ -32,10 +33,12 @@ export async function getAlertRecipientIds(
   if (!hasMentions) return members.map((m) => m.user.id);
 
   const mentioned = new Set(matchMentionedUserIds(content, members.map((m) => m.user)));
+  const channelWide = mentionsChannel(content);
   const inScope = scope ? new Set(scope) : null;
   return members
     .filter(
       (m) =>
+        channelWide ||
         mentioned.has(m.user.id) ||
         (m.notificationPreference === 'ALL' && (!inScope || inScope.has(m.user.id))),
     )

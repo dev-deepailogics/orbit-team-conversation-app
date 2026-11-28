@@ -8,7 +8,7 @@ Designed for seamless deployment on your own VPS with Docker and ready for cross
 
 ## 🚀 Key Features
 
-- 🏢 **Multi-Tenant Workspaces & Organizations**: Switch between workspaces with unique custom slugs and invite links.
+- 🏢 **Multi-Tenant Workspaces & Organizations**: Switch between workspaces with unique custom slugs; admins add members directly.
 - 💬 **Channels & Direct Messages**: Public & private channels, 1:1 and group direct messaging.
 - ⚡ **Real-Time Engine**: WebSocket-powered instant message delivery, live typing indicators, and user online/offline presence status.
 - 🧵 **Message Threads**: Reply in threaded discussions without cluttering the main channel feed.
@@ -183,9 +183,21 @@ DOMAIN=orbit.yourdomain.com
 POSTGRES_PASSWORD=generate_a_secure_random_string_here
 REDIS_PASSWORD=generate_a_secure_random_string_here
 JWT_SECRET=generate_a_secure_random_string_here
+LIVEKIT_API_KEY=generate_a_key_name_here
 LIVEKIT_API_SECRET=generate_another_secure_random_string_here
+ENV_SUFFIX=-prod           # suffixes container + Traefik router names; must differ per environment
 ```
-(see `.env.example` for the full list). Don't ship the defaults baked into `docker-compose.prod.yml` — they're dev fallbacks only.
+(see `.env.example` for the full list). Startup fails if any of these are missing.
+
+**Second environment on the same server (e.g. dev):** use the same compose file in another Coolify environment and also set
+```env
+DOMAIN=orbit-dev.yourdomain.com
+ENV_SUFFIX=-dev
+LIVEKIT_TCP_PORT=7891      # host ports must not overlap prod's 7881 / 40000-40050
+LIVEKIT_UDP_START=40100
+LIVEKIT_UDP_END=40150
+```
+Use different secrets than prod. Open the extra LiveKit ports in the firewall too.
 
 ### 5. Deploy
 Click **Deploy**. Coolify builds the `web`/`server` images and brings up `postgres`, `redis`, and `livekit`, then provisions a Let's Encrypt certificate for `DOMAIN` automatically.

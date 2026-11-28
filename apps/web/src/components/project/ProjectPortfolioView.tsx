@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../../lib/api';
+import { useClickOutside } from '../../lib/useClickOutside';
 import { Workspace, UserProfile, Channel } from '@orbit/types';
 import {
   ArrowLeft,
@@ -81,6 +82,8 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
   const [status, setStatus] = useState<'active' | 'inactive' | 'delivered'>('active');
   const [assignedEmployees, setAssignedEmployees] = useState<Array<{ name: string; uid?: string }>>([]);
   const [employeeDropdownOpen, setEmployeeDropdownOpen] = useState<boolean>(false);
+  const employeeFieldRef = useRef<HTMLDivElement>(null);
+  useClickOutside(employeeFieldRef, employeeDropdownOpen, () => setEmployeeDropdownOpen(false));
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Envs Modal State
@@ -535,8 +538,8 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
                 </div>
               </div>
 
-              {/* Field 4: Assign Employees */}
-              <div className="relative">
+              {/* Field 4: Assign Employees (the list closes on any click outside the field) */}
+              <div ref={employeeFieldRef} className="relative">
                 <label className="block text-xs font-semibold mb-1.5 text-[var(--theme-text)]">
                   Assign Employees
                 </label>

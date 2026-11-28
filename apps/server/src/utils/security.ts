@@ -49,16 +49,30 @@ export async function canUserAccessChannel(userId: string, channelId: string): P
   if (user?.systemRole === 'SUPER_ADMIN') return true;
 
   // Must belong to the channel's workspace
-  const isWsMember = await canUserAccessWorkspace(userId, channel.workspaceId);
-  if (!isWsMember) return false;
+  const wsMember = await prisma.workspaceMember.findUnique({
+    where: { workspaceId_userId: { workspaceId: channel.workspaceId, userId } },
+    select: { role: true },
+  });
+  if (!wsMember) return false;
 
-  // If private or direct channel, must be in channel.members
-  if (channel.type !== 'PUBLIC') {
+  // Private/direct channels, and every channel for guests, need channel membership
+  if (channel.type !== 'PUBLIC' || wsMember.role === 'GUEST') {
     return channel.members.some((m) => m.userId === userId);
   }
 
   return true;
 }
+
+/**
+ * Prisma filter for the channels a user can see: ones they're in, plus public ones in workspaces where they
+ * aren't a GUEST. Guests only ever see channels they've been added to. (SUPER_ADMIN callers skip this filter.)
+ */
+export const visibleChannelsWhere = (userId: string): Prisma.ChannelWhereInput => ({
+  OR: [
+    { members: { some: { userId } } },
+    { type: 'PUBLIC', workspace: { members: { some: { userId, role: { not: 'GUEST' } } } } },
+  ],
+});
 
 /**
  * Canvas access: canvases linked to a channel inherit that channel's access;
@@ -158,11 +172,11 @@ export async function verifyChannelAccess(
     return null;
   }
 
-  // If private or direct channel, caller must be a member
-  if (channel.type !== 'PUBLIC') {
+  // Private/direct channels, and every channel for guests, need channel membership
+  if (channel.type !== 'PUBLIC' || wsMember.role === 'GUEST') {
     const isChannelMember = channel.members.some((m) => m.userId === userId);
     if (!isChannelMember) {
-      reply.status(403).send({ error: 'You are not a member of this private channel' });
+      reply.status(403).send({ error: 'You are not a member of this channel' });
       return null;
     }
   }

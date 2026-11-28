@@ -930,17 +930,17 @@ export default function AppDashboard() {
       }
     };
 
-    const onReaction = (data: any) => {
-      const activeChannel = currentChannelRef.current;
-      if (activeChannel) {
-        setMessages(
-          useChatStore
-            .getState()
-            .messages.map((m) =>
-              m.id === data.messageId ? { ...m, reactions: data.reactions } : m,
-            ),
-        );
-      }
+    // A reply in a thread this user is part of: alert, and count it as unread on its conversation like a normal
+    // message so the sidebar shows where it came from (the open channel shows the new reply count instead).
+    const onThreadReplyNotify = (msg: any) => {
+      alertForMessage(msg);
+      if (msg.channelId === currentChannelRef.current?.id) markChannelReadSoon(msg.channelId);
+      else incrementUnread(msg.id, msg.channelId);
+    };
+
+    // Reactions on a channel message, a thread reply or the thread's parent all update wherever that message is shown
+    const onReaction = (data: { messageId: string; reactions: Message["reactions"] }) => {
+      useChatStore.getState().applyReactions(data.messageId, data.reactions);
     };
 
     // Someone voted: new totals for everyone viewing the channel (each client keeps its own choice)
@@ -1120,7 +1120,7 @@ export default function AppDashboard() {
 
     socket.on("account:deactivated", onAccountDeactivated);
     socket.on("message:new", onNewMessage);
-    socket.on("thread:reply_notify", alertForMessage);
+    socket.on("thread:reply_notify", onThreadReplyNotify);
     socket.on("message:reaction", onReaction);
     socket.on(SOCKET_EVENTS.POLL_UPDATED, onPollUpdated);
     socket.on("message:updated", onMessageUpdated);
@@ -1155,7 +1155,7 @@ export default function AppDashboard() {
     return () => {
       socket.off("account:deactivated", onAccountDeactivated);
       socket.off("message:new", onNewMessage);
-      socket.off("thread:reply_notify", alertForMessage);
+      socket.off("thread:reply_notify", onThreadReplyNotify);
       socket.off("message:reaction", onReaction);
       socket.off(SOCKET_EVENTS.POLL_UPDATED, onPollUpdated);
       socket.off("message:updated", onMessageUpdated);
@@ -1568,29 +1568,6 @@ export default function AppDashboard() {
                   </button>
                 </div>
               </>
-            ) : user?.systemRole === "WORKSPACE_ADMIN" ? (
-              <>
-                <div className="w-16 h-16 rounded-2xl bg-slack-activeChannel/20 border border-slack-activeChannel/40 flex items-center justify-center mb-6 shadow-xl text-slack-activeChannel">
-                  <Building2 size={36} />
-                </div>
-                <h1 className="text-2xl font-bold text-[var(--theme-text)] mb-2">
-                  Welcome, {user?.displayName || "Admin"}!
-                </h1>
-                <p className="text-sm text-[var(--theme-text-muted)] mb-6 leading-relaxed">
-                  You have been designated as a Company Administrator. Create
-                  your organization workspace to start adding channels and
-                  inviting your team members.
-                </p>
-                <div className="w-full mb-6">
-                  <button
-                    onClick={() => setShowCreateWsModal(true)}
-                    className="w-full px-5 py-3 bg-slack-green hover:bg-[#008a65] text-white text-sm font-semibold rounded-xl shadow-lg flex items-center justify-center gap-2 transition"
-                  >
-                    <Plus size={18} />
-                    Create Company Workspace
-                  </button>
-                </div>
-              </>
             ) : (
               <>
                 <div className="w-16 h-16 rounded-2xl bg-[var(--theme-bg-surface)] border border-[var(--theme-border)] flex items-center justify-center mb-6 shadow-xl text-[var(--theme-text-muted)]">
@@ -1651,7 +1628,7 @@ export default function AppDashboard() {
                   size={14}
                   className={isRefreshing ? "animate-spin" : ""}
                 />
-                Check for Invites
+                Check again
               </button>
               <button
                 onClick={logout}

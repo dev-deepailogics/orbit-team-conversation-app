@@ -22,7 +22,8 @@ before(async () => {
   app.decorate('authenticate', async (req: any) => {
     req.user = { id: req.headers['x-test-user'], username: 'tester' };
   });
-  app.decorate('io', { to: () => ({ emit: () => {} }) } as any);
+  const room = { emit: () => {}, except: () => room };
+  app.decorate('io', { to: () => room } as any);
   await app.register(channelRoutes, { prefix: '/api/channels' });
 
   const mk = (n: string) =>
