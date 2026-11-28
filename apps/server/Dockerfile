@@ -26,8 +26,13 @@ RUN npm run build --workspace=@orbit/db
 RUN npm run build --workspace=@orbit/server
 
 FROM node:22.22-alpine3.24 AS runner
-# su-exec: the entrypoint fixes upload-volume ownership as root, then runs the app as the unprivileged "node" user
-RUN apk add --no-cache openssl su-exec
+# su-exec: the entrypoint fixes upload-volume ownership as root, then runs the app as the unprivileged "node" user.
+# apk upgrade applies Alpine security fixes newer than the base image (musl, zlib, openssl); npm is pinned to the latest
+# 10.x patch, which carries fixed copies of its bundled tools (tar, etc.). Same Node and npm major versions as before.
+RUN apk upgrade --no-cache \
+ && apk add --no-cache openssl su-exec \
+ && npm install -g npm@10.9.11 \
+ && npm cache clean --force
 WORKDIR /app
 ENV NODE_ENV=production
 ENV UPLOAD_DIR=/data/uploads

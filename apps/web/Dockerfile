@@ -28,6 +28,11 @@ RUN npm run build --workspace=@orbit/types
 RUN npm run build --workspace=@orbit/web
 
 FROM node:22.22-alpine3.24 AS runner
+# Alpine security fixes newer than the base image (musl, zlib, openssl) and the latest npm 10.x patch (fixed bundled
+# tools such as tar). Same Node and npm major versions as before.
+RUN apk upgrade --no-cache \
+ && npm install -g npm@10.9.11 \
+ && npm cache clean --force
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
