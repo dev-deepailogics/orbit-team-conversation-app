@@ -127,12 +127,17 @@ const ALLOWED_ORIGINS = resolveAllowedOrigins();
 // Behind a reverse proxy / load balancer the client address comes from X-Forwarded-For. TRUST_PROXY: "true", "false",
 // a hop count, or a comma-separated list of proxy addresses/CIDRs. Defaults to true in production (the app is never
 // exposed directly there); rate limiting and audit entries depend on this to see the real client address.
-function resolveTrustProxy(): boolean | number | string | string[] {
+function resolveTrustProxy(): boolean | string | string[] | ((address: string, hop: number) => boolean) {
   const raw = process.env.TRUST_PROXY?.trim();
   if (!raw) return IS_PRODUCTION;
   if (raw === "true") return true;
   if (raw === "false") return false;
-  if (/^\d+$/.test(raw)) return parseInt(raw, 10);
+  if (/^\d+$/.test(raw)) {
+    // Hop count: trust the nearest N proxies. Same rule Fastify applies to a numeric value; written as a function
+    // because Fastify 5's types no longer accept a number here.
+    const hops = parseInt(raw, 10);
+    return (_address, hop) => hop < hops;
+  }
   return raw.includes(",") ? raw.split(",").map((x) => x.trim()) : raw;
 }
 
