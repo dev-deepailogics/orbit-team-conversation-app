@@ -39,6 +39,10 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
  && chown -R node:node /data/uploads
 
 EXPOSE 4000
+# Lets Docker / the hosting platform detect a stuck server (SAST-010). /api/health is exempt from rate limiting.
+# start-period covers the schema sync that runs on boot.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
+  CMD wget -q -O /dev/null "http://127.0.0.1:${PORT:-4000}/api/health" || exit 1
 ENTRYPOINT ["docker-entrypoint.sh"]
 # Sync schema on boot; prisma refuses data-losing changes, so a destructive schema edit stops startup instead of dropping data
 CMD ["sh", "-c", "npm run push --workspace=@orbit/db && npm run start --workspace=@orbit/server"]

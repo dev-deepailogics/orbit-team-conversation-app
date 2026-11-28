@@ -37,4 +37,7 @@ COPY --from=builder --chown=node:node /app ./
 USER node
 
 EXPOSE 3000
+# Lets Docker / the hosting platform detect a stuck web server (SAST-010). /robots.txt is a tiny, always-200 route.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD wget -q -O /dev/null "http://127.0.0.1:${PORT:-3000}/robots.txt" || exit 1
 CMD ["npm", "run", "start", "--workspace=@orbit/web"]

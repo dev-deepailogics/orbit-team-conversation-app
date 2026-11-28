@@ -179,10 +179,8 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
       return reply.redirect(`${clientUrl}?media_connected=true`);
     } catch (error: any) {
-      return reply.status(502).send({
-        error: 'Google OAuth code exchange failed',
-        details: error?.message || 'Unable to exchange authorization code',
-      });
+      request.log.error({ err: error }, 'Google OAuth code exchange failed');
+      return reply.status(502).send({ error: 'Google OAuth code exchange failed' });
     }
   });
 
@@ -390,7 +388,7 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
       if (authError) {
         return reply.status(401).send(authError);
       }
-      return reply.status(500).send({ error: error.message || 'Upload session could not be created' });
+      request.log.error({ err: error }, 'Upload session could not be created'); return reply.status(500).send({ error: 'Upload session could not be created' });
     }
   });
 
@@ -469,7 +467,7 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
     } catch (error: any) {
       const authError = getGoogleAuthErrorPayload(error);
       if (authError) return reply.status(401).send(authError);
-      return reply.status(500).send({ error: error.message || 'Upload could not be finalized' });
+      request.log.error({ err: error }, 'Upload could not be finalized'); return reply.status(500).send({ error: 'Upload could not be finalized' });
     }
   });
 
@@ -584,7 +582,7 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
     } catch (error: any) {
       const authError = getGoogleAuthErrorPayload(error);
       if (authError) return reply.status(401).send(authError);
-      return reply.status(500).send({ error: error.message || 'Failed to load folders' });
+      request.log.error({ err: error }, 'Failed to load folders'); return reply.status(500).send({ error: 'Failed to load folders' });
     }
   });
 
@@ -639,7 +637,7 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
     } catch (error: any) {
       const authError = getGoogleAuthErrorPayload(error);
       if (authError) return reply.status(401).send(authError);
-      return reply.status(500).send({ error: error.message || 'Failed to create folder' });
+      request.log.error({ err: error }, 'Failed to create folder'); return reply.status(500).send({ error: 'Failed to create folder' });
     }
   });
 
@@ -671,7 +669,7 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
     } catch (error: any) {
       const authError = getGoogleAuthErrorPayload(error);
       if (authError) return reply.status(401).send(authError);
-      return reply.status(500).send({ error: error.message || 'Failed to rename folder' });
+      request.log.error({ err: error }, 'Failed to rename folder'); return reply.status(500).send({ error: 'Failed to rename folder' });
     }
   });
 
@@ -700,7 +698,7 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
     } catch (error: any) {
       const authError = getGoogleAuthErrorPayload(error);
       if (authError) return reply.status(401).send(authError);
-      return reply.status(500).send({ error: error.message || 'Failed to delete folder' });
+      request.log.error({ err: error }, 'Failed to delete folder'); return reply.status(500).send({ error: 'Failed to delete folder' });
     }
   });
 
@@ -758,7 +756,7 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
     } catch (error: any) {
       const authError = getGoogleAuthErrorPayload(error);
       if (authError) return reply.status(401).send(authError);
-      return reply.status(500).send({ error: error.message || 'Failed to load files' });
+      request.log.error({ err: error }, 'Failed to load files'); return reply.status(500).send({ error: 'Failed to load files' });
     }
   });
 
@@ -790,7 +788,7 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
     } catch (error: any) {
       const authError = getGoogleAuthErrorPayload(error);
       if (authError) return reply.status(401).send(authError);
-      return reply.status(500).send({ error: error.message || 'Failed to rename file' });
+      request.log.error({ err: error }, 'Failed to rename file'); return reply.status(500).send({ error: 'Failed to rename file' });
     }
   });
 
@@ -819,7 +817,7 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
     } catch (error: any) {
       const authError = getGoogleAuthErrorPayload(error);
       if (authError) return reply.status(401).send(authError);
-      return reply.status(500).send({ error: error.message || 'Failed to delete file' });
+      request.log.error({ err: error }, 'Failed to delete file'); return reply.status(500).send({ error: 'Failed to delete file' });
     }
   });
 
@@ -893,7 +891,7 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
     } catch (error: any) {
       const authError = getGoogleAuthErrorPayload(error);
       if (authError) return reply.status(401).send(authError);
-      return reply.status(500).send({ error: error.message || 'Failed to update share permissions' });
+      request.log.error({ err: error }, 'Failed to update share permissions'); return reply.status(500).send({ error: 'Failed to update share permissions' });
     }
   });
 
@@ -940,7 +938,7 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
 
       return reply.send(media.data);
     } catch (error: any) {
-      return reply.status(500).send({ error: error.message || 'Failed to stream media' });
+      request.log.error({ err: error }, 'Failed to stream media'); return reply.status(500).send({ error: 'Failed to stream media' });
     }
   });
 
@@ -980,7 +978,7 @@ export const driveRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) 
         totalSize: totalSize.toString(),
       });
     } catch (error: any) {
-      return reply.status(500).send({ error: error.message || 'Failed to load project media stats' });
+      request.log.error({ err: error }, 'Failed to load project media stats'); return reply.status(500).send({ error: 'Failed to load project media stats' });
     }
   });
 };

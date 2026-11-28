@@ -5,6 +5,7 @@ import Fastify, {
 } from "fastify";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
+import { internalErrorHandler } from "./services/errorHandler.js";
 import rateLimit from "@fastify/rate-limit";
 import jwt from "@fastify/jwt";
 import multipart from "@fastify/multipart";
@@ -155,10 +156,19 @@ async function bootstrap() {
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   });
 
-  // Security headers (nosniff, frame protection, HSTS, referrer policy). The API serves JSON and user files, not HTML
-  // pages, so a page-level CSP is left to the web app; files must stay embeddable by the web app on another origin.
+  // Security headers (nosniff, frame protection, HSTS, referrer policy). The API serves JSON and user files, never HTML
+  // pages, so its CSP allows nothing to run or load. <img>/<video> embedding by the web app is not affected by a CSP on
+  // the file itself; file responses set their own policy in services/fileResponse.ts.
   await fastify.register(helmet, {
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        defaultSrc: ["'none'"],
+        baseUri: ["'none'"],
+        formAction: ["'none'"],
+        frameAncestors: ["'self'"],
+      },
+    },
     crossOriginResourcePolicy: { policy: "cross-origin" },
     crossOriginEmbedderPolicy: false,
   });
@@ -286,6 +296,10 @@ async function bootstrap() {
       service: "orbit-server",
     };
   });
+
+  // Unexpected server errors are logged, never sent to the client; 4xx responses stay unchanged (see errorHandler.ts).
+  // Must be set before the routes register so they inherit it.
+  fastify.setErrorHandler(internalErrorHandler);
 
   // Register Routes
   await fastify.register(authRoutes, { prefix: "/api/auth" });

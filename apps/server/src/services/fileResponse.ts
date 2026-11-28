@@ -60,8 +60,13 @@ export function setStoredFileHeaders(
   reply.header('Content-Type', charset ? `${type}; charset=${charset}` : type);
   reply.header('Content-Disposition', contentDisposition(inline ? 'inline' : 'attachment', file.fileName ?? ''));
   reply.header('X-Content-Type-Options', 'nosniff');
-  // Chrome refuses to show a PDF under a sandboxing CSP; its viewer runs PDF script outside our origin anyway.
-  if (type !== 'application/pdf') {
+  // Chrome refuses to show a PDF under a sandboxing CSP; its viewer runs PDF script outside our origin anyway. Remove
+  // the API-wide CSP too, so PDF previews behave exactly as before.
+  // @fastify/helmet writes its header straight onto the raw Node response, so clear it there as well.
+  reply.raw.removeHeader('Content-Security-Policy');
+  if (type === 'application/pdf') {
+    reply.removeHeader('Content-Security-Policy');
+  } else {
     reply.header('Content-Security-Policy', SANDBOX_CSP);
   }
 }
