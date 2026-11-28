@@ -18,6 +18,8 @@ COPY apps/web ./apps/web
 
 # Next.js inlines NEXT_PUBLIC_* into the client bundle at build time
 ARG NEXT_PUBLIC_SERVER_URL
+# Call server address, used to build the Content-Security-Policy (next.config.mjs). Optional.
+ARG NEXT_PUBLIC_LIVEKIT_URL
 # next build breaks (prerender useContext null) if NODE_ENV=development leaks in as a build arg
 ENV NODE_ENV=production
 

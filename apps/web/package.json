@@ -9,6 +9,13 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@fontsource/bricolage-grotesque": "^5.3.0",
+    "@fontsource/caveat": "^5.3.0",
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/kalam": "^5.3.0",
+    "@fontsource/lato": "^5.3.0",
+    "@fontsource/patrick-hand": "^5.3.0",
+    "@fontsource/space-grotesk": "^5.3.0",
     "@livekit/components-react": "^2.6.5",
     "@livekit/components-styles": "^1.1.4",
     "@orbit/types": "*",

@@ -1,0 +1,30 @@
+# Traefik TLS settings for Orbit (fixes DAST-009: older CBC cipher modes allowed).
+#
+# Traefik is run by the hosting platform (Coolify-style proxy), not by this repository, so this file must be added by
+# whoever manages the server:
+#   1. Put this file in the proxy's "dynamic configuration" folder (Coolify: Servers -> Proxy -> Dynamic Configurations,
+#      or the folder mounted at /traefik/dynamic). Traefik picks it up without a restart.
+#   2. Because the option set is named `default`, it applies to every site on that proxy. If other apps share the proxy
+#      and must keep older clients working, rename it to `orbit-modern` and add this label to the web and server
+#      services in docker-compose.prod.yml:
+#        - traefik.http.routers.orbit-web.tls.options=orbit-modern@file
+#        - traefik.http.routers.orbit-api.tls.options=orbit-modern@file
+#      (Only add the labels AFTER the file is in place; a label naming an unknown option breaks the route.)
+#   3. Re-test: `docker run --rm drwetter/testssl.sh:3.2 --quiet <domain>` should no longer report LUCKY13.
+#
+# TLS 1.3 is unaffected (its cipher suites are always modern). TLS 1.2 keeps only AEAD suites (GCM / ChaCha20).
+
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      cipherSuites:
+        - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+        - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+      curvePreferences:
+        - X25519
+        - CurveP256

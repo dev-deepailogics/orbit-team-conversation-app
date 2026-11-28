@@ -5,6 +5,7 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         NEXT_PUBLIC_SERVER_URL: https://${DOMAIN}
+        NEXT_PUBLIC_LIVEKIT_URL: wss://${DOMAIN}/livekit
     container_name: orbit-web
     restart: unless-stopped
     security_opt:

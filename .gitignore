@@ -53,3 +53,6 @@ upload/
 
 # Raw security-scan output (may contain partial secret matches). Archive as evidence; do not commit.
 security/sast/reports/raw/
+security/dast/reports/raw/
+security/dast/evidence/
+security/sast/evidence/
